@@ -71,25 +71,21 @@
 
 ## 아키텍처
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Nginx (리버스 프록시)                    │
-│                   :80 → 프론트/백엔드 라우팅                  │
-└──────────┬───────────────────────────────┬──────────────┘
-           │                               │
-    ┌──────▼──────┐                 ┌──────▼──────┐
-    │  Frontend   │  API Proxy      │   Backend   │
-    │  Next.js 15 │ ──────────────→ │   FastAPI   │
-    │  :3000      │                 │   :8001     │
-    └─────────────┘                 └──────┬──────┘
-                                           │
-                          ┌────────────────┼────────────────┐
-                          │                │                │
-                   ┌──────▼──────┐  ┌──────▼──────┐  ┌─────▼─────┐
-                   │  ChromaDB   │  │    Redis    │  │   Ollama  │
-                   │  벡터 DB     │  │  락/캐시     │  │  로컬 LLM  │
-                   │  :8000      │  │  :6379      │  │  :11434   │
-                   └─────────────┘  └─────────────┘  └───────────┘
+```mermaid
+flowchart TB
+    Nginx["Nginx (리버스 프록시)<br/>:80 → 프론트/백엔드 라우팅"]
+    Frontend["Frontend<br/>Next.js 15<br/>:3000"]
+    Backend["Backend<br/>FastAPI<br/>:8001"]
+    ChromaDB["ChromaDB<br/>벡터 DB<br/>:8000"]
+    Redis["Redis<br/>락/캐시<br/>:6379"]
+    Ollama["Ollama<br/>로컬 LLM<br/>:11434"]
+
+    Nginx --> Frontend
+    Nginx --> Backend
+    Frontend -->|API Proxy| Backend
+    Backend --> ChromaDB
+    Backend --> Redis
+    Backend --> Ollama
 ```
 
 ### 기술 스택
