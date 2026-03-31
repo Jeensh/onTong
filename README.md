@@ -102,6 +102,8 @@ graph TB
 
 ### 기술 스택
 
+각 기술의 선택 이유와 구체적인 사용 방식은 **[기술 스택 상세 →](docs/tech-stack.md)** 에서 확인하세요.
+
 | 계층 | 기술 |
 |------|------|
 | **프론트엔드** | Next.js 15, React 19, Tiptap, shadcn/ui, Zustand, react-force-graph-2d |
