@@ -72,20 +72,32 @@
 ## 아키텍처
 
 ```mermaid
-flowchart TB
-    Nginx["Nginx (리버스 프록시)<br/>:80 → 프론트/백엔드 라우팅"]
-    Frontend["Frontend<br/>Next.js 15<br/>:3000"]
-    Backend["Backend<br/>FastAPI<br/>:8001"]
-    ChromaDB["ChromaDB<br/>벡터 DB<br/>:8000"]
-    Redis["Redis<br/>락/캐시<br/>:6379"]
-    Ollama["Ollama<br/>로컬 LLM<br/>:11434"]
+graph TB
+    subgraph proxy["Reverse Proxy"]
+        Nginx(["Nginx · :80"])
+    end
 
-    Nginx --> Frontend
-    Nginx --> Backend
-    Frontend -->|API Proxy| Backend
+    subgraph app["Application"]
+        Frontend["Frontend\n Next.js 15 · :3000"]
+        Backend["Backend\nFastAPI · :8001"]
+    end
+
+    subgraph infra["Infrastructure"]
+        ChromaDB[("ChromaDB\n:8000")]
+        Redis[("Redis\n:6379")]
+        Ollama["Ollama\n:11434"]
+    end
+
+    Nginx -->|static| Frontend
+    Nginx -->|"/api"| Backend
+    Frontend -. "proxy" .-> Backend
     Backend --> ChromaDB
     Backend --> Redis
     Backend --> Ollama
+
+    style proxy fill:#e8f5e9,stroke:#66bb6a,color:#000
+    style app fill:#e3f2fd,stroke:#42a5f5,color:#000
+    style infra fill:#fff3e0,stroke:#ffa726,color:#000
 ```
 
 ### 기술 스택
