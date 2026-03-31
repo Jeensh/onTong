@@ -1,0 +1,65 @@
+"""Server-Sent Events (SSE) event bus for real-time broadcasting.
+
+Events: tree changes, indexing status, lock status.
+Clients subscribe via GET /api/events (SSE stream).
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import time
+from dataclasses import dataclass, field
+from typing import AsyncGenerator
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Event:
+    type: str  # "tree_change" | "index_status" | "lock_change"
+    data: dict
+    timestamp: float = field(default_factory=time.time)
+
+    def to_sse(self) -> str:
+        payload = json.dumps(self.data, ensure_ascii=False)
+        return f"event: {self.type}\ndata: {payload}\n\n"
+
+
+class EventBus:
+    """Async broadcast hub — fan-out events to all connected SSE clients."""
+
+    def __init__(self) -> None:
+        self._subscribers: list[asyncio.Queue[Event]] = []
+
+    def publish(self, event_type: str, data: dict) -> None:
+        event = Event(type=event_type, data=data)
+        dead: list[asyncio.Queue] = []
+        for q in self._subscribers:
+            try:
+                q.put_nowait(event)
+            except asyncio.QueueFull:
+                dead.append(q)
+        # Remove dead/full queues
+        for q in dead:
+            self._subscribers.remove(q)
+
+    async def subscribe(self) -> AsyncGenerator[Event, None]:
+        q: asyncio.Queue[Event] = asyncio.Queue(maxsize=256)
+        self._subscribers.append(q)
+        try:
+            while True:
+                event = await q.get()
+                yield event
+        finally:
+            if q in self._subscribers:
+                self._subscribers.remove(q)
+
+    @property
+    def subscriber_count(self) -> int:
+        return len(self._subscribers)
+
+
+# Singleton
+event_bus = EventBus()

@@ -1,0 +1,56 @@
+# onTong Backend — Python 3.10 multi-stage build
+FROM python:3.10-slim AS base
+
+WORKDIR /app
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install poetry
+RUN pip install --no-cache-dir poetry==1.7.1
+
+# Copy dependency files first for layer caching
+COPY pyproject.toml poetry.lock* ./
+
+# Install production dependencies only (no dev)
+RUN poetry config virtualenvs.create false \
+    && poetry install --no-interaction --no-ansi --only main 2>/dev/null \
+    || poetry install --no-interaction --no-ansi --no-dev 2>/dev/null \
+    || pip install fastapi uvicorn pydantic pydantic-settings python-dotenv \
+       litellm langfuse openai chromadb httpx aiofiles pyyaml python-dateutil \
+       python-json-logger
+
+# --- Production stage ---
+FROM python:3.10-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed packages from base
+COPY --from=base /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+COPY --from=base /usr/local/bin /usr/local/bin
+
+# Copy application code
+COPY backend/ ./backend/
+
+# Create wiki directory
+RUN mkdir -p /app/wiki /app/.logs
+
+# Environment
+ENV PYTHONUNBUFFERED=1
+ENV ENVIRONMENT=production
+ENV WIKI_DIR=/app/wiki
+ENV LOG_DIR=/app/.logs
+
+EXPOSE 8001
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD curl -f http://localhost:8001/health || exit 1
+
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8001", \
+     "--workers", "4", "--timeout-keep-alive", "65", "--limit-max-requests", "10000"]

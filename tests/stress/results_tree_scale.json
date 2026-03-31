@@ -1,0 +1,50 @@
+[
+  {
+    "files": 100,
+    "tree_nodes": 124,
+    "tree_time_s": 0.009,
+    "tree_size_kb": 12,
+    "etag_time_s": 0.008,
+    "etag_status": 304,
+    "index_time_s": 0.184,
+    "index_size_kb": 166,
+    "reindex_time_s": 0.1,
+    "reindex_chunks": 0
+  },
+  {
+    "files": 500,
+    "tree_nodes": 528,
+    "tree_time_s": 0.023,
+    "tree_size_kb": 50,
+    "etag_time_s": 0.052,
+    "etag_status": 304,
+    "index_time_s": 0.664,
+    "index_size_kb": 740,
+    "reindex_time_s": 0.7,
+    "reindex_chunks": 0
+  },
+  {
+    "files": 1000,
+    "tree_nodes": 1033,
+    "tree_time_s": 0.06,
+    "tree_size_kb": 97,
+    "etag_time_s": 0.049,
+    "etag_status": 304,
+    "index_time_s": 3.263,
+    "index_size_kb": 1458,
+    "reindex_time_s": 4.5,
+    "reindex_chunks": 0
+  },
+  {
+    "files": 2000,
+    "tree_nodes": 2043,
+    "tree_time_s": 0.077,
+    "tree_size_kb": 191,
+    "etag_time_s": 0.075,
+    "etag_status": 304,
+    "index_time_s": 2.448,
+    "index_size_kb": 2898,
+    "reindex_time_s": 2.7,
+    "reindex_chunks": 0
+  }
+]

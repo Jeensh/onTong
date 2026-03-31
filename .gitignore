@@ -1,0 +1,50 @@
+# Claude Code project configuration
+.claude/
+
+# IDE and editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+*.egg-info/
+dist/
+build/
+
+# OS
+.DS_Store
+
+# Monitoring & Logs
+.logs/
+*.jsonl
+.langsmith/
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+.env.production
+*.pem
+*.key
+credentials.json
+
+# Next.js
+.next/
+out/
+
+# Misc
+*.tsbuildinfo
+.gstack/
+
+# Wiki internal state
+wiki/.ontong/
+wiki/.next/
+
+# pytest
+.pytest_cache/
+*.pyc

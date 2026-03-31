@@ -1,0 +1,66 @@
+{
+  "throughput": [
+    {
+      "users": 10,
+      "files_per_user": 20,
+      "total_ops": 400,
+      "elapsed_s": 28.29,
+      "ops_per_sec": 14,
+      "successes": 200,
+      "conflicts": 0,
+      "errors": 0
+    },
+    {
+      "users": 25,
+      "files_per_user": 20,
+      "total_ops": 1000,
+      "elapsed_s": 76.83,
+      "ops_per_sec": 13,
+      "successes": 500,
+      "conflicts": 0,
+      "errors": 0
+    },
+    {
+      "users": 50,
+      "files_per_user": 20,
+      "total_ops": 2000,
+      "elapsed_s": 4.39,
+      "ops_per_sec": 456,
+      "successes": 703,
+      "conflicts": 297,
+      "errors": 0
+    },
+    {
+      "users": 100,
+      "files_per_user": 10,
+      "total_ops": 2000,
+      "elapsed_s": 7.05,
+      "ops_per_sec": 284,
+      "successes": 889,
+      "conflicts": 111,
+      "errors": 0
+    }
+  ],
+  "contention": [
+    {
+      "users": 10,
+      "winners": 1,
+      "losers": 9
+    },
+    {
+      "users": 25,
+      "winners": 1,
+      "losers": 24
+    },
+    {
+      "users": 50,
+      "winners": 1,
+      "losers": 49
+    },
+    {
+      "users": 100,
+      "winners": 1,
+      "losers": 99
+    }
+  ]
+}

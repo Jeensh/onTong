@@ -1,0 +1,103 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[project]
+name = "ontong"
+version = "0.1.0"
+description = "onTong - Knowledge-Fused Multi-Agent Platform (Agentic OS) for SCM"
+authors = [{name = "onTong Team"}]
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0"
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+# Core Framework
+fastapi = "^0.104.0"
+uvicorn = "^0.24.0"
+pydantic = "^2.0"
+pydantic-settings = "^2.0"
+python-dotenv = "^1.0"
+
+# LLM & AI
+litellm = "^1.0"
+langfuse = "^2.0"
+openai = "^1.0"
+
+# Vector Database
+chromadb = "^0.4.0"
+
+# Code Analysis (Phase 2)
+# javalang = "^0.13.0"  # Java parsing
+
+# Utilities
+httpx = "^0.25.0"
+aiofiles = "^23.0"
+pyyaml = "^6.0"
+python-dateutil = "^2.8"
+
+# Observability
+python-json-logger = "^2.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0"
+pytest-asyncio = "^0.21.0"
+black = "^23.0"
+ruff = "^0.1.0"
+mypy = "^1.0"
+httpx = "^0.25.0"
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | venv
+)/
+'''
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "W", "I", "N"]
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist"
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-v"
