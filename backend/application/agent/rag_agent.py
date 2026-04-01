@@ -20,12 +20,10 @@ import logging
 import re
 from typing import AsyncGenerator
 
-import litellm
-
-from backend.core.config import settings
 from backend.core.schemas import (
     ApprovalRequestEvent,
     ChatRequest,
+    ConflictPair,
     ConflictWarningEvent,
     ContentDelta,
     DoneEvent,
@@ -92,7 +90,7 @@ COGNITIVE_REFLECT_PROMPT = (
     '  "draft_response": "...",\n'
     '  "self_critique": "...",\n'
     '  "has_conflict": false,\n'
-    '  "conflict_details": "brief description of the conflict if has_conflict is true, else empty string"\n'
+    '  "conflict_details": "충돌 설명을 한국어로 작성 (has_conflict가 true일 때). 어떤 문서가 어떻게 다른지 구체적으로 기술. false면 빈 문자열"\n'
     "}"
 )
 
@@ -162,51 +160,36 @@ CLARITY_CHECK_PROMPT = (
     "- A query with a company name, person name, team, OJT, error code, or topic keyword → ALWAYS CLEAR\n"
 )
 
-# ── Write / Edit Intent Detection ─────────────────────────────────────
 
-# Edit intent: user wants to modify an EXISTING document
-EDIT_INTENT_PATTERNS = [
-    r"(문서|위키|페이지|파일).*(수정|변경|업데이트|편집|고쳐|바꿔|갱신)",
-    r"(수정|변경|업데이트|편집|고쳐|바꿔|갱신).*(문서|위키|페이지|파일)",
-    r"(에|에서|문서에|파일에).*(추가|넣어|적어|기록|써).*(줘|주세요|달라|해)",
-    r"(내용|정보|항목).*(추가|수정|변경|업데이트|삭제|제거).*(해|줘|주세요|달라)",
-    # Direct action verbs without "문서" keyword
-    r"(을|를|으로)\s*(바꿔|변경해|수정해|고쳐|편집해)\s*(줘|주세요|달라|해|줄래)",
-    r"(바꿔|변경해|수정해|고쳐|편집해)\s*(줘|주세요|달라|해|줄래)",
-]
-
-# Write intent: user wants to CREATE a new document
-WRITE_INTENT_PATTERNS = [
-    r"(새로운?|새)\s*(문서|페이지|위키).*(만들|작성|생성)",
-    r"(wiki|문서|위키).*(만들|작성|생성)",
-    r"(만들|작성|생성).*(wiki|문서|위키|페이지)",
-    r"(이걸|이것|이\s*내용).*(문서|위키).*(추가|저장|기록)",
-    r"(정리|요약).*(문서|위키).*(만들|작성|추가|저장)",
-]
+# Intent detection is now handled by the LLM-based router (UserIntent model).
+# The router passes intent.action ("question" | "write" | "edit") to execute().
 
 
-def _detect_edit_intent(message: str, has_attached_files: bool = False) -> bool:
-    """Check if the user message indicates an edit intent on an existing document."""
-    for pattern in EDIT_INTENT_PATTERNS:
-        if re.search(pattern, message, re.IGNORECASE):
-            return True
-    # When a file is attached, lower the bar: any action verb implies edit
-    if has_attached_files:
-        attached_edit_patterns = [
-            r"(바꿔|변경|수정|고쳐|편집|업데이트|갱신|추가|넣어|적어|써|삭제|제거)",
-        ]
-        for pattern in attached_edit_patterns:
-            if re.search(pattern, message, re.IGNORECASE):
-                return True
-    return False
+def _extract_pair_summary(file_a: str, file_b: str, conflict_details: str) -> str:
+    """Extract a concise summary relevant to a specific file pair from conflict_details.
 
+    If the details text mentions both files, extract the first complete sentence
+    that references them. Otherwise, take the first sentence of the details.
+    """
+    if not conflict_details:
+        return ""
 
-def _detect_write_intent(message: str) -> bool:
-    """Check if the user message indicates a new wiki document creation intent."""
-    for pattern in WRITE_INTENT_PATTERNS:
-        if re.search(pattern, message, re.IGNORECASE):
-            return True
-    return False
+    # Try to find a sentence mentioning either file
+    name_a = file_a.split("/")[-1].replace(".md", "")
+    name_b = file_b.split("/")[-1].replace(".md", "")
+
+    # Split on sentence boundaries (Korean period, newline)
+    sentences = [s.strip() for s in conflict_details.replace("\n", ". ").split(". ") if s.strip()]
+    if not sentences:
+        return conflict_details[:150]
+
+    # Prefer sentences mentioning both files
+    for s in sentences:
+        if name_a in s and name_b in s:
+            return s[:150]
+
+    # Fallback: first sentence only
+    return sentences[0][:150]
 
 
 class RAGAgent:
@@ -234,14 +217,16 @@ class RAGAgent:
                 yield event
             return
 
-        # Check for wiki edit intent (more specific, check first)
-        if _detect_edit_intent(query, has_attached_files=bool(request.attached_files)):
+        # Determine action from LLM-based intent (passed from router via kwargs)
+        intent = kwargs.get("intent")
+        action = getattr(intent, "action", "question") if intent else "question"
+
+        if action == "edit":
             async for event in self._handle_edit(request, history, ctx=ctx):
                 yield event
             return
 
-        # Check for wiki write intent (new document)
-        if _detect_write_intent(query):
+        if action == "write":
             async for event in self._handle_write(request, ctx=ctx):
                 yield event
             return
@@ -257,6 +242,7 @@ class RAGAgent:
         """Augment follow-up queries with context from conversation history.
 
         Called from api/agent.py for parallel pre-computation (before ctx exists).
+        Uses Pydantic AI Agent for LLM call.
         """
         if not history or len(history) < 2:
             return query
@@ -271,38 +257,33 @@ class RAGAgent:
                 recent_context.append(content[:100])
 
         try:
-            response = await litellm.acompletion(
-                model=settings.litellm_model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a search query rewriter. Given a follow-up question and "
-                            "conversation context, rewrite the question as a standalone search query "
-                            "that includes all necessary context for document retrieval.\n\n"
-                            "Rules:\n"
-                            "- Output ONLY the rewritten query, nothing else\n"
-                            "- Keep it concise (under 50 words)\n"
-                            "- Preserve the original language (Korean)\n"
-                            "- Include key entities/topics from context that the follow-up refers to\n\n"
-                            "Example:\n"
-                            "Context: user asked about '후판 공정계획'\n"
-                            "Follow-up: '담당자 누구 있는지 찾아줘'\n"
-                            "Rewritten: '후판 공정계획 담당자 누구'"
-                        ),
-                    },
-                    {
-                        "role": "user",
-                        "content": (
-                            f"Conversation context:\n{chr(10).join(recent_context)}\n\n"
-                            f"Follow-up question: {query}"
-                        ),
-                    },
-                ],
-                max_tokens=60,
-                temperature=0,
+            from pydantic_ai import Agent
+            from backend.application.agent.llm_factory import get_model
+
+            agent = Agent(
+                get_model(),
+                output_type=str,
+                system_prompt=(
+                    "You are a search query rewriter. Given a follow-up question and "
+                    "conversation context, rewrite the question as a standalone search query "
+                    "that includes all necessary context for document retrieval.\n\n"
+                    "Rules:\n"
+                    "- Output ONLY the rewritten query, nothing else\n"
+                    "- Keep it concise (under 50 words)\n"
+                    "- Preserve the original language (Korean)\n"
+                    "- Include key entities/topics from context that the follow-up refers to\n\n"
+                    "Example:\n"
+                    "Context: user asked about '후판 공정계획'\n"
+                    "Follow-up: '담당자 누구 있는지 찾아줘'\n"
+                    "Rewritten: '후판 공정계획 담당자 누구'"
+                ),
+                defer_model_check=True,
             )
-            augmented = response.choices[0].message.content.strip()
+            result = await agent.run(
+                f"Conversation context:\n{chr(10).join(recent_context)}\n\n"
+                f"Follow-up question: {query}"
+            )
+            augmented = result.output.strip()
             if augmented:
                 logger.info(f"Query augmented: '{query}' → '{augmented}'")
                 return augmented
@@ -479,11 +460,15 @@ class RAGAgent:
             if replaced:
                 logger.info(f"Replaced {replaced} deprecated doc(s) with latest version")
 
-        # 4. Filter by relevance
+        # 4. Filter by relevance — keep aligned triples
         relevant_docs = []
+        relevant_metas = []
+        relevant_dists = []
         for doc, meta, dist in zip(documents, metadatas, distances):
             if max(0, 1 - dist) >= MIN_SOURCE_RELEVANCE:
                 relevant_docs.append(doc)
+                relevant_metas.append(meta)
+                relevant_dists.append(dist)
 
         sources = self._build_sources(metadatas, distances, threshold=MIN_SOURCE_RELEVANCE)
         if sources:
@@ -491,9 +476,11 @@ class RAGAgent:
 
         if not relevant_docs:
             relevant_docs = [documents[0]]
+            relevant_metas = [metadatas[0]] if metadatas else [{}]
+            relevant_dists = [distances[0]] if distances else [1.0]
 
         # ── 5. Self-Reflective Cognitive Pipeline ─────────────────────────
-        context = self._build_context_with_metadata(relevant_docs, metadatas, distances)
+        context = self._build_context_with_metadata(relevant_docs, relevant_metas, relevant_dists)
 
         if attached_context:
             context = attached_context.strip() + "\n\n---\n\n" + context
@@ -511,17 +498,67 @@ class RAGAgent:
             else:
                 yield self._thinking("cognitive_reflect", "done", "답변 검토 완료", "기본 모드")
 
-        # 5a-1. Emit conflict warning if cognitive pipeline detected contradictions
-        if reflection and reflection.get("has_conflict"):
-            conflict_details = reflection.get("conflict_details", "")
-            conflicting_docs = [s.doc for s in sources] if sources else []
+        # 5a-1. Conflict detection — cognitive reflection result + dedicated check
+        has_conflict = reflection.get("has_conflict", False) if reflection else False
+        conflict_details = reflection.get("conflict_details", "") if reflection else ""
+
+        # If cognitive reflection missed it, run dedicated conflict_check
+        # Only when there are 2+ unique high-relevance sources (both >= 60% relevance)
+        unique_sources = {m.get("file_path", "") for m in relevant_metas}
+        high_relevance_sources = {
+            m.get("file_path", "")
+            for m, d in zip(relevant_metas, relevant_dists)
+            if max(0, 1 - d) >= 0.6
+        }
+        if not has_conflict and len(high_relevance_sources) >= 2 and ctx:
+            try:
+                conflict_result = await ctx.run_skill(
+                    "conflict_check",
+                    documents=relevant_docs,
+                    metadatas=relevant_metas,
+                    distances=relevant_dists,
+                )
+                if conflict_result and conflict_result.data.get("has_conflict"):
+                    has_conflict = True
+                    conflict_details = conflict_result.data.get("details", "")
+                    logger.info(f"Dedicated conflict_check detected: {conflict_details[:100]}")
+            except Exception as e:
+                logger.debug(f"Dedicated conflict check skipped: {e}")
+
+        if has_conflict:
+            conflicting_docs = sorted(unique_sources) if unique_sources else (
+                [s.doc for s in sources] if sources else []
+            )
+            # Build explicit conflict pairs for comparison UI
+            pairs: list[ConflictPair] = []
+            if len(conflicting_docs) >= 2:
+                pairs = self._build_conflict_pairs(
+                    conflicting_docs, relevant_metas, relevant_dists, conflict_details,
+                )
             yield self._sse(
                 "conflict_warning",
                 ConflictWarningEvent(
                     details=conflict_details,
                     conflicting_docs=conflicting_docs[:5],
+                    conflict_pairs=pairs,
                 ).model_dump_json(),
             )
+            # Register detected conflicts in ConflictStore for dashboard sync
+            if pairs and ctx and ctx.conflict_store:
+                try:
+                    import time as _time
+                    from backend.application.conflict.conflict_store import StoredConflict
+                    for pair in pairs:
+                        stored = StoredConflict(
+                            file_a=min(pair.file_a, pair.file_b),
+                            file_b=max(pair.file_a, pair.file_b),
+                            similarity=pair.similarity,
+                            detected_at=_time.time(),
+                            meta_a={}, meta_b={},
+                        )
+                        ctx.conflict_store.replace_for_file(pair.file_a, [stored])
+                except Exception as e:
+                    logger.debug(f"Failed to register conflict in store: {e}")
 
         # 5b. Final polished answer — streamed to user via llm_generate skill
         yield self._thinking("answer_gen", "start", "최종 답변 생성 중", f"컨텍스트 {len(relevant_docs)}건 사용")
@@ -566,34 +603,29 @@ class RAGAgent:
                 DoneEvent(usage=TokenUsage(input_tokens=0, output_tokens=total_tokens)).model_dump_json(),
             )
         else:
-            # Fallback: direct litellm call (backward compatibility)
+            # Fallback: Pydantic AI streaming (when ctx not provided)
             try:
-                from backend.application.agent.skills.llm_generate import _get_llm_semaphore
-                sem = _get_llm_semaphore()
-                await sem.acquire()
-                try:
-                    response = await litellm.acompletion(
-                        model=settings.litellm_model, messages=messages, stream=True,
-                    )
-                except Exception:
-                    sem.release()
-                    raise
+                from pydantic_ai import Agent
+                from backend.application.agent.llm_factory import get_model
+
+                system_msg = next((m["content"] for m in messages if m["role"] == "system"), "")
+                user_msg = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
+                agent = Agent(get_model(), output_type=str, system_prompt=system_msg, defer_model_check=True)
 
                 total_tokens = 0
-                try:
-                    async for chunk in response:
-                        delta = chunk.choices[0].delta
-                        if delta.content:
-                            yield self._sse("content_delta", ContentDelta(delta=delta.content).model_dump_json())
+                async with agent.run_stream(user_msg) as stream:
+                    async for delta in stream.stream_text(delta=True):
+                        if delta:
+                            yield self._sse("content_delta", ContentDelta(delta=delta).model_dump_json())
                             total_tokens += 1
-                finally:
-                    sem.release()
+                    usage = stream.usage()
+                    token_usage = TokenUsage(
+                        input_tokens=usage.input_tokens or 0,
+                        output_tokens=usage.output_tokens or 0,
+                    )
 
                 yield self._thinking("answer_gen", "done", "최종 답변 생성 완료")
-                yield self._sse(
-                    "done",
-                    DoneEvent(usage=TokenUsage(input_tokens=0, output_tokens=total_tokens)).model_dump_json(),
-                )
+                yield self._sse("done", DoneEvent(usage=token_usage).model_dump_json())
 
             except Exception as e:
                 logger.error(f"RAG LLM error: {e}")
@@ -612,9 +644,12 @@ class RAGAgent:
     ) -> dict | None:
         """Hidden cognitive pipeline: think → draft → critique.
 
+        Uses Pydantic AI for structured output — automatic JSON validation and retry.
         Returns dict with internal_thought/draft_response/self_critique,
         or None if reflection fails.
         """
+        from backend.application.agent.structured_agents import create_cognitive_agent
+
         history_text = ""
         if history:
             recent = history[-4:]
@@ -624,72 +659,35 @@ class RAGAgent:
                 lines.append(f"{role}: {msg.get('content', '')[:200]}")
             history_text = "\n".join(lines)
 
-        reflect_messages = [
-            {"role": "system", "content": COGNITIVE_REFLECT_PROMPT},
-            {
-                "role": "user",
-                "content": (
-                    f"## User Query\n{query}\n\n"
-                    f"## Conversation History\n{history_text or '(none)'}\n\n"
-                    f"## Wiki Context\n{context[:3000]}"
-                ),
-            },
-        ]
+        user_prompt = (
+            f"## User Query\n{query}\n\n"
+            f"## Conversation History\n{history_text or '(none)'}\n\n"
+            f"## Wiki Context\n{context[:6000]}"
+        )
 
         try:
-            if ctx:
-                gen_result = await ctx.run_skill(
-                    "llm_generate",
-                    messages=reflect_messages,
-                    max_tokens=1000,
-                    temperature=0.3,
-                    stream=False,
-                )
-                if not gen_result.success:
-                    logger.warning(f"Cognitive reflection failed: {gen_result.error}")
-                    return None
-                raw = gen_result.data["content"].strip()
-            else:
-                from backend.application.agent.skills.llm_generate import _get_llm_semaphore
-                async with _get_llm_semaphore():
-                    response = await litellm.acompletion(
-                        model=settings.litellm_model,
-                        messages=reflect_messages,
-                        max_tokens=1000,
-                        temperature=0.3,
-                    )
-                raw = response.choices[0].message.content.strip()
-
-            # Strip markdown fences if present
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-
-            result = json.loads(raw)
-
-            thought = result.get("internal_thought", "")
-            draft = result.get("draft_response", "")
-            critique = result.get("self_critique", "")
+            agent = create_cognitive_agent(COGNITIVE_REFLECT_PROMPT)
+            result = await agent.run(user_prompt)
+            reflection = result.output
 
             logger.info(
                 "\n╔══════════════════════════════════════════════════════════╗\n"
                 "║           COGNITIVE PIPELINE — INTERNAL LOG             ║\n"
                 "╚══════════════════════════════════════════════════════════╝\n"
                 f"\n📌 Query: {query}\n"
-                f"\n🧠 INTERNAL THOUGHT:\n{thought}\n"
-                f"\n📝 DRAFT RESPONSE:\n{draft[:500]}{'...' if len(draft) > 500 else ''}\n"
-                f"\n🔍 SELF-CRITIQUE:\n{critique}\n"
+                f"\n🧠 INTERNAL THOUGHT:\n{reflection.internal_thought}\n"
+                f"\n📝 DRAFT RESPONSE:\n{reflection.draft_response[:500]}"
+                f"{'...' if len(reflection.draft_response) > 500 else ''}\n"
+                f"\n🔍 SELF-CRITIQUE:\n{reflection.self_critique}\n"
                 "══════════════════════════════════════════════════════════"
             )
 
-            if not critique:
+            if not reflection.self_critique:
                 logger.warning("Cognitive reflection produced empty critique, skipping")
                 return None
 
-            return result
+            return reflection.model_dump()
 
-        except json.JSONDecodeError as e:
-            logger.warning(f"Cognitive reflection JSON parse failed: {e}")
-            return None
         except Exception as e:
             logger.warning(f"Cognitive reflection failed: {e}, proceeding without reflection")
             return None
@@ -820,15 +818,16 @@ class RAGAgent:
                 yield f"event: error\ndata: {ErrorEvent(error_code='SKILL_LLM_ERROR', message=gen.error or 'LLM generation failed').model_dump_json()}\n\n"
                 return
         else:
-            response = await litellm.acompletion(
-                model=settings.llm_model,
-                messages=messages,
-                stream=True,
-            )
-            async for chunk in response:
-                delta = chunk.choices[0].delta.content or ""
-                if delta:
-                    yield f"event: content_delta\ndata: {ContentDelta(delta=delta).model_dump_json()}\n\n"
+            from pydantic_ai import Agent
+            from backend.application.agent.llm_factory import get_model
+
+            system_msg = next((m["content"] for m in messages if m["role"] == "system"), "")
+            user_msg = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
+            agent = Agent(get_model(), output_type=str, system_prompt=system_msg, defer_model_check=True)
+            async with agent.run_stream(user_msg) as stream:
+                async for delta in stream.stream_text(delta=True):
+                    if delta:
+                        yield f"event: content_delta\ndata: {ContentDelta(delta=delta).model_dump_json()}\n\n"
 
         # 4. Show referenced docs as sources
         sources = [
@@ -879,10 +878,7 @@ class RAGAgent:
             yield self._thinking("answer_gen", "done", "문서 수정 완료")
 
             yield self._sse("content_delta", ContentDelta(
-                delta=(
-                    f"**`{data['path']}`** 문서를 수정하겠습니다.\n\n"
-                    f"**수정 내용**: {data['summary']}\n\n"
-                )
+                delta=f"**`{data['path']}`** 문서 수정안을 생성했습니다. 워크스페이스에서 확인하세요."
             ).model_dump_json())
 
             yield self._sse(
@@ -936,26 +932,20 @@ class RAGAgent:
                     f"- {fp}: {preview[:100]}..." for fp, preview in seen_files.items()
                 )
 
-                pick_response = await litellm.acompletion(
-                    model=settings.litellm_model,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": (
-                                "사용자가 Wiki 문서를 수정하려고 합니다. "
-                                "아래 후보 문서 목록에서 사용자의 수정 요청에 가장 적합한 문서를 선택하세요.\n\n"
-                                "응답은 파일명만 한 줄로 (예: 직원정보-마케팅DX그룹.md)"
-                            ),
-                        },
-                        {
-                            "role": "user",
-                            "content": f"수정 요청: {query}\n\n후보 문서:\n{file_list}",
-                        },
-                    ],
-                    temperature=0,
-                    max_tokens=100,
+                from pydantic_ai import Agent
+                from backend.application.agent.llm_factory import get_model
+
+                pick_agent = Agent(
+                    get_model(), output_type=str,
+                    system_prompt=(
+                        "사용자가 Wiki 문서를 수정하려고 합니다. "
+                        "아래 후보 문서 목록에서 사용자의 수정 요청에 가장 적합한 문서를 선택하세요.\n\n"
+                        "응답은 파일명만 한 줄로 (예: 직원정보-마케팅DX그룹.md)"
+                    ),
+                    defer_model_check=True,
                 )
-                picked = pick_response.choices[0].message.content.strip().replace("`", "").strip()
+                pick_result = await pick_agent.run(f"수정 요청: {query}\n\n후보 문서:\n{file_list}")
+                picked = pick_result.output.strip().replace("`", "").strip()
                 for fp in seen_files:
                     if fp in picked or picked in fp:
                         best_file_path = fp
@@ -991,43 +981,31 @@ class RAGAgent:
                 )
                 history_text = f"\n\n## 대화 히스토리\n{history_text}"
 
-            response = await litellm.acompletion(
-                model=settings.litellm_model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "당신은 사내 Wiki 문서 수정 전문가입니다. "
-                            "사용자의 요청에 따라 기존 문서를 수정하세요.\n\n"
-                            "## 규칙\n"
-                            "- YAML frontmatter(--- 사이의 내용)는 그대로 유지하세요.\n"
-                            "- 사용자가 요청한 부분만 수정하고, 나머지는 최대한 보존하세요.\n"
-                            "- 수정된 전체 문서를 반환하세요 (frontmatter 포함).\n\n"
-                            "응답은 반드시 다음 JSON 형식으로 해주세요 (마크다운 펜스 없이):\n"
-                            '{"content": "수정된 전체 문서 내용(frontmatter 포함)", '
-                            '"summary": "수정 내용 요약(한국어, 1~2문장)"}\n'
-                        ),
-                    },
-                    {
-                        "role": "user",
-                        "content": (
-                            f"## 수정 대상 문서: {best_file_path}\n\n"
-                            f"## 현재 문서 내용\n```\n{original_content}\n```\n"
-                            f"{history_text}\n\n"
-                            f"## 수정 요청\n{query}"
-                        ),
-                    },
-                ],
-                temperature=0.3,
+            from pydantic_ai import Agent
+            from backend.application.agent.llm_factory import get_model
+            from backend.application.agent.models import WikiEditResult
+
+            edit_agent = Agent(
+                get_model(), output_type=WikiEditResult,
+                system_prompt=(
+                    "당신은 사내 Wiki 문서 수정 전문가입니다. "
+                    "사용자의 요청에 따라 기존 문서를 수정하세요.\n\n"
+                    "## 규칙\n"
+                    "- YAML frontmatter(--- 사이의 내용)는 그대로 유지하세요.\n"
+                    "- 사용자가 요청한 부분만 수정하고, 나머지는 최대한 보존하세요.\n"
+                    "- 수정된 전체 문서를 반환하세요 (frontmatter 포함).\n"
+                ),
+                retries=2,
+                defer_model_check=True,
             )
-
-            raw = response.choices[0].message.content.strip()
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-
-            data = json.loads(raw)
-            new_content = data.get("content", "")
-            summary = data.get("summary", "문서가 수정되었습니다.")
+            edit_result = await edit_agent.run(
+                f"## 수정 대상 문서: {best_file_path}\n\n"
+                f"## 현재 문서 내용\n```\n{original_content}\n```\n"
+                f"{history_text}\n\n"
+                f"## 수정 요청\n{query}"
+            )
+            new_content = edit_result.output.content
+            summary = edit_result.output.summary
 
             yield self._thinking("answer_gen", "done", "문서 수정 완료")
 
@@ -1087,13 +1065,12 @@ class RAGAgent:
         query = request.message
 
         if ctx:
-            yield self._sse("content_delta", ContentDelta(
-                delta="Wiki 문서 작성을 준비하고 있습니다...\n\n"
-            ).model_dump_json())
+            yield self._thinking("answer_gen", "start", "문서 작성 중")
 
             write_result = await ctx.run_skill("wiki_write", instruction=query)
 
             if not write_result.success:
+                yield self._thinking("answer_gen", "done", "문서 작성 실패")
                 yield self._sse("content_delta", ContentDelta(
                     delta=write_result.error or "문서 생성에 실패했습니다."
                 ).model_dump_json())
@@ -1101,8 +1078,9 @@ class RAGAgent:
                 return
 
             data = write_result.data
+            yield self._thinking("answer_gen", "done", "문서 작성 완료")
             yield self._sse("content_delta", ContentDelta(
-                delta=f"다음 내용으로 **`{data['path']}`** 문서를 생성하겠습니다:\n\n```markdown\n{data['diff_preview']}\n```\n\n"
+                delta=f"**`{data['path']}`** 문서를 생성했습니다. 워크스페이스에서 확인하세요."
             ).model_dump_json())
 
             yield self._sse(
@@ -1124,32 +1102,24 @@ class RAGAgent:
                 delta="Wiki 문서 작성을 준비하고 있습니다...\n\n"
             ).model_dump_json())
 
-            response = await litellm.acompletion(
-                model=settings.litellm_model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "당신은 사내 Wiki 기술 문서 작성 전문가입니다. "
-                            "사용자의 요청에 맞는 Wiki 문서를 Markdown 형식으로 작성하세요.\n\n"
-                            "응답은 반드시 다음 JSON 형식으로 해주세요 (마크다운 펜스 없이):\n"
-                            '{"path": "파일명.md", "content": "# 제목\\n\\n문서 내용..."}\n\n'
-                            "path는 적절한 파일명(한글 가능, .md 확장자), "
-                            "content는 완전한 Markdown 문서입니다."
-                        ),
-                    },
-                    {"role": "user", "content": query},
-                ],
-                temperature=0.3,
+            from pydantic_ai import Agent
+            from backend.application.agent.llm_factory import get_model
+            from backend.application.agent.models import WikiWriteResult
+
+            write_agent = Agent(
+                get_model(), output_type=WikiWriteResult,
+                system_prompt=(
+                    "당신은 사내 Wiki 기술 문서 작성 전문가입니다. "
+                    "사용자의 요청에 맞는 Wiki 문서를 Markdown 형식으로 작성하세요.\n\n"
+                    "path는 적절한 파일명(한글 가능, .md 확장자), "
+                    "content는 완전한 Markdown 문서입니다."
+                ),
+                retries=2,
+                defer_model_check=True,
             )
-
-            raw = response.choices[0].message.content.strip()
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-
-            data = json.loads(raw)
-            path = data.get("path", "new-document.md")
-            content = data.get("content", "")
+            write_result = await write_agent.run(query)
+            path = write_result.output.path
+            content = write_result.output.content
 
             if not content:
                 yield self._sse("content_delta", ContentDelta(
@@ -1204,6 +1174,40 @@ class RAGAgent:
         """Emit a thinking_step SSE event."""
         evt = ThinkingStepEvent(step=step, status=status, label=label, detail=detail)
         return f"event: thinking_step\ndata: {evt.model_dump_json()}\n\n"
+
+    @staticmethod
+    def _build_conflict_pairs(
+        conflicting_docs: list[str],
+        relevant_metas: list[dict],
+        relevant_dists: list[float],
+        conflict_details: str,
+    ) -> list[ConflictPair]:
+        """Build explicit ConflictPair list from detected conflict info."""
+        # Pre-compute per-file average relevance from retrieval distances
+        file_sims: dict[str, list[float]] = {}
+        for meta, dist in zip(relevant_metas, relevant_dists):
+            fp = meta.get("file_path", "")
+            if fp:
+                file_sims.setdefault(fp, []).append(max(0.0, 1.0 - dist))
+
+        pairs: list[ConflictPair] = []
+        for i, a in enumerate(conflicting_docs):
+            for b in conflicting_docs[i + 1:]:
+                # Average the two files' retrieval relevance as pair similarity
+                avg_a = sum(file_sims.get(a, [0.5])) / max(len(file_sims.get(a, [0.5])), 1)
+                avg_b = sum(file_sims.get(b, [0.5])) / max(len(file_sims.get(b, [0.5])), 1)
+                sim = round((avg_a + avg_b) / 2, 3)
+
+                # Extract pair-relevant summary from conflict_details
+                summary = _extract_pair_summary(a, b, conflict_details)
+
+                pairs.append(ConflictPair(
+                    file_a=a,
+                    file_b=b,
+                    similarity=sim,
+                    summary=summary,
+                ))
+        return pairs
 
     @staticmethod
     def _build_context_with_metadata(

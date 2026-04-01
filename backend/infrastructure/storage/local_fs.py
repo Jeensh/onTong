@@ -128,6 +128,13 @@ def _inject_metadata(
     if user_name:
         meta.updated_by = user_name
 
+    # Lineage cleanup: if status is no longer deprecated, clear supersedes/superseded_by
+    if meta.status != "deprecated":
+        if meta.supersedes:
+            meta.supersedes = ""
+        if meta.superseded_by:
+            meta.superseded_by = ""
+
     return _serialize_frontmatter(meta, body)
 
 

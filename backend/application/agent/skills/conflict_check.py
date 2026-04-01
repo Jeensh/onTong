@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
-import litellm
-
-from backend.core.config import settings
 from backend.application.agent.skill import SkillResult
 
 logger = logging.getLogger(__name__)
@@ -21,11 +17,8 @@ CONFLICT_CHECK_PROMPT = (
     "- Different numbers/amounts for the same metric\n"
     "- Different rules or procedures for the same process\n"
     "- Multiple versions of a policy from different teams/dates without clear precedence\n\n"
-    "Respond in this exact JSON format (no markdown fences):\n"
-    '{"has_conflict": false}\n'
-    "or\n"
-    '{"has_conflict": true, "details": "brief Korean description of the conflict", '
-    '"conflicting_docs": ["file_a.md", "file_b.md"]}\n'
+    "IMPORTANT: The 'details' field MUST be written in Korean (한국어). "
+    "Describe which documents conflict and how they differ specifically.\n"
 )
 
 
@@ -56,28 +49,26 @@ class ConflictCheckSkill:
         context = "\n\n---\n\n".join(chunks)
 
         try:
-            response = await litellm.acompletion(
-                model=settings.litellm_model,
-                messages=[
-                    {"role": "system", "content": CONFLICT_CHECK_PROMPT},
-                    {"role": "user", "content": f"## 문서들\n\n{context}"},
-                ],
-                max_tokens=300,
-                temperature=0,
+            from pydantic_ai import Agent
+            from backend.application.agent.llm_factory import get_model
+            from backend.application.agent.models import ConflictCheckResult
+
+            agent = Agent(
+                get_model(),
+                output_type=ConflictCheckResult,
+                system_prompt=CONFLICT_CHECK_PROMPT,
+                retries=2,
+                defer_model_check=True,
             )
-
-            raw = response.choices[0].message.content.strip()
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-
-            result = json.loads(raw)
+            result = await agent.run(f"## 문서들\n\n{context}")
+            output = result.output
             return SkillResult(data={
-                "has_conflict": result.get("has_conflict", False),
-                "details": result.get("details", ""),
-                "conflicting_docs": result.get("conflicting_docs", []),
+                "has_conflict": output.has_conflict,
+                "details": output.details,
+                "conflicting_docs": output.conflicting_docs,
             })
 
-        except (json.JSONDecodeError, Exception) as e:
+        except Exception as e:
             logger.warning(f"Conflict check failed: {e}")
             return SkillResult(data={"has_conflict": False, "details": "", "conflicting_docs": []})
 

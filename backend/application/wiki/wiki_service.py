@@ -88,12 +88,60 @@ class WikiService:
         content = self._auto_inject_error_codes(content)
 
         wiki_file = await self.storage.write(path, content, user_name=user_name)
+
+        # Lineage sync: if this file cleared its lineage, clear the counterpart too
+        await self._sync_lineage_counterpart(wiki_file)
+
         # Background indexing — save returns immediately
         index_status.mark_pending(path)
         asyncio.create_task(self._bg_index(wiki_file))
         event_bus.publish("tree_change", {"action": "update", "path": path})
         logger.info(f"Saved: {path} (indexing queued)")
         return wiki_file
+
+    async def _sync_lineage_counterpart(self, wiki_file: WikiFile) -> None:
+        """If this file's lineage was cleared, also clear the counterpart document's reference."""
+        meta = wiki_file.metadata
+        # If this file still has lineage, no cleanup needed
+        if meta.supersedes or meta.superseded_by:
+            return
+
+        # Check if any other document still references this file in lineage
+        try:
+            all_entries = await self.storage.list_all_metadata()
+        except Exception:
+            return
+
+        for entry in all_entries:
+            if entry.path == wiki_file.path:
+                continue
+            refs_this = (
+                entry.metadata.supersedes == wiki_file.path
+                or entry.metadata.superseded_by == wiki_file.path
+            )
+            if not refs_this:
+                continue
+
+            other = await self.storage.read(entry.path)
+            if not other:
+                continue
+            raw = other.raw_content
+            cleaned_lines = []
+            for line in raw.split("\n"):
+                stripped = line.strip()
+                if stripped == f"supersedes: {wiki_file.path}":
+                    continue
+                if stripped == f"superseded_by: {wiki_file.path}":
+                    continue
+                cleaned_lines.append(line)
+            cleaned = "\n".join(cleaned_lines)
+            if cleaned != raw:
+                await self.storage.write(entry.path, cleaned, user_name="")
+                updated = await self.storage.read(entry.path)
+                if updated:
+                    index_status.mark_pending(entry.path)
+                    asyncio.create_task(self._bg_index(updated))
+                logger.info(f"Lineage sync: cleared reference to {wiki_file.path} in {entry.path}")
 
     async def _bg_index(self, wiki_file: WikiFile) -> None:
         """Background indexing task."""
