@@ -16,11 +16,17 @@ class Settings(BaseSettings):
     # Frontend (CORS)
     frontend_url: str = "http://localhost:3000"
 
-    # LLM — default: Ollama local model (air-gap safe)
-    # For cloud LLM, set LITELLM_MODEL=openai/gpt-4o-mini and provide API key
+    # LLM — format: "provider/model" (e.g. "openai/gpt-4o-mini", "ollama/llama3")
+    # Supported providers: openai, anthropic, ollama, google, azure, groq, deepseek
     litellm_model: str = "ollama/llama3"
-    litellm_api_key: str = ""
-    anthropic_api_key: str = ""
+    litellm_api_key: str = ""       # Generic fallback API key
+    anthropic_api_key: str = ""     # ANTHROPIC_API_KEY
+    google_api_key: str = ""        # GOOGLE_API_KEY (Gemini)
+    groq_api_key: str = ""          # GROQ_API_KEY
+    azure_endpoint: str = ""        # AZURE_OPENAI_ENDPOINT
+    azure_api_key: str = ""         # AZURE_OPENAI_API_KEY
+    azure_api_version: str = "2024-12-01-preview"
+    deepseek_api_key: str = ""      # DEEPSEEK_API_KEY
     ollama_host: str = "http://localhost:11434"
 
     # Embedding — "default" uses ChromaDB built-in, "openai" uses OpenAI API

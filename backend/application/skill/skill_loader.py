@@ -36,6 +36,7 @@ class UserSkillLoader:
         self._cache: dict[str, SkillMeta] = {}
         self._cache_ts: float = 0.0
         self._cache_ttl: float = 30.0  # seconds
+        self._path_index: dict[str, str] = {}  # filename → full path
 
     async def list_skills(self, username: str = "", include_disabled: bool = False) -> SkillListResponse:
         """Return skills accessible to the given user."""
@@ -114,6 +115,13 @@ class UserSkillLoader:
             logger.exception("Failed to list files for skill scan")
             return
 
+        # Build filename→full-path index for wikilink resolution
+        self._path_index: dict[str, str] = {}
+        for p in all_paths:
+            if p.endswith(".md"):
+                fname = p.rsplit("/", 1)[-1]
+                self._path_index[fname] = p
+
         skill_paths = [p for p in all_paths if p.startswith("_skills/") and p.endswith(".md")]
 
         for path in skill_paths:
@@ -158,13 +166,12 @@ class UserSkillLoader:
         # Extract [[wikilinks]] from body
         referenced_docs = WIKILINK_RE.findall(body)
 
-        # Resolve wikilink names to paths (append .md if no extension)
+        # Resolve wikilink names to full paths via filename index
         resolved_refs: list[str] = []
         for ref in referenced_docs:
-            if not ref.endswith(".md"):
-                resolved_refs.append(f"{ref}.md")
-            else:
-                resolved_refs.append(ref)
+            fname = ref if ref.endswith(".md") else f"{ref}.md"
+            # Look up full path from index; fall back to bare filename
+            resolved_refs.append(self._path_index.get(fname, fname))
 
         # Determine scope from path
         scope = "personal" if "/@" in path or "/_skills/@" in path.replace("_skills/@", "/_skills/@") else "shared"

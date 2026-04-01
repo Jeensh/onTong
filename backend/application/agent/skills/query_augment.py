@@ -4,9 +4,6 @@ from __future__ import annotations
 
 import logging
 
-import litellm
-
-from backend.core.config import settings
 from backend.application.agent.skill import SkillResult
 
 logger = logging.getLogger(__name__)
@@ -47,22 +44,20 @@ class QueryAugmentSkill:
                 recent_context.append(content[:100])
 
         try:
-            response = await litellm.acompletion(
-                model=settings.litellm_model,
-                messages=[
-                    {"role": "system", "content": AUGMENT_SYSTEM_PROMPT},
-                    {
-                        "role": "user",
-                        "content": (
-                            f"Conversation context:\n{chr(10).join(recent_context)}\n\n"
-                            f"Follow-up question: {query}"
-                        ),
-                    },
-                ],
-                max_tokens=60,
-                temperature=0,
+            from pydantic_ai import Agent
+            from backend.application.agent.llm_factory import get_model
+
+            agent = Agent(
+                get_model(),
+                output_type=str,
+                system_prompt=AUGMENT_SYSTEM_PROMPT,
+                defer_model_check=True,
             )
-            augmented = response.choices[0].message.content.strip()
+            result = await agent.run(
+                f"Conversation context:\n{chr(10).join(recent_context)}\n\n"
+                f"Follow-up question: {query}"
+            )
+            augmented = result.output.strip()
             if augmented:
                 logger.info(f"Query augmented: '{query}' → '{augmented}'")
                 return SkillResult(data={"augmented_query": augmented})

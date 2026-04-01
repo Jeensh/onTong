@@ -1,4 +1,8 @@
-"""LLMGenerateSkill — unified LLM call with semaphore concurrency control."""
+"""LLMGenerateSkill — unified LLM call with semaphore concurrency control.
+
+Uses Pydantic AI's LiteLLM provider internally while maintaining the same
+SkillResult interface for backward compatibility with ctx.run_skill().
+"""
 
 from __future__ import annotations
 
@@ -25,6 +29,17 @@ def _get_llm_semaphore() -> asyncio.Semaphore:
 
 
 class LLMGenerateSkill:
+    """Unified LLM call skill — retains litellm for raw message passing.
+
+    This skill is the bridge between the old ctx.run_skill("llm_generate", ...)
+    pattern and the underlying LLM. It keeps litellm for streaming and tool-calling
+    support that Pydantic AI's Agent doesn't expose at the raw message level.
+
+    Other skills and rag_agent.py have been migrated to use Pydantic AI directly
+    for their specific LLM calls. This skill remains for:
+    - Streaming final answers in _handle_qa() (via ctx.run_skill)
+    - Any future code that needs raw message-level LLM access
+    """
     name = "llm_generate"
     description = "LLM으로 텍스트를 생성합니다"
 

@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
-import litellm
-
-from backend.core.config import settings
 from backend.core.schemas import ApprovalRequestEvent, WikiEditAction
 from backend.core.session import session_store
 from backend.application.agent.skill import SkillResult
@@ -21,10 +17,7 @@ EDIT_SYSTEM_PROMPT = (
     "## 규칙\n"
     "- YAML frontmatter(--- 사이의 내용)는 그대로 유지하세요.\n"
     "- 사용자가 요청한 부분만 수정하고, 나머지는 최대한 보존하세요.\n"
-    "- 수정된 전체 문서를 반환하세요 (frontmatter 포함).\n\n"
-    "응답은 반드시 다음 JSON 형식으로 해주세요 (마크다운 펜스 없이):\n"
-    '{"content": "수정된 전체 문서 내용(frontmatter 포함)", '
-    '"summary": "수정 내용 요약(한국어, 1~2문장)"}\n'
+    "- 수정된 전체 문서를 반환하세요 (frontmatter 포함).\n"
 )
 
 
@@ -84,31 +77,26 @@ class WikiEditSkill:
                 )
                 history_text = f"\n\n## 대화 히스토리\n{history_text}"
 
-            # LLM generates edited version
-            response = await litellm.acompletion(
-                model=settings.litellm_model,
-                messages=[
-                    {"role": "system", "content": EDIT_SYSTEM_PROMPT},
-                    {
-                        "role": "user",
-                        "content": (
-                            f"## 수정 대상 문서: {best_file_path}\n\n"
-                            f"## 현재 문서 내용\n```\n{original_content}\n```\n"
-                            f"{history_text}\n\n"
-                            f"## 수정 요청\n{instruction}"
-                        ),
-                    },
-                ],
-                temperature=0.3,
+            # LLM generates edited version via Pydantic AI
+            from pydantic_ai import Agent
+            from backend.application.agent.llm_factory import get_model
+            from backend.application.agent.models import WikiEditResult
+
+            agent = Agent(
+                get_model(),
+                output_type=WikiEditResult,
+                system_prompt=EDIT_SYSTEM_PROMPT,
+                retries=2,
+                defer_model_check=True,
             )
-
-            raw = response.choices[0].message.content.strip()
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-
-            data = json.loads(raw)
-            new_content = data.get("content", "")
-            summary = data.get("summary", "문서가 수정되었습니다.")
+            result = await agent.run(
+                f"## 수정 대상 문서: {best_file_path}\n\n"
+                f"## 현재 문서 내용\n```\n{original_content}\n```\n"
+                f"{history_text}\n\n"
+                f"## 수정 요청\n{instruction}"
+            )
+            new_content = result.output.content
+            summary = result.output.summary
 
             if not new_content:
                 return SkillResult(
@@ -131,19 +119,20 @@ class WikiEditSkill:
                 action_type="wiki_edit",
                 path=best_file_path,
                 diff_preview=diff_preview,
+                content=new_content,
+                original_content=original_content,
             )
 
             return SkillResult(data={
                 "path": best_file_path,
                 "content": new_content,
+                "original_content": original_content,
                 "summary": summary,
                 "diff_preview": diff_preview,
                 "action_id": action_id,
                 "approval_event": approval_event,
             })
 
-        except json.JSONDecodeError:
-            return SkillResult(data=None, success=False, error="문서 수정 중 형식 오류가 발생했습니다.")
         except Exception as e:
             logger.error(f"wiki_edit failed: {e}")
             return SkillResult(data=None, success=False, error=str(e))
@@ -171,30 +160,24 @@ class WikiEditSkill:
         if not seen_files:
             return None
 
-        # Use LLM to pick the best target
+        # Use Pydantic AI to pick the best target
         file_list = "\n".join(f"- {fp}: {preview[:100]}..." for fp, preview in seen_files.items())
 
         try:
-            pick_response = await litellm.acompletion(
-                model=settings.litellm_model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "사용자가 Wiki 문서를 수정하려고 합니다. "
-                            "아래 후보 문서 목록에서 사용자의 수정 요청에 가장 적합한 문서를 선택하세요.\n\n"
-                            "응답은 파일명만 한 줄로 (예: 직원정보-마케팅DX그룹.md)"
-                        ),
-                    },
-                    {
-                        "role": "user",
-                        "content": f"수정 요청: {query}\n\n후보 문서:\n{file_list}",
-                    },
-                ],
-                temperature=0,
-                max_tokens=100,
+            from pydantic_ai import Agent
+            from backend.application.agent.llm_factory import get_model
+
+            pick_agent = Agent(
+                get_model(), output_type=str,
+                system_prompt=(
+                    "사용자가 Wiki 문서를 수정하려고 합니다. "
+                    "아래 후보 문서 목록에서 사용자의 수정 요청에 가장 적합한 문서를 선택하세요.\n\n"
+                    "응답은 파일명만 한 줄로 (예: 직원정보-마케팅DX그룹.md)"
+                ),
+                defer_model_check=True,
             )
-            picked = pick_response.choices[0].message.content.strip().replace("`", "").strip()
+            result = await pick_agent.run(f"수정 요청: {query}\n\n후보 문서:\n{file_list}")
+            picked = result.output.strip().replace("`", "").strip()
             for fp in seen_files:
                 if fp in picked or picked in fp:
                     return fp
