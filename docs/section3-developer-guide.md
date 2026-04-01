@@ -24,56 +24,62 @@ onTong은 3개 섹션으로 구성된 플랫폼입니다:
 
 ### 2-1. 사전 요구사항
 
-- **Python 3.10+** (venv 사용, 프로젝트 venv에는 Python 3.13 설치됨)
-- **Node.js 20** (`nvm use 20`)
-- **Docker** (ChromaDB 실행용)
+| 구분 | 버전 | 확인 명령어 |
+|------|------|-------------|
+| **Python** | 3.10+ | `python3 --version` |
+| **Node.js** | 20+ | `node --version` |
+| **Docker Desktop** | 최신 | `docker --version` |
+| **Poetry** | 2.x | `poetry --version` (없으면 `pip install poetry`) |
+
+> **주의**: macOS 기본 Python(3.9)으로는 설치가 안 됩니다. `python3.13`이나 `python3.12` 경로를 확인해서 venv를 만드세요.
 
 ### 2-2. 최초 설정
 
 ```bash
 # 1. 프로젝트 클론
-git clone <repo-url>
+git clone https://github.com/Jeensh/onTong.git
 cd onTong
 
-# 2. Python 가상환경 + 의존성
-python3 -m venv venv
+# 2. Python 가상환경 생성 (반드시 3.10 이상 경로 지정)
+python3.13 -m venv venv          # 또는: python3.12 -m venv venv
 source venv/bin/activate
-pip install -e ".[dev]"
-# 또는: poetry install
+python --version                  # 3.10+ 확인
 
-# 3. 프론트엔드 의존성
+# 3. Python 의존성 설치
+pip install poetry
+poetry install                    # pyproject.toml 기반 전체 설치
+
+# 4. 프론트엔드 의존성 설치
 cd frontend
 npm install
 cd ..
 
-# 4. 환경변수 확인
-# .env 파일이 루트에 있어야 합니다. 없으면 팀 리더에게 요청하세요.
-# 최소 필요 항목:
-#   LITELLM_MODEL=openai/gpt-4o (또는 사용 중인 LLM)
-#   CHROMADB_HOST=localhost
-#   CHROMADB_PORT=8000
-#   ENVIRONMENT=development
+# 5. 환경변수 설정
+cp .env.example .env
+# 필요 시 .env를 편집하여 LLM 키 등 설정 (없어도 Wiki/Simulation Mock은 동작)
 ```
 
 ### 2-3. 서비스 실행 순서
 
-총 3개의 서비스를 실행해야 합니다:
+Docker Desktop을 먼저 실행한 뒤, 아래 순서대로 진행합니다:
 
 ```bash
-# 터미널 1: ChromaDB (벡터 DB — Wiki 검색에 필요)
-docker compose up -d chroma
+# 1. 인프라 (ChromaDB + Redis)
+docker compose up -d chroma redis
 # 정상 확인: curl http://localhost:8000/api/v1/heartbeat
 
-# 터미널 2: 백엔드 (포트 8001)
+# 2. 백엔드 (포트 8001)
 source venv/bin/activate
 python -m backend.main
 # 정상 확인: curl http://localhost:8001/health
 
-# 터미널 3: 프론트엔드 (포트 3000)
+# 3. 프론트엔드 (포트 3000, 새 터미널에서)
 cd frontend
 npm run dev
 # 정상 확인: 브라우저에서 http://localhost:3000 접속
 ```
+
+> **포트 충돌 시**: 3000 포트를 다른 서비스가 사용 중이면 `PORT=3001 npm run dev`로 실행하세요.
 
 ### 2-4. 정상 동작 확인 체크리스트
 
