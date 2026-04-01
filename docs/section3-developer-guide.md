@@ -150,10 +150,10 @@ frontend/src/
 |------|--------|------|
 | `backend/application/` | Wiki (Section 1) | 기존 완성된 Wiki 코드 |
 | `backend/modeling/` | 팀 리더 (Section 2) | Section 2 영역 |
-| `backend/shared/contracts/` | **공유** | Section 2↔3 타입 계약. **수정 시 팀 리더와 합의 필수** |
+| `backend/shared/contracts/` | **공유** | Section 2↔3 타입 계약. **수정 시 팀원과 합의 필수** |
 | `frontend/src/components/sections/` | 공유 | SectionNav 등 공통 UI |
 | `frontend/src/components/` (simulation 제외) | Wiki / 공통 | 기존 Wiki 프론트엔드 |
-| `backend/core/`, `backend/infrastructure/` | 공유 인프라 | 수정 필요 시 팀 리더와 상의 |
+| `backend/core/`, `backend/infrastructure/` | 공유 인프라 | 수정 필요 시 팀원과 상의 |
 
 ---
 
