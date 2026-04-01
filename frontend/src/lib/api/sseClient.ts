@@ -20,10 +20,13 @@ export interface SSECallbacks {
     action_type: string;
     path: string;
     diff_preview: string;
+    content: string;
+    original_content: string;
   }) => void;
   onConflictWarning?: (data: {
     details: string;
     conflicting_docs: string[];
+    conflict_pairs?: { file_a: string; file_b: string; similarity: number; summary: string }[];
   }) => void;
   onError?: (data: {
     error_code: string;
@@ -149,7 +152,7 @@ function dispatchEvent(
       break;
     case "conflict_warning":
       callbacks.onConflictWarning?.(
-        data as { details: string; conflicting_docs: string[] }
+        data as { details: string; conflicting_docs: string[]; conflict_pairs?: { file_a: string; file_b: string; similarity: number; summary: string }[] }
       );
       break;
     case "approval_request":
@@ -159,6 +162,8 @@ function dispatchEvent(
           action_type: string;
           path: string;
           diff_preview: string;
+          content: string;
+          original_content: string;
         }
       );
       break;

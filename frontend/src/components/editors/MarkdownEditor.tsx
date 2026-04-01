@@ -56,6 +56,9 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
   const openTab = useWorkspaceStore((s) => s.openTab);
   const agentDiff = useWorkspaceStore((s) => s.agentDiff);
   const clearAgentDiff = useWorkspaceStore((s) => s.clearAgentDiff);
+  const agentWrite = useWorkspaceStore((s) => s.agentWrite);
+  const clearAgentWrite = useWorkspaceStore((s) => s.clearAgentWrite);
+  const refreshTree = useWorkspaceStore((s) => s.refreshTree);
   const [diffNewContent, setDiffNewContent] = useState<string | null>(null);
   const [lockedBy, setLockedBy] = useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = useState(false);
@@ -234,12 +237,18 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
     setSourceMode(!sourceMode);
   }, [editor, sourceMode, sourceText]);
 
-  // Fetch new content for diff view when agentDiff targets this file
+  // Set new content for diff view when agentDiff targets this file
   useEffect(() => {
     if (!agentDiff || agentDiff.filePath !== filePath) {
       setDiffNewContent(null);
       return;
     }
+    // Pre-approval mode: newContent provided directly from SSE
+    if (agentDiff.newContent) {
+      setDiffNewContent(agentDiff.newContent);
+      return;
+    }
+    // Post-approval mode (legacy): fetch from server
     let cancelled = false;
     fetchFile(filePath).then((wiki) => {
       if (!cancelled) setDiffNewContent(wiki.content);
@@ -264,43 +273,82 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
     });
   }, [editor, filePath, tabId, setDirty]);
 
+  const resolveApproval = useCallback(async (approved: boolean) => {
+    if (!agentDiff?.actionId || !agentDiff?.sessionId) return;
+    try {
+      await fetch("/api/approval/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: agentDiff.sessionId,
+          action_id: agentDiff.actionId,
+          approved,
+        }),
+      });
+      if (approved) {
+        refreshTree();
+        toast.success("문서가 수정되었습니다");
+      } else {
+        toast.info("수정이 취소되었습니다");
+      }
+    } catch {
+      toast.error("승인 처리 실패");
+    }
+  }, [agentDiff, refreshTree]);
+
   const handleDiffAction = useCallback(
     async (action: DiffAction, partialContent?: string) => {
+      const isPreApproval = !!agentDiff?.actionId;
+
       if (action === "revert") {
-        // Restore old content
-        const oldContent = agentDiff?.oldContent;
-        if (oldContent !== undefined) {
-          const { parseFrontmatter, mergeFrontmatterAndBody } = await import(
+        if (isPreApproval) {
+          // Pre-approval: reject — don't save anything
+          await resolveApproval(false);
+        } else {
+          // Post-approval: restore old content
+          const oldContent = agentDiff?.oldContent;
+          if (oldContent !== undefined) {
+            const { parseFrontmatter: pf, mergeFrontmatterAndBody: mf } = await import(
+              "@/lib/markdown/frontmatterSync"
+            );
+            const currentRaw = await fetchFile(filePath).then((w) => w.raw_content ?? "");
+            const meta = pf(currentRaw);
+            const full = mf(meta, oldContent);
+            await saveFile(filePath, full);
+            reloadEditor(oldContent);
+          }
+        }
+      } else if (action === "accept") {
+        if (isPreApproval) {
+          // Pre-approval: approve via API (backend saves the file)
+          await resolveApproval(true);
+          // Reload with new content from server
+          reloadEditor();
+        } else if (partialContent) {
+          // Post-approval partial apply
+          const { parseFrontmatter: pf, mergeFrontmatterAndBody: mf } = await import(
             "@/lib/markdown/frontmatterSync"
           );
-          // Preserve current frontmatter, replace body with old content
           const currentRaw = await fetchFile(filePath).then((w) => w.raw_content ?? "");
-          const meta = parseFrontmatter(currentRaw);
-          const full = mergeFrontmatterAndBody(meta, oldContent);
+          const meta = pf(currentRaw);
+          const full = mf(meta, partialContent);
           await saveFile(filePath, full);
-          reloadEditor(oldContent);
+          reloadEditor(partialContent);
+        } else {
+          // Post-approval accept all
+          reloadEditor();
         }
-      } else if (action === "accept" && partialContent) {
-        // Partial apply: save the partially reconstructed content
-        const { parseFrontmatter, mergeFrontmatterAndBody } = await import(
-          "@/lib/markdown/frontmatterSync"
-        );
-        const currentRaw = await fetchFile(filePath).then((w) => w.raw_content ?? "");
-        const meta = parseFrontmatter(currentRaw);
-        const full = mergeFrontmatterAndBody(meta, partialContent);
-        await saveFile(filePath, full);
-        reloadEditor(partialContent);
       } else if (action === "edit") {
-        // Close diff, open editor with current (new) content
-        reloadEditor();
-      } else {
-        // accept all — just close diff and reload
+        if (isPreApproval) {
+          // Approve first (save the AI content), then let user edit
+          await resolveApproval(true);
+        }
         reloadEditor();
       }
       clearAgentDiff();
       setDiffNewContent(null);
     },
-    [agentDiff, clearAgentDiff, filePath, reloadEditor]
+    [agentDiff, clearAgentDiff, filePath, reloadEditor, resolveApproval]
   );
 
   // Lock acquisition + auto-refresh (via central lockManager) + cleanup
@@ -353,6 +401,103 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
     return (
       <div className="flex items-center justify-center h-full text-destructive">
         <div className="text-sm">로드 실패: {error}</div>
+      </div>
+    );
+  }
+
+  // Show write preview if agent write is active for this file
+  if (agentWrite && agentWrite.filePath === filePath) {
+    const handleWriteApprove = async () => {
+      try {
+        await fetch("/api/approval/resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session_id: agentWrite.sessionId,
+            action_id: agentWrite.actionId,
+            approved: true,
+          }),
+        });
+        clearAgentWrite();
+        refreshTree();
+        toast.success("문서가 생성되었습니다");
+        // Reload editor with saved content
+        reloadEditor();
+      } catch {
+        toast.error("문서 생성 실패");
+      }
+    };
+    const handleWriteCancel = async () => {
+      try {
+        await fetch("/api/approval/resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session_id: agentWrite.sessionId,
+            action_id: agentWrite.actionId,
+            approved: false,
+          }),
+        });
+        clearAgentWrite();
+        toast.info("문서 생성이 취소되었습니다");
+      } catch {
+        toast.error("취소 처리 실패");
+      }
+    };
+    const handleWriteEdit = async () => {
+      // Approve (save file) then let user edit
+      try {
+        await fetch("/api/approval/resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session_id: agentWrite.sessionId,
+            action_id: agentWrite.actionId,
+            approved: true,
+          }),
+        });
+        clearAgentWrite();
+        refreshTree();
+        reloadEditor();
+      } catch {
+        toast.error("처리 실패");
+      }
+    };
+
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center gap-3 px-4 py-2.5 border-b bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+          <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+            AI가 생성한 문서 미리보기
+          </span>
+          <code className="text-xs bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-700 dark:text-blue-300">
+            {agentWrite.filePath}
+          </code>
+          <div className="flex-1" />
+          <button
+            onClick={handleWriteApprove}
+            className="inline-flex items-center gap-1 rounded-md bg-green-600 px-3 py-1 text-xs text-white hover:bg-green-700"
+          >
+            저장
+          </button>
+          <button
+            onClick={handleWriteEdit}
+            className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90"
+          >
+            직접 편집
+          </button>
+          <button
+            onClick={handleWriteCancel}
+            className="inline-flex items-center gap-1 rounded-md bg-muted px-3 py-1 text-xs text-muted-foreground hover:bg-muted/80"
+          >
+            취소
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto p-4">
+          <div className="prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{
+            __html: markdownToHtml(agentWrite.content),
+          }} />
+        </div>
       </div>
     );
   }

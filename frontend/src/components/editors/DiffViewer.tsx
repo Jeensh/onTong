@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { FileText, Loader2, ArrowRight, Check } from "lucide-react";
 import { toast } from "sonner";
+import { useWorkspaceStore } from "@/lib/workspace/useWorkspaceStore";
 
 interface CompareFile {
   path: string;
@@ -46,6 +47,7 @@ export function DiffViewer({ pathA, pathB }: { pathA: string; pathB: string }) {
   const [fileB, setFileB] = useState<CompareFile | null>(null);
   const [loading, setLoading] = useState(true);
   const [deprecating, setDeprecating] = useState<string | null>(null);
+  const addResolvedConflict = useWorkspaceStore((s) => s.addResolvedConflict);
 
   useEffect(() => {
     setLoading(true);
@@ -71,6 +73,9 @@ export function DiffViewer({ pathA, pathB }: { pathA: string; pathB: string }) {
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       toast.success(`${deprecatePath.split("/").pop()} → deprecated`);
+      // Mark conflict pair as resolved in workspace store
+      const pairKey = `${pathA}__${pathB}`;
+      addResolvedConflict(pairKey);
       // Refresh
       const r = await fetch(`/api/wiki/compare?path_a=${encodeURIComponent(pathA)}&path_b=${encodeURIComponent(pathB)}`);
       const data = await r.json();

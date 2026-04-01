@@ -34,6 +34,16 @@ function getTitle(filePath: string): string {
 export interface AgentDiff {
   filePath: string;
   oldContent: string;
+  newContent?: string;       // proposed new content (for pre-approval diff)
+  actionId?: string;         // pending action ID for approval API
+  sessionId?: string;        // session ID for approval API
+}
+
+export interface AgentWrite {
+  filePath: string;
+  content: string;           // proposed content for new file
+  actionId: string;          // pending action ID for approval API
+  sessionId: string;         // session ID for approval API
 }
 
 const VIRTUAL_TAB_TITLES: Record<VirtualTabType, string> = {
@@ -50,7 +60,9 @@ interface WorkspaceState {
   activeTabId: string | null;
   treeVersion: number;
   agentDiff: AgentDiff | null;
+  agentWrite: AgentWrite | null;
   graphCenterPath: string | null;
+  resolvedConflicts: Set<string>;
   openTab: (filePath: string) => void;
   openVirtualTab: (tabType: VirtualTabType) => void;
   openGraphTab: (centerPath: string) => void;
@@ -63,6 +75,9 @@ interface WorkspaceState {
   refreshTree: () => void;
   setAgentDiff: (diff: AgentDiff) => void;
   clearAgentDiff: () => void;
+  setAgentWrite: (write: AgentWrite) => void;
+  clearAgentWrite: () => void;
+  addResolvedConflict: (pairKey: string) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -70,7 +85,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   activeTabId: null,
   treeVersion: 0,
   agentDiff: null,
+  agentWrite: null,
   graphCenterPath: null,
+  resolvedConflicts: new Set<string>(),
 
   openTab: (filePath: string) => {
     const { tabs } = get();
@@ -206,5 +223,21 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   clearAgentDiff: () => {
     set({ agentDiff: null });
+  },
+
+  setAgentWrite: (write: AgentWrite) => {
+    set({ agentWrite: write });
+  },
+
+  clearAgentWrite: () => {
+    set({ agentWrite: null });
+  },
+
+  addResolvedConflict: (pairKey: string) => {
+    set((state) => {
+      const next = new Set(state.resolvedConflicts);
+      next.add(pairKey);
+      return { resolvedConflicts: next };
+    });
   },
 }));

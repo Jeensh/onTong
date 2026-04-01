@@ -47,6 +47,9 @@ interface ApprovalData {
   action_type: string;
   path: string;
   diff_preview: string;
+  content?: string;
+  original_content?: string;
+  sentToWorkspace?: boolean;
 }
 
 interface ThinkingStepState {
@@ -56,9 +59,17 @@ interface ThinkingStepState {
   status: "start" | "done";
 }
 
+interface ConflictPairItem {
+  file_a: string;
+  file_b: string;
+  similarity: number;
+  summary: string;
+}
+
 interface ConflictWarning {
   details: string;
   conflicting_docs: string[];
+  conflict_pairs?: ConflictPairItem[];
 }
 
 interface ChatMessage {
@@ -113,6 +124,7 @@ export function AICopilot() {
   const tabs = useWorkspaceStore((s) => s.tabs);
   const refreshTree = useWorkspaceStore((s) => s.refreshTree);
   const setAgentDiff = useWorkspaceStore((s) => s.setAgentDiff);
+  const setAgentWrite = useWorkspaceStore((s) => s.setAgentWrite);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId)!;
   const messages = activeSession.messages;
@@ -293,6 +305,7 @@ export function AICopilot() {
     };
 
     updateMessages((msgs) => [...msgs, userMsg, assistantMsg]);
+    pushHistory(text);
     setInput("");
     setAttachedFiles([]);
     setShowFilePicker(false);
@@ -345,9 +358,29 @@ export function AICopilot() {
         }));
       },
       onApprovalRequest: (data) => {
+        // Open directly in workspace instead of showing approval in chat
+        if (data.action_type === "wiki_edit") {
+          setAgentDiff({
+            filePath: data.path,
+            oldContent: data.original_content || "",
+            newContent: data.content || "",
+            actionId: data.action_id,
+            sessionId: activeSessionId,
+          });
+          openTab(data.path);
+        } else if (data.action_type === "wiki_write") {
+          setAgentWrite({
+            filePath: data.path,
+            content: data.content || "",
+            actionId: data.action_id,
+            sessionId: activeSessionId,
+          });
+          openTab(data.path);
+        }
+        // Store minimal approval info in chat for status display
         updateLastAssistant((msg) => ({
           ...msg,
-          approval: data,
+          approval: { ...data, sentToWorkspace: true },
         }));
       },
       onSkillMatch: (data) => {
@@ -460,11 +493,59 @@ export function AICopilot() {
     [activeSessionId, updateLastAssistant, refreshTree, setAgentDiff, openTab]
   );
 
+  // ── Input history (Up/Down arrow recall) ──────────────────────────
+  const [inputHistory, setInputHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [savedInput, setSavedInput] = useState("");
+
+  const pushHistory = useCallback((text: string) => {
+    setInputHistory((prev) => {
+      const filtered = prev.filter((h) => h !== text);
+      return [...filtered, text];
+    });
+    setHistoryIndex(-1);
+  }, []);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.nativeEvent.isComposing) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+      return;
+    }
+    if (e.key === "ArrowUp" && inputHistory.length > 0) {
+      const textarea = e.currentTarget as HTMLTextAreaElement;
+      const cursorAtStart = textarea.selectionStart === 0 && textarea.selectionEnd === 0;
+      if (!cursorAtStart && input.includes("\n")) return;
+
+      e.preventDefault();
+      if (historyIndex === -1) {
+        setSavedInput(input);
+        const newIdx = inputHistory.length - 1;
+        setHistoryIndex(newIdx);
+        setInput(inputHistory[newIdx]);
+      } else if (historyIndex > 0) {
+        const newIdx = historyIndex - 1;
+        setHistoryIndex(newIdx);
+        setInput(inputHistory[newIdx]);
+      }
+      return;
+    }
+    if (e.key === "ArrowDown" && historyIndex >= 0) {
+      const textarea = e.currentTarget as HTMLTextAreaElement;
+      const cursorAtEnd = textarea.selectionStart === input.length;
+      if (!cursorAtEnd && input.includes("\n")) return;
+
+      e.preventDefault();
+      if (historyIndex < inputHistory.length - 1) {
+        const newIdx = historyIndex + 1;
+        setHistoryIndex(newIdx);
+        setInput(inputHistory[newIdx]);
+      } else {
+        setHistoryIndex(-1);
+        setInput(savedInput);
+      }
+      return;
     }
   };
 
@@ -844,6 +925,8 @@ function AssistantBubble({
   onSourceClick: (path: string) => void;
   onApproval: (actionId: string, approved: boolean, actionType?: string, path?: string) => void;
 }) {
+  const openCompareTab = useWorkspaceStore((s) => s.openCompareTab);
+  const resolvedConflicts = useWorkspaceStore((s) => s.resolvedConflicts);
   const hasThinkingSteps = msg.thinkingSteps && msg.thinkingSteps.length > 0;
   const allStepsDone = hasThinkingSteps && msg.thinkingSteps!.every((s) => s.status === "done");
   const isThinking = hasThinkingSteps && !allStepsDone && !msg.content;
@@ -881,7 +964,7 @@ function AssistantBubble({
 
       {/* Conflict Warning Banner */}
       {msg.conflictWarning && (
-        <div className="rounded-lg border border-amber-400/50 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-1.5">
+        <div className="rounded-lg border border-amber-400/50 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-2">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
             <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
@@ -891,7 +974,70 @@ function AssistantBubble({
           <p className="text-xs text-amber-800 dark:text-amber-300/80 leading-relaxed">
             {msg.conflictWarning.details}
           </p>
-          {msg.conflictWarning.conflicting_docs.length > 0 && (
+          {/* Pair-based comparison UI */}
+          {msg.conflictWarning.conflict_pairs && msg.conflictWarning.conflict_pairs.length > 0 ? (
+            <div className="space-y-2 pt-1">
+              {msg.conflictWarning.conflict_pairs.map((pair, idx) => {
+                const pairKey = `${pair.file_a}__${pair.file_b}`;
+                const isResolved = resolvedConflicts.has(pairKey);
+                return (
+                  <div
+                    key={idx}
+                    className={`rounded border p-2 space-y-1 ${
+                      isResolved
+                        ? "border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/20"
+                        : "border-amber-300 dark:border-amber-600 bg-white/50 dark:bg-amber-950/20"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 text-[11px] text-amber-800 dark:text-amber-300">
+                      <FileText className="h-3 w-3 flex-shrink-0" />
+                      <button
+                        onClick={() => onSourceClick(pair.file_a)}
+                        className="font-medium hover:underline truncate max-w-[120px]"
+                        title={pair.file_a}
+                      >
+                        {pair.file_a.split("/").pop()}
+                      </button>
+                      <span className="text-amber-500">↔</span>
+                      <button
+                        onClick={() => onSourceClick(pair.file_b)}
+                        className="font-medium hover:underline truncate max-w-[120px]"
+                        title={pair.file_b}
+                      >
+                        {pair.file_b.split("/").pop()}
+                      </button>
+                      <span className="ml-auto text-[10px] text-amber-500 dark:text-amber-400/70">
+                        유사도 {Math.round(pair.similarity * 100)}%
+                      </span>
+                    </div>
+                    {pair.summary && (
+                      <p className="text-[10px] text-amber-700/70 dark:text-amber-400/50 line-clamp-2 leading-relaxed">
+                        {pair.summary}
+                      </p>
+                    )}
+                    <div className="pt-0.5">
+                      {isResolved ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-green-600 dark:text-green-400 font-medium">
+                          <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                          해결됨
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => openCompareTab(pair.file_a, pair.file_b)}
+                          className="inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-800/40 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-700/50 transition-colors"
+                        >
+                          나란히 비교
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : msg.conflictWarning.conflicting_docs.length > 0 ? (
+            /* Fallback: legacy doc-link-only UI */
             <div className="flex flex-wrap gap-1 pt-1">
               {msg.conflictWarning.conflicting_docs.map((doc) => (
                 <button
@@ -904,7 +1050,7 @@ function AssistantBubble({
                 </button>
               ))}
             </div>
-          )}
+          ) : null}
         </div>
       )}
 
@@ -941,8 +1087,22 @@ function AssistantBubble({
         </div>
       )}
 
-      {/* Approval Request */}
-      {msg.approval && !msg.approvalResolved && (
+      {/* Approval Request — sent to workspace */}
+      {msg.approval && !msg.approvalResolved && msg.approval.sentToWorkspace && (
+        <div className="rounded-lg border border-dashed border-primary/50 bg-primary/5 p-2">
+          <div className="flex items-center gap-2 text-xs text-primary">
+            <FileText className="h-3 w-3" />
+            <span className="font-medium">
+              {msg.approval.action_type === "wiki_edit" ? "문서 수정" : "문서 생성"}
+            </span>
+            <code className="bg-muted px-1 rounded text-muted-foreground">{msg.approval.path}</code>
+            <span className="text-muted-foreground">— 워크스페이스에서 확인</span>
+          </div>
+        </div>
+      )}
+
+      {/* Legacy: approval not sent to workspace (fallback) */}
+      {msg.approval && !msg.approvalResolved && !msg.approval.sentToWorkspace && (
         <div className="rounded-lg border border-dashed border-primary/50 bg-primary/5 p-3 space-y-2">
           <div className="text-xs font-medium text-primary">
             {msg.approval.action_type === "wiki_edit" ? "Wiki 문서 수정 요청" : "Wiki 문서 생성 요청"}
@@ -950,9 +1110,6 @@ function AssistantBubble({
           <div className="text-xs text-muted-foreground">
             경로: <code className="bg-muted px-1 rounded">{msg.approval.path}</code>
           </div>
-          <pre className="text-xs bg-muted text-muted-foreground rounded p-2 overflow-auto max-h-40 whitespace-pre-wrap">
-            {msg.approval.diff_preview}
-          </pre>
           <div className="flex gap-2">
             <button
               onClick={() => onApproval(msg.approval!.action_id, true, msg.approval!.action_type, msg.approval!.path)}
