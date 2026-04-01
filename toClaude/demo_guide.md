@@ -1,4 +1,4 @@
-# onTong 데모 가이드 (Step 0 ~ Skill System 고도화)
+# onTong 데모 가이드 (Wiki 완성 + 3-Section Platform v2 진행 중)
 
 ---
 
@@ -2177,3 +2177,117 @@ cd /Users/donghae/workspace/ai/onTong
 source venv/bin/activate
 pytest tests/ -v
 ```
+
+---
+
+## 🏗️ 3-Section Platform v2 아키텍처 (계획 단계)
+
+> **현재 상태**: Phase 0 진행 중 (6/17 완료) — 스캐폴딩 + 개발자 C 환경 준비 완료
+> **상세 문서**: `toClaude/reports/platform_architecture_v2.md`
+
+### 플랫폼 구조 개요
+
+| Section | 용도 | 주 사용자 | 담당 |
+|---------|------|-----------|------|
+| Section 1 (Wiki) | 문서 관리 + AI Q&A | 전체 | 기존 시스템 유지 |
+| Section 2 (Modeling) | 코드매핑/온톨로지/영향분석/시뮬실행 | IT 담당자 | 팀 리더 |
+| Section 3 (Simulation) | 시나리오 설계/시각화 | SCM 현업 | 개발자 C |
+
+### 핵심 설계 결정
+
+1. **에이전트 독립**: 섹션마다 독립 에이전트 (shared에는 Protocol만)
+2. **시뮬레이션 2종 분리**: 코드 영향분석(그래프 BFS) + 비즈니스 시뮬(Monte Carlo 등)
+3. **온톨로지**: SCOR + ISA-95 하이브리드, Neo4j Community 저장
+4. **Typed Contract**: `dict` 금지, 시나리오별 Pydantic 모델 필수
+5. **비동기 Job Queue**: 시뮬레이션은 POST → job_id → 폴링/SSE
+6. **매핑 신뢰도**: 0.95+ 자동승인, 0.80-0.95 IT리뷰, 0.60-0.80 합동리뷰, <0.60 거부
+
+### Phase 0 데모 시나리오
+
+**0-1. 섹션 네비게이션 확인** (구현 완료)
+1. `http://localhost:3000` 접속
+2. 상단 [Wiki] / [Modeling] / [Simulation] 탭 확인
+3. 각 탭 클릭 시 해당 섹션 렌더링 확인
+4. Wiki 탭에서 기존 3-pane 레이아웃 정상 동작
+
+**0-2. Simulation 시나리오 목록 확인** (구현 완료)
+1. Simulation 탭 클릭
+2. 좌측에 3개 시나리오 (수요 예측, 재고 최적화, 리드타임 영향 분석) 표시
+3. API 연동 확인:
+```bash
+curl http://localhost:8001/api/simulation/scenarios | python -m json.tool
+curl http://localhost:8001/api/simulation/health
+curl http://localhost:8001/api/modeling/health
+```
+
+**0-3. Mock 시뮬레이션 실행 확인** (구현 완료)
+```bash
+curl -X POST http://localhost:8001/api/simulation/scenario \
+  -H "Content-Type: application/json" \
+  -d '{"scenario_type":"demand_forecast","parameters":{"scenario_type":"demand_forecast","product_id":"PROD-001","forecast_horizon_days":30},"output_formats":["chart_line","table"]}' \
+  | python -m json.tool
+# → job_id, status=completed, result.outputs에 chart_line + table 확인
+```
+
+**0-4. shared 인프라 구조 확인** (구현 완료)
+```bash
+# 디렉토리 구조 확인
+tree backend/shared/ -L 2
+tree backend/simulation/ -L 2
+tree backend/modeling/ -L 2
+
+# import-linter 모듈 경계 검증 (미구현)
+# lint-imports
+```
+
+**0-5. Wiki 마이그레이션 확인** (미구현)
+- 기존 Wiki 기능이 `backend/wiki/` 아래에서 정상 동작
+- 기존 테스트 전체 통과
+
+**0-3. Section 2/3 스캐폴딩 확인**
+```bash
+# Section 2 API placeholder 응답
+curl http://localhost:8000/api/v1/modeling/health
+
+# Section 3 API placeholder 응답
+curl http://localhost:8000/api/v1/simulation/health
+```
+
+**0-4. Neo4j 연결 확인**
+```bash
+# Neo4j Community 연결 테스트
+curl http://localhost:7474/
+```
+
+### Phase 1 데모 시나리오 (구현 후 검증 예정)
+
+**1-1. 코드 파싱 + 온톨로지 적재**
+- tree-sitter로 코드 파싱 → 엔티티 추출
+- Neo4j에 3-Layer 온톨로지 적재 (Domain / Code / Mapping)
+
+**1-2. 코드 영향분석**
+- 특정 함수 변경 시 영향받는 엔티티 목록 반환
+- 그래프 BFS 기반 결정론적 분석
+
+**1-3. 매핑 신뢰도 검증**
+- 4-factor scoring (self_consistency + AST + embedding + body_relevance)
+- 신뢰도 임계값별 자동/리뷰/거부 동작 확인
+
+### Phase 2 데모 시나리오 (구현 후 검증 예정)
+
+**2-1. 비즈니스 시뮬레이션 실행**
+- Section 3에서 시나리오 선택 → Section 2 API 호출
+- Job ID 발급 → 진행률 SSE → 결과 반환
+
+**2-2. 시각화 대시보드**
+- 시뮬레이션 결과 차트/테이블 동적 렌더링
+- 시나리오 비교 기능
+
+### 트러블슈팅 (공통)
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| Neo4j 연결 실패 | Docker 미실행 | `docker-compose up -d neo4j` |
+| import-linter 위반 | 섹션 간 직접 import | shared Protocol 경유로 변경 |
+| Section 2↔3 통신 오류 | typed contract 불일치 | `shared/contracts/simulation.py` 확인 |
+| 시뮬레이션 타임아웃 | job queue 미동작 | 백엔드 로그 + job status 확인 |

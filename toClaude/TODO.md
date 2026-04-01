@@ -819,3 +819,99 @@ Step 1-C 백엔드(1C-5)부터 시작해줘
 ```
 
 완료 태스크는 이 파일 + `CHECKLIST.md`에서 동시 업데이트합니다.
+
+---
+
+## 🔷 3-Section Platform 전환 (v2 아키텍처)
+
+> 기반 문서: `toClaude/reports/platform_architecture_v2.md`
+> 3관점 리뷰 반영 (Systems Architect + Developer C + Domain Expert)
+
+### Phase 0: 공유 인프라 구축
+
+| # | Task | 의존 | 상태 | 산출물 |
+|---|------|------|------|--------|
+| V2-0-1 | SCOR + ISA-95 하이브리드 온톨로지 초안 스키마 설계 (Neo4j 노드/관계 타입) | - | [ ] | `docs/ontology-schema.md` |
+| V2-0-2 | `shared/contracts/simulation.py` — typed 계약 합의 (DemandForecastParams 등) | - | [x] | `backend/shared/contracts/simulation.py` |
+| V2-0-3 | `shared/agent_framework/` — BaseAgent Protocol 추출 (기존 AgentPlugin 기반) | - | [x] | `backend/shared/agent_framework/` |
+| V2-0-4 | `shared/` 공통 코드 추출 (schemas, auth, config, db, observability) | V2-0-3 | [ ] | `backend/shared/` |
+| V2-0-5 | `backend/wiki/` 마이그레이션 — 기존 코드 이동 (git mv, 로직 변경 없음) | V2-0-4 | [ ] | `backend/wiki/` |
+| V2-0-6 | import 호환 shim (`backend/application/__init__.py` re-export + deprecation) | V2-0-5 | [ ] | `backend/application/__init__.py` |
+| V2-0-7 | 177 테스트 전수 통과 확인 | V2-0-6 | [ ] | 테스트 결과 |
+| V2-0-8 | `import-linter` independence contract 설정 + CI 연동 | V2-0-7 | [ ] | `pyproject.toml` |
+| V2-0-9 | `.github/CODEOWNERS` 작성 | V2-0-8 | [ ] | `.github/CODEOWNERS` |
+| V2-0-10 | `backend/modeling/` 스캐폴딩 (빈 모듈 + __init__.py + API 라우터) | V2-0-7 | [x] | `backend/modeling/` |
+| V2-0-11 | `backend/simulation/` 스캐폴딩 (빈 모듈 + mock 서버 + client Protocol) | V2-0-7 | [x] | `backend/simulation/` |
+| V2-0-12 | Frontend Section 네비게이션 + 3-pane 하이브리드 레이아웃 | V2-0-7 | [x] | `SectionNav.tsx`, `SimulationSection.tsx`, `ModelingSection.tsx` |
+| V2-0-13 | ChatShell 추출 (기존 AICopilot.tsx에서 공통 UI 분리) | V2-0-12 | [ ] | `frontend/src/components/shared/ChatShell.tsx` |
+| V2-0-14 | Neo4j docker-compose 추가 | - | [ ] | `docker-compose.yml` |
+| V2-0-15 | 비동기 job queue 기술 선택 + 기반 구현 | - | [ ] | `backend/shared/job_queue.py` |
+| V2-0-16 | 디렉토리 구조 + 네이밍 규칙 + import 규칙 3명 합의 문서 | - | [ ] | `docs/collaboration-rules.md` |
+| V2-0-17 | 개발자 C 가이드 문서 작성 | V2-0-11 | [x] | `docs/section3-developer-guide.md` |
+
+### Phase 1: 코드 영향 분석 MVP (Section 2 코어)
+
+| # | Task | 의존 | 상태 | 산출물 |
+|---|------|------|------|--------|
+| V2-1-1 | tree-sitter 기반 코드 파싱 엔진 | Phase 0 | [ ] | `backend/modeling/code_analysis/parser.py` |
+| V2-1-2 | 코드 엔티티 → Neo4j 그래프 빌드 | V2-1-1 | [ ] | `backend/modeling/code_analysis/graph_builder.py` |
+| V2-1-3 | SCOR+ISA-95 온톨로지 스키마 Neo4j 적재 | Phase 0 | [ ] | `backend/modeling/ontology/` |
+| V2-1-4 | 매핑 엔진 (LLM 제안 + AST 검증) | V2-1-2, V2-1-3 | [ ] | `backend/modeling/mapping/engine.py` |
+| V2-1-5 | Confidence scoring (4-factor) | V2-1-4 | [ ] | `backend/modeling/mapping/confidence.py` |
+| V2-1-6 | 전문가 리뷰 큐 (0.80-0.95 구간) | V2-1-5 | [ ] | `backend/modeling/mapping/review_queue.py` |
+| V2-1-7 | BFS 기반 영향 분석 ("이 메서드 바꾸면 어떤 도메인 기능이 영향?") | V2-1-4 | [ ] | `backend/modeling/agent/skills/impact_analysis.py` |
+| V2-1-8 | Wiki 런북 자동 링크 (영향 도메인 → 관련 wiki 문서) | V2-1-7 | [ ] | `backend/modeling/agent/skills/` |
+| V2-1-9 | ModelingAgent 기본 구현 + API 라우터 | V2-1-7 | [ ] | `backend/modeling/agent/` |
+| V2-1-10 | ModelingCopilot 프론트엔드 (ChatShell + 코드뷰어 + 그래프뷰) | V2-1-9 | [ ] | `frontend/src/components/modeling/` |
+| V2-1-11 | Git hook → AST diff → 매핑 재검증 트리거 | V2-1-5 | [ ] | `backend/modeling/code_analysis/ast_diff.py` |
+
+### Phase 2: 비즈니스 시뮬레이션 연동 (Section 2 + 3)
+
+| # | Task | 의존 | 상태 | 산출물 |
+|---|------|------|------|--------|
+| V2-2-1 | 파라메트릭 시뮬레이션 엔진 (Monte Carlo 등) | Phase 1 | [ ] | `backend/modeling/simulation/executor.py` |
+| V2-2-2 | 비동기 job queue 연동 (시뮬레이션 실행) | V2-0-15, V2-2-1 | [ ] | `backend/modeling/simulation/job_queue.py` |
+| V2-2-3 | OutputFormat별 결과 가공 (ChartOutput, TableOutput, GanttOutput) | V2-2-1 | [ ] | `backend/modeling/simulation/formatter.py` |
+| V2-2-4 | Parametric mock 서버 (정적 JSON X, 파라미터 기반 동적 생성) | Phase 0 | [ ] | `backend/simulation/mock/parametric_mock.py` |
+| V2-2-5 | SimAgent 기본 구현 (시나리오 설계 + 결과 해석) | V2-2-4 | [ ] | `backend/simulation/agent/` |
+| V2-2-6 | SimCopilot 프론트엔드 (채팅 + 대시보드 하이브리드) | V2-2-5 | [ ] | `frontend/src/components/simulation/` |
+| V2-2-7 | ScenarioDashboard (차트/테이블/Gantt 시각화) | V2-2-3 | [ ] | `frontend/src/components/simulation/ScenarioDashboard.tsx` |
+| V2-2-8 | ParameterForm (시나리오 파라미터 입력 폼) | V2-2-4 | [ ] | `frontend/src/components/simulation/ParameterForm.tsx` |
+| V2-2-9 | 시나리오 버전 관리 + 결과 저장소 | V2-2-6 | [ ] | `backend/simulation/storage/` |
+| V2-2-10 | CompareView (시나리오 A vs B 비교) | V2-2-9 | [ ] | `frontend/src/components/simulation/CompareView.tsx` |
+| V2-2-11 | Mock → 실제 API 전환 테스트 | V2-2-1, V2-2-5 | [ ] | 통합 테스트 |
+
+### Phase 3: 데이터 통합 + 운영 연동
+
+| # | Task | 의존 | 상태 | 산출물 |
+|---|------|------|------|--------|
+| V2-3-1 | ERP/MES/WMS 커넥터 (읽기 전용) | Phase 2 | [ ] | `backend/modeling/data/connectors/` |
+| V2-3-2 | 데이터 카탈로그 + 익명화 파이프라인 | V2-3-1 | [ ] | `backend/modeling/data/catalog.py` |
+| V2-3-3 | 시뮬레이션용 데이터 스냅샷 관리 | V2-3-2 | [ ] | `backend/modeling/data/snapshot.py` |
+| V2-3-4 | 모니터링 연동 (장애 대응 진입점) | Phase 2 | [ ] | `backend/modeling/observability/` |
+| V2-3-5 | 변경 이력 상관분석 (배포↔장애 매칭) | V2-3-4 | [ ] | `backend/modeling/observability/` |
+| V2-3-6 | 코드 샌드박스 보안 강화 (gVisor/Kata, 네트워크 격리, 감사 로그) | Phase 2 | [ ] | `backend/modeling/simulation/sandbox.py` |
+
+---
+
+### V2 진행 요약
+
+| Phase | 내용 | Task 수 | 상태 |
+|-------|------|---------|------|
+| Phase 0 | 공유 인프라 구축 | 17 | 🔨 6/17 완료 |
+| Phase 1 | 코드 영향 분석 MVP | 11 | ⬜ 미시작 |
+| Phase 2 | 비즈니스 시뮬레이션 연동 | 11 | ⬜ 미시작 |
+| Phase 3 | 데이터 통합 + 운영 연동 | 6 | ⬜ 미시작 |
+| | **V2 합계** | **45 tasks** | |
+
+---
+
+### V2 핵심 설계 원칙
+
+1. **시뮬레이션 ≠ 코드 실행** — 영향분석(그래프 BFS) + 비즈니스시뮬(수학모델) 분리
+2. **에이전트는 섹션별 독립** — Protocol만 공유, 구현은 각 섹션
+3. **결정론적 경로 우선** — 같은 질문에 항상 같은 핵심 답변
+4. **타입 있는 계약 먼저** — dict X → 시나리오별 Pydantic 모델
+5. **데이터 없이 가치 주는 것부터** — Phase 1은 코드+온톨로지만으로 MVP
+6. **코드 분석은 실마리, 확정은 인간** — Human-in-the-loop 필수
+7. **SCOR + ISA-95 하이브리드** — 공장 내부 + SCM 전체 커버

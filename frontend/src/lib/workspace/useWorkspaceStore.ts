@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Tab, FileType, VirtualTabType } from "@/types";
+import type { Tab, FileType, VirtualTabType, SectionId } from "@/types";
 
 function getFileType(filePath: string): FileType {
   const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
@@ -56,6 +56,7 @@ const VIRTUAL_TAB_TITLES: Record<VirtualTabType, string> = {
 };
 
 interface WorkspaceState {
+  activeSection: SectionId;
   tabs: Tab[];
   activeTabId: string | null;
   treeVersion: number;
@@ -63,6 +64,7 @@ interface WorkspaceState {
   agentWrite: AgentWrite | null;
   graphCenterPath: string | null;
   resolvedConflicts: Set<string>;
+  setActiveSection: (section: SectionId) => void;
   openTab: (filePath: string) => void;
   openVirtualTab: (tabType: VirtualTabType) => void;
   openGraphTab: (centerPath: string) => void;
@@ -81,6 +83,7 @@ interface WorkspaceState {
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
+  activeSection: "wiki" as SectionId,
   tabs: [],
   activeTabId: null,
   treeVersion: 0,
@@ -88,6 +91,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   agentWrite: null,
   graphCenterPath: null,
   resolvedConflicts: new Set<string>(),
+
+  setActiveSection: (section: SectionId) => {
+    set({ activeSection: section });
+  },
 
   openTab: (filePath: string) => {
     const { tabs } = get();

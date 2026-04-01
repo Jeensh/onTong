@@ -6,6 +6,45 @@
 
 ---
 
+## 2026-04-01 (세션 27 — Phase 0 스캐폴딩 + 개발자 C 환경 구축)
+
+- [x] **shared/contracts/ 생성** — `simulation.py` typed 계약 (DemandForecastParams, InventoryOptimizeParams, LeadTimeAnalysisParams, SimulationJob 등)
+- [x] **shared/agent_framework/ 생성** — AgentPlugin Protocol re-export
+- [x] **backend/simulation/ 스캐폴딩** — API 라우터, mock 서버(파라미터 기반), client Protocol, agent/visualization/storage 빈 모듈
+- [x] **backend/modeling/ 스캐폴딩** — API 라우터(health), agent/ontology/code_analysis/mapping/simulation/data 빈 모듈
+- [x] **main.py 라우터 등록** — modeling_api, simulation_api 등록 + MockModelingClient 초기화
+- [x] **프론트엔드 Section 네비게이션** — SectionNav 상단 탭 (Wiki/Modeling/Simulation), useWorkspaceStore에 activeSection 상태 추가
+- [x] **SimulationSection 3-pane 레이아웃** — 시나리오 목록(API 연동) + 대시보드 영역 + SimCopilot placeholder
+- [x] **ModelingSection stub** — Phase 1 로드맵 카드 + ModelingCopilot placeholder
+- [x] **개발자 C 가이드 문서** — `docs/section3-developer-guide.md` (실행법, 디렉토리, API 계약, mock 사용법, 규칙)
+- [x] **전체 테스트 통과** — 177/177 pass + TypeScript 빌드 성공
+
+---
+
+## 2026-04-01 (세션 26 — 3-Section Platform 아키텍처 v2)
+
+- [x] **3-Section 플랫폼 아키텍처 설계** — Wiki / Source-Domain Modeling / Simulation 3섹션 분리
+- [x] **3관점 리뷰 수행** — Systems Architect, Developer C, Domain Expert 관점 검토 (26건 이슈 도출)
+- [x] **리뷰 반영 아키텍처 v2 확정** — 시뮬레이션 2종 분리, SCOR+ISA-95, typed 계약, 비동기 job, 매핑 임계값 상향
+- [x] **아키텍처 문서 작성** — `toClaude/reports/platform_architecture_v2.md` (16개 섹션)
+- [x] **TODO.md 업데이트** — V2 Phase 0~3 태스크 44건 추가
+- [x] **메모리 업데이트** — project_status, architecture_v2, user_role
+- [x] **Phase 0 실행 시작** — 세션 27에서 스캐폴딩 + 개발자 C 환경 구축 완료
+
+### 핵심 아키텍처 결정 (합의 완료)
+- 에이전트 섹션별 독립 (공유 금지, Protocol만 공유)
+- ISA-95 단독 X → SCOR + ISA-95 하이브리드 온톨로지
+- 시뮬레이션 2종: 코드 영향분석(그래프 BFS) + 비즈니스시뮬(파라메트릭 모델)
+- 매핑 자동승인 임계값 0.95 (제조업 기준 상향)
+- 비동기 Job queue 필수 (동기 HTTP X)
+- Typed 계약 (dict X → 시나리오별 Pydantic 모델)
+- Chat + Dashboard 하이브리드 UI (섹션 3)
+- 모노리스 솔직하게 인정 (Python Protocol → 나중에 HTTP 분리)
+- MVP 순서: Phase 1은 코드 영향분석 (데이터 없이 가치 제공 가능)
+- Neo4j Community (그래프 DB)
+
+---
+
 ## 2026-04-01 (세션 23 — GitHub 배포 + 방법론 + 기술스택 + 에이전트 논의)
 
 - [x] **README.md 한국어 가이드** — 주요 기능, 아키텍처, 실행법, API, 스킬 작성법, 배포 가이드

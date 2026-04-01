@@ -1,3 +1,16 @@
+// ── Sections ──────────────────────────────────────────────────────────
+
+export type SectionId = "wiki" | "modeling" | "simulation";
+
+export interface SectionMeta {
+  id: SectionId;
+  label: string;
+  description: string;
+  icon: string;      // lucide icon name
+  owner: string;
+  status: "active" | "scaffolding" | "planned";
+}
+
 // ── Workspace ─────────────────────────────────────────────────────────
 
 export type FileType =

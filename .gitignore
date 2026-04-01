@@ -48,3 +48,9 @@ wiki/.next/
 # pytest
 .pytest_cache/
 *.pyc
+
+# ChromaDB local data
+.chroma_data/
+
+# uv lock
+uv.lock

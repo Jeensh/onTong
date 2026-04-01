@@ -1,0 +1,41 @@
+"""Cross-section typed contracts."""
+
+from backend.shared.contracts.simulation import (
+    OutputFormat,
+    DemandForecastParams,
+    InventoryOptimizeParams,
+    LeadTimeAnalysisParams,
+    ScenarioParams,
+    SimulationJobStatus,
+    SimulationError,
+    SimulationRequest,
+    SimulationResult,
+    SimulationJob,
+    ChartSeries,
+    ChartOutput,
+    ColumnDef,
+    TableOutput,
+    GanttTask,
+    GanttOutput,
+    ScenarioInfo,
+)
+
+__all__ = [
+    "OutputFormat",
+    "DemandForecastParams",
+    "InventoryOptimizeParams",
+    "LeadTimeAnalysisParams",
+    "ScenarioParams",
+    "SimulationJobStatus",
+    "SimulationError",
+    "SimulationRequest",
+    "SimulationResult",
+    "SimulationJob",
+    "ChartSeries",
+    "ChartOutput",
+    "ColumnDef",
+    "TableOutput",
+    "GanttTask",
+    "GanttOutput",
+    "ScenarioInfo",
+]

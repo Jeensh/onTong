@@ -1,6 +1,6 @@
 # onTong
 
-**AI 기반 위키 지식관리 시스템** — 조직의 운영 지식을 체계적으로 관리하고, AI가 실시간으로 답변하는 올인원 플랫폼
+**Knowledge-Fused Multi-Agent Platform for SCM** — 위키 지식관리 + 코드-도메인 매핑 + 비즈니스 시뮬레이션을 통합한 제조 SCM 플랫폼
 
 <br>
 
@@ -16,7 +16,29 @@
 
 <br>
 
-## 주요 기능
+## 플랫폼 구조
+
+onTong은 3개 섹션으로 구성되어 있으며, 하나의 애플리케이션에서 함께 동작합니다.
+
+| 섹션 | 용도 | 대상 사용자 | 상태 |
+|------|------|-------------|------|
+| **Section 1 (Wiki)** | 문서 관리 + AI Q&A | 전체 | 운영 중 |
+| **Section 2 (Modeling)** | 코드매핑 / 온톨로지 / 영향분석 | IT 담당자 | 개발 중 |
+| **Section 3 (Simulation)** | 시뮬레이션 시나리오 설계 / 시각화 | SCM 현업 | 개발 중 |
+
+### 섹션별 개발 가이드
+
+| 섹션 | 작업 영역 | 가이드 |
+|------|-----------|--------|
+| Section 3 (Simulation) | `backend/simulation/` · `frontend/src/components/simulation/` | **[Section 3 개발 가이드 →](docs/section3-developer-guide.md)** |
+| Section 2 (Modeling) | `backend/modeling/` | (팀 리더 담당) |
+| Section 1 (Wiki) | `backend/application/` · `frontend/src/components/` | 아래 기능 목록 참고 |
+
+> 아키텍처 상세: [platform_architecture_v2.md](toClaude/reports/platform_architecture_v2.md)
+
+<br>
+
+## 주요 기능 (Section 1 — Wiki)
 
 ### 위키 에디터
 - **Tiptap WYSIWYG 에디터** — 마크다운 소스 모드 전환, 슬래시(`/`) 명령어, 테이블, 체크리스트
@@ -257,48 +279,54 @@ GOOGLE_API_KEY=your-key
 
 ```
 onTong/
-├── backend/                    # FastAPI 백엔드
-│   ├── api/                    # REST API 엔드포인트
-│   │   ├── wiki.py             #   위키 CRUD, 트리, 인덱싱
-│   │   ├── search.py           #   검색, 그래프, 백링크
-│   │   ├── agent.py            #   AI Copilot 채팅 (SSE)
-│   │   ├── skill.py            #   스킬 CRUD, 매칭
-│   │   ├── conflict.py         #   충돌 감지, 폐기
-│   │   ├── metadata.py         #   태그, 템플릿, Auto-Tag
-│   │   ├── lock.py             #   편집 잠금
-│   │   ├── acl.py              #   ACL 권한 관리
-│   │   ├── files.py            #   파일 업로드/다운로드
-│   │   └── approval.py         #   승인 워크플로우
-│   ├── application/            # 비즈니스 로직
+├── backend/
+│   ├── api/                    # Section 1 REST API
+│   ├── application/            # Section 1 비즈니스 로직 (Wiki)
 │   │   ├── agent/              #   AI 에이전트 (RAG, 스킬, ReAct)
 │   │   ├── skill/              #   스킬 로더, 매처
 │   │   ├── wiki/               #   위키 서비스, 인덱서
 │   │   ├── conflict/           #   충돌 감지 서비스
 │   │   └── metadata/           #   메타데이터 서비스
+│   ├── modeling/               # Section 2 — 코드매핑, 온톨로지, 영향분석
+│   │   ├── api/                #   Modeling API 라우터
+│   │   ├── agent/              #   ModelingAgent
+│   │   ├── ontology/           #   SCOR + ISA-95 온톨로지
+│   │   ├── code_analysis/      #   tree-sitter 코드 파싱
+│   │   └── mapping/            #   코드↔도메인 매핑
+│   ├── simulation/             # Section 3 — 시뮬레이션 시나리오 설계/시각화
+│   │   ├── api/                #   Simulation API 라우터
+│   │   ├── agent/              #   SimAgent
+│   │   ├── mock/               #   Section 2 Mock 서버
+│   │   ├── client/             #   Section 2 API 클라이언트
+│   │   ├── visualization/      #   결과 포맷 변환
+│   │   └── storage/            #   시나리오/결과 저장
+│   ├── shared/                 # 섹션 간 공유 계약
+│   │   ├── contracts/          #   typed API 계약 (Pydantic 모델)
+│   │   └── agent_framework/    #   AgentPlugin Protocol
 │   ├── core/                   # 설정, 스키마, 인증
 │   └── infrastructure/         # 스토리지, 벡터DB, 검색, 캐시
 │
-├── frontend/                   # Next.js 프론트엔드
-│   └── src/
-│       ├── components/         # UI 컴포넌트
-│       │   ├── AICopilot.tsx   #   AI 채팅 패널
-│       │   ├── TreeNav.tsx     #   사이드바 (트리/태그/스킬/관리)
-│       │   ├── editors/        #   에디터 (MD, Excel, PDF, PPT, Image)
-│       │   ├── search/         #   검색 커맨드 팔레트
-│       │   ├── skills/         #   스킬 생성 다이얼로그
-│       │   └── workspace/      #   탭, 파일 라우터
-│       ├── lib/                # API 클라이언트, 상태 관리, 유틸
-│       └── types/              # TypeScript 타입 정의
+├── frontend/src/
+│   ├── components/
+│   │   ├── simulation/         # Section 3 컴포넌트 (자유 영역)
+│   │   ├── sections/           # 섹션 네비게이션 (공통)
+│   │   ├── AICopilot.tsx       # Wiki AI 채팅 패널
+│   │   ├── TreeNav.tsx         # Wiki 사이드바
+│   │   ├── editors/            # 에디터 (MD, Excel, PDF, PPT, Image)
+│   │   └── workspace/          # 탭, 파일 라우터
+│   ├── lib/
+│   │   ├── simulation/         # Section 3 훅/스토어/API (자유 영역)
+│   │   ├── workspace/          # Zustand 상태 관리
+│   │   └── api/                # SSE 클라이언트, Wiki API
+│   └── types/                  # TypeScript 타입 정의
+│
+├── docs/
+│   ├── section3-developer-guide.md  # Section 3 개발 가이드
+│   └── tech-stack.md                # 기술 스택 상세
 │
 ├── wiki/                       # 위키 콘텐츠 (파일 기반 스토리지)
-│   ├── _skills/                #   AI 스킬 정의 파일
-│   └── {카테고리}/              #   문서 폴더
-│
 ├── tests/                      # 테스트 스위트 (177 tests)
 ├── docker-compose.yml          # 전체 서비스 오케스트레이션
-├── Dockerfile.backend          # 백엔드 멀티스테이지 빌드
-├── frontend/Dockerfile         # 프론트엔드 멀티스테이지 빌드
-├── nginx.conf                  # 리버스 프록시 설정
 └── .env.example                # 환경 변수 템플릿
 ```
 
@@ -344,6 +372,22 @@ onTong/
 | `PUT` | `/api/skills/{path}` | 스킬 수정 |
 | `PATCH` | `/api/skills/{path}/toggle` | 활성/비활성 전환 |
 | `DELETE` | `/api/skills/{path}` | 스킬 삭제 |
+
+### 시뮬레이션 (Section 3)
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| `GET` | `/api/simulation/health` | Section 3 헬스 체크 |
+| `GET` | `/api/simulation/scenarios` | 사용 가능한 시나리오 목록 |
+| `POST` | `/api/simulation/scenario` | 시뮬레이션 실행 (Job 반환) |
+| `GET` | `/api/simulation/job/{job_id}` | Job 상태 폴링 |
+| `DELETE` | `/api/simulation/job/{job_id}` | Job 취소 |
+
+### 모델링 (Section 2)
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| `GET` | `/api/modeling/health` | Section 2 헬스 체크 |
 
 ### 관리
 

@@ -39,6 +39,10 @@ from backend.api import skill as skill_api
 from backend.application.skill.skill_loader import UserSkillLoader
 from backend.application.skill.skill_matcher import SkillMatcher
 from backend.infrastructure.events.event_bus import event_bus
+from backend.modeling.api import modeling as modeling_api
+from backend.simulation.api import simulation as simulation_api
+from backend.simulation.client.modeling_client import create_modeling_client
+from backend.simulation.client.config import use_mock as simulation_use_mock
 
 setup_logging(
     level=settings.log_level,
@@ -89,6 +93,11 @@ async def lifespan(app: FastAPI):
                    conflict_store=conflict_store)
     skill_api.init(skill_loader, skill_matcher, storage)
     conflict_api.init(wiki_service, conflict_svc)
+
+    # Initialize Section 2 (Modeling) and Section 3 (Simulation) APIs
+    modeling_api.init()
+    sim_client = create_modeling_client(use_mock=simulation_use_mock())
+    simulation_api.init(sim_client)
 
     # Register skills (before agents — agents may use them)
     register_all_skills()
@@ -177,6 +186,8 @@ app.include_router(conflict_api.router)
 app.include_router(lock_api.router)
 app.include_router(acl_api.router)
 app.include_router(skill_api.router)
+app.include_router(modeling_api.router)
+app.include_router(simulation_api.router)
 
 
 # Global exception handler
