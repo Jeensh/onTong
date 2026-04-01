@@ -707,3 +707,335 @@ npx tsc --noEmit
   ```python
   python -c "from backend.core.auth.factory import create_auth_provider; create_auth_provider('unknown')"
   ```
+
+---
+
+# Phase 2+ 검증 체크리스트
+
+> **최종 갱신**: 2026-04-01
+> 아래 항목들은 Pre-Demo Verification Protocol에서 사용.
+> `## Quick Smoke Test`는 매 변경 후 반드시 실행. 나머지는 해당 기능 변경 시 실행.
+
+---
+
+## Quick Smoke Test (매 변경 후 필수)
+
+```bash
+# 1. 백엔드 테스트
+./venv/bin/pytest tests/ -x -q
+
+# 2. 프론트엔드 타입 체크
+cd frontend && npx tsc --noEmit
+
+# 3. 프론트엔드 빌드
+cd frontend && npm run build
+
+# 4. 백엔드 서버 기동 확인
+source venv/bin/activate && uvicorn backend.main:app --port 8001 &
+sleep 3
+curl -sf http://localhost:8001/api/wiki/tree | head -c 100
+# → JSON 배열 출력
+
+# 5. 기본 채팅 동작
+curl -s -N -X POST http://localhost:8001/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "장애 대응 절차 알려줘", "session_id": "smoke"}' \
+  | grep -c "content_delta"
+# → 1 이상
+```
+
+- [ ] pytest 전체 PASS
+- [ ] tsc --noEmit 에러 0개
+- [ ] npm run build 성공
+- [ ] 백엔드 /api/wiki/tree 정상 응답
+- [ ] 채팅 content_delta 이벤트 수신
+
+---
+
+## 충돌 감지 & 비교 해결
+
+### CD-1. 충돌 경고 (SSE)
+
+```bash
+# 충돌 나야 하는 질문 (구체적 수치 비교)
+curl -s -N -X POST http://localhost:8001/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "밥 짓는법 쌀 몇컵?", "session_id": "cd-1"}' \
+  | grep "conflict_warning"
+```
+
+- [ ] `conflict_warning` 이벤트 1개 발생
+- [ ] `details` 필드가 한국어
+- [ ] `conflict_pairs` 배열에 페어 1개 이상
+- [ ] 각 페어에 `file_a`, `file_b`, `similarity`, `summary` 포함
+
+### CD-2. 충돌 오탐 없음
+
+```bash
+# 충돌 안 나야 하는 일반 질문
+curl -s -N -X POST http://localhost:8001/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "밥 맛있게 짓는법 알려줘", "session_id": "cd-2"}' \
+  | grep -c "conflict_warning"
+# → 0
+
+# 관련 없는 주제
+curl -s -N -X POST http://localhost:8001/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "VPN 접속 방법", "session_id": "cd-3"}' \
+  | grep -c "conflict_warning"
+# → 0
+```
+
+- [ ] 일반적 질문에서 `conflict_warning` 0건
+- [ ] 무관한 주제에서 `conflict_warning` 0건
+
+### CD-3. ConflictDashboard API
+
+```bash
+# 유사 문서 쌍 조회
+curl -s "http://localhost:8001/api/conflict/duplicates?threshold=0.9" | python3 -m json.tool | head -20
+
+# 풀 스캔
+curl -s -X POST http://localhost:8001/api/conflict/full-scan
+sleep 2
+curl -s http://localhost:8001/api/conflict/scan-status
+```
+
+- [ ] `/api/conflict/duplicates` → JSON 배열 반환
+- [ ] 각 항목에 `file_a`, `file_b`, `similarity` 포함
+- [ ] full-scan 후 scan-status에 progress 반영
+
+### CD-4. 문서 비교
+
+```bash
+curl -s "http://localhost:8001/api/wiki/compare?path_a=밥%20맛있게%20짓는%20법.md&path_b=테스트/맛있게_밥_짓는_법.md" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('A:', d['file_a']['path']); print('B:', d['file_b']['path']); print('A content length:', len(d['file_a']['content'])); print('B content length:', len(d['file_b']['content']))"
+```
+
+- [ ] `file_a`, `file_b` 각각 `path`, `content`, `metadata` 포함
+- [ ] content 길이 0 이상
+
+### CD-5. Deprecation & Lineage
+
+```bash
+# deprecate API (주의: 실제 문서 상태 변경)
+# curl -s -X POST "http://localhost:8001/api/conflict/deprecate?path=테스트/맛있게_밥_짓는_법.md&superseded_by=밥%20맛있게%20짓는%20법.md"
+
+# lineage 확인
+curl -s "http://localhost:8001/api/wiki/lineage/밥%20맛있게%20짓는%20법.md" | python3 -m json.tool
+```
+
+- [ ] lineage API가 `supersedes`, `superseded_by` 필드 반환
+- [ ] deprecated 처리 후 superseded_by 체인 정상
+
+---
+
+## 문서 관계 그래프
+
+### GR-1. Graph API
+
+```bash
+curl -s "http://localhost:8001/api/search/graph?center_path=밥%20맛있게%20짓는%20법.md&include_similar=true&similarity_threshold=0.8" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('nodes:', len(d['nodes'])); print('edges:', len(d['edges']))"
+```
+
+- [ ] `nodes` 배열에 center 노드 포함
+- [ ] `edges` 배열에 similarity/link 엣지 포함
+- [ ] similarity_threshold 조절 시 엣지 수 변화
+
+---
+
+## 검색 API
+
+### SR-1. Hybrid 검색
+
+```bash
+curl -s "http://localhost:8001/api/search/hybrid?q=장애대응&n=5" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('results:', len(d['results'])); [print(f'  {r[\"path\"]} ({r[\"score\"]:.3f})') for r in d['results'][:3]]"
+```
+
+- [ ] results 배열 반환, 각 항목에 `path`, `score` 포함
+- [ ] 관련 문서가 상위에 위치
+
+### SR-2. Quick 검색
+
+```bash
+curl -s "http://localhost:8001/api/search/quick?q=캐시&limit=3" \
+  | python3 -m json.tool | head -10
+```
+
+- [ ] 결과 반환, limit 이하 개수
+
+---
+
+## 스킬 시스템
+
+### SK-1. 스킬 목록 & 매칭
+
+```bash
+curl -s http://localhost:8001/api/skills/ | python3 -c "import sys,json; d=json.load(sys.stdin); print('skills:', len(d['skills'])); [print(f'  {s[\"title\"]}') for s in d['skills'][:5]]"
+
+curl -s "http://localhost:8001/api/skills/match?q=장애%20대응" | python3 -m json.tool
+```
+
+- [ ] 스킬 목록에 등록된 스킬 표시
+- [ ] match API가 관련 스킬 반환
+
+---
+
+## 메타데이터 & 태깅
+
+### MT-1. 메타데이터 태그
+
+```bash
+curl -s http://localhost:8001/api/metadata/tags | python3 -c "import sys,json; d=json.load(sys.stdin); print('domains:', len(d['domains'])); print('tags:', len(d['tags']))"
+
+curl -s http://localhost:8001/api/metadata/untagged | python3 -c "import sys,json; d=json.load(sys.stdin); print('untagged:', len(d))"
+```
+
+- [ ] domains, tags 배열 반환
+- [ ] untagged 목록 반환
+
+### MT-2. 메타데이터 템플릿
+
+```bash
+curl -s http://localhost:8001/api/metadata/templates | python3 -m json.tool | head -15
+```
+
+- [ ] templates 설정 반환 (domains, processes, tag_presets)
+
+---
+
+## 문서 작성/수정 (SSE + Approval)
+
+### WE-1. 문서 생성 플로우
+
+```bash
+curl -s -N -X POST http://localhost:8001/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "서버 점검 체크리스트 만들어줘", "session_id": "we-1"}' \
+  | grep -E "event: (approval_request|content_delta)" | head -5
+```
+
+- [ ] `approval_request` 이벤트 발생
+- [ ] `action_type: "wiki_write"` 포함
+- [ ] `content` 필드에 생성될 문서 내용 포함
+- [ ] 채팅 content_delta에 긴 본문이 아닌 간단 안내만 표시
+
+### WE-2. 문서 수정 플로우
+
+```bash
+curl -s -N -X POST http://localhost:8001/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "밥 맛있게 짓는 법.md 문서에 현미밥 짓는법 섹션 추가해줘", "session_id": "we-2", "attached_files": ["밥 맛있게 짓는 법.md"]}' \
+  | grep -E "event: (approval_request|content_delta)" | head -5
+```
+
+- [ ] `approval_request` 이벤트 발생
+- [ ] `action_type: "wiki_edit"` 포함
+- [ ] `original_content` 필드에 원본 내용 포함
+- [ ] `content` 필드에 수정된 내용 포함
+
+### WE-3. Approval 처리
+
+```bash
+# 승인 API (action_id는 위 테스트에서 추출)
+# curl -s -X POST http://localhost:8001/api/approval/resolve \
+#   -H "Content-Type: application/json" \
+#   -d '{"action_id": "...", "approved": true, "session_id": "..."}'
+```
+
+- [ ] approved=true → 파일 실제 저장
+- [ ] approved=false → 파일 미변경
+
+---
+
+## 문서 잠금 (Locking)
+
+### LK-1. 잠금 라이프사이클
+
+```bash
+# 잠금 획득
+curl -s -X POST http://localhost:8001/api/lock \
+  -H "Content-Type: application/json" \
+  -d '{"path": "test-lock.md", "user": "tester", "ttl": 10}' | python3 -m json.tool
+
+# 잠금 상태 확인
+curl -s "http://localhost:8001/api/lock/status?path=test-lock.md" | python3 -m json.tool
+
+# 잠금 해제
+curl -s -X DELETE "http://localhost:8001/api/lock?path=test-lock.md&user=tester"
+```
+
+- [ ] 잠금 획득 → locked: true
+- [ ] 상태 확인 → holder 정보 표시
+- [ ] 해제 → locked: false
+
+---
+
+## 파일/에셋 관리
+
+### FM-1. 미사용 에셋
+
+```bash
+curl -s http://localhost:8001/api/files/assets/unused | python3 -m json.tool | head -10
+```
+
+- [ ] 미참조 이미지 목록 반환 (또는 빈 배열)
+
+---
+
+## Pre-Demo 자동 검증 스크립트
+
+> 위 체크리스트의 핵심 항목을 한 번에 실행하는 스크립트.
+> 변경 후 `bash toClaude/verify.sh`로 실행.
+
+```bash
+#!/bin/bash
+# toClaude/verify.sh — Pre-Demo Quick Verification
+set -e
+cd "$(dirname "$0")/.."
+
+echo "═══ 1. pytest ═══"
+./venv/bin/pytest tests/ -x -q
+
+echo ""
+echo "═══ 2. TypeScript ═══"
+cd frontend && npx tsc --noEmit && cd ..
+
+echo ""
+echo "═══ 3. Backend alive ═══"
+curl -sf http://localhost:8001/api/wiki/tree > /dev/null && echo "OK" || echo "FAIL: backend not running"
+
+echo ""
+echo "═══ 4. Chat basic ═══"
+DELTAS=$(curl -s -N -X POST http://localhost:8001/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"장애 대응 절차","session_id":"verify"}' | grep -c "content_delta")
+[ "$DELTAS" -gt 0 ] && echo "OK ($DELTAS deltas)" || echo "FAIL: no content_delta"
+
+echo ""
+echo "═══ 5. Conflict false-positive check ═══"
+FP=$(curl -s -N -X POST http://localhost:8001/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"밥 맛있게 짓는법 알려줘","session_id":"verify-fp"}' | grep -c "conflict_warning")
+[ "$FP" -eq 0 ] && echo "OK (no false positive)" || echo "FAIL: false positive conflict"
+
+echo ""
+echo "═══ 6. Conflict detection ═══"
+CD=$(curl -s -N -X POST http://localhost:8001/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"밥 짓는법 쌀 몇컵?","session_id":"verify-cd"}' | grep -c "conflict_warning")
+[ "$CD" -gt 0 ] && echo "OK (conflict detected)" || echo "WARN: conflict not detected (LLM dependent)"
+
+echo ""
+echo "═══ 7. API endpoints ═══"
+curl -sf "http://localhost:8001/api/conflict/duplicates?threshold=0.9" > /dev/null && echo "conflict/duplicates: OK" || echo "FAIL"
+curl -sf "http://localhost:8001/api/search/graph?center_path=밥%20맛있게%20짓는%20법.md" > /dev/null && echo "search/graph: OK" || echo "FAIL"
+curl -sf http://localhost:8001/api/metadata/tags > /dev/null && echo "metadata/tags: OK" || echo "FAIL"
+curl -sf http://localhost:8001/api/skills/ > /dev/null && echo "skills: OK" || echo "FAIL"
+
+echo ""
+echo "═══ DONE ═══"
+```

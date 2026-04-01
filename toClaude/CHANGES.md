@@ -6,6 +6,43 @@
 
 ---
 
+## 2026-04-01 (세션 23 — GitHub 배포 + 방법론 + 기술스택 + 에이전트 논의)
+
+- [x] **README.md 한국어 가이드** — 주요 기능, 아키텍처, 실행법, API, 스킬 작성법, 배포 가이드
+- [x] **GitHub 공개 배포** — Jeensh/onTong, v1.0.0 태그, 프론트엔드 서브모듈 fix
+- [x] **위키 콘텐츠 교체** — IT 시스템 운영 데모용 21개 문서 (장애대응/인프라/보안/업무절차/개발운영 + 스킬 3개)
+- [x] **Agentic Workflow 방법론** — agentic-workflow/ 폴더 (가이드 + 템플릿 5개 + CLAUDE.md 프리셋 3개 + 6-Layer 스킬 2개)
+- [x] **Mermaid 다이어그램** — ASCII → Mermaid 전환, 서브에이전트 검토 반영
+- [x] **기술스택 상세 문서** — docs/tech-stack.md 작성 완료 (2회 검토, 로컬에 있음, 미커밋)
+- [x] **Pydantic AI 프레임워크 도입** — Hybrid 접근: 구조화된 출력(cognitive reflect, classify, edit, write, conflict) + ReAct 루프 + 스트리밍을 Pydantic AI로 전환. litellm 직접 호출을 llm_generate.py 1곳으로 격리. 신규 7파일, 수정 12파일, 테스트 174/174 PASS
+- [x] **SIMULATION/DEBUG_TRACE 에이전트** — 스캐폴딩 완료. 본격 구현은 동료가 별도 진행 (본 TODO 범위 밖)
+
+## 2026-04-01 (세션 25 — 충돌 문서 비교 해결 기능)
+
+- [x] **ConflictPair 모델** — `schemas.py`에 `ConflictPair(file_a, file_b, similarity, summary)` 추가, `ConflictWarningEvent`에 `conflict_pairs` 필드 추가
+- [x] **충돌 페어 빌드** — `rag_agent.py`에서 충돌 감지 시 문서 쌍별 similarity 계산 + 명시적 ConflictPair 목록 생성
+- [x] **ConflictStore 연동** — `AgentContext`에 `conflict_store` 추가, 채팅에서 감지된 충돌을 ConflictStore에 등록하여 ConflictDashboard와 동기화
+- [x] **채팅 충돌 배너 개선** — 페어별 유사도 표시 + "나란히 비교" 버튼 → 기존 DiffViewer에서 "A가 최신/B가 최신" 선택으로 해결
+- [x] **해결 상태 반영** — DiffViewer에서 deprecation 완료 시 채팅 배너에 "해결됨" 표시 (`resolvedConflicts` 상태 관리)
+- [x] **하위 호환** — `conflict_pairs`가 없는 기존 이벤트에서도 레거시 배너 정상 표시
+- [x] **충돌 감지 오탐 수정** — 2차 conflict_check 조건을 관련도 60% 이상 문서 2개 이상으로 강화, 일반적 질문에서 불필요한 충돌 경고 방지
+- [x] **충돌 요약 품질 개선** — conflict_details[:200] 단순 자르기 → 문서명 기반 문장 추출 (`_extract_pair_summary`)
+
+## 2026-04-01 (세션 24 — Pydantic AI 데모 테스트 버그 수정)
+
+- [x] **스킬 참조문서 wikilink 해석 버그** — `[[장애등급-분류기준]]` 등 하위 디렉토리 문서를 파일명만으로 찾지 못하던 문제. skill_loader에 파일명→전체경로 인덱스 추가
+- [x] **Pydantic AI LiteLLMProvider API 키 버그** — LiteLLMProvider가 OPENAI_API_KEY를 무시하고 placeholder 키를 사용하던 문제. OpenAIProvider로 직접 교체하여 올바른 API 키 전달
+- [x] **Write intent 패턴 확장** — "체크리스트/가이드/매뉴얼/절차서 만들어줘" 패턴 추가 (기존은 "문서/위키" 키워드 필수)
+- [x] **LLM Provider 추상화** — llm_factory.py를 레지스트리 패턴으로 재설계. OpenAI/Anthropic/Ollama/Google/Azure/Groq/DeepSeek 7개 프로바이더 지원. .env의 LITELLM_MODEL만 변경하면 전환 가능
+- [x] **LLM 모델 업그레이드** — gpt-4o-mini → gpt-4o로 변경
+- [x] **키워드 라우팅 → LLM 통합 분류** — router.py의 40+ regex 규칙과 rag_agent.py의 edit/write regex를 제거. 단일 LLM 호출(UserIntent 모델)로 agent + action을 동시에 판단. 키워드 누락 문제 근본 해결
+- [x] **문서 업데이트** — README.md (AI Copilot 설명, LLM 설정 7개 프로바이더, 환경 변수 테이블, 테스트 수 177), docs/tech-stack.md (LiteLLM→Pydantic AI 섹션 재작성, Ollama 연동 방식 업데이트)
+- [x] **충돌 감지 버그 수정** — (1) context[:3000]→[:6000] 확장 (2) zip() 불일치 수정: relevant_docs/metas/dists 동기화 (3) cognitive reflection이 놓친 충돌을 conflict_check 스킬로 2차 감지
+- [x] **Lineage 동기화 버그 수정** — status를 미설정으로 변경 시 supersedes/superseded_by 자동 정리 + 상대 문서의 역참조도 연동 삭제
+- [x] **충돌 설명 한국어화** — cognitive reflection + conflict_check 스킬 프롬프트에서 conflict_details를 한국어로 출력하도록 변경
+- [x] **채팅 입력 히스토리** — 위/아래 방향키로 이전 질문 재입력 기능 (세션 내 히스토리)
+- [x] **문서 생성/수정 워크스페이스 직접 작업** — 채팅에서 승인 버튼 제거, workspace에서 바로 미리보기+승인/취소/편집. 생성: 렌더링된 미리보기+상단바(저장/직접편집/취소). 수정: DiffView에서 hunk별 선택+전체적용/되돌리기/직접편집. 채팅은 상태 메시지만 표시.
+
 ## 2026-04-01 (세션 22 — Skill 시스템 테스트 추가)
 
 - [x] **skill_loader Unit 테스트** — frontmatter 파싱, 카테고리 추출, 6-Layer 섹션, 캐시, wikilink 참조 (39 tests)

@@ -37,6 +37,7 @@
 - **출처 표시** — 참조 문서 링크, 작성자, 날짜, 신뢰도 배지
 - **승인 워크플로우** — AI가 문서 수정 제안 시 diff 미리보기 + 승인/거절
 - **Self-Reflective Pipeline** — 의도분석 → 초안 → 자기검토 → 최종답변
+- **LLM 기반 의도 분류** — 구조화된 출력(Pydantic AI)으로 질문/작성/편집 의도를 정밀 분류
 - **탐색 과정 시각화** — AI의 사고 과정을 단계별로 표시
 
 ### 스킬 시스템
@@ -107,10 +108,10 @@ graph TB
 | 계층 | 기술 |
 |------|------|
 | **프론트엔드** | Next.js 15, React 19, Tiptap, shadcn/ui, Zustand, react-force-graph-2d |
-| **백엔드** | FastAPI, Pydantic v2, LiteLLM, aiofiles |
+| **백엔드** | FastAPI, Pydantic v2, Pydantic AI, aiofiles |
 | **벡터 DB** | ChromaDB (all-MiniLM-L6-v2 임베딩) |
 | **검색** | BM25 (rank-bm25) + 벡터 + RRF 병합 + Cross-encoder 리랭킹 |
-| **LLM** | Ollama (로컬, 기본) / OpenAI (옵션) |
+| **LLM** | Ollama / OpenAI / Anthropic / Google Gemini / Azure / Groq / DeepSeek |
 | **캐시/락** | Redis 7 (분산 락, 쿼리 캐시, 충돌 스토어) |
 | **프록시** | Nginx (로드밸런싱, SSE 지원, gzip) |
 | **컨테이너** | Docker Compose, 멀티스테이지 빌드 |
@@ -183,7 +184,7 @@ http://localhost:3000 에서 접속합니다.
 
 ### LLM 설정 (선택)
 
-AI Copilot 기능을 사용하려면 LLM이 필요합니다.
+AI Copilot 기능을 사용하려면 LLM이 필요합니다. `LITELLM_MODEL` 환경 변수를 `{provider}/{model}` 형식으로 설정하면 자동으로 해당 프로바이더에 연결됩니다.
 
 **Ollama (로컬, 기본값):**
 
@@ -192,18 +193,33 @@ AI Copilot 기능을 사용하려면 LLM이 필요합니다.
 ollama pull llama3
 ```
 
-`.env`에서 설정 확인:
 ```env
 LITELLM_MODEL=ollama/llama3
 OLLAMA_HOST=http://localhost:11434
 ```
 
-**OpenAI (클라우드):**
+**OpenAI:**
 
 ```env
-LITELLM_MODEL=openai/gpt-4o-mini
+LITELLM_MODEL=openai/gpt-4o
 LITELLM_API_KEY=sk-your-api-key
 ```
+
+**Anthropic:**
+
+```env
+LITELLM_MODEL=anthropic/claude-sonnet-4-20250514
+ANTHROPIC_API_KEY=sk-ant-your-key
+```
+
+**Google Gemini:**
+
+```env
+LITELLM_MODEL=google/gemini-2.0-flash
+GOOGLE_API_KEY=your-key
+```
+
+**그 외 지원 프로바이더:** Azure OpenAI (`azure/gpt-4o`), Groq (`groq/llama3-70b-8192`), DeepSeek (`deepseek/deepseek-chat`)
 
 > LLM 없이도 위키 편집, 검색, 파일 뷰어 등 핵심 기능은 모두 사용할 수 있습니다.
 
@@ -213,9 +229,15 @@ LITELLM_API_KEY=sk-your-api-key
 
 | 변수 | 기본값 | 설명 |
 |------|--------|------|
-| `LITELLM_MODEL` | `ollama/llama3` | 사용할 LLM 모델 |
+| `LITELLM_MODEL` | `ollama/llama3` | LLM 모델 (`{provider}/{model}` 형식) |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama 서버 주소 |
-| `LITELLM_API_KEY` | (없음) | OpenAI 등 클라우드 LLM API 키 |
+| `LITELLM_API_KEY` | (없음) | OpenAI API 키 |
+| `ANTHROPIC_API_KEY` | (없음) | Anthropic API 키 |
+| `GOOGLE_API_KEY` | (없음) | Google Gemini API 키 |
+| `GROQ_API_KEY` | (없음) | Groq API 키 |
+| `DEEPSEEK_API_KEY` | (없음) | DeepSeek API 키 |
+| `AZURE_ENDPOINT` | (없음) | Azure OpenAI 엔드포인트 |
+| `AZURE_API_KEY` | (없음) | Azure OpenAI API 키 |
 | `EMBEDDING_PROVIDER` | `default` | 임베딩 제공자 (`default`: ChromaDB 내장, `openai`: OpenAI) |
 | `STORAGE_BACKEND` | `local` | 스토리지 (`local` / `nas`) |
 | `WIKI_DIR` | `wiki` | 위키 파일 저장 경로 |
@@ -272,7 +294,7 @@ onTong/
 │   ├── _skills/                #   AI 스킬 정의 파일
 │   └── {카테고리}/              #   문서 폴더
 │
-├── tests/                      # 테스트 스위트 (145 tests)
+├── tests/                      # 테스트 스위트 (177 tests)
 ├── docker-compose.yml          # 전체 서비스 오케스트레이션
 ├── Dockerfile.backend          # 백엔드 멀티스테이지 빌드
 ├── frontend/Dockerfile         # 프론트엔드 멀티스테이지 빌드
@@ -466,7 +488,7 @@ cd frontend && npm run build
 
 ```bash
 source venv/bin/activate
-pytest tests/ -v          # 전체 (145 tests)
+pytest tests/ -v          # 전체 (177 tests)
 pytest tests/test_skill_loader.py tests/test_skill_matcher.py tests/test_skill_api.py -v  # 스킬 시스템만
 ```
 

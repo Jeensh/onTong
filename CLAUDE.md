@@ -104,6 +104,24 @@ For any NEW backend logic, API endpoint, or Agent tool:
 
 ---
 
+# 🔍 Pre-Demo Verification Protocol (Strict)
+
+pytest 통과 + TS 빌드 성공 ≠ 기능 정상. 사용자에게 데모를 넘기기 전에 반드시 아래를 수행할 것.
+
+1. **`bash toClaude/verify.sh` 실행** — 자동 검증 스크립트 (pytest + tsc + API + 채팅 + 충돌 오탐 체크)
+2. **해당 기능 체크리스트 실행** — `CHECKLIST.md`에서 변경 관련 섹션의 curl 명령을 직접 실행
+3. **Edge Case 테스트** — 빈 입력, 단일 결과, 다수 결과 등 경계 조건 확인
+4. **증거 기반 보고** — "잘 될 것이다" 추정 금지. 실행 결과(로그, curl 응답)를 근거로 보고
+
+특히 다음 경우에 이 프로토콜이 중요:
+- SSE 이벤트 추가/변경 → 실제 채팅으로 이벤트 시퀀스 확인
+- 프론트엔드 UI 변경 → 브라우저에서 직접 렌더링 확인
+- 데이터 파이프라인 변경 → 실제 데이터로 end-to-end 흐름 확인
+
+**위반 시**: 데모에서 기본적인 버그가 발견되면 사용자 신뢰를 잃는다. 반드시 지킬 것.
+
+---
+
 # 📁 Archive Rule
 
 - Do NOT read past step summaries (`toClaude/archive/*.md`) unless explicitly asked.

@@ -745,6 +745,45 @@
 
 ---
 
+## Pydantic AI 프레임워크 마이그레이션
+
+> 에이전트 프레임워크 유지보수성 확보를 위해 Pydantic AI로 마이그레이션.
+> SIMULATION/DEBUG_TRACE 에이전트 구현은 동료가 별도 진행 (본 TODO 범위 밖).
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| PA-1 | Pydantic AI 의존성 추가 + 환경 구성 | [x] | `pyproject.toml`, `llm_factory.py` |
+| PA-2 | 기존 Skill 프로토콜 → Pydantic AI `@agent.tool` 전환 + 구조화 출력 모델 | [x] | `models.py`, `pydantic_tools.py` |
+| PA-3 | AgentPlugin/Registry 유지 (Hybrid 접근) + litellm 제거 (5개 스킬) | [x] | `skills/*.py` |
+| PA-4 | RAGAgent 마이그레이션 (cognitive_reflect + 스트리밍 + 인라인 핸들러) | [x] | `rag_agent.py` |
+| PA-5 | ReAct 루프 (tool_executor.py) → Pydantic AI 내장 도구 호출 전환 | [x] | `tool_executor.py`, `react_agent.py` |
+| PA-6 | SSE 스트리밍 연동 확인 (기존 이벤트 타입 유지) | [x] | `api/agent.py` (변경 없음) |
+| PA-7 | 기존 테스트 회귀 확인 (174/174 PASS, 신규 29개) | [x] | `tests/test_pydantic_ai_migration.py` |
+| PA-8 | 새 에이전트 구조로 SIMULATION/DEBUG_TRACE 스캐폴딩 | [x] | `simulator_agent.py`, `tracer_agent.py` |
+
+## Pydantic AI 데모 테스트 버그 수정
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| BF-1 | 스킬 참조문서 wikilink 해석 — 하위 디렉토리 검색 | [x] | `skill_loader.py` |
+| BF-2 | LiteLLMProvider API 키 → OpenAIProvider 직접 사용 | [x] | `llm_factory.py` |
+| BF-3 | Write intent 패턴 확장 (체크리스트/가이드/매뉴얼 등) | [x] | `rag_agent.py` |
+| BF-4 | LLM Provider 추상화 — 레지스트리 패턴, 7개 프로바이더 | [x] | `llm_factory.py`, `config.py` |
+| BF-5 | LLM 모델 업그레이드 (gpt-4o-mini → gpt-4o) | [x] | `.env` |
+| BF-6 | 키워드 라우팅 → LLM 통합 분류 (UserIntent) | [x] | `router.py`, `rag_agent.py`, `models.py`, `structured_agents.py`, `api/agent.py` |
+| BF-7 | 충돌 감지 — context 확장(6000자) + zip 불일치 + conflict_check 2차 호출 | [x] | `rag_agent.py` |
+| BF-8 | Lineage 동기화 — status 미설정 시 supersedes/superseded_by 자동 정리 | [x] | `local_fs.py`, `wiki_service.py` |
+| BF-9 | 충돌 설명 한국어 출력 | [x] | `rag_agent.py`, `conflict_check.py` |
+| BF-10 | 채팅 입력 히스토리 (↑↓ 방향키) | [x] | `AICopilot.tsx` |
+| BF-11 | 문서 생성/수정 워크스페이스 직접 작업 (채팅 승인 제거) | [x] | `schemas.py`, `wiki_edit.py`, `wiki_write.py`, `rag_agent.py`, `AICopilot.tsx`, `MarkdownEditor.tsx`, `useWorkspaceStore.ts`, `sseClient.ts` |
+| BF-12 | README.md + docs/tech-stack.md 업데이트 | [x] | `README.md`, `docs/tech-stack.md` |
+| BF-13 | 충돌 비교 해결 — ConflictPair 모델 + SSE 이벤트 확장 | [x] | `schemas.py` |
+| BF-14 | 충돌 비교 해결 — 페어 빌드 로직 + ConflictStore 연동 | [x] | `rag_agent.py`, `context.py`, `agent.py`, `main.py` |
+| BF-15 | 충돌 비교 해결 — 채팅 배너 "나란히 비교" 버튼 + 해결 상태 반영 | [x] | `AICopilot.tsx`, `sseClient.ts`, `useWorkspaceStore.ts`, `DiffViewer.tsx` |
+| BF-16 | 충돌 감지 오탐 수정 + 요약 품질 개선 | [x] | `rag_agent.py` |
+
+---
+
 ### 권장 작업 순서 (크리티컬 패스)
 
 ```

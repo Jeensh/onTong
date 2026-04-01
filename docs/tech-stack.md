@@ -143,20 +143,30 @@
 
 ---
 
-### LiteLLM
+### Pydantic AI
 
-**역할**: LLM 추상화 레이어
+**역할**: LLM 에이전트 프레임워크 + LLM 추상화 레이어
 
-**선택 이유**: 하나의 인터페이스(`acompletion`)로 Ollama(로컬)와 OpenAI(클라우드)를 동일하게 호출합니다. 모델을 `ollama/llama3` → `openai/gpt-4o-mini`로 환경 변수 하나만 바꿔서 전환할 수 있어, 에어갭 환경과 클라우드 환경을 동일 코드로 지원합니다.
+**선택 이유**: 구조화된 출력(Structured Output)으로 LLM 응답을 Pydantic 모델로 자동 파싱하여 JSON 수동 파싱 코드를 제거합니다. 프로바이더별 SDK를 직접 지원하여 API 키를 명시적으로 전달할 수 있고, 모델 전환이 환경 변수 하나로 가능합니다.
 
 **사용 방식**:
-- `litellm.acompletion()` — 비동기 LLM 호출 (일반 응답)
-- 스트리밍 모드 — async generator로 토큰 단위 SSE 전달
-- Tool/Function calling — 에이전트 도구 호출 지원
-- **세마포어**: 동시 LLM 호출을 8개로 제한하여 Ollama 과부하 방지
+- **LLM Factory** (`llm_factory.py`) — `{provider}/{model}` 형식 문자열을 파싱하여 해당 프로바이더의 Pydantic AI 모델 인스턴스를 생성하는 중앙 팩토리. 레지스트리 패턴으로 7개 프로바이더를 지원:
+  - OpenAI (`openai/gpt-4o`) — `OpenAIChatModel` + `OpenAIProvider`
+  - Anthropic (`anthropic/claude-sonnet-4-20250514`) — `AnthropicModel` + `AnthropicProvider`
+  - Google Gemini (`google/gemini-2.0-flash`) — `GoogleModel` + `GoogleProvider`
+  - Ollama (`ollama/llama3`) — `OpenAIChatModel` + `OpenAIProvider` (OpenAI 호환 API)
+  - Azure OpenAI (`azure/gpt-4o`) — `OpenAIChatModel` + `OpenAIProvider` (Azure 엔드포인트)
+  - Groq (`groq/llama3-70b-8192`) — `OpenAIChatModel` + `OpenAIProvider` (OpenAI 호환 API)
+  - DeepSeek (`deepseek/deepseek-chat`) — `OpenAIChatModel` + `OpenAIProvider` (OpenAI 호환 API)
+- **구조화된 출력** — `Agent(output_type=PydanticModel)`로 LLM 응답을 타입 안전하게 파싱:
+  - `CognitiveReflection` — 자기 검토 결과 (confidence, issues, suggestions)
+  - `UserIntent` — 의도 분류 (agent, action, confidence)
+  - `EditResult`, `WriteResult` — 문서 수정/작성 결과
+- **스트리밍** — `Agent.run_stream()` + `stream_text(delta=True)`로 토큰 단위 SSE 전달
+- **세마포어**: `ThrottledModel`로 동시 LLM 호출을 8개로 제한
 - **기본값**: `ollama/llama3` (로컬, API 키 불필요)
 
-**참고 파일**: `backend/core/config.py`, `backend/application/agent/skills/llm_generate.py`
+**참고 파일**: `backend/application/agent/llm_factory.py`, `backend/application/agent/structured_agents.py`, `backend/application/agent/models.py`
 
 ---
 
@@ -313,14 +323,14 @@ async with aiofiles.open(path, "r", encoding="utf-8") as f:
 
 **선택 이유**: 에어갭(폐쇄망) 환경에서 외부 API 호출 없이 LLM 기능을 제공합니다. API 키 관리가 불필요하고, 데이터가 외부로 유출되지 않아 보안 요구사항을 충족합니다.
 
-**연동 방식**: LiteLLM을 통해 `ollama/llama3`로 호출 (직접 Ollama API를 사용하지 않음)
+**연동 방식**: Pydantic AI의 `OpenAIProvider`를 통해 Ollama의 OpenAI 호환 API(`/v1`)로 연결. LLM Factory에서 `ollama/{model}` 형식을 인식하여 자동으로 `base_url`을 `{OLLAMA_HOST}/v1`로 설정합니다.
 
 **운영 설정**:
 - 병렬 처리: 4 (단일 GPU 기준 적정치)
 - 세마포어: 8 (전체 에이전트 동시 호출 상한)
-- 호스트: `http://localhost:11434` (기본값)
+- 호스트: `http://localhost:11434` (기본값, `OLLAMA_HOST` 환경 변수로 변경)
 
-**참고 파일**: `backend/core/config.py`
+**참고 파일**: `backend/application/agent/llm_factory.py`, `backend/core/config.py`
 
 ---
 
