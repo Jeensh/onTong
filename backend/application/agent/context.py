@@ -29,6 +29,7 @@ class AgentContext:
     user_roles: list[str] = field(default_factory=lambda: ["admin"])
     user_skill: Any = None        # SkillMeta | None — matched user-facing skill
     skill_context: Any = None     # SkillContext | None — structured 6-layer context
+    conflict_store: Any = None    # ConflictStore | None — for registering detected conflicts
 
     @staticmethod
     def emit_thinking(step: str, status: str, label: str, detail: str = "") -> str:

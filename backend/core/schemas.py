@@ -167,6 +167,8 @@ class ApprovalRequestEvent(BaseModel):
     action_type: str
     path: str
     diff_preview: str
+    content: str = ""            # full proposed content (for workspace preview)
+    original_content: str = ""   # original content before edit (for diff view)
 
 
 class ErrorEvent(BaseModel):
@@ -176,11 +178,20 @@ class ErrorEvent(BaseModel):
     retry_hint: str | None = None
 
 
+class ConflictPair(BaseModel):
+    """A specific pair of conflicting documents with similarity and summary."""
+    file_a: str           # file path A
+    file_b: str           # file path B
+    similarity: float     # cosine similarity (0~1)
+    summary: str          # Korean summary of how they differ
+
+
 class ConflictWarningEvent(BaseModel):
     """Emitted when RAG pipeline detects contradictory information across documents."""
     event: Literal["conflict_warning"] = "conflict_warning"
     details: str          # human-readable conflict description
     conflicting_docs: list[str] = []  # file paths of conflicting documents
+    conflict_pairs: list[ConflictPair] = []  # explicit conflict pairs for comparison
 
 
 class DoneEvent(BaseModel):

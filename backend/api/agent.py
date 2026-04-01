@@ -15,6 +15,7 @@ from backend.core.schemas import (
     ContentDelta,
     DoneEvent,
     ErrorEvent,
+    RouterDecision,
     UnknownIntentResponse,
 )
 from backend.core.session import session_store
@@ -28,6 +29,7 @@ _chroma: object | None = None
 _storage: object | None = None
 _skill_loader: object | None = None   # UserSkillLoader
 _skill_matcher: object | None = None  # SkillMatcher
+_conflict_store: object | None = None  # ConflictStore
 
 
 def init(
@@ -37,13 +39,15 @@ def init(
     storage: object | None = None,
     skill_loader: object | None = None,
     skill_matcher: object | None = None,
+    conflict_store: object | None = None,
 ) -> None:
-    global _wiki_service, _chroma, _storage, _skill_loader, _skill_matcher
+    global _wiki_service, _chroma, _storage, _skill_loader, _skill_matcher, _conflict_store
     _wiki_service = wiki_service
     _chroma = chroma
     _storage = storage
     _skill_loader = skill_loader
     _skill_matcher = skill_matcher
+    _conflict_store = conflict_store
 
 logger = logging.getLogger(__name__)
 
@@ -73,15 +77,20 @@ async def chat(request: ChatRequest, user: User = Depends(get_current_user)):
             augmented_query = None
 
             if is_followup and rag_agent and hasattr(rag_agent, '_augment_query'):
-                decision, augmented_query = await asyncio.gather(
-                    main_router.route(request.message),
+                intent, augmented_query = await asyncio.gather(
+                    main_router.classify(request.message, has_attached_files=bool(request.attached_files)),
                     rag_agent._augment_query(request.message, history),
                 )
             else:
-                decision = await main_router.route(request.message)
+                intent = await main_router.classify(request.message, has_attached_files=bool(request.attached_files))
 
+            decision = RouterDecision(
+                agent=intent.agent,
+                confidence=intent.confidence,
+                reasoning=f"llm_intent: action={intent.action}",
+            )
             logger.info(
-                f"Routed to {decision.agent} (confidence={decision.confidence})"
+                f"Routed to {decision.agent} (confidence={decision.confidence}, action={intent.action})"
             )
 
             # Send routing info
@@ -127,6 +136,7 @@ async def chat(request: ChatRequest, user: User = Depends(get_current_user)):
                 attached_context=attached_context,
                 augmented_query=augmented_query,
                 user_roles=current_user_roles,
+                conflict_store=_conflict_store,
             )
 
             # Resolve user-facing skill (explicit or auto-matched)
@@ -162,7 +172,7 @@ async def chat(request: ChatRequest, user: User = Depends(get_current_user)):
 
             # Execute agent (yields SSE events), collect assistant response
             assistant_content = ""
-            async for event in agent.execute(request, ctx=ctx, history=history, attached_context=attached_context, augmented_query=augmented_query, user_roles=current_user_roles):
+            async for event in agent.execute(request, ctx=ctx, history=history, attached_context=attached_context, augmented_query=augmented_query, user_roles=current_user_roles, intent=intent):
                 yield event
                 # Capture content deltas for session history
                 if "content_delta" in event and '"delta"' in event:

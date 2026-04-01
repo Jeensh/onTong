@@ -85,7 +85,8 @@ async def lifespan(app: FastAPI):
     skill_matcher = SkillMatcher()
 
     agent_api.init(wiki_service, chroma=chroma, storage=storage,
-                   skill_loader=skill_loader, skill_matcher=skill_matcher)
+                   skill_loader=skill_loader, skill_matcher=skill_matcher,
+                   conflict_store=conflict_store)
     skill_api.init(skill_loader, skill_matcher, storage)
     conflict_api.init(wiki_service, conflict_svc)
 
