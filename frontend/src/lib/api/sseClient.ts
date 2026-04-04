@@ -50,12 +50,13 @@ export async function streamChat(
   attachedFiles?: string[],
   skillPath?: string
 ): Promise<void> {
-  // SSE streams must bypass the Next.js rewrite proxy, which buffers
-  // chunked responses and delays thinking_step events. Hit the backend directly.
-  const backendUrl =
-    typeof window !== "undefined" && window.location.hostname === "localhost"
-      ? "http://localhost:8001"
-      : "";
+  // SSE streams bypass the Next.js rewrite proxy (which buffers chunked
+  // responses). On localhost we hit the backend directly; on external access
+  // (ngrok/LAN) we use the Next.js /api/agent/chat route handler that
+  // streams without buffering.
+  const isLocal =
+    typeof window !== "undefined" && window.location.hostname === "localhost";
+  const backendUrl = isLocal ? "http://localhost:8001" : "";
 
   const body: Record<string, unknown> = { message, session_id: sessionId };
   if (attachedFiles && attachedFiles.length > 0) {
