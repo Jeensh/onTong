@@ -33,7 +33,7 @@ class GitConnector:
             return dest
 
         subprocess.run(
-            ["git", "clone", "--depth=1", url, str(dest)],
+            ["git", "clone", "--depth=1", "--", url, str(dest)],
             check=True,
             capture_output=True,
             text=True,
@@ -113,5 +113,8 @@ class GitConnector:
         return result.stdout.strip()
 
     def read_file(self, repo_id: str, file_path: str) -> str:
-        full_path = self.repos_dir / repo_id / file_path
+        repo_root = (self.repos_dir / repo_id).resolve()
+        full_path = (repo_root / file_path).resolve()
+        if not str(full_path).startswith(str(repo_root)):
+            raise ValueError(f"Path traversal detected: {file_path}")
         return full_path.read_text(encoding="utf-8")

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ImpactQuery(BaseModel):
     """User's impact analysis request."""
     term: str                      # natural language term or code entity name
     repo_id: str
-    depth: int = 3                 # BFS traversal depth
+    depth: int = Field(default=3, ge=1, le=10)  # BFS traversal depth
     confirmed_only: bool = True    # only use confirmed mappings
 
 

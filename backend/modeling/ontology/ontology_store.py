@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 
 from backend.modeling.infrastructure.neo4j_client import Neo4jClient
+
+_SAFE_REL_TYPE = re.compile(r"^[A-Z_]+$")
 from backend.modeling.ontology.domain_models import (
     DomainNode,
     DomainOntology,
@@ -54,7 +58,7 @@ class OntologyStore:
             "name": node.name,
             "description": node.description,
             "parent_id": node.parent_id,
-            "metadata": str(node.metadata),
+            "metadata": json.dumps(node.metadata) if node.metadata else "{}",
         })
 
     def update_node(
@@ -113,6 +117,8 @@ class OntologyStore:
 
     def _write_relation(self, rel: DomainRelation) -> None:
         rel_type = rel.kind.value.upper()
+        if not _SAFE_REL_TYPE.match(rel_type):
+            raise ValueError(f"Invalid relationship type: {rel_type}")
         cypher = (
             f"MATCH (a:DomainNode {{id: $source}}) "
             f"MATCH (b:DomainNode {{id: $target}}) "

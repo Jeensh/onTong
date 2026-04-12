@@ -5,6 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from backend.modeling.mapping.mapping_models import MappingStatus
+
 router = APIRouter(prefix="/api/modeling/approval", tags=["modeling-approval"])
 
 _approval_service = None
@@ -45,7 +47,7 @@ async def submit_review(req: SubmitReviewRequest):
     """Submit a mapping for business review."""
     # Update mapping status to review
     mf = _load_mf(req.repo_id)
-    _mapping_service.update_status(mf, req.mapping_code, "review")
+    _mapping_service.update_status(mf, req.mapping_code, MappingStatus.REVIEW)
     _save_mf(req.repo_id, mf)
 
     review = _approval_service.create_review(

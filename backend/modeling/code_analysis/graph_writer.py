@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from backend.modeling.infrastructure.neo4j_client import Neo4jClient
 from backend.modeling.code_analysis.parser_protocol import (
     CodeEntity, CodeRelation, ParseResult, RelationKind,
 )
+
+_SAFE_REL_TYPE = re.compile(r"^[A-Z_]+$")
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +52,8 @@ class CodeGraphWriter:
     def write_relations(self, relations: list[CodeRelation], repo_id: str) -> None:
         for rel in relations:
             rel_type = rel.kind.value.upper()
+            if not _SAFE_REL_TYPE.match(rel_type):
+                raise ValueError(f"Invalid relationship type: {rel_type}")
             cypher = f"""
             MATCH (a:CodeEntity {{qualified_name: $source, repo_id: $repo_id}})
             MATCH (b:CodeEntity {{qualified_name: $target, repo_id: $repo_id}})

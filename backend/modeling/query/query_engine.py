@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from backend.modeling.infrastructure.neo4j_client import Neo4jClient
-from backend.modeling.mapping.mapping_models import MappingFile, MappingStatus
+from backend.modeling.mapping.mapping_models import Mapping, MappingFile, MappingStatus
 from backend.modeling.mapping.mapping_service import MappingService
 from backend.modeling.query.query_models import (
     ImpactQuery, ImpactResult, AffectedProcess,
@@ -125,7 +125,7 @@ class QueryEngine:
         """ % max_depth
         return self._neo4j.query(cypher, {"qn": entity, "repo_id": repo_id})
 
-    def _find_inherited_mapping(self, mf: MappingFile, qn: str):
+    def _find_inherited_mapping(self, mf: MappingFile, qn: str) -> Mapping | None:
         """Find the mapping entry that would apply via inheritance."""
         parts = qn.rsplit(".", 1)
         while len(parts) == 2:

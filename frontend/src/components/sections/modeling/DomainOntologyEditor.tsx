@@ -206,9 +206,8 @@ export function DomainOntologyEditor({ repoId }: { repoId: string }) {
                 className="w-full mt-1 px-2 py-1.5 text-sm bg-background border border-border rounded"
               >
                 <option value="process">Process</option>
-                <option value="activity">Activity</option>
-                <option value="task">Task</option>
-                <option value="resource">Resource</option>
+                <option value="entity">Entity</option>
+                <option value="role">Role</option>
               </select>
             </div>
             <div>
