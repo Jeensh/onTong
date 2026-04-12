@@ -46,8 +46,13 @@ chromadb = "^0.4.0"
 # Search
 rank-bm25 = "^0.2.2"
 
-# Code Analysis (Phase 2)
-# javalang = "^0.13.0"  # Java parsing
+# Graph Database (Section 2 - Modeling)
+neo4j = "^5.0"
+
+# Code Analysis (Section 2 - Modeling)
+tree-sitter = "^0.23"
+tree-sitter-java = "^0.23"
+# javalang = "^0.13.0"  # Java parsing (deprecated)
 
 # Utilities
 httpx = "^0.25.0"

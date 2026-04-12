@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     wiki_dir: Path = Path(__file__).resolve().parent.parent.parent / "wiki"
     nas_wiki_dir: str = ""  # NAS mount path (used when storage_backend=nas)
 
+    # Neo4j (Section 2 - Modeling)
+    neo4j_uri: str = "bolt://localhost:7687"
+    neo4j_user: str = "neo4j"
+    neo4j_password: str = "ontong_dev"
+
     # Redis (optional — falls back to in-memory if not configured)
     redis_url: str = ""  # e.g. redis://localhost:6379/0
 

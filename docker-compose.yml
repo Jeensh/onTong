@@ -109,6 +109,23 @@ services:
           memory: 512M
     restart: unless-stopped
 
+  # Neo4j - Graph Database for Section 2 Modeling
+  neo4j:
+    image: neo4j:5-community
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/ontong_dev
+      NEO4J_PLUGINS: '["apoc"]'
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD", "neo4j", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ChromaDB - Vector Database for RAG
   chroma:
     image: chromadb/chroma:latest
@@ -178,6 +195,7 @@ volumes:
   wiki_data:
   chroma_data:
   redis_data:
+  neo4j_data:
   postgres_data:
   backend_logs:
 
