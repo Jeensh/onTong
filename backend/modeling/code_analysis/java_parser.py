@@ -167,7 +167,7 @@ class JavaParser:
                 )
             )
 
-        # EXTENDS
+        # EXTENDS (class superclass)
         superclass = node.child_by_field_name("superclass")
         if superclass:
             for child in superclass.children:
@@ -183,19 +183,35 @@ class JavaParser:
                         )
                     )
 
+        # EXTENDS (interface extends_interfaces)
+        for child in node.children:
+            if child.type == "extends_interfaces":
+                for desc in self._walk(child):
+                    if desc.type == "type_identifier":
+                        target = self._resolve_type(desc.text.decode(), import_map, pkg_name)
+                        relations.append(
+                            CodeRelation(
+                                kind=RelationKind.EXTENDS,
+                                source=qname,
+                                target=target,
+                                file_path=fp,
+                                line=desc.start_point[0] + 1,
+                            )
+                        )
+
         # IMPLEMENTS
         interfaces = node.child_by_field_name("interfaces")
         if interfaces:
-            for child in interfaces.children:
-                if child.type == "type_identifier":
-                    target = self._resolve_type(child.text.decode(), import_map, pkg_name)
+            for desc in self._walk(interfaces):
+                if desc.type == "type_identifier":
+                    target = self._resolve_type(desc.text.decode(), import_map, pkg_name)
                     relations.append(
                         CodeRelation(
                             kind=RelationKind.IMPLEMENTS,
                             source=qname,
                             target=target,
                             file_path=fp,
-                            line=child.start_point[0] + 1,
+                            line=desc.start_point[0] + 1,
                         )
                     )
 

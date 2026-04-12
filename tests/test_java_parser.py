@@ -32,6 +32,45 @@ public class SafetyStockCalculator {
 """
 
 
+SAMPLE_INTERFACE = """\
+package com.example.shapes;
+
+import com.example.base.Drawable;
+
+public interface Resizable extends Drawable {
+    void resize(int width, int height);
+}
+"""
+
+SAMPLE_ENUM = """\
+package com.example.shapes;
+
+public enum ShapeType {
+    CIRCLE, SQUARE, TRIANGLE;
+}
+"""
+
+SAMPLE_INHERITANCE = """\
+package com.example.shapes;
+
+import com.example.base.BaseShape;
+
+public class Circle extends BaseShape implements Resizable {
+    private double radius;
+
+    public Circle(double radius) {
+        this.radius = radius;
+    }
+
+    public void resize(int width, int height) {}
+
+    public double area() {
+        return Math.PI * radius * radius;
+    }
+}
+"""
+
+
 class TestJavaParser:
     def setup_method(self):
         self.parser = JavaParser()
@@ -113,3 +152,62 @@ class TestJavaParser:
             SAMPLE_JAVA,
         )
         assert result.errors == []
+
+    def test_parse_extracts_interface(self):
+        result = self.parser.parse_file(
+            Path("src/com/example/shapes/Resizable.java"),
+            SAMPLE_INTERFACE,
+        )
+        interfaces = [e for e in result.entities if e.kind == EntityKind.INTERFACE]
+        assert len(interfaces) == 1
+        assert interfaces[0].qualified_name == "com.example.shapes.Resizable"
+        assert "public" in interfaces[0].modifiers
+
+    def test_parse_extracts_enum(self):
+        result = self.parser.parse_file(
+            Path("src/com/example/shapes/ShapeType.java"),
+            SAMPLE_ENUM,
+        )
+        enums = [e for e in result.entities if e.kind == EntityKind.ENUM]
+        assert len(enums) == 1
+        assert enums[0].qualified_name == "com.example.shapes.ShapeType"
+
+    def test_parse_extracts_constructor(self):
+        result = self.parser.parse_file(
+            Path("src/com/example/inventory/SafetyStockCalculator.java"),
+            SAMPLE_JAVA,
+        )
+        constructors = [e for e in result.entities if e.kind == EntityKind.CONSTRUCTOR]
+        assert len(constructors) == 1
+        assert constructors[0].name == "SafetyStockCalculator"
+
+    def test_parse_extracts_extends(self):
+        # Test class EXTENDS
+        result = self.parser.parse_file(
+            Path("src/com/example/shapes/Circle.java"),
+            SAMPLE_INHERITANCE,
+        )
+        extends = [r for r in result.relations if r.kind == RelationKind.EXTENDS]
+        assert len(extends) == 1
+        assert extends[0].source == "com.example.shapes.Circle"
+        assert extends[0].target == "com.example.base.BaseShape"
+
+        # Test interface EXTENDS
+        result2 = self.parser.parse_file(
+            Path("src/com/example/shapes/Resizable.java"),
+            SAMPLE_INTERFACE,
+        )
+        extends2 = [r for r in result2.relations if r.kind == RelationKind.EXTENDS]
+        assert len(extends2) == 1
+        assert extends2[0].source == "com.example.shapes.Resizable"
+        assert extends2[0].target == "com.example.base.Drawable"
+
+    def test_parse_extracts_implements(self):
+        result = self.parser.parse_file(
+            Path("src/com/example/shapes/Circle.java"),
+            SAMPLE_INHERITANCE,
+        )
+        implements = [r for r in result.relations if r.kind == RelationKind.IMPLEMENTS]
+        assert len(implements) == 1
+        assert implements[0].source == "com.example.shapes.Circle"
+        assert implements[0].target == "com.example.shapes.Resizable"
