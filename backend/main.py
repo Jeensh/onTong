@@ -24,6 +24,9 @@ from backend.application.agent.registry import registry
 from backend.application.agent.skill import skill_registry
 from backend.application.agent.skills import register_all_skills
 from backend.application.agent.rag_agent import RAGAgent
+from backend.application.trust.confidence_service import ConfidenceService
+from backend.application.trust.citation_tracker import create_citation_tracker
+from backend.application.trust.feedback_tracker import create_feedback_tracker
 from backend.application.agent.simulator_agent import SimulatorAgent
 from backend.application.agent.tracer_agent import TracerAgent
 from backend.api import wiki as wiki_api
@@ -36,6 +39,11 @@ from backend.api import conflict as conflict_api
 from backend.api import lock as lock_api
 from backend.api import acl as acl_api
 from backend.api import skill as skill_api
+from backend.api import persona as persona_api
+from backend.api import auth as auth_api
+from backend.api import graph as graph_api
+from backend.application.graph.graph_store import create_graph_store
+from backend.application.graph.graph_builder import GraphBuilder
 from backend.application.skill.skill_loader import UserSkillLoader
 from backend.application.skill.skill_matcher import SkillMatcher
 from backend.infrastructure.events.event_bus import event_bus
@@ -74,28 +82,114 @@ async def lifespan(app: FastAPI):
     search_service = WikiSearchService()
     wiki_service = WikiService(storage, indexer, search_service)
 
+    # Build materialized metadata index (auto-build if missing)
+    from backend.application.metadata.metadata_index import MetadataIndex
+    from backend.application.metadata.tag_registry import tag_registry
+    meta_index = MetadataIndex(settings.wiki_dir)
+    wiki_service.set_metadata_index(meta_index)
+    if not meta_index._path.exists():
+        _files = await wiki_service.get_all_files()
+        meta_index.rebuild(extended=[
+            {
+                "path": f.path,
+                "domain": f.metadata.domain,
+                "process": f.metadata.process,
+                "tags": f.metadata.tags,
+                "updated": f.metadata.updated,
+                "updated_by": f.metadata.updated_by,
+                "created_by": f.metadata.created_by,
+                "related": f.metadata.related,
+                "status": f.metadata.status,
+                "supersedes": f.metadata.supersedes,
+                "superseded_by": f.metadata.superseded_by,
+            }
+            for f in _files
+        ])
+        logger.info("Metadata index auto-built on startup")
+
+    # Initialize semantic tag registry (same embedding as wiki collection)
+    if chroma._client:
+        from backend.infrastructure.vectordb.chroma import _get_embedding_function
+        tag_registry.connect(chroma._client, _get_embedding_function())
+        # Sync existing tags from index to registry
+        idx_data = meta_index._load()
+        tag_counts = idx_data.get("tags", {})
+        if tag_counts and tag_registry.is_connected:
+            tag_registry.register_tags_bulk(tag_counts)
+
+    # Wire metadata service dependencies
+    from backend.application.metadata import metadata_service as meta_svc
+    meta_svc.init(meta_index, tag_registry)
+
+    # Build feedback tracker (before confidence service, which uses it)
+    feedback_tracker = create_feedback_tracker()
+
+    # Build citation tracker and confidence scoring service
+    citation_tracker = create_citation_tracker()
+    confidence_svc = ConfidenceService(meta_index, settings.wiki_dir)
+    confidence_svc.set_citation_tracker(citation_tracker)
+    confidence_svc.set_chroma(chroma)
+    confidence_svc.set_feedback_tracker(feedback_tracker)
+
     # Build conflict detection service
     conflict_store = create_conflict_store()
     conflict_svc = ConflictDetectionService(chroma, conflict_store)
     wiki_service.set_conflict_service(conflict_svc)
+    wiki_service.set_chroma(chroma)
+    wiki_service.set_confidence_service(confidence_svc)
+
+    # Build digest service
+    from backend.application.trust.digest import DocumentDigestService
+    digest_svc = DocumentDigestService(confidence_svc, conflict_svc, settings.wiki_dir)
+
+    # Build knowledge graph
+    graph_store = create_graph_store()
+    graph_builder = GraphBuilder(
+        graph_store=graph_store,
+        meta_index=meta_index,
+        conflict_store=conflict_store,
+        citation_tracker=citation_tracker,
+    )
+
+    # Invalidate caches on tree_change events (100K-scale: avoid stale data)
+    def _on_tree_change(data: dict) -> None:
+        path = data.get("path", "")
+        if path:
+            confidence_svc.invalidate(path)
+            graph_builder.rebuild_file(path)
+        digest_svc.invalidate_cache()
+
+    event_bus.on("tree_change", _on_tree_change)
 
     # Wire up API modules
-    wiki_api.init(wiki_service)
-    search_api.init(wiki_service, search_service, chroma)
+    graph_api.init(graph_store, graph_builder)
+    wiki_api.init(wiki_service, confidence_service=confidence_svc, digest_service=digest_svc, feedback_tracker=feedback_tracker)
+    search_api.init(wiki_service, search_service, chroma, confidence_service=confidence_svc)
     approval_api.init(wiki_service)
-    metadata_api.init(wiki_service)
+    metadata_api.init(wiki_service, meta_index)
     # Initialize user-facing skill system
     skill_loader = UserSkillLoader(storage)
     skill_matcher = SkillMatcher()
 
     agent_api.init(wiki_service, chroma=chroma, storage=storage,
                    skill_loader=skill_loader, skill_matcher=skill_matcher,
-                   conflict_store=conflict_store)
+                   conflict_store=conflict_store, meta_index=meta_index)
     skill_api.init(skill_loader, skill_matcher, storage)
+    persona_api.init(storage)
     conflict_api.init(wiki_service, conflict_svc)
 
-    # Initialize Section 2 (Modeling) and Section 3 (Simulation) APIs
-    modeling_api.init()
+    # Initialize Section 2 (Modeling) with Neo4j
+    from backend.modeling.infrastructure.neo4j_client import Neo4jClient
+    try:
+        neo4j_client = Neo4jClient(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password)
+        neo4j_health = neo4j_client.health()
+        logger.info(f"Neo4j: {neo4j_health['status']}")
+        modeling_api.init(neo4j_client=neo4j_client)
+    except Exception as e:
+        logger.warning(f"Neo4j unavailable, modeling in limited mode: {e}")
+        modeling_api.init()
+
+    # Initialize Section 3 (Simulation) API
     sim_client = create_modeling_client(use_mock=simulation_use_mock())
     simulation_api.init(sim_client)
 
@@ -103,8 +197,15 @@ async def lifespan(app: FastAPI):
     register_all_skills()
     logger.info(f"Registered skills: {len(skill_registry.list_skills())} skills")
 
+    # Register default hooks
+    from backend.application.agent.hooks import register_default_hooks
+    register_default_hooks()
+
     # Register agents
-    registry.register(RAGAgent(chroma, storage=storage))
+    rag_agent = RAGAgent(chroma, storage=storage)
+    rag_agent.set_confidence_service(confidence_svc)
+    rag_agent.set_citation_tracker(citation_tracker)
+    registry.register(rag_agent)
     registry.register(SimulatorAgent())
     registry.register(TracerAgent())
     logger.info(f"Registered agents: {registry.list_agents()}")
@@ -129,6 +230,11 @@ async def lifespan(app: FastAPI):
             logger.info("Populating conflict store...")
             await asyncio.to_thread(conflict_svc.full_scan)
             logger.info("Conflict store populated")
+
+            # Build knowledge graph from metadata + conflicts
+            logger.info("Building knowledge graph...")
+            rel_count = await asyncio.to_thread(graph_builder.rebuild_all)
+            logger.info(f"Knowledge graph built: {rel_count} relationships")
         except Exception as e:
             logger.warning(f"Background indexing failed: {e}")
 
@@ -147,12 +253,14 @@ app = FastAPI(
     description="Knowledge-Fused Multi-Agent Platform for SCM",
     version="0.1.0",
     lifespan=lifespan,
+    redirect_slashes=False,
 )
 
 # CORS — explicit whitelist (no wildcards)
 _cors_origins = [settings.frontend_url]
 if settings.environment == "development":
     _cors_origins.append("http://localhost:3000")
+    _cors_origins.append("http://localhost:3001")
 
 app.add_middleware(
     CORSMiddleware,
@@ -186,6 +294,9 @@ app.include_router(conflict_api.router)
 app.include_router(lock_api.router)
 app.include_router(acl_api.router)
 app.include_router(skill_api.router)
+app.include_router(persona_api.router)
+app.include_router(auth_api.router)
+app.include_router(graph_api.router)
 app.include_router(modeling_api.router)
 app.include_router(simulation_api.router)
 
