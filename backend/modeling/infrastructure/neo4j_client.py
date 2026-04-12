@@ -27,20 +27,19 @@ class Neo4jClient:
 
     def query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict]:
         with self._driver.session() as session:
-            result = session.run(cypher, params or {})
-            return result.data()
+            return session.execute_read(lambda tx: tx.run(cypher, params or {}).data())
 
     def write(self, cypher: str, params: dict[str, Any] | None = None) -> None:
         with self._driver.session() as session:
-            session.run(cypher, params or {})
+            session.execute_write(lambda tx: tx.run(cypher, params or {}))
 
     def write_tx(self, cypher_list: list[tuple[str, dict]]) -> None:
         """Execute multiple writes in a single transaction."""
+        def _work(tx):
+            for cypher, params in cypher_list:
+                tx.run(cypher, params)
         with self._driver.session() as session:
-            with session.begin_transaction() as tx:
-                for cypher, params in cypher_list:
-                    tx.run(cypher, params)
-                tx.commit()
+            session.execute_write(_work)
 
     def close(self) -> None:
         self._driver.close()
