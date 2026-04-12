@@ -159,6 +159,26 @@ export async function approveReview(reviewId: string, reviewer: string): Promise
   return res.json();
 }
 
+export async function rejectReview(reviewId: string, reviewer: string, comment: string): Promise<ReviewRequest> {
+  const res = await fetch(`${API_BASE}/api/modeling/approval/${reviewId}/reject`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reviewer, comment }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function addDomainNode(node: { id: string; name: string; kind: string; parent_id: string | null }): Promise<DomainNode> {
+  const res = await fetch(`${API_BASE}/api/modeling/ontology/node`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(node),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function getPendingReviews(repoId: string): Promise<{ reviews: ReviewRequest[] }> {
   const res = await fetch(`${API_BASE}/api/modeling/approval/pending/${repoId}`);
   if (!res.ok) throw new Error(await res.text());

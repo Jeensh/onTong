@@ -2,6 +2,11 @@
 
 import React, { useState } from "react";
 import { Code, Network, GitCompare, Search, CheckSquare } from "lucide-react";
+import { CodeGraphViewer } from "./modeling/CodeGraphViewer";
+import { DomainOntologyEditor } from "./modeling/DomainOntologyEditor";
+import { MappingSplitView } from "./modeling/MappingSplitView";
+import { ImpactQueryPanel } from "./modeling/ImpactQueryPanel";
+import { ApprovalList } from "./modeling/ApprovalList";
 
 type ModelingView = "code" | "ontology" | "mapping" | "impact" | "approval";
 
@@ -76,16 +81,16 @@ export function ModelingSection() {
 }
 
 function ViewRouter({ view, repoId }: { view: ModelingView; repoId: string }) {
-  const info = NAV_ITEMS.find((n) => n.id === view);
-
-  // Placeholder — individual view components will be added in Tasks 13-17
-  return (
-    <div>
-      <h2 className="text-lg font-semibold mb-1">{info?.label}</h2>
-      <p className="text-sm text-muted-foreground mb-6">{info?.description}</p>
-      <div className="border border-dashed border-border rounded-lg p-8 text-center text-muted-foreground">
-        {view} view — repo: {repoId}
-      </div>
-    </div>
-  );
+  switch (view) {
+    case "code":
+      return <CodeGraphViewer repoId={repoId} />;
+    case "ontology":
+      return <DomainOntologyEditor repoId={repoId} />;
+    case "mapping":
+      return <MappingSplitView repoId={repoId} />;
+    case "impact":
+      return <ImpactQueryPanel repoId={repoId} />;
+    case "approval":
+      return <ApprovalList repoId={repoId} />;
+  }
 }
