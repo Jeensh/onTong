@@ -64,6 +64,9 @@ export interface WikiTreeNode {
   is_dir: boolean;
   children: WikiTreeNode[];
   has_children?: boolean | null;  // true if dir has unloaded children (lazy loading)
+  owner?: string;
+  my_permission?: "read" | "write" | "manage";
+  shared?: boolean;
 }
 
 // ── Search ────────────────────────────────────────────────────────────

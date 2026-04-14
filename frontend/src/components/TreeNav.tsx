@@ -27,6 +27,10 @@ import {
   X,
   Gauge,
   ClipboardList,
+  Lock,
+  Users,
+  Share2,
+  Info,
 } from "lucide-react";
 import {
   DndContext,
@@ -50,6 +54,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Eye, EyeOff, Copy, Pin, GripVertical } from "lucide-react";
 import { fetchSubtree } from "@/lib/api/wiki";
+import { ContextMenu as ACLContextMenu, type MenuItemDef } from "@/components/ContextMenu";
+import { ShareDialog } from "@/components/ShareDialog";
+import { PropertiesPanel } from "@/components/PropertiesPanel";
+import { useAuth } from "@/hooks/useAuth";
 
 // ── API helpers ───────────────────────────────────────────────────────
 
@@ -366,7 +374,13 @@ function DraggableTreeItem({
               ? <FolderOpen className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               : <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             }
-            <span className="truncate">{node.name}</span>
+            <span className="truncate flex-1">{node.name}</span>
+            {node.my_permission === "read" && (
+              <span title="읽기 전용"><Lock className="h-3 w-3 shrink-0 text-muted-foreground/60 ml-1" /></span>
+            )}
+            {node.shared && (
+              <span title="공유됨"><Users className="h-3 w-3 shrink-0 text-primary/60 ml-1" /></span>
+            )}
           </div>
         )}
 
@@ -426,6 +440,12 @@ function DraggableTreeItem({
       <span className={`truncate flex-1 ${statusMap?.[node.path] === "deprecated" ? "line-through" : ""}`}>
         {node.name}
       </span>
+      {node.my_permission === "read" && (
+        <span title="읽기 전용"><Lock className="h-3 w-3 shrink-0 text-muted-foreground/60 ml-1" /></span>
+      )}
+      {node.shared && (
+        <span title="공유됨"><Users className="h-3 w-3 shrink-0 text-primary/60 ml-1" /></span>
+      )}
     </div>
   );
 }
@@ -1578,6 +1598,48 @@ export function TreeNav() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ path: string; type: "file" | "folder" } | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  // Share dialog / properties panel
+  const [shareDialogPath, setShareDialogPath] = useState<string | null>(null);
+  const [propertiesPath, setPropertiesPath] = useState<string | null>(null);
+
+  // Collapsible section headers — persisted to localStorage
+  const [sectionMyDocs, setSectionMyDocs] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("ontong:tree-section-mydocs") !== "false";
+  });
+  const [sectionWiki, setSectionWiki] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("ontong:tree-section-wiki") !== "false";
+  });
+  const [sectionSkills, setSectionSkills] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("ontong:tree-section-skills") !== "false";
+  });
+
+  const { user } = useAuth();
+
+  const toggleSectionMyDocs = useCallback(() => {
+    setSectionMyDocs((v) => {
+      const next = !v;
+      localStorage.setItem("ontong:tree-section-mydocs", String(next));
+      return next;
+    });
+  }, []);
+  const toggleSectionWiki = useCallback(() => {
+    setSectionWiki((v) => {
+      const next = !v;
+      localStorage.setItem("ontong:tree-section-wiki", String(next));
+      return next;
+    });
+  }, []);
+  const toggleSectionSkills = useCallback(() => {
+    setSectionSkills((v) => {
+      const next = !v;
+      localStorage.setItem("ontong:tree-section-skills", String(next));
+      return next;
+    });
+  }, []);
+
   const openTab = useWorkspaceStore((s) => s.openTab);
   const openVirtualTab = useWorkspaceStore((s) => s.openVirtualTab);
   const closeTabById = useWorkspaceStore((s) => s.closeTab);
@@ -1934,20 +1996,73 @@ export function TreeNav() {
         </div>
 
         {/* Section content */}
-        {section === "files" && (
-          <>
-            <RootDropZone onContextMenu={handleRootContextMenu}>
-              {creatingIn === "__root__" && creatingType === "file" && (
-                <InlineInput icon={File} placeholder="파일명.md" indent={8}
-                  onSubmit={handleCreateSubmit} onCancel={() => { setCreatingIn(null); setCreatingType(null); }} />
-              )}
-              {creatingIn === "__root__" && creatingType === "folder" && (
-                <InlineInput icon={Folder} placeholder="폴더명" indent={8}
-                  onSubmit={handleCreateSubmit} onCancel={() => { setCreatingIn(null); setCreatingType(null); }} />
-              )}
-              {tree.length === 0 && !creatingIn
-                ? <div className="p-3 text-sm text-muted-foreground">파일이 없습니다</div>
-                : tree.map((node) => (
+        {section === "files" && (() => {
+          const userId = user?.id ?? "";
+          const myDocNodes = userId
+            ? tree.filter((n) => n.path === `@${userId}` || n.path.startsWith(`@${userId}/`))
+            : [];
+          const skillNodes = tree.filter((n) => n.path === "_skills" || n.path.startsWith("_skills/"));
+          const wikiNodes = tree.filter(
+            (n) =>
+              !myDocNodes.includes(n) &&
+              !skillNodes.includes(n) &&
+              !(userId && (n.path === `@${userId}` || n.path.startsWith(`@${userId}/`)))
+          );
+
+          const renderSection = (
+            label: string,
+            nodes: WikiTreeNode[],
+            expanded: boolean,
+            onToggle: () => void,
+          ) => (
+            <>
+              <button
+                onClick={onToggle}
+                className="flex items-center gap-1 w-full px-3 py-1 text-[11px] font-semibold text-muted-foreground uppercase hover:text-foreground select-none"
+              >
+                {expanded
+                  ? <ChevronDown className="h-3 w-3 shrink-0" />
+                  : <ChevronRight className="h-3 w-3 shrink-0" />
+                }
+                {label}
+              </button>
+              {expanded && nodes.map((node) => (
+                <DraggableTreeItem key={node.path} node={node} depth={0}
+                  renamingPath={renamingNode?.path ?? null}
+                  activeFilePath={activeFilePath}
+                  onRenameSubmit={handleRenameSubmit} onRenameCancel={() => setRenamingNode(null)}
+                  onContextMenu={handleContextMenu} onOpenTab={openTab}
+                  creatingIn={creatingIn} creatingType={creatingType}
+                  onCreateSubmit={handleCreateSubmit}
+                  onCreateCancel={() => { setCreatingIn(null); setCreatingType(null); }}
+                  onLoadChildren={loadChildren} statusMap={deprecatedMap} />
+              ))}
+            </>
+          );
+
+          const useSections = userId && (myDocNodes.length > 0 || skillNodes.length > 0);
+
+          return (
+            <>
+              <RootDropZone onContextMenu={handleRootContextMenu}>
+                {creatingIn === "__root__" && creatingType === "file" && (
+                  <InlineInput icon={File} placeholder="파일명.md" indent={8}
+                    onSubmit={handleCreateSubmit} onCancel={() => { setCreatingIn(null); setCreatingType(null); }} />
+                )}
+                {creatingIn === "__root__" && creatingType === "folder" && (
+                  <InlineInput icon={Folder} placeholder="폴더명" indent={8}
+                    onSubmit={handleCreateSubmit} onCancel={() => { setCreatingIn(null); setCreatingType(null); }} />
+                )}
+                {tree.length === 0 && !creatingIn ? (
+                  <div className="p-3 text-sm text-muted-foreground">파일이 없습니다</div>
+                ) : useSections ? (
+                  <>
+                    {myDocNodes.length > 0 && renderSection("내 문서", myDocNodes, sectionMyDocs, toggleSectionMyDocs)}
+                    {wikiNodes.length > 0 && renderSection("위키", wikiNodes, sectionWiki, toggleSectionWiki)}
+                    {skillNodes.length > 0 && renderSection("스킬", skillNodes, sectionSkills, toggleSectionSkills)}
+                  </>
+                ) : (
+                  tree.map((node) => (
                     <DraggableTreeItem key={node.path} node={node} depth={0}
                       renamingPath={renamingNode?.path ?? null}
                       activeFilePath={activeFilePath}
@@ -1958,11 +2073,12 @@ export function TreeNav() {
                       onCreateCancel={() => { setCreatingIn(null); setCreatingType(null); }}
                       onLoadChildren={loadChildren} statusMap={deprecatedMap} />
                   ))
-              }
-            </RootDropZone>
-            <UnusedImagesPanel />
-          </>
-        )}
+                )}
+              </RootDropZone>
+              <UnusedImagesPanel />
+            </>
+          );
+        })()}
 
         {section === "tags" && (
           <TagBrowserSection onOpenTab={openTab} />
@@ -1991,19 +2107,92 @@ export function TreeNav() {
       </DragOverlay>
 
       {/* Context Menu */}
-      {contextMenu && (
-        <ContextMenu
-          state={contextMenu}
-          onClose={() => setContextMenu(null)}
-          onRename={(node) => setRenamingNode(node)}
-          onDeleteFile={handleDeleteFile}
-          onDeleteFolder={handleDeleteFolder}
-          onNewFileInFolder={(p) => { setCreatingIn(p); setCreatingType("file"); }}
-          onNewSubfolder={(p) => { setCreatingIn(p); setCreatingType("folder"); }}
-          onCreateNewVersion={handleNewVersionOpen}
-          statusMap={deprecatedMap}
-        />
-      )}
+      {contextMenu && (() => {
+        const node = contextMenu.node;
+        const isRoot = node === null;
+        const isDir = node?.is_dir ?? false;
+        const canWrite = isRoot || node?.my_permission === "write" || node?.my_permission === "manage" || !node?.my_permission;
+        const canManage = isRoot || node?.my_permission === "manage" || !node?.my_permission;
+
+        const items: MenuItemDef[] = [
+          // Create actions (root or folder)
+          {
+            label: "새 문서",
+            icon: <FilePlus className="h-3.5 w-3.5" />,
+            visible: isRoot || isDir,
+            action: () => {
+              const p = isRoot ? "__root__" : node!.path;
+              setCreatingIn(p); setCreatingType("file");
+              setContextMenu(null);
+            },
+          },
+          {
+            label: "새 폴더",
+            icon: <FolderPlus className="h-3.5 w-3.5" />,
+            visible: isRoot || isDir,
+            action: () => {
+              const p = isRoot ? "__root__" : node!.path;
+              setCreatingIn(p); setCreatingType("folder");
+              setContextMenu(null);
+            },
+          },
+          // Node-specific actions
+          {
+            label: "문서 링크 복사",
+            icon: <Link className="h-3.5 w-3.5" />,
+            visible: !isRoot,
+            separator: isDir,
+            action: () => { copyDocLink(node!.path); setContextMenu(null); },
+          },
+          {
+            label: "새 버전 만들기",
+            icon: <Copy className="h-3.5 w-3.5" />,
+            visible: !isRoot && !isDir && node!.path.endsWith(".md") && deprecatedMap[node!.path] !== "deprecated",
+            action: () => { handleNewVersionOpen(node!.path); setContextMenu(null); },
+          },
+          {
+            label: "이름 변경",
+            icon: <Pencil className="h-3.5 w-3.5" />,
+            visible: !isRoot && canWrite,
+            separator: true,
+            action: () => { setRenamingNode(node!); setContextMenu(null); },
+          },
+          // ACL-related actions
+          {
+            label: "공유 설정...",
+            icon: <Share2 className="h-3.5 w-3.5" />,
+            visible: !isRoot && canManage,
+            action: () => { setShareDialogPath(node!.path); setContextMenu(null); },
+          },
+          {
+            label: "속성",
+            icon: <Info className="h-3.5 w-3.5" />,
+            visible: !isRoot,
+            action: () => { setPropertiesPath(node!.path); setContextMenu(null); },
+          },
+          // Delete actions
+          {
+            label: isDir ? "폴더 삭제" : "삭제",
+            icon: <Trash2 className="h-3.5 w-3.5" />,
+            visible: !isRoot && canWrite,
+            separator: true,
+            action: () => {
+              if (isDir) handleDeleteFolder(node!.path);
+              else handleDeleteFile(node!.path);
+              setContextMenu(null);
+            },
+          },
+        ];
+
+        return (
+          <ACLContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            items={items}
+            onClose={() => setContextMenu(null)}
+          />
+        );
+      })()}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteConfirm} onOpenChange={(open) => { if (!open) { setDeleteConfirm(null); setDeleteLoading(false); } }}>
@@ -2056,6 +2245,25 @@ export function TreeNav() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Share Dialog */}
+      {shareDialogPath && (
+        <ShareDialog
+          path={shareDialogPath}
+          onClose={() => setShareDialogPath(null)}
+        />
+      )}
+
+      {/* Properties Panel */}
+      {propertiesPath && (
+        <PropertiesPanel
+          path={propertiesPath}
+          onClose={() => setPropertiesPath(null)}
+          onOpenShare={() => {
+            setShareDialogPath(propertiesPath);
+            setPropertiesPath(null);
+          }}
+        />
+      )}
     </DndContext>
   );
 }
