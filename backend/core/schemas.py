@@ -75,6 +75,9 @@ class WikiTreeNode(BaseModel):
     is_dir: bool
     children: list[WikiTreeNode] = []
     has_children: bool | None = None  # True if dir has children (for lazy loading)
+    owner: str = ""           # document owner
+    my_permission: str = ""   # "read" | "write" | "manage"
+    shared: bool = False      # true if owner shared with others
 
 
 # ── Search ────────────────────────────────────────────────────────────

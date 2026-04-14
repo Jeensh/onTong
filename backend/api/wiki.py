@@ -64,15 +64,64 @@ class MoveRequest(BaseModel):
     new_path: str
 
 
+def _filter_tree_by_acl(nodes: list[WikiTreeNode], user: User) -> list[WikiTreeNode]:
+    """Recursively filter tree to accessible nodes and annotate permission level."""
+    from backend.core.auth.acl_store import acl_store
+
+    result: list[WikiTreeNode] = []
+    for node in nodes:
+        # Check read permission
+        if not acl_store.check_permission(node.path, user, "read"):
+            continue
+        # Determine highest permission level
+        if acl_store.check_permission(node.path, user, "manage"):
+            perm = "manage"
+        elif acl_store.check_permission(node.path, user, "write"):
+            perm = "write"
+        else:
+            perm = "read"
+        # Resolve owner and shared flag from ACL entry
+        entry = acl_store._resolve_entry(node.path) or {}
+        owner = entry.get("owner", "")
+        # shared = owner has shared with others (read list is non-empty and not just owner)
+        read_principals = entry.get("read", [])
+        shared = bool(read_principals) and not (
+            len(read_principals) == 1 and read_principals[0] == f"@{owner}"
+        )
+        # Recursively filter children
+        filtered_children = _filter_tree_by_acl(node.children, user)
+        result.append(WikiTreeNode(
+            name=node.name,
+            path=node.path,
+            is_dir=node.is_dir,
+            children=filtered_children,
+            has_children=node.has_children,
+            owner=owner,
+            my_permission=perm,
+            shared=shared,
+        ))
+    return result
+
+
+@router.get("/tree/personal", response_model=list[WikiTreeNode])
+async def get_personal_tree(user: User = Depends(get_current_user)):
+    """Return tree for @username/ personal space."""
+    personal_path = f"@{user.id}"
+    return await _svc().get_subtree(personal_path)
+
+
 @router.get("/tree", response_model=list[WikiTreeNode])
-async def get_tree(request: Request, response: Response, depth: int = 1):
-    """Get wiki file tree. depth=0 returns full tree, depth=1 returns top-level only.
+async def get_tree(request: Request, response: Response, depth: int = 1, user: User = Depends(get_current_user)):
+    """Get wiki file tree filtered by ACL. depth=0 returns full tree, depth=1 returns top-level only.
     Supports ETag caching for large trees."""
     if depth == 1:
         # Optimized: scan only root directory (no full tree build)
         tree = await _svc().get_subtree("")
     else:
         tree = await _svc().get_tree()
+
+    # Apply ACL filtering
+    tree = _filter_tree_by_acl(tree, user)
 
     # ETag caching
     import json
