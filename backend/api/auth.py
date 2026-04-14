@@ -12,4 +12,4 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 @router.get("/me")
 async def get_me(user: User = Depends(get_current_user)):
     """Return the current authenticated user."""
-    return {"id": user.id, "name": user.name, "email": user.email, "roles": user.roles}
+    return user.model_dump()

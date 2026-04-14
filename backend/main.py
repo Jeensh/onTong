@@ -42,6 +42,7 @@ from backend.api import skill as skill_api
 from backend.api import persona as persona_api
 from backend.api import auth as auth_api
 from backend.api import graph as graph_api
+from backend.api import group as group_api
 from backend.application.graph.graph_store import create_graph_store
 from backend.application.graph.graph_builder import GraphBuilder
 from backend.application.skill.skill_loader import UserSkillLoader
@@ -178,6 +179,12 @@ async def lifespan(app: FastAPI):
     persona_api.init(storage)
     conflict_api.init(wiki_service, conflict_svc)
 
+    # Initialize group store and group API
+    from backend.core.auth.group_store import JSONGroupStore
+    from pathlib import Path
+    group_store = JSONGroupStore(path=Path("data/groups.json"))
+    group_api.init(group_store)
+
     # Initialize Section 2 (Modeling) with Neo4j
     from backend.modeling.infrastructure.neo4j_client import Neo4jClient
     try:
@@ -297,6 +304,7 @@ app.include_router(skill_api.router)
 app.include_router(persona_api.router)
 app.include_router(auth_api.router)
 app.include_router(graph_api.router)
+app.include_router(group_api.router)
 app.include_router(modeling_api.router)
 app.include_router(simulation_api.router)
 
