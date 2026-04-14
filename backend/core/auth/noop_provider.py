@@ -9,8 +9,10 @@ import logging
 from pathlib import Path
 
 from fastapi import Request
+from pydantic import ValidationError
 
 from backend.core.auth.base import AuthProvider
+from backend.core.auth.group_store import GroupStore
 from backend.core.auth.models import User
 
 logger = logging.getLogger(__name__)
@@ -22,7 +24,7 @@ _DEFAULT_USER = User(
 
 class NoOpAuthProvider(AuthProvider):
     def __init__(self, users_path: Path | None = None,
-                 group_store=None) -> None:
+                 group_store: GroupStore | None = None) -> None:
         self._users_path = users_path or Path("data/users.json")
         self._users: dict[str, User] = {}
         self._group_store = group_store
@@ -34,8 +36,11 @@ class NoOpAuthProvider(AuthProvider):
                     self._users_path.read_text(encoding="utf-8")
                 )
                 for u in data.get("users", []):
-                    user = User(**u)
-                    self._users[user.id] = user
+                    try:
+                        user = User(**u)
+                        self._users[user.id] = user
+                    except ValidationError as e:
+                        logger.warning("Skipping malformed user entry %s: %s", u, e)
                 logger.info("Loaded %d dev users", len(self._users))
             except (json.JSONDecodeError, OSError) as e:
                 logger.warning("Failed to load users: %s", e)
@@ -46,12 +51,13 @@ class NoOpAuthProvider(AuthProvider):
         pass
 
     async def authenticate(self, request: Request) -> User:
+        if not self._users:
+            raise RuntimeError("NoOpAuthProvider: no users loaded — call on_startup() first")
         user_id = request.headers.get("X-User-Id", "")
         user = self._users.get(user_id)
         if not user:
-            # Default to first user
+            # Default to first user in config file order
             user = next(iter(self._users.values()))
-        # Resolve groups
         groups = await self.resolve_groups(user.id)
         return user.model_copy(update={"groups": groups})
 
