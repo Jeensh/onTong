@@ -1,17 +1,35 @@
-"""ACL (Access Control List) store for folder/document level permissions.
+"""ACL (Access Control List) store v2 — default-deny, owner/manage, inheritance.
 
-ACL is stored as a JSON file. Structure:
+ACL is stored as a JSON file. Structure (v2):
 {
-  "wiki/hr/": { "read": ["all"], "write": ["hr-team", "admin"] },
-  "wiki/finance/": { "read": ["finance-team", "admin"], "write": ["finance-team", "admin"] }
+  "wiki/hr/": {
+    "owner": "hr-admin",
+    "read": ["hr-team", "admin"],
+    "write": ["hr-team", "admin"],
+    "manage": ["hr-admin"],
+    "inherited": false
+  },
+  "wiki/hr/salary.md": {
+    "owner": "hr-admin",
+    "read": ["hr-lead"],
+    "write": ["hr-lead"],
+    "manage": ["hr-admin"],
+    "inherited": false
+  }
 }
 
-Rules:
+Rules (v2):
+- Default is DENY if no ACL entry exists (opposite of v1)
 - "all" grants access to everyone
+- "@username" matches a specific user by id
+- Group names match user.groups, role names match user.roles
 - Folder paths end with "/"
-- Child documents inherit parent folder permissions
-- Document-level overrides are supported (exact path match)
-- If no ACL entry exists, default is read/write for all (open by default)
+- Child documents inherit parent folder permissions (walk up)
+- Document-level overrides (inherited=False on a doc) take precedence
+- @username/ paths are personal spaces: only that user (and admin) can access
+- Owner of a resource always has read + write + manage
+- Admin role always has full access everywhere
+- "manage" permission controls who can modify the ACL itself
 """
 
 from __future__ import annotations
@@ -21,33 +39,48 @@ import logging
 import os
 import threading
 import time
-from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import BaseModel
+
+from backend.core.auth.models import User
 from backend.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-Permission = Literal["read", "write"]
-
-# Default ACL: everyone can read/write everything
-DEFAULT_ACL: dict[str, dict[str, list[str]]] = {}
+Permission = Literal["read", "write", "manage"]
 
 _CACHE_TTL = 60  # seconds
 _FILE_POLL_INTERVAL = 30  # seconds
 
 
+class ACLEntry(BaseModel):
+    """Single ACL entry for a path (folder or document)."""
+
+    path: str = ""
+    owner: str = ""
+    read: list[str] = []       # principals: group names, @userID, "all"
+    write: list[str] = []
+    manage: list[str] = []     # who can change this ACL
+    inherited: bool = True     # True = inherited from parent folder
+
+
 class ACLStore:
-    """JSON file-based ACL manager with LRU caching and hot reload."""
+    """JSON file-based ACL manager v2 with default-deny, owner/manage, inheritance.
+
+    LRU caching with TTL and file watcher for hot reload.
+    """
 
     def __init__(self, acl_path: Path | None = None) -> None:
         self._acl_path = acl_path or (settings.wiki_dir / ".acl.json")
-        self._acl: dict[str, dict[str, list[str]]] = {}
+        self._acl: dict[str, dict] = {}
         self._last_mtime: float = 0.0
-        self._perm_cache: dict[tuple[str, tuple[str, ...], str], tuple[bool, float]] = {}
+        self._perm_cache: dict[tuple, tuple[bool, float]] = {}
         self._load()
         self._start_watcher()
+
+    # ── Persistence ──────────────────────────────────────────────────────
 
     def _load(self) -> None:
         if self._acl_path.exists():
@@ -56,13 +89,13 @@ class ACLStore:
                     self._acl = json.load(f)
                 self._last_mtime = os.path.getmtime(self._acl_path)
                 self._invalidate_cache()
-                logger.info(f"ACL loaded: {len(self._acl)} entries from {self._acl_path}")
+                logger.info("ACL loaded: %d entries from %s", len(self._acl), self._acl_path)
             except (json.JSONDecodeError, IOError) as e:
-                logger.warning(f"Failed to load ACL: {e}, using default (open)")
-                self._acl = DEFAULT_ACL.copy()
+                logger.warning("Failed to load ACL: %s, using empty (deny-all)", e)
+                self._acl = {}
         else:
-            self._acl = DEFAULT_ACL.copy()
-            logger.info("No ACL file found, using default (open access)")
+            self._acl = {}
+            logger.info("No ACL file found, using default (deny-all)")
 
     def _save(self) -> None:
         self._acl_path.parent.mkdir(parents=True, exist_ok=True)
@@ -95,68 +128,242 @@ class ACLStore:
         t = threading.Thread(target=_poll, daemon=True, name="acl-watcher")
         t.start()
 
+    # ── Permission Checking ──────────────────────────────────────────────
+
     def check_permission(
-        self, path: str, user_roles: list[str], permission: Permission
+        self, path: str, user: User, permission: Permission
     ) -> bool:
-        """Check if user with given roles has permission on path.
+        """Check if user has permission on path.
 
-        Results are cached with TTL for repeated checks on the same path/roles.
+        Results are cached with TTL for repeated checks.
 
-        Lookup order:
-        1. Exact path match (document-level override)
-        2. Walk up parent folders until a match is found
-        3. If no ACL entry exists → allow (open by default)
+        Rules (evaluated in order):
+        1. Admin role → always allow
+        2. @username/ personal space → only that user
+        3. Document has own ACL (inherited=False) → use that ACL
+        4. No own ACL → walk up parent folders recursively
+        5. No ACL found at root → DENY (default-deny)
+        6. Owner → always has read + write + manage on their resources
         """
-        cache_key = (path, tuple(sorted(user_roles)), permission)
+        cache_key = (
+            path,
+            user.id,
+            tuple(sorted(user.roles)),
+            tuple(sorted(user.groups)),
+            permission,
+        )
         cached = self._perm_cache.get(cache_key)
         if cached is not None:
             result, ts = cached
             if time.time() - ts < _CACHE_TTL:
                 return result
 
-        result = self._check_permission_uncached(path, user_roles, permission)
+        result = self._check_permission_uncached(path, user, permission)
         self._perm_cache[cache_key] = (result, time.time())
         return result
 
     def _check_permission_uncached(
-        self, path: str, user_roles: list[str], permission: Permission
+        self, path: str, user: User, permission: Permission
     ) -> bool:
-        # 1. Exact match
-        entry = self._acl.get(path)
-        if entry:
-            return self._roles_match(entry.get(permission, []), user_roles)
+        # Rule 5: admin role → always allow
+        if "admin" in user.roles:
+            return True
 
-        # 2. Walk up parent folders
+        # Rule 1: @username/ personal space — only that user
+        if path.startswith("@"):
+            # Extract username from path: "@alice/notes.md" → "alice"
+            slash_idx = path.find("/")
+            if slash_idx > 0:
+                space_owner = path[1:slash_idx]
+                return user.id == space_owner
+            # "@alice" with no slash — treat as personal too
+            space_owner = path[1:]
+            return user.id == space_owner
+
+        # Rule 2: exact match on document (inherited=False)
+        entry = self._acl.get(path)
+        if entry and not entry.get("inherited", True):
+            return self._entry_allows(entry, user, permission)
+
+        # Rule 3: walk up parent folders
         parts = path.split("/")
         for i in range(len(parts) - 1, 0, -1):
             folder_path = "/".join(parts[:i]) + "/"
-            entry = self._acl.get(folder_path)
-            if entry:
-                return self._roles_match(entry.get(permission, []), user_roles)
+            folder_entry = self._acl.get(folder_path)
+            if folder_entry:
+                return self._entry_allows(folder_entry, user, permission)
 
-        # 3. No ACL → open access
-        return True
+        # Rule 4: no ACL found → DENY (default-deny)
+        return False
 
-    def get_accessible_prefixes(self, user_roles: list[str], permission: Permission) -> list[str]:
+    def _entry_allows(
+        self, entry: dict, user: User, permission: Permission
+    ) -> bool:
+        """Check if an ACL entry grants permission to the user.
+
+        Owner always has read + write + manage.
+        Then check principals list for the requested permission.
+        """
+        # Rule 6: owner always has full access
+        owner = entry.get("owner", "")
+        if owner and user.id == owner:
+            return True
+
+        principals: list[str] = entry.get(permission, [])
+        return self._principals_match(principals, user)
+
+    @staticmethod
+    def _principals_match(principals: list[str], user: User) -> bool:
+        """Check if any principal in the list matches the user.
+
+        Matching rules:
+        - "all" matches everyone
+        - "@username" matches user.id
+        - group names match user.groups
+        - role names match user.roles
+        """
+        if not principals:
+            return False
+        if "all" in principals:
+            return True
+
+        user_identifiers: set[str] = set()
+        # Direct user grant
+        user_identifiers.add(f"@{user.id}")
+        # Groups
+        user_identifiers.update(user.groups)
+        # Roles
+        user_identifiers.update(user.roles)
+
+        return bool(set(principals) & user_identifiers)
+
+    # ── Access Scope (for ChromaDB metadata) ─────────────────────────────
+
+    def compute_access_scope(self, path: str) -> dict[str, list[str]]:
+        """Return read/write principal lists for a path.
+
+        Used to stamp ChromaDB metadata so search can pre-filter by access.
+        """
+        # Personal space
+        if path.startswith("@"):
+            slash_idx = path.find("/")
+            if slash_idx > 0:
+                owner_principal = f"@{path[1:slash_idx]}"
+            else:
+                owner_principal = f"@{path[1:]}"
+            return {"read": [owner_principal], "write": [owner_principal]}
+
+        # Exact match (document override)
+        entry = self._acl.get(path)
+        if entry and not entry.get("inherited", True):
+            return {
+                "read": list(entry.get("read", [])),
+                "write": list(entry.get("write", [])),
+            }
+
+        # Walk up folders
+        parts = path.split("/")
+        for i in range(len(parts) - 1, 0, -1):
+            folder_path = "/".join(parts[:i]) + "/"
+            folder_entry = self._acl.get(folder_path)
+            if folder_entry:
+                return {
+                    "read": list(folder_entry.get("read", [])),
+                    "write": list(folder_entry.get("write", [])),
+                }
+
+        # No ACL → empty (deny all)
+        return {"read": [], "write": []}
+
+    # ── Accessible Prefixes (RAG fallback) ───────────────────────────────
+
+    def get_accessible_prefixes(
+        self, user: User, permission: Permission
+    ) -> list[str]:
         """Get list of path prefixes the user can access.
 
-        Returns empty list if no ACL restrictions exist (all accessible).
+        Returns list of path prefixes where the user has the given permission.
         Used by RAG to filter search results.
         """
         if not self._acl:
-            return []  # No ACL → everything accessible
+            return []  # No ACL → nothing accessible (default-deny)
 
         prefixes: list[str] = []
         for path, entry in self._acl.items():
+            # Admin always has access
+            if "admin" in user.roles:
+                prefixes.append(path.rstrip("/"))
+                continue
+
+            # Owner check
+            owner = entry.get("owner", "")
+            if owner and user.id == owner:
+                prefixes.append(path.rstrip("/"))
+                continue
+
+            # Principals check
             allowed = entry.get(permission, [])
-            if self._roles_match(allowed, user_roles):
+            if self._principals_match(allowed, user):
                 prefixes.append(path.rstrip("/"))
 
         return prefixes
 
-    def set_acl(self, path: str, read: list[str], write: list[str]) -> None:
+    # ── Batch Group Operations ───────────────────────────────────────────
+
+    def get_paths_with_group(self, group_name: str) -> list[str]:
+        """Find all paths whose ACL references the given group name."""
+        paths: list[str] = []
+        for path, entry in self._acl.items():
+            for field in ("read", "write", "manage"):
+                if group_name in entry.get(field, []):
+                    paths.append(path)
+                    break
+        return paths
+
+    def rename_group_references(self, old_name: str, new_name: str) -> None:
+        """Rename a group in all ACL entries."""
+        changed = False
+        for path, entry in self._acl.items():
+            for field in ("read", "write", "manage"):
+                principals: list[str] = entry.get(field, [])
+                if old_name in principals:
+                    idx = principals.index(old_name)
+                    principals[idx] = new_name
+                    changed = True
+        if changed:
+            self._save()
+
+    def remove_group_references(self, group_name: str) -> None:
+        """Remove a group from all ACL entries."""
+        changed = False
+        for path, entry in self._acl.items():
+            for field in ("read", "write", "manage"):
+                principals: list[str] = entry.get(field, [])
+                if group_name in principals:
+                    principals.remove(group_name)
+                    changed = True
+        if changed:
+            self._save()
+
+    # ── CRUD ─────────────────────────────────────────────────────────────
+
+    def set_acl(
+        self,
+        path: str,
+        read: list[str],
+        write: list[str],
+        manage: list[str] | None = None,
+        owner: str = "",
+        inherited: bool = False,
+    ) -> None:
         """Set ACL for a path (folder or document)."""
-        self._acl[path] = {"read": read, "write": write}
+        self._acl[path] = {
+            "owner": owner,
+            "read": read,
+            "write": write,
+            "manage": manage or [],
+            "inherited": inherited,
+        }
         self._save()
 
     def remove_acl(self, path: str) -> bool:
@@ -167,18 +374,9 @@ class ACLStore:
             return True
         return False
 
-    def get_all(self) -> dict[str, dict[str, list[str]]]:
+    def get_all(self) -> dict[str, dict]:
         """Get full ACL data."""
-        return self._acl.copy()
-
-    @staticmethod
-    def _roles_match(allowed_roles: list[str], user_roles: list[str]) -> bool:
-        """Check if any user role matches the allowed roles."""
-        if "all" in allowed_roles:
-            return True
-        if "admin" in user_roles:
-            return True  # Admin always has access
-        return bool(set(allowed_roles) & set(user_roles))
+        return {k: dict(v) for k, v in self._acl.items()}
 
 
 # Singleton

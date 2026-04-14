@@ -1,7 +1,7 @@
 """Permission check dependencies for FastAPI routes.
 
 Usage:
-    from backend.core.auth.permission import require_read, require_write
+    from backend.core.auth.permission import require_read, require_write, require_manage
 
     @router.get("/file/{path:path}")
     async def get_file(path: str, user: User = Depends(require_read)):
@@ -23,7 +23,7 @@ async def require_read(
 ) -> User:
     """Dependency that checks read permission for the path in the request."""
     path = _extract_path(request)
-    if path and not acl_store.check_permission(path, user.roles, "read"):
+    if path and not acl_store.check_permission(path, user, "read"):
         raise HTTPException(status_code=403, detail=f"No read access to {path}")
     return user
 
@@ -34,8 +34,19 @@ async def require_write(
 ) -> User:
     """Dependency that checks write permission for the path in the request."""
     path = _extract_path(request)
-    if path and not acl_store.check_permission(path, user.roles, "write"):
+    if path and not acl_store.check_permission(path, user, "write"):
         raise HTTPException(status_code=403, detail=f"No write access to {path}")
+    return user
+
+
+async def require_manage(
+    request: Request,
+    user: User = Depends(get_current_user),
+) -> User:
+    """Dependency that checks manage permission for the path in the request."""
+    path = _extract_path(request)
+    if path and not acl_store.check_permission(path, user, "manage"):
+        raise HTTPException(status_code=403, detail=f"No manage access to {path}")
     return user
 
 
