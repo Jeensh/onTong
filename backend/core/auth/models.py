@@ -16,3 +16,4 @@ class User(BaseModel):
     name: str
     email: str = ""
     roles: list[str] = []
+    groups: list[str] = []
