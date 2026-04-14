@@ -45,6 +45,8 @@ class AgentContext:
     # L3 Path-Aware RAG: path preferences from disambiguation
     path_preference: str | None = None       # current query's path preference
     path_preferences: list[str] = field(default_factory=list)  # session-accumulated
+    # ACL domain scoping — computed from authenticated user at request time
+    user_scope: list[str] | None = None      # e.g. ["@userId", "group1", "role1", "all"]
 
     @staticmethod
     def emit_thinking(step: str, status: str, label: str, detail: str = "") -> str:

@@ -13,6 +13,7 @@ from backend.infrastructure.search.hybrid import reciprocal_rank_fusion
 from backend.infrastructure.search.reranker import rerank
 from backend.infrastructure.cache.query_cache import query_cache
 from backend.core.auth.acl_store import acl_store
+from backend.core.auth.scope import build_scope_where_clause
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ class WikiSearchSkill:
         exclude_deprecated: bool = True,
         user_roles: list[str] | None = None,
         path_preference: str | None = None,
+        user_scope: list[str] | None = None,
     ) -> SkillResult:
         chroma = ctx.chroma
         roles = user_roles or getattr(ctx, "user_roles", ["admin"])
@@ -49,6 +51,13 @@ class WikiSearchSkill:
 
         deprecated_filter = {"status": {"$ne": "deprecated"}} if exclude_deprecated else None
         effective_filter = _merge_where_filters(base_filter, deprecated_filter)
+
+        # Add access_read scope filter if user_scope is provided
+        resolved_scope = user_scope or getattr(ctx, "user_scope", None)
+        if resolved_scope:
+            scope_filter = build_scope_where_clause(resolved_scope)
+            if scope_filter:
+                effective_filter = _merge_where_filters(effective_filter, scope_filter)
 
         # Cache check
         cached = query_cache.get(query, effective_filter)
@@ -152,6 +161,7 @@ class WikiSearchSkill:
                 exclude_deprecated=False,
                 user_roles=user_roles,
                 path_preference=path_preference,
+                user_scope=user_scope,
             )
             if fallback.data.get("documents"):
                 fallback.feedback = "활성 문서에서 결과를 찾지 못했습니다. 폐기된 문서에서 관련 내용을 찾았습니다."

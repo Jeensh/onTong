@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from backend.infrastructure.vectordb.chroma import ChromaWrapper
 from .conflict_store import ConflictStore, StoredConflict
+from backend.core.auth.scope import build_scope_where_clause
 
 logger = logging.getLogger(__name__)
 
@@ -60,12 +61,23 @@ class ConflictDetectionService:
         self.store = store
         self._scan_state: dict = {"running": False, "progress": 0, "total": 0}
 
-    def check_file(self, file_path: str, threshold: float = SIMILARITY_THRESHOLD) -> list[StoredConflict]:
+    def check_file(
+        self,
+        file_path: str,
+        threshold: float = SIMILARITY_THRESHOLD,
+        user_scope: list[str] | None = None,
+    ) -> list[StoredConflict]:
         """Check one file against all others via ChromaDB HNSW query.
 
         Called after indexing completes for a file.
         HNSW returns chunk-level results, so we use it to find candidate files,
         then compute avg-to-avg cosine similarity for accurate file-level comparison.
+
+        Args:
+            file_path: The file to check against all others.
+            threshold: Cosine similarity threshold for conflict detection.
+            user_scope: Optional ACL scope list for filtering candidates.
+                        If provided, only candidates readable by this scope are considered.
         """
         try:
             data = self.chroma.get_file_embeddings(file_path)
@@ -79,8 +91,15 @@ class ConflictDetectionService:
             # Compute average embedding for this file
             avg_embedding = np.mean(embeddings, axis=0)
 
+            # Build scope where clause for HNSW candidate query
+            scope_where: dict | None = None
+            if user_scope:
+                scope_where = build_scope_where_clause(user_scope)
+
             # Query HNSW for similar chunks (candidate discovery)
-            results = self.chroma.query_by_embedding(avg_embedding.tolist(), n_results=HNSW_N_RESULTS)
+            results = self.chroma.query_by_embedding(
+                avg_embedding.tolist(), n_results=HNSW_N_RESULTS, where=scope_where
+            )
 
             result_metadatas = results.get("metadatas", [[]])[0]
 

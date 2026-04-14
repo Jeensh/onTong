@@ -536,6 +536,7 @@ class RAGAgent:
                     metadata_filter=metadata_filter,
                     user_roles=user_roles,
                     path_preference=ctx.path_preference if ctx else None,
+                    user_scope=ctx.user_scope if ctx else None,
                 )
                 if not search_result.success:
                     yield self._sse("content_delta", ContentDelta(
