@@ -540,3 +540,10 @@ class TestGetAccessiblePrefixes:
         prefixes = store.get_accessible_prefixes(admin, "read")
         assert "wiki/hr" in prefixes
         assert "wiki/eng" in prefixes
+
+    def test_always_includes_personal_space(self):
+        """Every user's personal @username space is always accessible."""
+        store = _make_store({})
+        user = _user("alice")
+        prefixes = store.get_accessible_prefixes(user, "read")
+        assert "@alice" in prefixes
