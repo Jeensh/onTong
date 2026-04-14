@@ -547,3 +547,38 @@ class TestGetAccessiblePrefixes:
         user = _user("alice")
         prefixes = store.get_accessible_prefixes(user, "read")
         assert "@alice" in prefixes
+
+
+class TestDirectoryPathResolution:
+    """ACL entries use trailing slash (e.g. 'ERP/') but callers may pass
+    directory paths without trailing slash (e.g. 'ERP'). Both forms must work."""
+
+    def test_folder_permission_without_trailing_slash(self):
+        acl = {
+            "ERP/": {
+                "owner": "admin",
+                "read": ["all"],
+                "write": ["all"],
+                "manage": ["admin"],
+                "inherited": False,
+            }
+        }
+        store = _make_store(acl)
+        user = _user("bob")
+        # "ERP" (no slash) should still match "ERP/" ACL entry
+        assert store.check_permission("ERP", user, "read") is True
+
+    def test_folder_scope_without_trailing_slash(self):
+        acl = {
+            "인프라/": {
+                "owner": "admin",
+                "read": ["eng-team"],
+                "write": ["eng-team"],
+                "manage": ["admin"],
+                "inherited": False,
+            }
+        }
+        store = _make_store(acl)
+        scope = store.compute_access_scope("인프라")
+        assert "eng-team" in scope["read"]
+        assert "@admin" in scope["read"]  # owner injected

@@ -152,6 +152,13 @@ class ACLStore:
         if entry and not entry.get("inherited", True):
             return entry
 
+        # Directory match: ACL convention stores folder paths with trailing "/"
+        # but callers may pass "ERP" instead of "ERP/"
+        if not path.endswith("/"):
+            dir_entry = self._acl.get(path + "/")
+            if dir_entry:
+                return dir_entry
+
         # Walk up parent folders
         parts = path.split("/")
         for i in range(len(parts) - 1, 0, -1):
