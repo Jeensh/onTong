@@ -201,7 +201,10 @@ class WikiIndexer:
             bm25_index.add_documents(bm25_docs)
 
     @staticmethod
-    def _metadata_to_chroma(wiki_file: WikiFile) -> dict:
+    def _metadata_to_chroma(
+        wiki_file: WikiFile,
+        access_scope: dict[str, str] | None = None,
+    ) -> dict:
         """Convert WikiFile metadata to ChromaDB-compatible flat dict.
 
         Auto-generated from DocumentMetadata fields so new fields are
@@ -210,6 +213,9 @@ class WikiIndexer:
 
         Also includes structured path fields (path_depth_1/2, path_stem)
         for query-time filtering (L2: Path-Aware RAG).
+
+        access_scope: optional {"read": "<pipe-delimited>", "write": "<pipe-delimited>"}
+        stamped into access_read / access_write for per-user vector pre-filtering.
         """
         meta = wiki_file.metadata
         result = {}
@@ -225,9 +231,22 @@ class WikiIndexer:
         # Structured path metadata for pre-filtering at scale
         result.update(_extract_path_depths(wiki_file.path))
 
+        # Access scope metadata for per-user vector search pre-filtering
+        if access_scope:
+            result["access_read"] = access_scope.get("read", "")
+            result["access_write"] = access_scope.get("write", "")
+        else:
+            result["access_read"] = ""
+            result["access_write"] = ""
+
         return result
 
-    async def index_file(self, wiki_file: WikiFile, force: bool = False) -> int:
+    async def index_file(
+        self,
+        wiki_file: WikiFile,
+        force: bool = False,
+        access_scope: dict[str, str] | None = None,
+    ) -> int:
         """Index a single wiki file into ChromaDB + BM25. Returns chunk count.
 
         Skips indexing if content hash is unchanged (unless force=True).
@@ -246,7 +265,7 @@ class WikiIndexer:
             logger.debug(f"Skipped indexing (unchanged): {wiki_file.path}")
             return 0
 
-        chroma_meta = self._metadata_to_chroma(wiki_file)
+        chroma_meta = self._metadata_to_chroma(wiki_file, access_scope=access_scope)
 
         try:
             self.chroma.upsert(
@@ -318,3 +337,38 @@ class WikiIndexer:
             f"{skipped} skipped (unchanged), BM25: {bm25_index.size}"
         )
         return total
+
+    async def update_access_scope(
+        self,
+        file_path: str,
+        access_scope: dict[str, str],
+    ) -> int:
+        """Update only access_scope metadata for existing chunks (no re-embedding).
+
+        Used when an ACL change affects a document that is already indexed —
+        avoids the cost of re-chunking and re-embedding.
+
+        Returns the number of chunks updated (0 if ChromaDB unavailable or
+        no chunks found for the path).
+        """
+        if not self.chroma.is_connected:
+            return 0
+        data = self.chroma._collection.get(
+            where={"file_path": file_path},
+            include=["metadatas"],
+        )
+        if not data["ids"]:
+            return 0
+        updated_metadatas = []
+        for meta in data["metadatas"]:
+            meta["access_read"] = access_scope.get("read", "")
+            meta["access_write"] = access_scope.get("write", "")
+            updated_metadatas.append(meta)
+        self.chroma._collection.update(
+            ids=data["ids"],
+            metadatas=updated_metadatas,
+        )
+        logger.info(
+            f"Updated access_scope for {len(data['ids'])} chunks: {file_path}"
+        )
+        return len(data["ids"])

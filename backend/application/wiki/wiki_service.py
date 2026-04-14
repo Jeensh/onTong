@@ -143,9 +143,22 @@ class WikiService:
         if wiki_file.metadata.status == "deprecated" and self._conflict_svc:
             self._auto_resolve_conflicts_for_deprecated(path)
 
+        # Compute ACL-based access scope for ChromaDB metadata stamping
+        from backend.core.auth.acl_store import acl_store
+        from backend.core.auth.scope import format_scope_for_chroma
+        try:
+            scope = acl_store.compute_access_scope(path)
+            access_scope: dict[str, str] | None = {
+                "read": format_scope_for_chroma(scope["read"]),
+                "write": format_scope_for_chroma(scope["write"]),
+            }
+        except Exception as e:
+            logger.warning(f"Failed to compute access_scope for {path}: {e}")
+            access_scope = None
+
         # Background indexing — save returns immediately
         index_status.mark_pending(path)
-        asyncio.create_task(self._bg_index(wiki_file))
+        asyncio.create_task(self._bg_index(wiki_file, access_scope=access_scope))
         event_bus.publish("tree_change", {"action": "update", "path": path})
         logger.info(f"Saved: {path} (indexing queued)")
         return wiki_file
@@ -332,10 +345,14 @@ class WikiService:
                     asyncio.create_task(self._bg_index(updated))
                 logger.info(f"Lineage sync: cleared reference to {my_path} in {entry.path}")
 
-    async def _bg_index(self, wiki_file: WikiFile) -> None:
+    async def _bg_index(
+        self,
+        wiki_file: WikiFile,
+        access_scope: dict[str, str] | None = None,
+    ) -> None:
         """Background indexing task."""
         try:
-            await self.indexer.index_file(wiki_file)
+            await self.indexer.index_file(wiki_file, access_scope=access_scope)
             event_bus.publish("index_status", {"action": "done", "path": wiki_file.path})
             # Incremental conflict check after indexing
             if self._conflict_svc:
