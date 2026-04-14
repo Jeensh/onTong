@@ -12,7 +12,7 @@ const SECTIONS: {
   status: "active" | "scaffolding";
 }[] = [
   { id: "wiki", label: "Wiki", icon: <BookOpen className="w-4 h-4" />, status: "active" },
-  { id: "modeling", label: "Modeling", icon: <Cpu className="w-4 h-4" />, status: "scaffolding" },
+  { id: "modeling", label: "Modeling", icon: <Cpu className="w-4 h-4" />, status: "active" },
   { id: "simulation", label: "Simulation", icon: <BarChart3 className="w-4 h-4" />, status: "scaffolding" },
 ];
 
