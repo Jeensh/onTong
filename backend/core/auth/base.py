@@ -31,6 +31,10 @@ class AuthProvider(ABC):
         """
 
     @abstractmethod
+    async def resolve_groups(self, user_id: str) -> list[str]:
+        """Return group names the user belongs to."""
+
+    @abstractmethod
     async def on_startup(self) -> None:
         """Run once at application startup (e.g., fetch JWKS, connect to LDAP)."""
 

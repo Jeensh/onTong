@@ -5,7 +5,7 @@ from __future__ import annotations
 from backend.core.auth.base import AuthProvider
 
 
-def create_auth_provider(provider_name: str) -> AuthProvider:
+def create_auth_provider(provider_name: str, **kwargs) -> AuthProvider:
     """Return an AuthProvider instance for the given name.
 
     To add a new provider:
@@ -14,7 +14,7 @@ def create_auth_provider(provider_name: str) -> AuthProvider:
     """
     if provider_name == "noop":
         from backend.core.auth.noop_provider import NoOpAuthProvider
-        return NoOpAuthProvider()
+        return NoOpAuthProvider(**kwargs)
 
     raise ValueError(
         f"Unknown auth provider: {provider_name!r}. "

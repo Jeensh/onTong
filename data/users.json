@@ -1,0 +1,22 @@
+{
+  "users": [
+    {
+      "id": "donghae",
+      "name": "동해",
+      "email": "donghae@ontong.local",
+      "roles": ["admin"]
+    },
+    {
+      "id": "kim",
+      "name": "김팀원",
+      "email": "kim@ontong.local",
+      "roles": []
+    },
+    {
+      "id": "lee",
+      "name": "이팀원",
+      "email": "lee@ontong.local",
+      "roles": []
+    }
+  ]
+}
