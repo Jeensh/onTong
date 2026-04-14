@@ -63,14 +63,14 @@ async def get_code_graph(repo_id: str, kind: str | None = None):
     from backend.modeling.infrastructure.neo4j_client import Neo4jClient
     neo4j: Neo4jClient = _graph_writer._neo4j
 
-    filter_clause = ""
+    where_clause = ""
     params = {"repo_id": repo_id}
     if kind:
-        filter_clause = " AND n.kind = $kind"
+        where_clause = " WHERE n.kind = $kind"
         params["kind"] = kind
 
     entities = neo4j.query(
-        f"MATCH (n:CodeEntity {{repo_id: $repo_id}}){filter_clause} "
+        f"MATCH (n:CodeEntity {{repo_id: $repo_id}}){where_clause} "
         "RETURN n.qualified_name as id, n.name as name, n.kind as kind, "
         "n.file_path as file_path, n.parent as parent "
         "ORDER BY n.qualified_name",
