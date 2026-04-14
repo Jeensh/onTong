@@ -3,6 +3,7 @@
 export interface ChatRequest {
   message: string;
   session_id: string;
+  clarification_response_id?: string;  // response to a ClarificationRequestEvent
 }
 
 export type AgentType = "WIKI_QA" | "SIMULATION" | "DEBUG_TRACE" | "UNKNOWN";
@@ -52,6 +53,14 @@ export interface ConflictWarningEvent {
   conflicting_docs: string[];
 }
 
+export interface ClarificationRequestEvent {
+  event: "clarification_request";
+  request_id: string;
+  question: string;
+  options: string[];
+  context: string;
+}
+
 export interface ErrorEvent {
   event: "error";
   error_code: string;
@@ -69,6 +78,7 @@ export type SSEEvent =
   | SourcesEvent
   | ConflictWarningEvent
   | ApprovalRequestEvent
+  | ClarificationRequestEvent
   | ErrorEvent
   | DoneEvent;
 

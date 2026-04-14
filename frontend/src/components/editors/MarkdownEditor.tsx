@@ -20,8 +20,9 @@ import { resolveWikiLink } from "@/lib/search/useSearchStore";
 import { BubbleToolbar } from "./BubbleToolbar";
 import { SlashMenu } from "./SlashMenu";
 import { TableContextMenu } from "./TableContextMenu";
-import { MetadataTagBar } from "./metadata/MetadataTagBar";
-import { LinkedDocsPanel } from "./LinkedDocsPanel";
+import { DocumentInfoBar } from "./DocumentInfoBar";
+import { DocumentInfoDrawer } from "./DocumentInfoDrawer";
+import { LineageWidget } from "./LineageWidget";
 import {
   emptyMetadata,
   parseFrontmatter,
@@ -35,14 +36,7 @@ interface MarkdownEditorProps {
   tabId: string;
 }
 
-// Simple session user ID (will be replaced by auth system later)
-const SESSION_USER = typeof window !== "undefined"
-  ? (sessionStorage.getItem("ontong_user") || (() => {
-      const id = `user-${Math.random().toString(36).slice(2, 8)}`;
-      sessionStorage.setItem("ontong_user", id);
-      return id;
-    })())
-  : "unknown";
+import { getCurrentUserName } from "@/lib/auth/currentUser";
 
 export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
   const [loading, setLoading] = useState(true);
@@ -53,6 +47,7 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
   const savingRef = useRef(false);
   const [metadata, setMetadata] = useState<DocumentMetadata>(emptyMetadata());
   const setDirty = useWorkspaceStore((s) => s.setDirty);
+  const isDirty = useWorkspaceStore((s) => s.tabs.find((t) => t.id === tabId)?.isDirty ?? false);
   const openTab = useWorkspaceStore((s) => s.openTab);
   const agentDiff = useWorkspaceStore((s) => s.agentDiff);
   const clearAgentDiff = useWorkspaceStore((s) => s.clearAgentDiff);
@@ -63,12 +58,25 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
   const [lockedBy, setLockedBy] = useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = useState(false);
   const [indexPending, setIndexPending] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerTab, setDrawerTab] = useState("metadata");
+  const [confidenceData, setConfidenceData] = useState<{
+    score: number; tier: string; stale: boolean; stale_months: number;
+    signals: Record<string, number>; citation_count: number;
+    newer_alternatives: Array<{ path: string; title: string; confidence_score: number; confidence_tier: string }>;
+  } | null>(null);
+  const [feedbackData, setFeedbackData] = useState<{
+    verified_count: number; needs_update_count: number;
+    last_verified_at: number; last_verified_by: string;
+  } | null>(null);
+  const [linkedDocsCount, setLinkedDocsCount] = useState(0);
   const originalContentRef = useRef("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadedRef = useRef(false);
+  const prevFilePathRef = useRef(filePath);
   const openTabRef = useRef(openTab);
   openTabRef.current = openTab;
-  // Ref to always call the latest handleSave from onUpdate debounce
+  // Ref to always call the latest handleSave
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleSaveRef = useRef<(html?: string, silent?: boolean) => Promise<void>>(null as any);
 
@@ -106,15 +114,10 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
           "prose prose-sm max-w-none focus:outline-none min-h-[300px] px-6 py-4",
       },
     },
-    onUpdate: ({ editor: ed }) => {
+    onUpdate: () => {
       // Skip the update triggered by initial content load
       if (!loadedRef.current) return;
       setDirty(tabId, true);
-      // Debounced auto-save — use ref to always call latest handleSave
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        handleSaveRef.current?.(ed.getHTML(), true);
-      }, 3000);
     },
   });
 
@@ -123,6 +126,14 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
     let cancelled = false;
 
     async function load() {
+      // Auto-save previous file if dirty before loading new one
+      if (prevFilePathRef.current !== filePath && handleSaveRef.current) {
+        try {
+          await handleSaveRef.current(undefined, true);
+        } catch {}
+      }
+      prevFilePathRef.current = filePath;
+
       setLoading(true);
       setError(null);
       try {
@@ -161,12 +172,14 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
     };
   }, [filePath, editor, tabId, setDirty]);
 
+
   // Save handler
   const handleSave = useCallback(
     async (html?: string, silent = false) => {
       if (!editor || savingRef.current) return;
-      const content = html ?? editor.getHTML();
-      const md = htmlToMarkdown(content);
+      const rawContent = html ?? editor.getHTML();
+      if (!rawContent || typeof rawContent !== "string") return;
+      const md = htmlToMarkdown(rawContent);
       // Merge frontmatter with body for saving
       const fullContent = mergeFrontmatterAndBody(metadata, md);
       savingRef.current = true;
@@ -200,7 +213,10 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
         // Auto-clear after 30s to avoid infinite polling
         setTimeout(() => { clearInterval(pollIndex); setIndexPending(false); }, 30000);
       } catch (e) {
-        if (!silent) toast.error("저장 실패: " + (e instanceof Error ? e.message : String(e)));
+        if (!silent) {
+          const msg = e instanceof Error ? e.message : String(e);
+          toast.error("저장 실패", { description: msg, duration: 5000 });
+        }
       } finally {
         savingRef.current = false;
         setSaving(false);
@@ -355,8 +371,8 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
   useEffect(() => {
     if (!filePath.endsWith(".md")) return;
 
-    acquireLock(filePath, SESSION_USER).then((res) => {
-      if (res.locked && res.user === SESSION_USER) {
+    acquireLock(filePath, getCurrentUserName()).then((res) => {
+      if (res.locked && res.user === getCurrentUserName()) {
         setLockedBy(null);
         setIsReadOnly(false);
         // Register with central lock manager for batched refresh
@@ -370,7 +386,7 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
 
     return () => {
       lockManager.unregister(filePath);
-      releaseLock(filePath, SESSION_USER).catch(() => {});
+      releaseLock(filePath, getCurrentUserName()).catch(() => {});
     };
   }, [filePath, editor]);
 
@@ -380,6 +396,43 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, []);
+
+  // Fetch confidence + feedback data (lifted from TrustBanner)
+  useEffect(() => {
+    if (!filePath) return;
+    let cancelled = false;
+    const base = typeof window !== "undefined" && window.location.hostname === "localhost"
+      ? "http://localhost:8001" : "";
+    Promise.all([
+      fetch(`${base}/api/wiki/confidence/${encodeURIComponent(filePath)}`).then((r) => r.ok ? r.json() : null),
+      fetch(`${base}/api/wiki/feedback/${encodeURIComponent(filePath)}`).then((r) => r.ok ? r.json() : null),
+    ]).then(([conf, fb]) => {
+      if (cancelled) return;
+      if (conf && typeof conf.score === "number") setConfidenceData(conf);
+      if (fb) setFeedbackData(fb);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [filePath]);
+
+  // Keyboard shortcut: Cmd+I to toggle drawer
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "i") {
+        e.preventDefault();
+        setDrawerOpen((v) => !v);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const handleToggleDrawer = useCallback(() => setDrawerOpen((v) => !v), []);
+  const handleOpenDrawerTab = useCallback((tab: string) => {
+    setDrawerTab(tab);
+    setDrawerOpen(true);
+  }, []);
+  const handleCloseDrawer = useCallback(() => setDrawerOpen(false), []);
+  const handleLinkedDocsCountChange = useCallback((total: number) => setLinkedDocsCount(total), []);
 
   const handleMetadataChange = useCallback(
     (newMeta: DocumentMetadata) => {
@@ -527,29 +580,56 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
           <span>{lockedBy} 님이 편집 중입니다 (읽기 전용)</span>
         </div>
       )}
-      <MetadataTagBar
+      <DocumentInfoBar
+        filePath={filePath}
         metadata={metadata}
-        content={currentBodyText}
-        onChange={handleMetadataChange}
+        drawerOpen={drawerOpen}
+        onToggleDrawer={handleToggleDrawer}
+        onOpenDrawerTab={handleOpenDrawerTab}
+        confidenceData={confidenceData}
+        feedbackData={feedbackData}
+        onConfidenceUpdate={setConfidenceData}
+        onFeedbackUpdate={setFeedbackData}
+        linkedDocsCounts={{ total: linkedDocsCount }}
       />
-      <LinkedDocsPanel filePath={filePath} />
-      {sourceMode ? (
-        <textarea
-          className="flex-1 w-full p-6 font-mono text-sm bg-muted/30 resize-none focus:outline-none"
-          value={sourceText}
-          onChange={(e) => {
-            setSourceText(e.target.value);
-            setDirty(tabId, true);
-          }}
+      <LineageWidget filePath={filePath} />
+      {/* Drawer sits between InfoBar and editor content — relative container for overlay */}
+      <div className="relative flex-1 min-h-0 flex flex-col">
+        <DocumentInfoDrawer
+          open={drawerOpen}
+          activeTab={drawerTab}
+          onTabChange={setDrawerTab}
+          onClose={handleCloseDrawer}
+          filePath={filePath}
+          metadata={metadata}
+          content={currentBodyText}
+          onMetadataChange={handleMetadataChange}
+          confidenceData={confidenceData}
+          feedbackData={feedbackData}
+          onConfidenceUpdate={setConfidenceData}
+          onFeedbackUpdate={setFeedbackData}
+          onConnectionCountChange={handleLinkedDocsCountChange}
+          isDirty={isDirty}
+          onSave={handleSave}
         />
-      ) : (
-        <div className="flex-1 overflow-auto relative">
-          <EditorContent editor={editor} />
-          {editor && <BubbleToolbar editor={editor} />}
-          {editor && <SlashMenu editor={editor} />}
-          {editor && <TableContextMenu editor={editor} />}
-        </div>
-      )}
+        {sourceMode ? (
+          <textarea
+            className="flex-1 w-full p-6 font-mono text-sm bg-muted/30 resize-none focus:outline-none"
+            value={sourceText}
+            onChange={(e) => {
+              setSourceText(e.target.value);
+              setDirty(tabId, true);
+            }}
+          />
+        ) : (
+          <div className="flex-1 overflow-auto relative">
+            <EditorContent editor={editor} />
+            {editor && <BubbleToolbar editor={editor} />}
+            {editor && <SlashMenu editor={editor} />}
+            {editor && <TableContextMenu editor={editor} />}
+          </div>
+        )}
+      </div>
 
       {/* Floating action buttons */}
       <div className="absolute bottom-4 right-4 flex items-center gap-1.5 z-10">

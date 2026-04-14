@@ -22,15 +22,22 @@ import {
   CircleCheck,
   Brain,
   Paperclip,
+  Settings,
+  ThumbsUp,
+  ThumbsDown,
+  Info,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { streamChat, type SSECallbacks, type ThinkingStep } from "@/lib/api/sseClient";
 import { fetchFile } from "@/lib/api/wiki";
 import { fetchSkills, matchSkill } from "@/lib/api/skills";
+import { useAuth } from "@/lib/auth";
+import { ensurePersonaFile } from "@/lib/api/persona";
 import { useWorkspaceStore } from "@/lib/workspace/useWorkspaceStore";
 import { toast } from "sonner";
 import type { SkillMeta } from "@/types";
+import { ExternalLink, PanelRightClose } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -40,6 +47,9 @@ interface SourceItem {
   updated?: string;
   updated_by?: string;
   status?: string;
+  superseded_by?: string;
+  confidence_score?: number;
+  confidence_tier?: string;
 }
 
 interface ApprovalData {
@@ -56,7 +66,7 @@ interface ThinkingStepState {
   step: string;
   label: string;
   detail: string;
-  status: "start" | "done";
+  status: "start" | "done" | "info";
 }
 
 interface ConflictPairItem {
@@ -72,6 +82,13 @@ interface ConflictWarning {
   conflict_pairs?: ConflictPairItem[];
 }
 
+interface ClarificationData {
+  request_id: string;
+  question: string;
+  options: string[];
+  context: string;
+}
+
 interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -83,6 +100,7 @@ interface ChatMessage {
   error?: string;
   thinkingSteps?: ThinkingStepState[];
   conflictWarning?: ConflictWarning;
+  clarification?: ClarificationData;
 }
 
 interface ChatSession {
@@ -94,7 +112,13 @@ interface ChatSession {
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function AICopilot() {
+interface AICopilotProps {
+  onPopout?: () => void;
+  onDockBack?: () => void;
+  isPopout?: boolean;
+}
+
+export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {}) {
   const [sessions, setSessions] = useState<ChatSession[]>(() => [
     createSession(),
   ]);
@@ -122,6 +146,7 @@ export function AICopilot() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const openTab = useWorkspaceStore((s) => s.openTab);
   const tabs = useWorkspaceStore((s) => s.tabs);
+  const { user } = useAuth();
   const refreshTree = useWorkspaceStore((s) => s.refreshTree);
   const setAgentDiff = useWorkspaceStore((s) => s.setAgentDiff);
   const setAgentWrite = useWorkspaceStore((s) => s.setAgentWrite);
@@ -214,6 +239,17 @@ export function AICopilot() {
     },
     [activeSessionId]
   );
+
+  const handleOpenPersona = useCallback(async () => {
+    try {
+      const { path } = await ensurePersonaFile();
+      openTab(path);
+    } catch {
+      // Fallback: open with assumed path
+      const username = user?.name || "개발자";
+      openTab(`_personas/@${username}/ontong.local.md`);
+    }
+  }, [user, openTab]);
 
   const handleNewSession = useCallback(() => {
     // Stop any ongoing stream
@@ -328,8 +364,13 @@ export function AICopilot() {
           if (data.status === "start") {
             steps.push({ step: data.step, label: data.label, detail: data.detail, status: "start" });
           } else {
-            // Update existing step to done
-            const idx = steps.findLastIndex((s) => s.step === data.step);
+            // Update matching in-progress step to done. If there is no pending
+            // start, it's a standalone progress event — append instead of
+            // overwriting the previous done entry, so sequences like
+            // doc_ref(1/5), doc_ref(2/5)... all stay visible.
+            const idx = steps.findLastIndex(
+              (s) => s.step === data.step && s.status === "start"
+            );
             if (idx >= 0) {
               steps[idx] = { ...steps[idx], status: "done", label: data.label, detail: data.detail };
             } else {
@@ -401,6 +442,15 @@ export function AICopilot() {
           setSessionSkill(matched);
         }
       },
+      onClarificationRequest: (data) => {
+        updateLastAssistant((msg) => ({
+          ...msg,
+          content: data.question,
+          clarification: data,
+          isStreaming: false,
+        }));
+        setIsLoading(false);
+      },
       onError: (data) => {
         updateLastAssistant((msg) => ({
           ...msg,
@@ -419,7 +469,7 @@ export function AICopilot() {
     };
 
     try {
-      await streamChat(text, activeSessionId, callbacks, controller.signal, filesToAttach, skillToUse?.path);
+      await streamChat(text, activeSessionId, callbacks, controller.signal, filesToAttach, skillToUse?.path, undefined, [...dismissedSkills]);
     } catch (e) {
       if ((e as Error).name !== "AbortError") {
         updateLastAssistant((msg) => ({
@@ -434,6 +484,84 @@ export function AICopilot() {
       abortRef.current = null;
     }
   }, [input, isLoading, activeSessionId, activeSession.title, attachedFiles, selectedSkill, updateMessages, updateLastAssistant, updateSessionTitle]);
+
+  const handleClarificationSelect = useCallback(async (option: string, requestId: string) => {
+    if (isLoading) return;
+
+    // Remove clarification UI from the assistant message
+    updateLastAssistant((msg) => ({
+      ...msg,
+      clarification: undefined,
+    }));
+
+    // Add user's choice as a message
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: option,
+    };
+    const assistantMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "assistant",
+      content: "",
+      isStreaming: true,
+    };
+    updateMessages((msgs) => [...msgs, userMsg, assistantMsg]);
+    setIsLoading(true);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const callbacks: SSECallbacks = {
+      onThinkingStep: (data: ThinkingStep) => {
+        updateLastAssistant((msg) => {
+          const steps = [...(msg.thinkingSteps || [])];
+          if (data.status === "start") {
+            steps.push({ step: data.step, label: data.label, detail: data.detail, status: "start" });
+          } else if (data.status === "info") {
+            steps.push({ step: data.step, label: data.label, detail: data.detail, status: "info" });
+          } else {
+            const idx = steps.findLastIndex(
+              (s) => s.step === data.step && s.status === "start"
+            );
+            if (idx >= 0) {
+              steps[idx] = { ...steps[idx], status: "done", label: data.label, detail: data.detail };
+            } else {
+              steps.push({ step: data.step, label: data.label, detail: data.detail, status: "done" });
+            }
+          }
+          return { ...msg, thinkingSteps: steps };
+        });
+      },
+      onContentDelta: (delta) => {
+        updateLastAssistant((msg) => ({ ...msg, content: msg.content + delta }));
+      },
+      onSources: (sources) => {
+        updateLastAssistant((msg) => ({ ...msg, sources }));
+      },
+      onConflictWarning: (data) => {
+        updateLastAssistant((msg) => ({ ...msg, conflictWarning: data }));
+      },
+      onError: (data) => {
+        updateLastAssistant((msg) => ({ ...msg, error: data.message, isStreaming: false }));
+      },
+      onDone: () => {
+        updateLastAssistant((msg) => ({ ...msg, isStreaming: false }));
+        setIsLoading(false);
+      },
+    };
+
+    try {
+      await streamChat(option, activeSessionId, callbacks, controller.signal, undefined, undefined, requestId);
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") {
+        updateLastAssistant((msg) => ({ ...msg, error: "연결이 끊어졌습니다.", isStreaming: false }));
+      }
+    } finally {
+      setIsLoading(false);
+      abortRef.current = null;
+    }
+  }, [isLoading, activeSessionId, updateMessages, updateLastAssistant]);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
@@ -640,6 +768,31 @@ export function AICopilot() {
           >
             <MessageSquare className="h-4 w-4" />
           </button>
+          <button
+            onClick={handleOpenPersona}
+            className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+            title="AI 페르소나 설정 — 내 응답 스타일을 자유롭게 커스터마이즈"
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+          {onPopout && !isPopout && (
+            <button
+              onClick={onPopout}
+              className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+              title="팝아웃 (별도 창으로 분리)"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </button>
+          )}
+          {onDockBack && isPopout && (
+            <button
+              onClick={onDockBack}
+              className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+              title="패널로 되돌리기 (⌘J)"
+            >
+              <PanelRightClose className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -666,6 +819,7 @@ export function AICopilot() {
                 msg={msg}
                 onSourceClick={openTab}
                 onApproval={handleApproval}
+                onClarificationSelect={handleClarificationSelect}
               />
             )}
           </div>
@@ -679,7 +833,10 @@ export function AICopilot() {
         {skillSuggestion && !selectedSkill && (
           <div className="flex items-center gap-2 text-xs bg-primary/5 border border-primary/20 rounded-lg px-3 py-1.5">
             <span>{skillSuggestion.icon}</span>
-            <span className="flex-1 truncate font-medium">{skillSuggestion.title}</span>
+            <div className="flex-1 min-w-0">
+              <span className="truncate block font-medium">{skillSuggestion.title}</span>
+              <span className="text-[10px] text-muted-foreground">입력 내용에 맞는 스킬이 있습니다</span>
+            </div>
             <button
               onClick={() => { setSelectedSkill(skillSuggestion); setSkillSuggestion(null); }}
               className="text-primary hover:underline font-medium"
@@ -780,7 +937,10 @@ export function AICopilot() {
           });
           return (
             <div className="rounded-lg border bg-popover shadow-md p-1 max-h-56 overflow-auto">
-              <div className="px-2 py-1 text-xs text-muted-foreground font-medium">스킬 선택</div>
+              <div className="px-2 py-1">
+                <div className="text-xs font-medium text-muted-foreground">스킬 선택</div>
+                <div className="text-[10px] text-muted-foreground/70">스킬을 적용하면 AI가 정해진 역할과 형식으로 답변합니다</div>
+              </div>
               {enabledSkills.length >= 5 && (
                 <input
                   value={skillSearch}
@@ -791,8 +951,13 @@ export function AICopilot() {
                 />
               )}
               {filtered.length === 0 ? (
-                <div className="px-2 py-2 text-xs text-muted-foreground">
-                  {enabledSkills.length === 0 ? "등록된 스킬이 없습니다" : "검색 결과 없음"}
+                <div className="px-2 py-3 text-center space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    {enabledSkills.length === 0 ? "등록된 스킬이 없습니다" : "검색 결과 없음"}
+                  </p>
+                  {enabledSkills.length === 0 && (
+                    <p className="text-[10px] text-muted-foreground/70">왼쪽 사이드바 ⚡ 탭에서 스킬을 만들어보세요</p>
+                  )}
                 </div>
               ) : (
                 catKeys.map((cat) => (
@@ -920,15 +1085,17 @@ function AssistantBubble({
   msg,
   onSourceClick,
   onApproval,
+  onClarificationSelect,
 }: {
   msg: ChatMessage;
   onSourceClick: (path: string) => void;
   onApproval: (actionId: string, approved: boolean, actionType?: string, path?: string) => void;
+  onClarificationSelect: (option: string, requestId: string) => void;
 }) {
   const openCompareTab = useWorkspaceStore((s) => s.openCompareTab);
   const resolvedConflicts = useWorkspaceStore((s) => s.resolvedConflicts);
   const hasThinkingSteps = msg.thinkingSteps && msg.thinkingSteps.length > 0;
-  const allStepsDone = hasThinkingSteps && msg.thinkingSteps!.every((s) => s.status === "done");
+  const allStepsDone = hasThinkingSteps && msg.thinkingSteps!.every((s) => s.status === "done" || s.status === "info");
   const isThinking = hasThinkingSteps && !allStepsDone && !msg.content;
 
   return (
@@ -961,6 +1128,21 @@ function AssistantBubble({
           </div>
         )}
       </div>
+
+      {/* Clarification Options */}
+      {msg.clarification && msg.clarification.options.length > 0 && (
+        <div className="mt-2 space-y-1.5">
+          {msg.clarification.options.map((option, idx) => (
+            <button
+              key={idx}
+              onClick={() => onClarificationSelect(option, msg.clarification!.request_id)}
+              className="w-full text-left text-xs px-3 py-2 rounded-lg border hover:bg-primary/5 hover:border-primary/30 transition-colors"
+            >
+              <span className="font-medium">{idx + 1}.</span> {option}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Conflict Warning Banner */}
       {msg.conflictWarning && (
@@ -1058,8 +1240,8 @@ function AssistantBubble({
       {msg.sources && msg.sources.length > 0 && (
         <div className="flex flex-wrap gap-1 px-1">
           {msg.sources.map((s) => (
+            <span key={s.doc} className="inline-flex items-center gap-0.5">
             <button
-              key={s.doc}
               onClick={() => onSourceClick(s.doc)}
               className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs transition-colors ${
                 s.status === "deprecated"
@@ -1070,19 +1252,81 @@ function AssistantBubble({
               }`}
               title={[
                 `관련도: ${Math.round(s.relevance * 100)}%`,
+                s.confidence_score != null && s.confidence_score >= 0 && `신뢰도: ${s.confidence_score} (${s.confidence_tier === "high" ? "높음 — 신뢰할 수 있는 문서" : s.confidence_tier === "medium" ? "보통 — 검증 권장" : "낮음 — 최신 정보가 아닐 수 있음"})`,
                 s.updated_by && `작성자: ${s.updated_by}`,
                 s.updated && `수정일: ${s.updated}`,
                 s.status && `상태: ${s.status}`,
-              ].filter(Boolean).join(" | ")}
+                s.superseded_by && `새 버전: ${s.superseded_by}`,
+              ].filter(Boolean).join("\n")}
             >
               {s.status === "approved" && <CircleCheck className="h-3 w-3 text-green-600" />}
               {s.status === "deprecated" && <X className="h-3 w-3 text-red-500" />}
               {(!s.status || (s.status !== "approved" && s.status !== "deprecated")) && <FileText className="h-3 w-3" />}
               <span>{s.doc.split("/").pop()}</span>
+              {s.status === "deprecated" && <span className="rounded bg-red-100 px-1 text-[10px] font-medium text-red-600 dark:bg-red-900/40 dark:text-red-400">폐기됨</span>}
+              {s.status === "deprecated" && s.superseded_by && (
+                <span
+                  className="cursor-pointer text-[10px] text-blue-500 underline hover:text-blue-700"
+                  onClick={(e) => { e.stopPropagation(); onSourceClick(s.superseded_by!); }}
+                  title={`새 버전: ${s.superseded_by}`}
+                >→ 새 버전</span>
+              )}
               {s.updated && (
                 <span className="text-[10px] opacity-60">{s.updated.slice(5, 10)}</span>
               )}
+              {s.confidence_score != null && s.confidence_score >= 0 && (
+                <span
+                  className={`inline-block h-2 w-2 rounded-full ${
+                    s.confidence_tier === "high"
+                      ? "bg-green-500"
+                      : s.confidence_tier === "medium"
+                      ? "bg-yellow-500"
+                      : "bg-gray-400"
+                  }`}
+                  title={
+                    s.confidence_tier === "high"
+                      ? `신뢰도 ${s.confidence_score}`
+                      : s.confidence_tier === "medium"
+                      ? `신뢰도 ${s.confidence_score} — 검증 권장`
+                      : `신뢰도 ${s.confidence_score} — 오래된 문서`
+                  }
+                />
+              )}
             </button>
+            {/* Source feedback thumbs */}
+            <span className="inline-flex items-center gap-0.5 ml-0.5">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const base = typeof window !== "undefined" && window.location.hostname === "localhost" ? "http://localhost:8001" : "";
+                  fetch(`${base}/api/wiki/feedback/${encodeURIComponent(s.doc)}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "thumbs_up" }),
+                  }).catch(() => {});
+                }}
+                className="p-0.5 rounded hover:bg-green-100 dark:hover:bg-green-900/30 text-muted-foreground hover:text-green-600 transition-colors"
+                title="이 소스가 도움이 되었습니다"
+              >
+                <ThumbsUp className="h-3 w-3" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const base = typeof window !== "undefined" && window.location.hostname === "localhost" ? "http://localhost:8001" : "";
+                  fetch(`${base}/api/wiki/feedback/${encodeURIComponent(s.doc)}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "thumbs_down" }),
+                  }).catch(() => {});
+                }}
+                className="p-0.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-muted-foreground hover:text-red-600 transition-colors"
+                title="이 소스가 부정확합니다"
+              >
+                <ThumbsDown className="h-3 w-3" />
+              </button>
+            </span>
+            </span>
           ))}
         </div>
       )}
@@ -1172,7 +1416,7 @@ function ThinkingStepsDisplay({
     prevCollapsed.current = initialCollapsed;
   }, [initialCollapsed]);
 
-  const completedCount = steps.filter((s) => s.status === "done").length;
+  const completedCount = steps.filter((s) => s.status === "done" || s.status === "info").length;
   const totalCount = steps.length;
 
   // Collapsed view — clickable summary
@@ -1211,6 +1455,8 @@ function ThinkingStepsDisplay({
             {/* Status indicator */}
             {step.status === "done" ? (
               <CircleCheck className="h-3.5 w-3.5 text-green-500 shrink-0 mt-0.5" />
+            ) : step.status === "info" ? (
+              <Info className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
             ) : (
               <Loader2 className="h-3.5 w-3.5 text-primary animate-spin shrink-0 mt-0.5" />
             )}

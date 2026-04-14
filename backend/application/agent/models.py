@@ -59,9 +59,47 @@ class WikiWriteResult(BaseModel):
     content: str
 
 
+class QueryAugmentResult(BaseModel):
+    """Structured output for query augmentation with topic shift detection."""
+
+    augmented_query: str = ""
+    topic_shift: bool = Field(
+        default=False,
+        description="True if the current question is about a completely different topic from the conversation history.",
+    )
+
+
+class SearchEvaluation(BaseModel):
+    """ReAct loop: evaluate whether search results can answer the question."""
+
+    sufficient: bool = True
+    reason: str = ""
+    retry_query: str = ""
+
+
 class ConflictCheckResult(BaseModel):
     """Conflict detection between documents."""
 
     has_conflict: bool = False
     details: str = ""
     conflicting_docs: list[str] = Field(default_factory=list)
+
+
+class ConflictAnalysis(BaseModel):
+    """LLM output for semantic conflict pair analysis.
+
+    Used by ConflictCheckSkill.analyze_pair() to classify a pair of
+    similar documents into conflict types with resolution suggestions.
+    """
+
+    conflict_type: Literal[
+        "factual_contradiction", "scope_overlap", "temporal", "none"
+    ] = "none"
+    severity: Literal["high", "medium", "low"] = "low"
+    summary_ko: str = Field(default="", description="한국어 충돌 요약")
+    claim_a: str = Field(default="", description="문서 A의 구체적 주장 인용")
+    claim_b: str = Field(default="", description="문서 B의 구체적 주장 인용")
+    suggested_resolution: Literal[
+        "merge", "scope_clarify", "version_chain", "dismiss"
+    ] = "dismiss"
+    resolution_detail: str = Field(default="", description="한국어 해결 제안")

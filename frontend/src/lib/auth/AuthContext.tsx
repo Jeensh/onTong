@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import type { AuthProvider, AuthState, User } from "./types";
+import { setCurrentUser } from "./currentUser";
 
 interface AuthContextValue extends AuthState {
   login: () => Promise<void>;
@@ -35,13 +36,14 @@ export function AuthContextProvider({
   useEffect(() => {
     provider
       .init()
-      .then((user) =>
+      .then((user) => {
+        if (user) setCurrentUser(user.name);
         setState({
           user,
           isAuthenticated: user !== null,
           isLoading: false,
-        })
-      )
+        });
+      })
       .catch(() =>
         setState({ user: null, isAuthenticated: false, isLoading: false })
       );
@@ -51,6 +53,7 @@ export function AuthContextProvider({
     setState((s) => ({ ...s, isLoading: true }));
     try {
       const user = await provider.login();
+      setCurrentUser(user.name);
       setState({ user, isAuthenticated: true, isLoading: false });
     } catch {
       setState((s) => ({ ...s, isLoading: false }));

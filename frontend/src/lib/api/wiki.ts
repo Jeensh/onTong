@@ -76,8 +76,18 @@ export async function fetchSubtree(path: string): Promise<WikiTreeNode[]> {
   return res.json();
 }
 
+// Encode each path segment but keep "/" so FastAPI's {path:path} still sees
+// the directory structure. Raw Korean/special chars otherwise get inconsistent
+// handling across browsers/proxies.
+function encodePath(p: string): string {
+  return p
+    .split("/")
+    .map((seg) => encodeURIComponent(seg))
+    .join("/");
+}
+
 export async function fetchFile(path: string): Promise<WikiFile> {
-  const res = await fetch(`/api/wiki/file/${path}`);
+  const res = await fetch(`/api/wiki/file/${encodePath(path)}`);
   if (!res.ok)
     throw new Error(`GET /api/wiki/file/${path} failed: ${res.status}`);
   return res.json();
@@ -87,12 +97,14 @@ export async function saveFile(
   path: string,
   content: string
 ): Promise<WikiFile> {
-  const res = await fetch(`/api/wiki/file/${path}`, {
+  const res = await fetch(`/api/wiki/file/${encodePath(path)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content }),
   });
-  if (!res.ok)
-    throw new Error(`PUT /api/wiki/file/${path} failed: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `저장 실패 (${res.status})`);
+  }
   return res.json();
 }

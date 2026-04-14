@@ -15,7 +15,8 @@ class DocumentMetadata(BaseModel):
     process: str = ""
     error_codes: list[str] = []
     tags: list[str] = []
-    status: str = ""          # document lifecycle: draft | review | approved | deprecated
+    status: str = "draft"     # document lifecycle: draft | approved | deprecated
+    prev_status: str = ""    # status before auto-deprecation (for restoration)
     supersedes: str = ""      # file path this doc replaces (newer version of)
     superseded_by: str = ""   # file path that replaces this doc (older version)
     related: list[str] = []   # file paths of related documents
@@ -46,6 +47,13 @@ class WikiFile(BaseModel):
         return self.metadata.tags
 
 
+class TagAlternative(BaseModel):
+    """Existing tag suggested as a replacement for a newly proposed tag."""
+    tag: str
+    distance: float = 0.0  # cosine distance, smaller = more similar
+    count: int = 0          # usage count in the system
+
+
 class MetadataSuggestion(BaseModel):
     domain: str = ""
     process: str = ""
@@ -53,6 +61,12 @@ class MetadataSuggestion(BaseModel):
     tags: list[str] = []
     confidence: float = 0.0
     reasoning: str = ""
+    # Soft-normalization: for new tags that didn't auto-replace, the closest
+    # existing alternatives. Keyed by suggested tag name.
+    tag_alternatives: dict[str, list[TagAlternative]] = {}
+    # Tags that were auto-normalized (replaced) during suggestion. Keyed by
+    # original LLM tag → final tag.
+    tag_replaced: dict[str, str] = {}
 
 
 class WikiTreeNode(BaseModel):
@@ -80,6 +94,17 @@ class BacklinkMap(BaseModel):
 
 class TagIndex(BaseModel):
     tags: dict[str, list[str]] = {}  # tag -> file_paths
+
+
+class RelatedDocResult(BaseModel):
+    """A document related to the current one, discovered via embedding similarity."""
+    path: str
+    title: str
+    snippet: str
+    similarity: float
+    confidence_score: int = -1
+    confidence_tier: str = ""
+    relationship: str = "similar_topic"  # "similar_topic" | "same_domain" | "shared_tags"
 
 
 class HybridSearchResult(BaseModel):
@@ -112,6 +137,31 @@ class GraphData(BaseModel):
     edges: list[GraphEdge] = []
 
 
+class Relationship(BaseModel):
+    """Typed, weighted edge in the knowledge graph."""
+    source: str                    # file path
+    target: str                    # file path
+    rel_type: str                  # "related" | "supersedes" | "cites" | "similar" | "conflicts"
+    strength: float = 1.0          # 0.0-1.0
+    created_by: str = "system"     # "system" | "user:{name}" | "ai:{tool}"
+    created_at: float = 0.0        # unix timestamp
+    metadata: dict = {}            # rel_type-specific data
+
+
+class GraphResult(BaseModel):
+    """Knowledge graph query result — relationships centered on a document."""
+    center: str                        # queried file path
+    relationships: list[Relationship] = []
+    depth: int = 1
+
+
+class GraphStats(BaseModel):
+    """Aggregate statistics for the knowledge graph."""
+    total_nodes: int = 0
+    total_edges: int = 0
+    type_distribution: dict[str, int] = {}  # rel_type → count
+
+
 # ── Router ────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
@@ -119,6 +169,8 @@ class ChatRequest(BaseModel):
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     attached_files: list[str] = Field(default_factory=list)  # file paths to force-reference
     skill_path: str | None = None  # explicit user-skill invocation
+    clarification_response_id: str | None = None  # response to a ClarificationRequestEvent
+    dismissed_skills: list[str] = Field(default_factory=list)  # skill paths user explicitly ignored
 
 
 class RouterDecision(BaseModel):
@@ -135,6 +187,9 @@ class SourceRef(BaseModel):
     updated: str = ""         # last modified date
     updated_by: str = ""      # last modifier
     status: str = ""          # document lifecycle status
+    superseded_by: str = ""   # path of newer version (when deprecated)
+    confidence_score: int = -1   # -1 = not computed
+    confidence_tier: str = ""    # "high" | "medium" | "low"
 
 
 class TokenUsage(BaseModel):
@@ -186,12 +241,38 @@ class ConflictPair(BaseModel):
     summary: str          # Korean summary of how they differ
 
 
+class TypedConflict(BaseModel):
+    """Semantic conflict analysis result — produced by LLM pair analysis."""
+    file_a: str
+    file_b: str
+    conflict_type: str = "none"  # "factual_contradiction" | "scope_overlap" | "temporal" | "none"
+    severity: str = "low"        # "high" | "medium" | "low"
+    summary_ko: str = ""         # Korean explanation
+    claim_a: str = ""            # specific claim from doc A
+    claim_b: str = ""            # specific claim from doc B
+    suggested_resolution: str = "dismiss"  # "merge" | "scope_clarify" | "version_chain" | "dismiss"
+    resolution_detail: str = ""  # Korean resolution suggestion
+    analyzed_at: float = 0.0     # timestamp
+    resolved: bool = False
+    resolved_by: str = ""
+    resolved_action: str = ""    # action taken to resolve
+
+
 class ConflictWarningEvent(BaseModel):
     """Emitted when RAG pipeline detects contradictory information across documents."""
     event: Literal["conflict_warning"] = "conflict_warning"
     details: str          # human-readable conflict description
     conflicting_docs: list[str] = []  # file paths of conflicting documents
     conflict_pairs: list[ConflictPair] = []  # explicit conflict pairs for comparison
+
+
+class ClarificationRequestEvent(BaseModel):
+    """Emitted when agent needs user clarification before proceeding (NEEDS_CONTEXT)."""
+    event: Literal["clarification_request"] = "clarification_request"
+    request_id: str           # unique ID to match user response
+    question: str             # clarification question in Korean
+    options: list[str] = []   # suggested options (empty = free-form)
+    context: str = ""         # what the agent was trying to do
 
 
 class DoneEvent(BaseModel):
@@ -264,6 +345,7 @@ class SkillMeta(BaseModel):
     category: str = ""        # folder-derived or frontmatter-specified category
     priority: int = 5         # 1~10, higher = matched first (default 5)
     pinned: bool = False      # always show at top in UI
+    allowed_tools: list[str] = []  # per-skill built-in skill restrictions (empty = use intent default)
 
 
 class SkillListResponse(BaseModel):
@@ -304,3 +386,4 @@ class SkillCreateRequest(BaseModel):
     checklist: str = ""             # ## 체크리스트 — include/exclude
     output_format: str = ""         # ## 출력 형식 — response structure
     self_regulation: str = ""       # ## 제한사항 — limits/boundaries
+    allowed_tools: list[str] = []   # per-skill built-in skill restrictions

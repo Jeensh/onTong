@@ -9,7 +9,7 @@ export function emptyMetadata(): DocumentMetadata {
     process: "",
     error_codes: [],
     tags: [],
-    status: "",
+    status: "draft",
     supersedes: "",
     superseded_by: "",
     related: [],

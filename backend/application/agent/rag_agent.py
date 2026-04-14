@@ -18,11 +18,14 @@ from __future__ import annotations
 import json
 import logging
 import re
+from functools import lru_cache
+from pathlib import Path
 from typing import AsyncGenerator
 
 from backend.core.schemas import (
     ApprovalRequestEvent,
     ChatRequest,
+    ClarificationRequestEvent,
     ConflictPair,
     ConflictWarningEvent,
     ContentDelta,
@@ -46,87 +49,215 @@ logger = logging.getLogger(__name__)
 
 LOW_RELEVANCE_THRESHOLD = 0.55
 MIN_SOURCE_RELEVANCE = 0.30
+MAX_REACT_TURNS = 3  # max search attempts in ReAct loop
+REACT_RELEVANCE_THRESHOLD = 0.25  # below this, results are considered insufficient
 
-# ── Cognitive Pipeline Prompts ────────────────────────────────────────
+# Cognitive reflect pipeline removed (AG-1-8).
+# Quality gates moved to ontong.md; conflict detection via conflict_check skill.
+COGNITIVE_REFLECT_PROMPT = None
 
-COGNITIVE_REFLECT_PROMPT = (
-    "You are an internal reasoning engine for a corporate wiki AI assistant. "
-    "You NEVER talk to the user. Your output is consumed only by the system.\n\n"
-    "Given the user's query, conversation history, and retrieved wiki context, "
-    "perform a three-step cognitive analysis:\n\n"
-    "## Step 1: internal_thought (English)\n"
-    "Analyze:\n"
-    "- What is the user REALLY asking? (surface intent vs deeper need)\n"
-    "- What is their likely emotional state? (frustrated? exploring? urgent?)\n"
-    "- What domain context matters? (SCM, HR, IT, production?)\n"
-    "- Are there gaps between the wiki context and what they need?\n\n"
-    "## Step 2: draft_response (Korean)\n"
-    "Write a first-draft answer in Korean based on the wiki context.\n"
-    "Use markdown formatting: paragraphs, bullet lists, bold for key terms.\n"
-    "Include source citations. Be thorough.\n\n"
-    "## Step 3: self_critique (English)\n"
-    "Critique your draft against these quality gates:\n"
-    "- EMPATHY: Does it acknowledge the user's situation before diving into info?\n"
-    "- MINTO PYRAMID: Is the conclusion/answer FIRST, then supporting details?\n"
-    "- ACTIONABLE: Does it suggest concrete human next-steps? "
-    "(e.g., '이 문서를 바탕으로 생산팀에 확인 요청을 해보시겠어요?') "
-    "Do NOT suggest tools/features that don't exist.\n"
-    "- CONCISE: Can anything be cut without losing critical info?\n"
-    "- FORMATTING: Does it use line breaks, bullet lists, bold? Never a wall of text.\n"
-    "- CITATIONS: Are source documents properly referenced?\n"
-    "- CONFLICT_CHECK: Do any documents in the context contain **different values, numbers, "
-    "rules, or guidelines** on the same topic? This includes:\n"
-    "  * Different numbers for the same metric (e.g., budget 30,000 vs 50,000)\n"
-    "  * Different rules or procedures for the same process\n"
-    "  * Multiple versions of a policy from different teams/dates without clear precedence\n"
-    "  Compare [출처] headers, dates, and content. If ANY discrepancy exists between documents, "
-    "set 'has_conflict' to true — even if the documents come from different teams or versions. "
-    "Note which documents conflict, what the discrepancy is, and recommend referencing "
-    "the most recently updated document.\n"
-    "List specific improvements the final answer must make.\n\n"
-    "Respond in this EXACT JSON format (no markdown fences, no extra text):\n"
-    "{\n"
-    '  "internal_thought": "...",\n'
-    '  "draft_response": "...",\n'
-    '  "self_critique": "...",\n'
-    '  "has_conflict": false,\n'
-    '  "conflict_details": "충돌 설명을 한국어로 작성 (has_conflict가 true일 때). 어떤 문서가 어떻게 다른지 구체적으로 기술. false면 빈 문자열"\n'
-    "}"
-)
+_ONTONG_MD_PATH = Path(__file__).resolve().parent.parent.parent / "ontong.md"
 
-FINAL_ANSWER_SYSTEM_PROMPT = (
-    "당신은 On-Tong, 사내 Wiki 지식 관리 시스템의 AI 파트너입니다.\n\n"
-    "## 페르소나\n"
-    "- **공감하는 IT 파트너**: 사용자가 겪고 있는 상황을 먼저 인정하고, "
-    "전문적이면서도 따뜻한 톤으로 답변하세요.\n"
-    "- **결론 우선 (Minto Pyramid)**: 핵심 답변을 첫 문장에 제시하고, "
-    "뒷받침 근거와 세부사항은 그 아래에 구조화하세요.\n"
-    "- **실행 가능한 다음 단계**: 답변 끝에 사용자가 즉시 취할 수 있는 "
-    "구체적 행동을 제안하세요. 존재하지 않는 시스템 기능을 언급하지 마세요.\n"
-    "  예시: '이 내용을 바탕으로 XX팀에 확인 요청을 해보시겠어요?'\n"
-    "- **출처 명시**: 어떤 Wiki 문서에서 정보를 가져왔는지 반드시 언급하세요.\n"
-    "- **간결함**: 불필요한 서론이나 반복 없이, 핵심만 전달하세요.\n\n"
-    "## 포맷팅 규칙\n"
-    "- 답변은 반드시 **마크다운 형식**으로 작성하세요.\n"
-    "- 핵심 답변 후 빈 줄을 넣고, 세부 내용은 **줄바꿈과 단락 구분**을 충분히 사용하세요.\n"
-    "- 여러 항목이 있으면 **번호 목록(1. 2. 3.)** 또는 **불릿 목록(- )** 을 사용하세요.\n"
-    "- 중요한 키워드나 이름은 **볼드**로 강조하세요.\n"
-    "- 절대로 모든 내용을 한 줄에 이어 쓰지 마세요.\n\n"
-    "## 문서 충돌 감지 규칙\n"
-    "- 컨텍스트의 여러 문서가 **같은 주제에 대해 다른 숫자, 금액, 규칙, 기준, 절차**를 담고 있으면 반드시 알려주세요.\n"
-    "- 다른 팀/부서에서 작성했더라도, 같은 항목(예: 일비, 숙박비, 안전재고 등)에 다른 값이 있으면 충돌입니다.\n"
-    "- 충돌 감지 시 반드시 답변 **맨 앞에** 다음 형식으로 경고하세요:\n"
-    "  ⚠️ **문서 간 내용 차이 감지**\n"
-    "  - `문서A` (수정일: YYYY-MM-DD)에서는 'X'라고 설명\n"
-    "  - `문서B` (수정일: YYYY-MM-DD)에서는 'Y'라고 설명\n"
-    "  → 최종수정일이 더 최근인 문서를 우선 참고하시되, 담당자에게 확인을 권장합니다.\n"
-    "- 충돌이 없으면 경고 없이 정상 답변하세요.\n"
-    "- 각 문서의 [출처], [작성자], [최종수정] 헤더를 활용하여 비교하세요.\n\n"
-    "## 절대 규칙\n"
-    "- 컨텍스트에 없는 내용을 추측하거나 지어내지 마세요.\n"
-    "- 구조화된 데이터(키:값)도 주의 깊게 읽고 관련 정보를 추출하세요.\n"
-    "- 인사 정보가 있으면 이름과 소속을 명시하세요.\n"
-)
+
+@lru_cache(maxsize=1)
+def _load_ontong_md() -> str:
+    """Load ontong.md as the base system prompt. Cached after first read."""
+    try:
+        return _ONTONG_MD_PATH.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        logger.warning("ontong.md not found at %s, using fallback", _ONTONG_MD_PATH)
+        return (
+            "당신은 On-Tong, 사내 Wiki 지식 관리 시스템의 AI 어시스턴트입니다.\n"
+            "검색된 문서를 기반으로 간결하고 정확하게 답변하세요.\n"
+            "문서에 없는 내용은 추측하지 마세요."
+        )
+
+
+def get_system_prompt() -> str:
+    """Return the current ontong.md system prompt."""
+    return _load_ontong_md()
+
+
+# ── Scoring config ──────────────────────────────────────────────────
+from backend.application.trust.scoring_config import SCORING as _SCORING
+
+# ── Per-user persona (ontong.local.md) ───────────────────────────────
+
+import time as _time
+
+_persona_cache: dict[str, tuple[str, float]] = {}
+_PERSONA_TTL = 60  # seconds
+
+
+def invalidate_persona_cache(username: str) -> None:
+    """Called when a user updates their persona settings."""
+    _persona_cache.pop(username, None)
+
+
+async def get_user_persona(username: str, storage: object) -> str:
+    """Load per-user persona markdown (freeform). Returns empty string if not set.
+
+    The persona file is a regular wiki document edited by the user in Tiptap.
+    Its full content is injected into the system prompt as-is.
+    """
+    if not username or not storage:
+        return ""
+
+    cached = _persona_cache.get(username)
+    if cached and (_time.time() - cached[1]) < _PERSONA_TTL:
+        return cached[0]
+
+    path = f"_personas/@{username}/ontong.local.md"
+    try:
+        wiki_file = await storage.read(path)  # type: ignore[union-attr]
+        if not wiki_file:
+            _persona_cache[username] = ("", _time.time())
+            return ""
+
+        content = wiki_file.content.strip()
+
+        # Strip YAML frontmatter if present (wiki storage may add it)
+        if content.startswith("---"):
+            parts = content.split("---", 2)
+            if len(parts) >= 3:
+                content = parts[2].strip()
+
+        # Skip template-only content (guide comments with no real instructions)
+        # If the content is mostly HTML comments, treat as empty
+        import re
+        stripped = re.sub(r"<!--.*?-->", "", content, flags=re.DOTALL).strip()
+        stripped = re.sub(r"^#+\s+.*$", "", stripped, flags=re.MULTILINE).strip()
+        stripped = re.sub(r"^>.*$", "", stripped, flags=re.MULTILINE).strip()
+        if not stripped:
+            _persona_cache[username] = ("", _time.time())
+            return ""
+
+        _persona_cache[username] = (content, _time.time())
+        return content
+    except Exception as e:
+        logger.debug(f"Failed to load persona for '{username}': {e}")
+        return ""
+
+
+async def build_system_prompt(username: str, storage: object) -> str:
+    """Build the full system prompt: base ontong.md + per-user persona."""
+    base = get_system_prompt()
+    persona = await get_user_persona(username, storage)
+    if persona:
+        return base + "\n\n---\n\n## 사용자 개인 설정\n\n" + persona
+    return base
+
+
+def build_history_window(
+    history: list[dict], max_tokens: int = 4000
+) -> list[dict]:
+    """Select recent messages that fit within a token budget.
+
+    When older messages are dropped, a structured summary is prepended
+    so the LLM retains awareness of the full conversation scope.
+    """
+    if not history:
+        return []
+
+    window: list[dict] = []
+    token_count = 0
+    cutoff_idx = len(history)  # index where we stopped including
+
+    for i, msg in enumerate(reversed(history)):
+        est = len(msg.get("content", "")) // 4
+        if token_count + est > max_tokens:
+            cutoff_idx = len(history) - i
+            break
+        token_count += est
+        window.insert(0, msg)
+
+    # If all messages fit, no summary needed
+    if cutoff_idx == len(history) or cutoff_idx == 0:
+        return window
+
+    # Build structured summary of dropped messages
+    dropped = history[:cutoff_idx]
+    summary = _summarize_dropped_messages(dropped)
+    if summary:
+        summary_msg = {
+            "role": "system",
+            "content": (
+                "[대화 요약 — 이전 대화 내용을 요약한 것입니다. "
+                "이 요약을 언급하지 말고 자연스럽게 이어서 답변하세요.]\n\n"
+                + summary
+            ),
+        }
+        window.insert(0, summary_msg)
+
+    return window
+
+
+def _summarize_dropped_messages(messages: list[dict]) -> str:
+    """Rule-based structured summary of dropped conversation messages.
+
+    Extracts: scope, referenced docs, recent requests, skills used, current work.
+    No LLM call — pure extraction from message content.
+    """
+    user_messages = [m for m in messages if m.get("role") == "user"]
+    assistant_messages = [m for m in messages if m.get("role") == "assistant"]
+
+    if not user_messages:
+        return ""
+
+    parts: list[str] = []
+
+    # 1. Scope
+    total_turns = len(user_messages)
+    parts.append(f"- **대화 규모**: 사용자 {total_turns}회 질문")
+
+    # 2. Recent requests (last 3 user messages from dropped portion)
+    recent_requests = []
+    for msg in user_messages[-3:]:
+        content = msg.get("content", "").strip()
+        if content:
+            # Truncate long messages
+            truncated = content[:80] + ("..." if len(content) > 80 else "")
+            recent_requests.append(truncated)
+    if recent_requests:
+        req_lines = "\n".join(f"  - {r}" for r in recent_requests)
+        parts.append(f"- **이전 요청**:\n{req_lines}")
+
+    # 3. Referenced docs — extract file paths from assistant responses
+    doc_refs: set[str] = set()
+    doc_pattern = re.compile(r'(?:출처|참조|📄)\s*[:\s]*([^\s\n\]]+\.md)', re.IGNORECASE)
+    for msg in assistant_messages:
+        content = msg.get("content", "")
+        for match in doc_pattern.finditer(content):
+            doc_refs.add(match.group(1))
+    if doc_refs:
+        parts.append(f"- **참조된 문서**: {', '.join(sorted(doc_refs)[:5])}")
+
+    # 4. Skills used — detect skill keywords
+    skill_keywords = {
+        "수정": "wiki_edit", "생성": "wiki_write", "검색": "wiki_search",
+        "시뮬레이션": "simulation", "인덱싱": "reindex",
+    }
+    skills_used: set[str] = set()
+    for msg in user_messages:
+        content = msg.get("content", "")
+        for keyword, skill in skill_keywords.items():
+            if keyword in content:
+                skills_used.add(skill)
+    if skills_used:
+        parts.append(f"- **사용된 기능**: {', '.join(sorted(skills_used))}")
+
+    # 5. Current work — last assistant response summary
+    if assistant_messages:
+        last_assist = assistant_messages[-1].get("content", "").strip()
+        if last_assist:
+            summary_line = last_assist[:120] + ("..." if len(last_assist) > 120 else "")
+            parts.append(f"- **마지막 응답 요약**: {summary_line}")
+
+    return "\n".join(parts)
+
+
+# Keep legacy name for backward compatibility in imports (e.g., tests)
+FINAL_ANSWER_SYSTEM_PROMPT = None  # Replaced by ontong.md — use get_system_prompt()
 
 CLARITY_CHECK_PROMPT = (
     "You are a helpful assistant for a corporate wiki knowledge system.\n"
@@ -198,6 +329,14 @@ class RAGAgent:
     def __init__(self, chroma: ChromaWrapper, storage: StorageProvider | None = None) -> None:
         self.chroma = chroma
         self.storage = storage
+        self._confidence_service = None  # set via set_confidence_service()
+        self._citation_tracker = None    # set via set_citation_tracker()
+
+    def set_confidence_service(self, svc: object) -> None:
+        self._confidence_service = svc
+
+    def set_citation_tracker(self, tracker: object) -> None:
+        self._citation_tracker = tracker
 
     async def execute(
         self, request: ChatRequest, metadata_filter: dict | None = None,
@@ -226,26 +365,30 @@ class RAGAgent:
                 yield event
             return
 
+        # Wiki chat is Q&A-only. Document creation ('write') is handled by
+        # explicit UI affordances (tree create, editor), not the chat endpoint.
+        # Fall through to Q&A so the answer is rendered inline (including
+        # code blocks) instead of silently creating a wiki file.
         if action == "write":
-            async for event in self._handle_write(request, ctx=ctx):
-                yield event
-            return
+            action = "question"
 
         # Normal Q&A flow (with clarification check)
         async for event in self._handle_qa(
             request, metadata_filter, history, attached_context,
             augmented_query, ctx=ctx, user_roles=kwargs.get("user_roles", ["admin"]),
+            topic_shift=kwargs.get("topic_shift", False),
         ):
             yield event
 
-    async def _augment_query(self, query: str, history: list[dict]) -> str:
+    async def _augment_query(self, query: str, history: list[dict]) -> dict:
         """Augment follow-up queries with context from conversation history.
 
         Called from api/agent.py for parallel pre-computation (before ctx exists).
-        Uses Pydantic AI Agent for LLM call.
+        Returns dict with 'augmented_query' and 'topic_shift' keys.
         """
+        default = {"augmented_query": query, "topic_shift": False}
         if not history or len(history) < 2:
-            return query
+            return default
 
         recent_context = []
         for msg in history[-4:]:
@@ -259,44 +402,99 @@ class RAGAgent:
         try:
             from pydantic_ai import Agent
             from backend.application.agent.llm_factory import get_model
+            from backend.application.agent.models import QueryAugmentResult
+            from backend.application.agent.skills.query_augment import AUGMENT_SYSTEM_PROMPT
 
             agent = Agent(
                 get_model(),
-                output_type=str,
-                system_prompt=(
-                    "You are a search query rewriter. Given a follow-up question and "
-                    "conversation context, rewrite the question as a standalone search query "
-                    "that includes all necessary context for document retrieval.\n\n"
-                    "Rules:\n"
-                    "- Output ONLY the rewritten query, nothing else\n"
-                    "- Keep it concise (under 50 words)\n"
-                    "- Preserve the original language (Korean)\n"
-                    "- Include key entities/topics from context that the follow-up refers to\n\n"
-                    "Example:\n"
-                    "Context: user asked about '후판 공정계획'\n"
-                    "Follow-up: '담당자 누구 있는지 찾아줘'\n"
-                    "Rewritten: '후판 공정계획 담당자 누구'"
-                ),
+                output_type=QueryAugmentResult,
+                system_prompt=AUGMENT_SYSTEM_PROMPT,
+                retries=1,
                 defer_model_check=True,
             )
             result = await agent.run(
                 f"Conversation context:\n{chr(10).join(recent_context)}\n\n"
                 f"Follow-up question: {query}"
             )
-            augmented = result.output.strip()
-            if augmented:
-                logger.info(f"Query augmented: '{query}' → '{augmented}'")
-                return augmented
+            output = result.output
+            augmented = output.augmented_query.strip() or query
+            logger.info(f"Query augmented: '{query}' → '{augmented}' (topic_shift={output.topic_shift})")
+            return {"augmented_query": augmented, "topic_shift": output.topic_shift}
         except Exception as e:
             logger.warning(f"Query augmentation failed: {e}, using original query")
 
-        return query
+        return default
+
+    async def _evaluate_search_results(
+        self,
+        query: str,
+        search_query: str,
+        documents: list[str],
+        metadatas: list[dict],
+        distances: list[float],
+        ctx: AgentContext,
+    ) -> dict:
+        """ReAct: evaluate if search results can answer the question.
+
+        Returns dict with 'sufficient', 'reason', 'retry_query'.
+        Uses rule-based check first; falls back to LLM only when ambiguous.
+        """
+        # Rule-based fast path
+        if not documents:
+            return {"sufficient": False, "reason": "no results", "retry_query": query}
+
+        best_relevance = max(0, 1 - min(distances)) if distances else 0
+
+        # High relevance → sufficient
+        if best_relevance >= 0.4:
+            return {"sufficient": True, "reason": "high relevance", "retry_query": ""}
+
+        # Very low relevance → insufficient, try LLM for refined query
+        if best_relevance < REACT_RELEVANCE_THRESHOLD:
+            try:
+                from pydantic_ai import Agent
+                from backend.application.agent.llm_factory import get_model
+                from backend.application.agent.models import SearchEvaluation
+                from backend.application.agent.skills.prompt_loader import load_prompt
+
+                doc_summaries = []
+                for doc, meta, dist in zip(documents[:5], metadatas[:5], distances[:5]):
+                    title = meta.get("path", meta.get("file_path", "unknown"))
+                    relevance = max(0, 1 - dist)
+                    doc_summaries.append(f"- {title} (관련도: {relevance:.0%}): {doc[:150]}...")
+
+                eval_prompt = load_prompt("qa_react")
+                agent = Agent(
+                    get_model(),
+                    output_type=SearchEvaluation,
+                    system_prompt=eval_prompt,
+                    retries=1,
+                    defer_model_check=True,
+                )
+                result = await agent.run(
+                    f"User question: {query}\n"
+                    f"Search query used: {search_query}\n"
+                    f"Search results:\n" + "\n".join(doc_summaries)
+                )
+                output = result.output
+                return {
+                    "sufficient": output.sufficient,
+                    "reason": output.reason,
+                    "retry_query": output.retry_query if not output.sufficient else "",
+                }
+            except Exception as e:
+                logger.warning(f"ReAct evaluation failed: {e}, treating as sufficient")
+                return {"sufficient": True, "reason": "eval_error", "retry_query": ""}
+
+        # Moderate relevance → sufficient (answer with what's available)
+        return {"sufficient": True, "reason": "moderate relevance", "retry_query": ""}
 
     async def _handle_qa(
         self, request: ChatRequest, metadata_filter: dict | None = None,
         history: list[dict] | None = None, attached_context: str = "",
         augmented_query: str | None = None, *,
         ctx: AgentContext | None = None, user_roles: list = None,
+        topic_shift: bool = False,
     ) -> AsyncGenerator[str, None]:
         """Standard RAG Q&A: clarity check → search (skill) → cognitive pipeline → LLM answer (skill)."""
         query = request.message
@@ -304,45 +502,87 @@ class RAGAgent:
         user_roles = user_roles or (ctx.user_roles if ctx else ["admin"])
 
         # 0. Query augmentation (pre-computed in parallel at API layer, or fallback here)
+        import asyncio as _asyncio
+
         is_followup = len(history) >= 2
         if augmented_query and augmented_query != query:
             search_query = augmented_query
-            yield self._thinking("query_augment", "done", "쿼리 보강 완료 (병렬)", search_query)
+            shift_label = " [주제 전환]" if topic_shift else ""
+            yield self._thinking("query_augment", "done", f"쿼리 보강 완료 (병렬){shift_label}", search_query)
         elif is_followup:
             yield self._thinking("query_augment", "start", "검색 쿼리 보강 중")
-            search_query = await self._augment_query(query, history)
+            augment_result = await self._augment_query(query, history)
+            search_query = augment_result["augmented_query"]
+            topic_shift = augment_result["topic_shift"]
+            shift_label = " [주제 전환]" if topic_shift else ""
             if search_query != query:
-                yield self._thinking("query_augment", "done", "쿼리 보강 완료", search_query)
+                yield self._thinking("query_augment", "done", f"쿼리 보강 완료{shift_label}", search_query)
             else:
-                yield self._thinking("query_augment", "done", "쿼리 보강 완료")
+                yield self._thinking("query_augment", "done", f"쿼리 보강 완료{shift_label}")
         else:
             search_query = query
 
-        # 1. Hybrid search via wiki_search skill
+        # 1. Hybrid search via wiki_search skill (with ReAct loop)
         yield self._thinking("vector_search", "start", "관련 문서 검색 중")
 
         if ctx:
-            search_result = await ctx.run_skill(
-                "wiki_search",
-                query=search_query,
-                n_results=8,
-                metadata_filter=metadata_filter,
-                user_roles=user_roles,
-            )
-            if not search_result.success:
-                yield self._sse("content_delta", ContentDelta(
-                    delta=f"검색 실패: {search_result.error}"
-                ).model_dump_json())
-                yield self._sse("done", DoneEvent().model_dump_json())
-                return
+            # ReAct loop: search → evaluate → re-search if insufficient
+            tried_queries: list[str] = []
+            for react_turn in range(MAX_REACT_TURNS):
+                search_result = await ctx.run_skill(
+                    "wiki_search",
+                    query=search_query,
+                    n_results=8,
+                    metadata_filter=metadata_filter,
+                    user_roles=user_roles,
+                    path_preference=ctx.path_preference if ctx else None,
+                )
+                if not search_result.success:
+                    yield self._sse("content_delta", ContentDelta(
+                        delta=f"검색 실패: {search_result.error}"
+                    ).model_dump_json())
+                    yield self._sse("done", DoneEvent().model_dump_json())
+                    return
 
-            documents = search_result.data["documents"]
-            metadatas = search_result.data["metadatas"]
-            distances = search_result.data["distances"]
-            search_mode = search_result.data["search_mode"]
+                documents = search_result.data["documents"]
+                metadatas = search_result.data["metadatas"]
+                distances = search_result.data["distances"]
+                search_mode = search_result.data["search_mode"]
+
+                # Surface non-fatal feedback (e.g., deprecated doc warnings)
+                if search_result.feedback:
+                    logger.info(f"Search feedback: {search_result.feedback}")
+                    yield self._thinking("vector_search", "info", search_result.feedback)
+
+                tried_queries.append(search_query)
+
+                # Evaluate: should we re-search?
+                if react_turn < MAX_REACT_TURNS - 1 and documents:
+                    evaluation = await self._evaluate_search_results(
+                        query, search_query, documents, metadatas, distances, ctx,
+                    )
+                    if evaluation["sufficient"]:
+                        break
+                    retry_query = evaluation["retry_query"]
+                    if retry_query and retry_query not in tried_queries:
+                        logger.info(
+                            f"ReAct turn {react_turn + 1}: re-searching "
+                            f"(reason: {evaluation['reason']}, new query: '{retry_query}')"
+                        )
+                        yield self._thinking(
+                            "vector_search", "retry",
+                            f"재검색 중 ({evaluation['reason']})",
+                            retry_query,
+                        )
+                        search_query = retry_query
+                        continue
+                break  # sufficient or no retry_query
         else:
             # Fallback: direct search (backward compatibility without ctx)
-            from backend.application.agent.filter_extractor import extract_metadata_filter as _extract
+            from backend.application.agent.filter_extractor import (
+                extract_metadata_filter as _extract,
+                extract_query_tags as _extract_tags,
+            )
             from backend.infrastructure.search.bm25 import bm25_index
             from backend.infrastructure.search.hybrid import reciprocal_rank_fusion
             from backend.infrastructure.cache.query_cache import query_cache as _cache
@@ -351,6 +591,9 @@ class RAGAgent:
             base_filter = metadata_filter or _extract(search_query)
             deprecated_filter = {"status": {"$ne": "deprecated"}}
             effective_filter = self._merge_where_filters(base_filter, deprecated_filter)
+
+            # B1: extract tag concepts from query for boost + fallback
+            query_tags: list[str] = _extract_tags(search_query)
 
             cached = _cache.get(search_query, effective_filter)
             if cached:
@@ -365,6 +608,19 @@ class RAGAgent:
                     vector_results = self.chroma.query(query_text=search_query, n_results=8)
 
                 v_docs = vector_results.get("documents", [[]])[0]
+                # B3: tag-only fallback before fully removing the filter
+                if effective_filter and not v_docs and query_tags:
+                    tag_filter = self._build_tag_filter(query_tags, deprecated_filter)
+                    if tag_filter:
+                        tag_results = self.chroma.query_with_filter(
+                            query_text=search_query, n_results=8, where=tag_filter
+                        )
+                        if tag_results.get("documents", [[]])[0]:
+                            vector_results = tag_results
+                            effective_filter = tag_filter
+                            v_docs = vector_results["documents"][0]
+                            logger.info(f"Tag-only fallback hit ({len(v_docs)} docs) for tags={query_tags}")
+
                 if effective_filter and not v_docs:
                     vector_results = self.chroma.query(query_text=search_query, n_results=8)
                     effective_filter = None
@@ -407,6 +663,15 @@ class RAGAgent:
                 else:
                     documents, metadatas, distances = [], [], []
 
+            # B2: tag intersection boost rerank
+            if documents and query_tags:
+                import os
+                boost_weight = float(os.environ.get("ONTONG_TAG_BOOST_WEIGHT", "0.05"))
+                if boost_weight > 0:
+                    documents, metadatas, distances = self._tag_boost_rerank(
+                        documents, metadatas, distances, query_tags, weight=boost_weight
+                    )
+
         doc_count = len(documents)
         if doc_count > 0:
             best_rel = max(0, 1 - min(distances)) if distances else 0
@@ -428,23 +693,67 @@ class RAGAgent:
             yield self._sse("done", DoneEvent().model_dump_json())
             return
 
-        # 3. Clarity check — only for genuinely vague queries with poor results
+        # 2.5. L3: Path divergence disambiguation
+        import os as _os
+        _disambig_enabled = _os.environ.get("ONTONG_PATH_DISAMBIG_ENABLED", "true").lower() == "true"
+        _has_path_pref = ctx and (ctx.path_preference or ctx.path_preferences)
+        if _disambig_enabled and documents and not is_followup and not _has_path_pref:
+            _min_paths = int(_os.environ.get("ONTONG_PATH_DISAMBIG_MIN_PATHS", "3"))
+            _dominance = float(_os.environ.get("ONTONG_PATH_DISAMBIG_DOMINANCE", "0.70"))
+            is_ambiguous, path_stats = self._detect_path_ambiguity(
+                metadatas, distances, min_paths=_min_paths, dominance_ratio=_dominance,
+            )
+            if is_ambiguous:
+                logger.info(f"Path ambiguity detected: {path_stats}")
+                options = [p for p, _c, _r in path_stats[:5]]
+                import uuid as _uuid
+                evt = ClarificationRequestEvent(
+                    request_id=str(_uuid.uuid4()),
+                    question="검색 결과가 여러 영역에 걸쳐 있습니다. 어떤 영역의 문서를 찾으시나요?",
+                    options=options,
+                    context=f"path_disambiguation:{search_query}",
+                )
+                yield self._sse("clarification_request", evt.model_dump_json())
+                yield self._sse("done", DoneEvent().model_dump_json())
+                return
+
+        # L4: Path boost rerank (session-accumulated preferences)
+        if ctx and ctx.path_preferences and documents:
+            _path_weight = float(_os.environ.get("ONTONG_PATH_BOOST_WEIGHT", "0.08"))
+            if _path_weight > 0:
+                documents, metadatas, distances = self._path_boost_rerank(
+                    documents, metadatas, distances, ctx.path_preferences, weight=_path_weight,
+                )
+
+        # 3. Clarity check — short vague queries with mediocre results
         best_distance = min(distances) if distances else 1.0
         best_relevance = max(0, 1 - best_distance)
-        query_too_short = len(query.strip()) < 6
-        results_very_poor = best_relevance < 0.15
-        needs_clarity_check = query_too_short and results_very_poor
+        query_too_short = len(query.strip()) < 8
+        results_ambiguous = best_relevance < 0.40
+        needs_clarity_check = query_too_short and results_ambiguous
 
         if needs_clarity_check and not is_followup:
             yield self._thinking("clarity_check", "start", "질문 명확성 확인 중")
             clarification = self._check_clarity_rule_based(query, metadatas, distances)
             if clarification:
                 yield self._thinking("clarity_check", "done", "명확화 질문 필요", "추가 정보 요청")
-                clarify_sources = self._build_sources(metadatas, distances, threshold=0.2)
+                clarify_sources = self._build_sources(metadatas, distances, threshold=0.2, confidence_service=self._confidence_service)
                 if clarify_sources:
                     yield self._sse("sources", SourcesEvent(sources=clarify_sources).model_dump_json())
 
-                yield self._sse("content_delta", ContentDelta(delta=clarification).model_dump_json())
+                # Build structured clarification options from search results
+                options = self._build_clarification_options(metadatas, distances)
+                if options:
+                    import uuid as _uuid
+                    evt = ClarificationRequestEvent(
+                        request_id=str(_uuid.uuid4()),
+                        question=f"Wiki에서 관련 문서를 찾았습니다.\n\n어떤 내용에 대해 알고 싶으신가요?",
+                        options=options,
+                        context=query,
+                    )
+                    yield self._sse("clarification_request", evt.model_dump_json())
+                else:
+                    yield self._sse("content_delta", ContentDelta(delta=clarification).model_dump_json())
                 yield self._sse("done", DoneEvent().model_dump_json())
                 return
 
@@ -470,47 +779,32 @@ class RAGAgent:
                 relevant_metas.append(meta)
                 relevant_dists.append(dist)
 
-        sources = self._build_sources(metadatas, distances, threshold=MIN_SOURCE_RELEVANCE)
+        sources = self._build_sources(metadatas, distances, threshold=MIN_SOURCE_RELEVANCE, confidence_service=self._confidence_service)
         if sources:
             yield self._sse("sources", SourcesEvent(sources=sources).model_dump_json())
+            self._record_citations(sources)
 
         if not relevant_docs:
             relevant_docs = [documents[0]]
             relevant_metas = [metadatas[0]] if metadatas else [{}]
             relevant_dists = [distances[0]] if distances else [1.0]
 
-        # ── 5. Self-Reflective Cognitive Pipeline ─────────────────────────
+        # ── 5. Build context + conflict detection ─────────────────────────
         context = self._build_context_with_metadata(relevant_docs, relevant_metas, relevant_dists)
 
         if attached_context:
             context = attached_context.strip() + "\n\n---\n\n" + context
 
-        # 5a. Hidden cognitive reflection — check cache first
-        yield self._thinking("cognitive_reflect", "start", "의도 분석 및 답변 검토 중")
-        reflection = self._get_cached_reflection(query, context)
-        if reflection:
-            yield self._thinking("cognitive_reflect", "done", "답변 검토 완료", "캐시 적중")
-        else:
-            reflection = await self._cognitive_reflect(query, context, history, ctx=ctx)
-            if reflection:
-                self._cache_reflection(query, context, reflection)
-                yield self._thinking("cognitive_reflect", "done", "답변 검토 완료", "자기 검토 통과")
-            else:
-                yield self._thinking("cognitive_reflect", "done", "답변 검토 완료", "기본 모드")
-
-        # 5a-1. Conflict detection — cognitive reflection result + dedicated check
-        has_conflict = reflection.get("has_conflict", False) if reflection else False
-        conflict_details = reflection.get("conflict_details", "") if reflection else ""
-
-        # If cognitive reflection missed it, run dedicated conflict_check
-        # Only when there are 2+ unique high-relevance sources (both >= 60% relevance)
+        # 5a. Conflict detection via dedicated skill
+        has_conflict = False
+        conflict_details = ""
         unique_sources = {m.get("file_path", "") for m in relevant_metas}
         high_relevance_sources = {
             m.get("file_path", "")
             for m, d in zip(relevant_metas, relevant_dists)
             if max(0, 1 - d) >= 0.6
         }
-        if not has_conflict and len(high_relevance_sources) >= 2 and ctx:
+        if len(high_relevance_sources) >= 2 and ctx:
             try:
                 conflict_result = await ctx.run_skill(
                     "conflict_check",
@@ -563,18 +857,17 @@ class RAGAgent:
         # 5b. Final polished answer — streamed to user via llm_generate skill
         yield self._thinking("answer_gen", "start", "최종 답변 생성 중", f"컨텍스트 {len(relevant_docs)}건 사용")
 
-        final_system = FINAL_ANSWER_SYSTEM_PROMPT + f"\n## Wiki 컨텍스트\n\n{context}"
+        username = ctx.username if ctx else ""
+        base_prompt = await build_system_prompt(username, self.storage)
+        final_system = base_prompt + f"\n\n---\n\n## Wiki 컨텍스트\n\n{context}"
 
-        if reflection:
-            final_system += (
-                f"\n\n## 내부 검토 피드백 (사용자에게 표시하지 말 것)\n"
-                f"다음 피드백을 반영하여 최종 답변을 작성하세요:\n"
-                f"{reflection['self_critique']}"
-            )
-
+        # Token-based history window — skip when topic shifted to prevent contamination
         messages = [{"role": "system", "content": final_system}]
-        for msg in history[-6:]:
-            messages.append({"role": msg["role"], "content": msg["content"]})
+        if not topic_shift:
+            for msg in build_history_window(history):
+                messages.append({"role": msg["role"], "content": msg["content"]})
+        else:
+            logger.info("Topic shift detected — skipping history injection for clean context")
         messages.append({"role": "user", "content": request.message})
 
         if ctx:
@@ -638,59 +931,21 @@ class RAGAgent:
                     ).model_dump_json(),
                 )
 
-    async def _cognitive_reflect(
-        self, query: str, context: str, history: list[dict],
-        *, ctx: AgentContext | None = None,
-    ) -> dict | None:
-        """Hidden cognitive pipeline: think → draft → critique.
-
-        Uses Pydantic AI for structured output — automatic JSON validation and retry.
-        Returns dict with internal_thought/draft_response/self_critique,
-        or None if reflection fails.
-        """
-        from backend.application.agent.structured_agents import create_cognitive_agent
-
-        history_text = ""
-        if history:
-            recent = history[-4:]
-            lines = []
-            for msg in recent:
-                role = "User" if msg.get("role") == "user" else "Assistant"
-                lines.append(f"{role}: {msg.get('content', '')[:200]}")
-            history_text = "\n".join(lines)
-
-        user_prompt = (
-            f"## User Query\n{query}\n\n"
-            f"## Conversation History\n{history_text or '(none)'}\n\n"
-            f"## Wiki Context\n{context[:6000]}"
-        )
-
-        try:
-            agent = create_cognitive_agent(COGNITIVE_REFLECT_PROMPT)
-            result = await agent.run(user_prompt)
-            reflection = result.output
-
-            logger.info(
-                "\n╔══════════════════════════════════════════════════════════╗\n"
-                "║           COGNITIVE PIPELINE — INTERNAL LOG             ║\n"
-                "╚══════════════════════════════════════════════════════════╝\n"
-                f"\n📌 Query: {query}\n"
-                f"\n🧠 INTERNAL THOUGHT:\n{reflection.internal_thought}\n"
-                f"\n📝 DRAFT RESPONSE:\n{reflection.draft_response[:500]}"
-                f"{'...' if len(reflection.draft_response) > 500 else ''}\n"
-                f"\n🔍 SELF-CRITIQUE:\n{reflection.self_critique}\n"
-                "══════════════════════════════════════════════════════════"
-            )
-
-            if not reflection.self_critique:
-                logger.warning("Cognitive reflection produced empty critique, skipping")
-                return None
-
-            return reflection.model_dump()
-
-        except Exception as e:
-            logger.warning(f"Cognitive reflection failed: {e}, proceeding without reflection")
-            return None
+    @staticmethod
+    def _build_clarification_options(metadatas: list[dict], distances: list[float]) -> list[str]:
+        """Build clickable option labels from search results for clarification UI."""
+        options: list[str] = []
+        seen: set[str] = set()
+        for meta, dist in zip(metadatas[:5], distances[:5]):
+            fp = meta.get("file_path", "")
+            if fp in seen:
+                continue
+            seen.add(fp)
+            heading = meta.get("heading", fp.split("/")[-1].replace(".md", ""))
+            domain = meta.get("domain", "")
+            label = f"{heading} — {domain}" if domain else heading
+            options.append(label)
+        return options if len(options) >= 2 else []
 
     def _check_clarity_rule_based(
         self, query: str, metadatas: list[dict], distances: list[float],
@@ -796,6 +1051,11 @@ class RAGAgent:
         for title, content in sc.referenced_doc_contents:
             prompt_parts.append(f"---\n## 참조: {title}\n\n{content}")
 
+        # Per-user persona (appended before closing instruction)
+        persona = await get_user_persona(ctx.username, self.storage) if ctx else ""
+        if persona:
+            prompt_parts.append(f"## 사용자 개인 설정\n{persona}")
+
         # Closing instruction
         prompt_parts.append("위 지시사항과 참조 문서를 바탕으로 사용자의 질문에 답변하세요.\n출처를 반드시 명시하세요.")
 
@@ -803,7 +1063,7 @@ class RAGAgent:
 
         # 3. Build messages and call LLM
         messages = [{"role": "system", "content": system_prompt}]
-        for msg in ctx.history[-6:]:
+        for msg in build_history_window(ctx.history):
             messages.append({"role": msg["role"], "content": msg["content"]})
         messages.append({"role": "user", "content": request.message})
 
@@ -974,7 +1234,7 @@ class RAGAgent:
 
             history_text = ""
             if history:
-                recent = history[-6:]
+                recent = build_history_window(history, max_tokens=1500)
                 history_text = "\n".join(
                     f"{'User' if h['role'] == 'user' else 'Assistant'}: {h['content'][:200]}"
                     for h in recent
@@ -1250,7 +1510,8 @@ class RAGAgent:
 
     @staticmethod
     def _build_sources(
-        metadatas: list[dict], distances: list[float], threshold: float = 0.4
+        metadatas: list[dict], distances: list[float], threshold: float = 0.4,
+        confidence_service: object | None = None,
     ) -> list[SourceRef]:
         """Build deduplicated, relevance-filtered source list with metadata."""
         sources = []
@@ -1258,19 +1519,48 @@ class RAGAgent:
         for meta, dist in zip(metadatas, distances):
             relevance = max(0, 1 - dist)
             file_path = meta.get("file_path", "")
-            status = meta.get("status", "")
-            if status == "deprecated":
-                continue
             if relevance >= threshold and file_path not in seen:
                 seen.add(file_path)
+                # Confidence scoring
+                conf_score = -1
+                conf_tier = ""
+                if confidence_service:
+                    try:
+                        cr = confidence_service.get_confidence(file_path)
+                        conf_score = cr.score
+                        conf_tier = cr.tier
+                    except Exception:
+                        pass
                 sources.append(SourceRef(
                     doc=file_path,
                     relevance=round(relevance, 3),
                     updated=meta.get("updated", ""),
                     updated_by=meta.get("updated_by", "") or meta.get("created_by", ""),
                     status=meta.get("status", ""),
+                    superseded_by=meta.get("superseded_by", ""),
+                    confidence_score=conf_score,
+                    confidence_tier=conf_tier,
                 ))
+        # Apply confidence-based mild boost: re-sort by adjusted relevance
+        if confidence_service and sources:
+            for s in sources:
+                if s.confidence_score >= 0:
+                    # Mild boost: confidence 100 → 100% weight, confidence 0 → floor% weight
+                    _floor = _SCORING.rag_boost.floor
+                    s.relevance = round(s.relevance * (_floor + (1 - _floor) * s.confidence_score / 100), 3)
+            sources.sort(key=lambda s: -s.relevance)
         return sources
+
+    def _record_citations(self, sources: list) -> None:
+        """Record citation counts for documents used in AI answers."""
+        if not self._citation_tracker:
+            return
+        try:
+            paths = list({s.doc for s in sources if s.doc})
+            if paths:
+                self._citation_tracker.record_citations(paths)
+        except Exception:
+            pass  # citation tracking is best-effort
 
     @staticmethod
     def _build_status_filter() -> dict:
@@ -1287,14 +1577,148 @@ class RAGAgent:
         return {"$and": [filter_a, filter_b]}
 
     @staticmethod
+    def _build_tag_filter(tags: list[str], extra: dict | None = None) -> dict | None:
+        """Build a ChromaDB where clause that matches docs containing any of the given tags.
+
+        ChromaDB metadata is stored as comma-joined strings (see chroma.py),
+        so we use $in over individual tag matches via $or with $contains-style equality.
+        Falls back to None if tags is empty.
+        """
+        if not tags:
+            return None
+        # Tags in ChromaDB metadata are stored as comma-separated string per doc.
+        # Use $or with multiple tag-equality not feasible directly; instead match
+        # by tag substring via the dedicated `tag_*` boolean keys if present.
+        # As a portable fallback we filter post-query (see _tag_boost_rerank).
+        # Here we return a marker dict that the caller can choose to ignore.
+        clauses = [{"tags": {"$in": [t]}} for t in tags]
+        tag_clause = clauses[0] if len(clauses) == 1 else {"$or": clauses}
+        if extra:
+            return {"$and": [tag_clause, extra]}
+        return tag_clause
+
+    @staticmethod
+    def _tag_boost_rerank(
+        documents: list,
+        metadatas: list,
+        distances: list,
+        query_tags: list[str],
+        weight: float = 0.05,
+    ) -> tuple[list, list, list]:
+        """Reorder search results by boosting docs whose tags intersect query_tags.
+
+        ChromaDB returns cosine distance (smaller=better). We subtract
+        `weight * |intersection|` from each distance and resort.
+        """
+        if not query_tags or not documents:
+            return documents, metadatas, distances
+        qset = set(query_tags)
+        scored = []
+        for doc, meta, dist in zip(documents, metadatas, distances):
+            raw_tags = meta.get("tags", "") if meta else ""
+            doc_tags = set()
+            if isinstance(raw_tags, str) and raw_tags:
+                doc_tags = {t.strip() for t in raw_tags.split(",") if t.strip()}
+            elif isinstance(raw_tags, list):
+                doc_tags = set(raw_tags)
+            overlap = len(qset & doc_tags)
+            adjusted = dist - (weight * overlap)
+            scored.append((adjusted, doc, meta, dist))
+        scored.sort(key=lambda x: x[0])
+        new_docs = [s[1] for s in scored]
+        new_metas = [s[2] for s in scored]
+        new_dists = [s[3] for s in scored]
+        return new_docs, new_metas, new_dists
+
+    @staticmethod
+    def _detect_path_ambiguity(
+        metadatas: list[dict],
+        distances: list[float],
+        min_paths: int = 3,
+        dominance_ratio: float = 0.70,
+    ) -> tuple[bool, list[tuple[str, int, float]]]:
+        """Detect if search results span ambiguously many path clusters.
+
+        Returns (is_ambiguous, path_stats) where path_stats is
+        [(path_depth_1, count, avg_relevance), ...] sorted by count desc.
+        """
+        from collections import Counter
+
+        path_relevances: dict[str, list[float]] = {}
+        for meta, dist in zip(metadatas, distances):
+            p = (meta or {}).get("path_depth_1", "")
+            if not p:
+                continue
+            path_relevances.setdefault(p, []).append(max(0, 1 - dist))
+
+        if len(path_relevances) < min_paths:
+            return False, []
+
+        total = sum(len(v) for v in path_relevances.values())
+        stats = sorted(
+            [
+                (path, len(rels), sum(rels) / len(rels))
+                for path, rels in path_relevances.items()
+            ],
+            key=lambda x: x[1],
+            reverse=True,
+        )
+
+        # If the most frequent path dominates, not ambiguous
+        if total > 0 and stats[0][1] / total >= dominance_ratio:
+            return False, stats
+
+        return True, stats
+
+    @staticmethod
+    def _path_boost_rerank(
+        documents: list,
+        metadatas: list,
+        distances: list,
+        path_preferences: list[str],
+        weight: float = 0.08,
+    ) -> tuple[list, list, list]:
+        """Boost docs whose path_depth_1 matches session path preferences.
+
+        More recent preferences get higher weight (recency decay).
+        """
+        if not path_preferences or not documents:
+            return documents, metadatas, distances
+
+        # Build preference score: most recent = 1.0, decaying by 0.5
+        pref_scores: dict[str, float] = {}
+        for i, pref in enumerate(reversed(path_preferences)):
+            if pref not in pref_scores:
+                pref_scores[pref] = 0.5 ** i  # 1.0, 0.5, 0.25, ...
+
+        scored = []
+        for doc, meta, dist in zip(documents, metadatas, distances):
+            path = (meta or {}).get("path_depth_1", "")
+            boost = pref_scores.get(path, 0.0)
+            adjusted = dist - (weight * boost)
+            scored.append((adjusted, doc, meta, dist))
+
+        scored.sort(key=lambda x: x[0])
+        return (
+            [s[1] for s in scored],
+            [s[2] for s in scored],
+            [s[3] for s in scored],
+        )
+
+    @staticmethod
     def _resolve_superseded_chain(
         file_path: str, supersede_map: dict[str, str], max_depth: int = 5
     ) -> str | None:
         current = file_path
+        visited: set[str] = {current}
         for _ in range(max_depth):
             next_path = supersede_map.get(current)
             if not next_path or next_path == current:
                 break
+            if next_path in visited:
+                logger.warning(f"Supersede cycle detected: {file_path} -> ... -> {next_path}")
+                break
+            visited.add(next_path)
             current = next_path
         return current if current != file_path else None
 
@@ -1336,39 +1760,6 @@ class RAGAgent:
             replaced += 1
 
         return replaced
-
-    # ── Reflection caching (in-memory LRU, TTL 10min) ──────────────────
-
-    _reflection_cache: dict[str, tuple[dict, float]] = {}
-    _REFLECTION_TTL = 600
-
-    @classmethod
-    def _make_reflection_key(cls, query: str, context: str) -> str:
-        import hashlib
-        raw = (query.strip().lower() + "|" + context[:500]).encode()
-        return hashlib.sha256(raw).hexdigest()[:16]
-
-    @classmethod
-    def _get_cached_reflection(cls, query: str, context: str) -> dict | None:
-        import time as _time
-        key = cls._make_reflection_key(query, context)
-        entry = cls._reflection_cache.get(key)
-        if entry is None:
-            return None
-        result, ts = entry
-        if _time.time() - ts > cls._REFLECTION_TTL:
-            del cls._reflection_cache[key]
-            return None
-        return result
-
-    @classmethod
-    def _cache_reflection(cls, query: str, context: str, result: dict) -> None:
-        import time as _time
-        key = cls._make_reflection_key(query, context)
-        cls._reflection_cache[key] = (result, _time.time())
-        if len(cls._reflection_cache) > 256:
-            oldest_key = min(cls._reflection_cache, key=lambda k: cls._reflection_cache[k][1])
-            del cls._reflection_cache[oldest_key]
 
     @staticmethod
     def _sse(event: str, data: str) -> str:

@@ -5,7 +5,7 @@
 
 export interface ThinkingStep {
   step: string;
-  status: "start" | "done";
+  status: "start" | "done" | "info";
   label: string;
   detail: string;
 }
@@ -14,7 +14,7 @@ export interface SSECallbacks {
   onRouting?: (data: { agent: string; confidence: number }) => void;
   onThinkingStep?: (data: ThinkingStep) => void;
   onContentDelta?: (delta: string) => void;
-  onSources?: (sources: { doc: string; relevance: number; updated?: string; updated_by?: string; status?: string }[]) => void;
+  onSources?: (sources: { doc: string; relevance: number; updated?: string; updated_by?: string; status?: string; superseded_by?: string; confidence_score?: number; confidence_tier?: string }[]) => void;
   onApprovalRequest?: (data: {
     action_id: string;
     action_type: string;
@@ -27,6 +27,12 @@ export interface SSECallbacks {
     details: string;
     conflicting_docs: string[];
     conflict_pairs?: { file_a: string; file_b: string; similarity: number; summary: string }[];
+  }) => void;
+  onClarificationRequest?: (data: {
+    request_id: string;
+    question: string;
+    options: string[];
+    context: string;
   }) => void;
   onError?: (data: {
     error_code: string;
@@ -48,7 +54,9 @@ export async function streamChat(
   callbacks: SSECallbacks,
   signal?: AbortSignal,
   attachedFiles?: string[],
-  skillPath?: string
+  skillPath?: string,
+  clarificationResponseId?: string,
+  dismissedSkills?: string[],
 ): Promise<void> {
   // SSE streams bypass the Next.js rewrite proxy (which buffers chunked
   // responses). On localhost we hit the backend directly; on external access
@@ -64,6 +72,12 @@ export async function streamChat(
   }
   if (skillPath) {
     body.skill_path = skillPath;
+  }
+  if (clarificationResponseId) {
+    body.clarification_response_id = clarificationResponseId;
+  }
+  if (dismissedSkills && dismissedSkills.length > 0) {
+    body.dismissed_skills = dismissedSkills;
   }
 
   const res = await fetch(`${backendUrl}/api/agent/chat`, {
@@ -148,7 +162,7 @@ function dispatchEvent(
       break;
     case "sources":
       callbacks.onSources?.(
-        data.sources as { doc: string; relevance: number; updated?: string; updated_by?: string; status?: string }[]
+        data.sources as { doc: string; relevance: number; updated?: string; updated_by?: string; status?: string; superseded_by?: string; confidence_score?: number; confidence_tier?: string }[]
       );
       break;
     case "conflict_warning":
@@ -171,6 +185,11 @@ function dispatchEvent(
     case "skill_match":
       callbacks.onSkillMatch?.(
         data as { skill_path: string; skill_title: string; skill_icon: string; confidence: number }
+      );
+      break;
+    case "clarification_request":
+      callbacks.onClarificationRequest?.(
+        data as { request_id: string; question: string; options: string[]; context: string }
       );
       break;
     case "error":

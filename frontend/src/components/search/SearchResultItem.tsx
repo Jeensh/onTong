@@ -75,8 +75,6 @@ export function SearchResultItem({
                   ? "border-green-500 text-green-600"
                   : status === "deprecated"
                   ? "border-red-400 text-red-500"
-                  : status === "review"
-                  ? "border-blue-400 text-blue-500"
                   : "border-gray-400 text-gray-500"
               }`}
             >

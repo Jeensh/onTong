@@ -19,9 +19,11 @@ from .conflict_store import ConflictStore, StoredConflict
 
 logger = logging.getLogger(__name__)
 
-SIMILARITY_THRESHOLD = 0.95
-HNSW_N_RESULTS = 20
-MAX_RESULTS = 200
+from backend.application.trust.scoring_config import SCORING as _SCORING
+
+SIMILARITY_THRESHOLD = _SCORING.conflict.similarity_threshold
+HNSW_N_RESULTS = _SCORING.conflict.hnsw_n_results
+MAX_RESULTS = _SCORING.conflict.max_results
 
 
 class DuplicatePair(BaseModel):
@@ -226,6 +228,104 @@ class ConflictDetectionService:
             pairs = pairs[:MAX_RESULTS]
 
         return pairs
+
+    def get_typed_pairs(
+        self,
+        filter_mode: str = "unresolved",
+    ) -> list[dict]:
+        """Return stored conflicts as TypedConflict-compatible dicts.
+
+        Only returns pairs that have been semantically analyzed (analyzed_at > 0).
+        """
+        stored = self.store.get_all_pairs()
+        results: list[dict] = []
+        for sc in stored:
+            if filter_mode == "unresolved" and sc.resolved:
+                continue
+            if filter_mode == "resolved" and not sc.resolved:
+                continue
+            results.append({
+                "file_a": sc.file_a,
+                "file_b": sc.file_b,
+                "conflict_type": sc.conflict_type or "none",
+                "severity": sc.severity or "low",
+                "summary_ko": sc.summary_ko,
+                "claim_a": sc.claim_a,
+                "claim_b": sc.claim_b,
+                "suggested_resolution": sc.suggested_resolution or "dismiss",
+                "resolution_detail": sc.resolution_detail,
+                "analyzed_at": sc.analyzed_at,
+                "resolved": sc.resolved,
+                "resolved_by": sc.resolved_by,
+                "resolved_action": sc.resolved_action,
+                "similarity": sc.similarity,
+            })
+        return results
+
+    def resolve_pair(self, file_a: str, file_b: str, resolved_by: str, action: str) -> bool:
+        """Mark a conflict pair as resolved."""
+        return self.store.resolve_pair(file_a, file_b, resolved_by, action)
+
+    def update_analysis(self, file_a: str, file_b: str, analysis: dict) -> bool:
+        """Update semantic analysis for a conflict pair."""
+        return self.store.update_analysis(file_a, file_b, analysis)
+
+    async def trigger_deep_analysis(self, file_path: str, max_pairs: int = 3) -> int:
+        """Run LLM semantic analysis on top conflict pairs for a file.
+
+        Called asynchronously after check_file(). Returns number of pairs analyzed.
+        """
+        stored = self.store.get_all_pairs()
+        # Filter to pairs involving this file, high similarity, not yet analyzed
+        candidates = [
+            sc for sc in stored
+            if (sc.file_a == file_path or sc.file_b == file_path)
+            and sc.similarity >= 0.9
+            and sc.analyzed_at == 0.0
+        ]
+        candidates.sort(key=lambda s: s.similarity, reverse=True)
+        candidates = candidates[:max_pairs]
+
+        if not candidates:
+            return 0
+
+        from backend.application.agent.skills.conflict_check import ConflictCheckSkill
+
+        analyzed = 0
+        for sc in candidates:
+            try:
+                # Load document contents
+                content_a = self._load_doc_content(sc.file_a)
+                content_b = self._load_doc_content(sc.file_b)
+                if not content_a or not content_b:
+                    continue
+
+                result = await ConflictCheckSkill.analyze_pair(
+                    sc.file_a, content_a, sc.meta_a,
+                    sc.file_b, content_b, sc.meta_b,
+                )
+                if result:
+                    self.store.update_analysis(sc.file_a, sc.file_b, result)
+                    analyzed += 1
+                    logger.info(
+                        f"Deep analysis: {sc.file_a} vs {sc.file_b} → {result.get('conflict_type', '?')}"
+                    )
+            except Exception as e:
+                logger.warning(f"Deep analysis failed for {sc.file_a} vs {sc.file_b}: {e}")
+
+        return analyzed
+
+    def _load_doc_content(self, file_path: str) -> str:
+        """Load document content from wiki storage (sync, for thread use)."""
+        try:
+            from pathlib import Path
+            from backend.core.config import settings
+            full_path = Path(settings.wiki_dir) / file_path
+            if full_path.exists():
+                return full_path.read_text(encoding="utf-8")
+        except Exception as e:
+            logger.warning(f"Failed to load {file_path}: {e}")
+        return ""
 
     # Keep backward compatibility for old batch approach
     def find_duplicates(self, threshold: float = SIMILARITY_THRESHOLD) -> list[DuplicatePair]:

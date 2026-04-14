@@ -13,13 +13,16 @@ from backend.application.wiki.wiki_service import WikiService
 from backend.application.wiki.wiki_search import WikiSearchService
 from backend.core.schemas import (
     BacklinkMap, SearchIndexEntry, TagIndex,
-    HybridSearchResult, GraphNode, GraphEdge, GraphData,
+    HybridSearchResult, RelatedDocResult, GraphNode, GraphEdge, GraphData,
 )
 from backend.infrastructure.search.bm25 import bm25_index
 from backend.infrastructure.search.hybrid import reciprocal_rank_fusion
 from backend.infrastructure.vectordb.chroma import ChromaWrapper
 
 from backend.core.auth import get_current_user
+from backend.application.trust.scoring_config import SCORING as _SCORING
+
+_RELATED = _SCORING.related
 
 logger = logging.getLogger(__name__)
 
@@ -52,13 +55,20 @@ router = APIRouter(prefix="/api/search", tags=["search"], dependencies=[Depends(
 _wiki_service: WikiService | None = None
 _search_service: WikiSearchService | None = None
 _chroma: ChromaWrapper | None = None
+_confidence_service = None
 
 
-def init(wiki_service: WikiService, search_service: WikiSearchService, chroma: ChromaWrapper | None = None) -> None:
-    global _wiki_service, _search_service, _chroma
+def init(
+    wiki_service: WikiService,
+    search_service: WikiSearchService,
+    chroma: ChromaWrapper | None = None,
+    confidence_service=None,
+) -> None:
+    global _wiki_service, _search_service, _chroma, _confidence_service
     _wiki_service = wiki_service
     _search_service = search_service
     _chroma = chroma
+    _confidence_service = confidence_service
 
 
 def _wiki() -> WikiService:
@@ -221,6 +231,155 @@ async def hybrid_search(
         ))
 
     return results
+
+
+@router.get("/related", response_model=list[RelatedDocResult])
+async def get_related_documents(
+    path: str = Query(..., description="File path to find related documents for"),
+    limit: int = Query(5, ge=1, le=20, description="Max related documents"),
+):
+    """Find documents related to the given file via embedding similarity.
+
+    Uses HNSW to discover candidates, then computes file-level cosine similarity.
+    Enriched with confidence scores and metadata-based relationship classification.
+    Excludes system paths (_skills/, _personas/).
+    """
+    if not _chroma:
+        return []
+
+    import numpy as np
+
+    try:
+        # Get embeddings for the source file
+        data = await asyncio.to_thread(_chroma.get_file_embeddings, path)
+        embeddings = data.get("embeddings", [])
+        if embeddings is None or len(embeddings) == 0:
+            return []
+
+        # Compute average embedding
+        avg_embedding = np.mean(embeddings, axis=0)
+        avg_norm = np.linalg.norm(avg_embedding)
+        if avg_norm == 0:
+            return []
+
+        # Query HNSW for similar chunks (candidate discovery)
+        n_candidates = max(limit * 4, 20)
+        results = await asyncio.to_thread(
+            _chroma.query_by_embedding, avg_embedding.tolist(), n_candidates
+        )
+        result_metadatas = results.get("metadatas", [[]])[0]
+        if not result_metadatas:
+            return []
+
+        # Collect unique candidate file paths
+        candidate_files: set[str] = set()
+        candidate_meta: dict[str, dict] = {}
+        for meta in result_metadatas:
+            fp = meta.get("file_path", "")
+            if not fp or fp == path:
+                continue
+            # Exclude system paths
+            if fp.startswith("_skills/") or fp.startswith("_personas/"):
+                continue
+            candidate_files.add(fp)
+            if fp not in candidate_meta:
+                candidate_meta[fp] = meta
+
+        # For each candidate, compute accurate file-level similarity
+        scored: list[tuple[str, float, dict]] = []
+        for other_path in candidate_files:
+            other_data = await asyncio.to_thread(_chroma.get_file_embeddings, other_path)
+            other_embs = other_data.get("embeddings", [])
+            if other_embs is None or len(other_embs) == 0:
+                continue
+            other_avg = np.mean(other_embs, axis=0)
+            other_norm = np.linalg.norm(other_avg)
+            if other_norm == 0:
+                continue
+            sim = float(np.dot(avg_embedding, other_avg) / (avg_norm * other_norm))
+            if sim >= _RELATED.min_similarity:
+                scored.append((other_path, sim, candidate_meta.get(other_path, {})))
+
+        if not scored:
+            return []
+
+        # Get source file metadata for relationship classification
+        source_meta = {}
+        if _wiki_service:
+            try:
+                source_file = await _wiki_service.get_file(path)
+                if source_file:
+                    source_meta = source_file.metadata.model_dump()
+            except Exception:
+                pass
+
+        # Build results with confidence and relationship classification
+        related: list[RelatedDocResult] = []
+        for other_path, sim, meta in scored:
+            # Confidence scoring
+            conf_score = -1
+            conf_tier = ""
+            if _confidence_service:
+                try:
+                    cr = _confidence_service.get_confidence(other_path)
+                    conf_score = cr.score
+                    conf_tier = cr.tier
+                except Exception:
+                    pass
+
+            # Classify relationship
+            relationship = "similar_topic"
+            other_domain = meta.get("domain", "")
+            other_tags_raw = meta.get("tags", "")
+            other_tags = set()
+            if isinstance(other_tags_raw, str) and other_tags_raw:
+                other_tags = {t.strip() for t in other_tags_raw.split(",") if t.strip()}
+            elif isinstance(other_tags_raw, list):
+                other_tags = set(other_tags_raw)
+
+            source_domain = source_meta.get("domain", "")
+            source_tags = set(source_meta.get("tags", []))
+
+            if source_domain and other_domain == source_domain:
+                relationship = "same_domain"
+            if source_tags and other_tags and source_tags & other_tags:
+                relationship = "shared_tags"
+
+            # Build title and snippet
+            heading = meta.get("heading", "")
+            title = heading if heading else other_path.split("/")[-1].replace(".md", "")
+
+            # Get snippet from file if possible
+            snippet = ""
+            if _wiki_service:
+                try:
+                    other_file = await _wiki_service.get_file(other_path)
+                    if other_file:
+                        title = other_file.title or title
+                        snippet = other_file.content[:120] + "..." if len(other_file.content) > 120 else other_file.content
+                except Exception:
+                    pass
+
+            # Composite score: 0.6 * similarity + 0.4 * (confidence / 100)
+            composite = _RELATED.w_similarity * sim + _RELATED.w_confidence * (conf_score / 100 if conf_score >= 0 else 0.5)
+
+            related.append(RelatedDocResult(
+                path=other_path,
+                title=title,
+                snippet=snippet,
+                similarity=round(sim, 3),
+                confidence_score=conf_score,
+                confidence_tier=conf_tier,
+                relationship=relationship,
+            ))
+
+        # Sort by composite score and limit
+        related.sort(key=lambda r: -(_RELATED.w_similarity * r.similarity + _RELATED.w_confidence * (r.confidence_score / 100 if r.confidence_score >= 0 else 0.5)))
+        return related[:limit]
+
+    except Exception as e:
+        logger.warning(f"Related docs search failed for {path}: {e}")
+        return []
 
 
 @router.get("/graph", response_model=GraphData)

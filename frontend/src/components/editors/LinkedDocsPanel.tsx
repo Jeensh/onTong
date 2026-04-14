@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ArrowUp,
   ArrowDown,
@@ -11,6 +11,8 @@ import {
   ChevronRight,
   AlertTriangle,
   Network,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import { useWorkspaceStore } from "@/lib/workspace/useWorkspaceStore";
 
@@ -33,6 +35,16 @@ interface BacklinkMap {
   backward: Record<string, string[]>;
 }
 
+interface RelatedDoc {
+  path: string;
+  title: string;
+  snippet: string;
+  similarity: number;
+  confidence_score: number;
+  confidence_tier: string;
+  relationship: string;
+}
+
 function fileName(path: string): string {
   return path.split("/").pop()?.replace(".md", "") ?? path;
 }
@@ -40,9 +52,26 @@ function fileName(path: string): string {
 export function LinkedDocsPanel({ filePath }: { filePath: string }) {
   const [lineage, setLineage] = useState<LineageData | null>(null);
   const [backlinks, setBacklinks] = useState<BacklinkMap | null>(null);
+  const [relatedDocs, setRelatedDocs] = useState<RelatedDoc[]>([]);
+  const [showAllRelated, setShowAllRelated] = useState(false);
+  const DEFAULT_VISIBLE = 2;
+  const [relatedLoading, setRelatedLoading] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const openTab = useWorkspaceStore((s) => s.openTab);
   const openGraphTab = useWorkspaceStore((s) => s.openGraphTab);
+
+  const isLocal = typeof window !== "undefined" && window.location.hostname === "localhost";
+  const base = isLocal ? "http://localhost:8001" : "";
+
+  const fetchRelated = useCallback(() => {
+    if (!filePath || filePath.startsWith("_skills/") || filePath.startsWith("_personas/")) return;
+    setRelatedLoading(true);
+    fetch(`${base}/api/search/related?path=${encodeURIComponent(filePath)}&limit=5`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: RelatedDoc[]) => setRelatedDocs(data))
+      .catch(() => setRelatedDocs([]))
+      .finally(() => setRelatedLoading(false));
+  }, [filePath, base]);
 
   useEffect(() => {
     fetch(`/api/wiki/lineage/${encodeURIComponent(filePath)}`)
@@ -54,21 +83,27 @@ export function LinkedDocsPanel({ filePath }: { filePath: string }) {
       .then((r) => (r.ok ? r.json() : null))
       .then(setBacklinks)
       .catch(() => setBacklinks(null));
-  }, [filePath]);
+
+    // Fetch AI-recommended related docs (debounced via useCallback)
+    const timer = setTimeout(fetchRelated, 500);
+    return () => clearTimeout(timer);
+  }, [filePath, fetchRelated]);
 
   const forwardLinks = [...new Set(backlinks?.forward[filePath] ?? [])];
   const backwardLinks = [...new Set(backlinks?.backward[filePath] ?? [])];
   const hasLineage = lineage?.supersedes || lineage?.superseded_by || (lineage?.related?.length ?? 0) > 0;
   const hasLinks = forwardLinks.length > 0 || backwardLinks.length > 0;
+  const hasRelated = relatedDocs.length > 0;
 
-  if (!hasLineage && !hasLinks) return null;
+  if (!hasLineage && !hasLinks && !hasRelated && !relatedLoading) return null;
 
   const totalConnections =
     (lineage?.supersedes ? 1 : 0) +
     (lineage?.superseded_by ? 1 : 0) +
     (lineage?.related?.length ?? 0) +
     forwardLinks.length +
-    backwardLinks.length;
+    backwardLinks.length +
+    relatedDocs.length;
 
   return (
     <div className="border-b bg-muted/10">
@@ -184,6 +219,49 @@ export function LinkedDocsPanel({ filePath }: { filePath: string }) {
                   {fileName(path)}
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* AI-recommended related documents */}
+          {(relatedDocs.length > 0 || relatedLoading) && (
+            <div className="border-t border-dashed pt-1.5 mt-1">
+              <div className="flex items-center gap-1.5 text-xs mb-1">
+                <Sparkles className="h-3 w-3 text-purple-500 shrink-0" />
+                <span className="text-muted-foreground font-medium">참고할 만한 문서</span>
+                {relatedLoading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+              </div>
+              {(showAllRelated ? relatedDocs : relatedDocs.slice(0, DEFAULT_VISIBLE)).map((r) => (
+                <div key={r.path} className="flex items-center gap-1.5 text-xs pl-4 py-0.5">
+                  <span
+                    className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${
+                      r.confidence_tier === "high"
+                        ? "bg-green-500"
+                        : r.confidence_tier === "medium"
+                        ? "bg-yellow-500"
+                        : "bg-gray-400"
+                    }`}
+                    title={`신뢰도 ${r.confidence_score >= 0 ? r.confidence_score : "?"}`}
+                  />
+                  <button
+                    onClick={() => openTab(r.path)}
+                    className="text-primary hover:underline truncate max-w-[180px]"
+                    title={r.snippet || r.title}
+                  >
+                    {r.title || fileName(r.path)}
+                  </button>
+                  <span className="text-[10px] text-muted-foreground shrink-0">
+                    {Math.round(r.similarity * 100)}%
+                  </span>
+                </div>
+              ))}
+              {relatedDocs.length > DEFAULT_VISIBLE && (
+                <button
+                  onClick={() => setShowAllRelated((v) => !v)}
+                  className="text-[10px] text-muted-foreground hover:text-primary pl-4 mt-0.5"
+                >
+                  {showAllRelated ? "접기" : `더 보기 (+${relatedDocs.length - DEFAULT_VISIBLE})`}
+                </button>
+              )}
             </div>
           )}
 

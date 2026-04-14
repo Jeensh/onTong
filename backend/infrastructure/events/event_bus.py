@@ -28,13 +28,33 @@ class Event:
 
 
 class EventBus:
-    """Async broadcast hub — fan-out events to all connected SSE clients."""
+    """Async broadcast hub — fan-out events to all connected SSE clients.
+
+    Also supports synchronous callbacks for cache invalidation etc.
+    """
 
     def __init__(self) -> None:
         self._subscribers: list[asyncio.Queue[Event]] = []
+        self._callbacks: dict[str, list] = {}  # event_type → [callable]
+
+    def on(self, event_type: str, callback) -> None:
+        """Register a synchronous callback for an event type.
+
+        Used for cache invalidation on tree_change events.
+        Callbacks must be fast (no I/O) — they run in the publish path.
+        """
+        self._callbacks.setdefault(event_type, []).append(callback)
 
     def publish(self, event_type: str, data: dict) -> None:
         event = Event(type=event_type, data=data)
+
+        # Fire synchronous callbacks first (cache invalidation, etc.)
+        for cb in self._callbacks.get(event_type, []):
+            try:
+                cb(data)
+            except Exception as e:
+                logger.warning("Event callback error for %s: %s", event_type, e)
+
         dead: list[asyncio.Queue] = []
         for q in self._subscribers:
             try:

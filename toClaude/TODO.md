@@ -822,96 +822,269 @@ Step 1-C 백엔드(1C-5)부터 시작해줘
 
 ---
 
-## 🔷 3-Section Platform 전환 (v2 아키텍처)
+## 🔷 3-Section Platform (모델링/시뮬레이션은 별도 팀 진행)
 
-> 기반 문서: `toClaude/reports/platform_architecture_v2.md`
-> 3관점 리뷰 반영 (Systems Architect + Developer C + Domain Expert)
+> Modeling(Section 2) + Simulation(Section 3)은 다른 팀에서 별도 진행 중.
+> 아래는 Wiki 팀에서 완료한 공유 인프라 스캐폴딩 기록만 남김.
 
-### Phase 0: 공유 인프라 구축
+### Phase 0 완료분 (Wiki 팀 기여)
 
-| # | Task | 의존 | 상태 | 산출물 |
-|---|------|------|------|--------|
-| V2-0-1 | SCOR + ISA-95 하이브리드 온톨로지 초안 스키마 설계 (Neo4j 노드/관계 타입) | - | [ ] | `docs/ontology-schema.md` |
-| V2-0-2 | `shared/contracts/simulation.py` — typed 계약 합의 (DemandForecastParams 등) | - | [x] | `backend/shared/contracts/simulation.py` |
-| V2-0-3 | `shared/agent_framework/` — BaseAgent Protocol 추출 (기존 AgentPlugin 기반) | - | [x] | `backend/shared/agent_framework/` |
-| V2-0-4 | `shared/` 공통 코드 추출 (schemas, auth, config, db, observability) | V2-0-3 | [ ] | `backend/shared/` |
-| V2-0-5 | `backend/wiki/` 마이그레이션 — 기존 코드 이동 (git mv, 로직 변경 없음) | V2-0-4 | [ ] | `backend/wiki/` |
-| V2-0-6 | import 호환 shim (`backend/application/__init__.py` re-export + deprecation) | V2-0-5 | [ ] | `backend/application/__init__.py` |
-| V2-0-7 | 177 테스트 전수 통과 확인 | V2-0-6 | [ ] | 테스트 결과 |
-| V2-0-8 | `import-linter` independence contract 설정 + CI 연동 | V2-0-7 | [ ] | `pyproject.toml` |
-| V2-0-9 | `.github/CODEOWNERS` 작성 | V2-0-8 | [ ] | `.github/CODEOWNERS` |
-| V2-0-10 | `backend/modeling/` 스캐폴딩 (빈 모듈 + __init__.py + API 라우터) | V2-0-7 | [x] | `backend/modeling/` |
-| V2-0-11 | `backend/simulation/` 스캐폴딩 (빈 모듈 + mock 서버 + client Protocol) | V2-0-7 | [x] | `backend/simulation/` |
-| V2-0-12 | Frontend Section 네비게이션 + 3-pane 하이브리드 레이아웃 | V2-0-7 | [x] | `SectionNav.tsx`, `SimulationSection.tsx`, `ModelingSection.tsx` |
-| V2-0-13 | ChatShell 추출 (기존 AICopilot.tsx에서 공통 UI 분리) | V2-0-12 | [ ] | `frontend/src/components/shared/ChatShell.tsx` |
-| V2-0-14 | Neo4j docker-compose 추가 | - | [ ] | `docker-compose.yml` |
-| V2-0-15 | 비동기 job queue 기술 선택 + 기반 구현 | - | [ ] | `backend/shared/job_queue.py` |
-| V2-0-16 | 디렉토리 구조 + 네이밍 규칙 + import 규칙 3명 합의 문서 | - | [ ] | `docs/collaboration-rules.md` |
-| V2-0-17 | 개발자 C 가이드 문서 작성 | V2-0-11 | [x] | `docs/section3-developer-guide.md` |
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| V2-0-2 | `shared/contracts/simulation.py` — typed 계약 합의 | [x] | `backend/shared/contracts/simulation.py` |
+| V2-0-3 | `shared/agent_framework/` — BaseAgent Protocol 추출 | [x] | `backend/shared/agent_framework/` |
+| V2-0-10 | `backend/modeling/` 스캐폴딩 | [x] | `backend/modeling/` |
+| V2-0-11 | `backend/simulation/` 스캐폴딩 + mock 서버 | [x] | `backend/simulation/` |
+| V2-0-12 | Frontend Section 네비게이션 + 3-pane 레이아웃 | [x] | `SectionNav.tsx`, `ModelingSection.tsx`, `SimulationSection.tsx` |
+| V2-0-17 | Section 3 개발자 가이드 | [x] | `docs/section3-developer-guide.md` |
 
-### Phase 1: 코드 영향 분석 MVP (Section 2 코어)
-
-| # | Task | 의존 | 상태 | 산출물 |
-|---|------|------|------|--------|
-| V2-1-1 | tree-sitter 기반 코드 파싱 엔진 | Phase 0 | [ ] | `backend/modeling/code_analysis/parser.py` |
-| V2-1-2 | 코드 엔티티 → Neo4j 그래프 빌드 | V2-1-1 | [ ] | `backend/modeling/code_analysis/graph_builder.py` |
-| V2-1-3 | SCOR+ISA-95 온톨로지 스키마 Neo4j 적재 | Phase 0 | [ ] | `backend/modeling/ontology/` |
-| V2-1-4 | 매핑 엔진 (LLM 제안 + AST 검증) | V2-1-2, V2-1-3 | [ ] | `backend/modeling/mapping/engine.py` |
-| V2-1-5 | Confidence scoring (4-factor) | V2-1-4 | [ ] | `backend/modeling/mapping/confidence.py` |
-| V2-1-6 | 전문가 리뷰 큐 (0.80-0.95 구간) | V2-1-5 | [ ] | `backend/modeling/mapping/review_queue.py` |
-| V2-1-7 | BFS 기반 영향 분석 ("이 메서드 바꾸면 어떤 도메인 기능이 영향?") | V2-1-4 | [ ] | `backend/modeling/agent/skills/impact_analysis.py` |
-| V2-1-8 | Wiki 런북 자동 링크 (영향 도메인 → 관련 wiki 문서) | V2-1-7 | [ ] | `backend/modeling/agent/skills/` |
-| V2-1-9 | ModelingAgent 기본 구현 + API 라우터 | V2-1-7 | [ ] | `backend/modeling/agent/` |
-| V2-1-10 | ModelingCopilot 프론트엔드 (ChatShell + 코드뷰어 + 그래프뷰) | V2-1-9 | [ ] | `frontend/src/components/modeling/` |
-| V2-1-11 | Git hook → AST diff → 매핑 재검증 트리거 | V2-1-5 | [ ] | `backend/modeling/code_analysis/ast_diff.py` |
-
-### Phase 2: 비즈니스 시뮬레이션 연동 (Section 2 + 3)
-
-| # | Task | 의존 | 상태 | 산출물 |
-|---|------|------|------|--------|
-| V2-2-1 | 파라메트릭 시뮬레이션 엔진 (Monte Carlo 등) | Phase 1 | [ ] | `backend/modeling/simulation/executor.py` |
-| V2-2-2 | 비동기 job queue 연동 (시뮬레이션 실행) | V2-0-15, V2-2-1 | [ ] | `backend/modeling/simulation/job_queue.py` |
-| V2-2-3 | OutputFormat별 결과 가공 (ChartOutput, TableOutput, GanttOutput) | V2-2-1 | [ ] | `backend/modeling/simulation/formatter.py` |
-| V2-2-4 | Parametric mock 서버 (정적 JSON X, 파라미터 기반 동적 생성) | Phase 0 | [ ] | `backend/simulation/mock/parametric_mock.py` |
-| V2-2-5 | SimAgent 기본 구현 (시나리오 설계 + 결과 해석) | V2-2-4 | [ ] | `backend/simulation/agent/` |
-| V2-2-6 | SimCopilot 프론트엔드 (채팅 + 대시보드 하이브리드) | V2-2-5 | [ ] | `frontend/src/components/simulation/` |
-| V2-2-7 | ScenarioDashboard (차트/테이블/Gantt 시각화) | V2-2-3 | [ ] | `frontend/src/components/simulation/ScenarioDashboard.tsx` |
-| V2-2-8 | ParameterForm (시나리오 파라미터 입력 폼) | V2-2-4 | [ ] | `frontend/src/components/simulation/ParameterForm.tsx` |
-| V2-2-9 | 시나리오 버전 관리 + 결과 저장소 | V2-2-6 | [ ] | `backend/simulation/storage/` |
-| V2-2-10 | CompareView (시나리오 A vs B 비교) | V2-2-9 | [ ] | `frontend/src/components/simulation/CompareView.tsx` |
-| V2-2-11 | Mock → 실제 API 전환 테스트 | V2-2-1, V2-2-5 | [ ] | 통합 테스트 |
-
-### Phase 3: 데이터 통합 + 운영 연동
-
-| # | Task | 의존 | 상태 | 산출물 |
-|---|------|------|------|--------|
-| V2-3-1 | ERP/MES/WMS 커넥터 (읽기 전용) | Phase 2 | [ ] | `backend/modeling/data/connectors/` |
-| V2-3-2 | 데이터 카탈로그 + 익명화 파이프라인 | V2-3-1 | [ ] | `backend/modeling/data/catalog.py` |
-| V2-3-3 | 시뮬레이션용 데이터 스냅샷 관리 | V2-3-2 | [ ] | `backend/modeling/data/snapshot.py` |
-| V2-3-4 | 모니터링 연동 (장애 대응 진입점) | Phase 2 | [ ] | `backend/modeling/observability/` |
-| V2-3-5 | 변경 이력 상관분석 (배포↔장애 매칭) | V2-3-4 | [ ] | `backend/modeling/observability/` |
-| V2-3-6 | 코드 샌드박스 보안 강화 (gVisor/Kata, 네트워크 격리, 감사 로그) | Phase 2 | [ ] | `backend/modeling/simulation/sandbox.py` |
+> Phase 0 잔여 (온톨로지, shared/ 추출, wiki/ 이동, Neo4j, job queue 등) 및 Phase 1~3은 모델링/시뮬레이션 팀 관할.
 
 ---
 
-### V2 진행 요약
+## 🧠 에이전트 고도화 (agent_bible 분석 기반, v3)
+
+> 기반 문서: `toClaude/agent_bible_analysis/99_adoption_plan.md` (v3 — 전문가 리뷰 반영)
+> 제1 목표: 에이전트 이해력/답변 품질 최대화
+
+### Phase 1: 이해력 혁신 (VOC 직접 해결)
+
+| # | Task | 의존 | 상태 | 산출물 |
+|---|------|------|------|--------|
+| AG-1-1 | ontong.md 생성 (에이전트 성격/규칙 정의) | - | [x] | `backend/ontong.md` |
+| AG-1-2 | 시스템 프롬프트 교체 (FINAL_ANSWER_SYSTEM_PROMPT → ontong.md 로드) | AG-1-1 | [x] | `rag_agent.py` |
+| AG-1-3 | 토큰 기반 히스토리 윈도우 (history[-6:] → 동적 예산) | - | [x] | `rag_agent.py`, `wiki_edit.py` |
+| AG-1-4 | 구조화된 대화 요약 (규칙 기반, Scope/Skills/Requests/Docs/Current) | AG-1-3 | [x] | `rag_agent.py` |
+| AG-1-5 | Continuation instruction 추가 ("요약 인정하지 말고 이어서") | AG-1-4 | [x] | `rag_agent.py`, `ontong.md` |
+| AG-1-6 | query_augment 강화 + 주제 전환 감지 (topic_shift) | - | [x] | `skills/query_augment.py`, `rag_agent.py`, `models.py`, `api/agent.py` |
+| AG-1-7 | 스킬 프롬프트 마크다운 분리 (코드 ↔ LLM 지시 분리) | AG-1-1 | [x] | `skills/prompts/*.md`, `prompt_loader.py` |
+| AG-1-8 | Cognitive Reflect 제거 (AG-1-1~2 검증 후) | AG-1-2 | [x] | `rag_agent.py`, `structured_agents.py` |
+
+### Phase 2: 실행 최적화
+
+| # | Task | 의존 | 상태 | 산출물 |
+|---|------|------|------|--------|
+| AG-2-1 | 스킬별 도구 풀 제한 (allowed-tools 매핑) | Phase 1 | [x] | `context.py`, `api/agent.py` |
+| AG-2-2 | 파이프라인 병렬화 (query_augment ∥ vector_search) | Phase 1 | [x] | `api/agent.py` (기존 병렬화 충분) |
+| AG-2-3 | SkillResult feedback 필드 추가 | Phase 1 | [x] | `skill.py`, `wiki_search.py`, `rag_agent.py` |
+
+### Phase 3: 인프라 강화
+
+| # | Task | 의존 | 상태 | 산출물 |
+|---|------|------|------|--------|
+| AG-3-1 | 세션 영속성 (JSONL append) | Phase 2 | [x] | `core/session.py`, `api/agent.py` |
+| AG-3-2 | 스킬 권한 매핑 (READ/WRITE/EXECUTE) | Phase 2 | [x] | `skill.py`, `context.py` |
+| AG-3-3 | PreSkill/PostSkill 훅 시스템 | AG-3-2 | [x] | `skill.py` HookRegistry, `hooks.py` 내장훅, `context.py` 훅 파이프라인 |
+
+### Phase 4: Q&A ReAct 루프
+
+| # | Task | 의존 | 상태 | 산출물 |
+|---|------|------|------|--------|
+| AG-4-1 | Q&A 멀티턴 자율 검색 (ReAct 루프 확장) | Phase 2 | [x] | `rag_agent.py`, `models.py`, `prompts/qa_react.md` |
+| AG-4-2 | 검색 결과 자기 평가 + 재검색 전략 | AG-4-1 | [x] | `skills/prompts/qa_react.md` (충분성 체크리스트 + 재검색 전략 5단계) |
+| AG-4-3 | 사용자 확인 루프 + CompletionStatus | AG-4-1 | [x] | ClarificationRequestEvent SSE, CompletionStatus enum, emit_clarification() |
+
+### 에이전트 고도화 진행 요약
 
 | Phase | 내용 | Task 수 | 상태 |
 |-------|------|---------|------|
-| Phase 0 | 공유 인프라 구축 | 17 | 🔨 6/17 완료 |
-| Phase 1 | 코드 영향 분석 MVP | 11 | ⬜ 미시작 |
-| Phase 2 | 비즈니스 시뮬레이션 연동 | 11 | ⬜ 미시작 |
-| Phase 3 | 데이터 통합 + 운영 연동 | 6 | ⬜ 미시작 |
-| | **V2 합계** | **45 tasks** | |
+| Phase 1 | 이해력 혁신 | 8 | ✅ 완료 (8/8) |
+| Phase 2 | 실행 최적화 | 3 | ✅ 완료 (3/3) |
+| Phase 3 | 인프라 강화 | 3 | ✅ 완료 (3/3) |
+| Phase 4 | Q&A ReAct 루프 | 3 | ✅ 완료 (3/3) |
+| | **합계** | **17/17 완료** | 전체 완료 |
 
 ---
 
-### V2 핵심 설계 원칙
+## 세션 35 (2026-04-07) — Smart Friction 레이턴시 최적화
 
-1. **시뮬레이션 ≠ 코드 실행** — 영향분석(그래프 BFS) + 비즈니스시뮬(수학모델) 분리
-2. **에이전트는 섹션별 독립** — Protocol만 공유, 구현은 각 섹션
-3. **결정론적 경로 우선** — 같은 질문에 항상 같은 핵심 답변
-4. **타입 있는 계약 먼저** — dict X → 시나리오별 Pydantic 모델
-5. **데이터 없이 가치 주는 것부터** — Phase 1은 코드+온톨로지만으로 MVP
-6. **코드 분석은 실마리, 확정은 인간** — Human-in-the-loop 필수
-7. **SCOR + ISA-95 하이브리드** — 공장 내부 + SCM 전체 커버
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| S35-1 | Smart Friction 선제 캐싱 — 디바운스 search와 동시에 `onCheckSimilar` 백그라운드 호출, 캐시 히트 시 Enter 즉시 반응 | [x] | `frontend/src/components/editors/metadata/TagInput.tsx` |
+| S35-2 | similarCache LRU 50개 제한 — Map 삽입 순서 기반 경량 LRU, 장시간 세션 메모리 누수 방지 | [x] | `frontend/src/components/editors/metadata/TagInput.tsx` |
+
+## 세션 36 (2026-04-07~08) — 태그 자동화 고도화 (Phase A+B)
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| S36-A1 | 프롬프트 외부화 (auto_tag_pass1/pass2/auto_tag.md) | [x] | `backend/application/agent/skills/prompts/auto_tag*.md` |
+| S36-A2 | 컨텍스트 확장 — filename/parent/neighbor tags/neighbor domains/related docs | [x] | `metadata_service.py`, `metadata_index.py` (4개 메서드 추가) |
+| S36-A3 | 2-pass 계층 추론 (domain/process → tags scoped) | [x] | `metadata_service.py` `_pass1_domain`/`_pass2_tags` |
+| S36-A4 | Few-shot 7개 도메인 예시 | [x] | `backend/application/metadata/auto_tag_examples.json` |
+| S36-A5 | Always-normalize + `TagAlternative` 스키마 | [x] | `metadata_service.py`, `core/schemas.py` |
+| S36-A6 | 프론트 Soft UI (alternatives 칩 + 치환 클릭) | [x] | `AutoTagButton.tsx`, `MetadataTagBar.tsx` |
+| S36-A7 | Confidence 자동 보정 | [x] | `metadata_service.py` |
+| S36-A8 | 회귀 테스트 (domain 정확도 100%, 22건 자동 치환) | [x] | `tests/test_auto_tag_quality.py`, `tests/fixtures/auto_tag_baseline.json` |
+| S36-B1 | `extract_query_tags` (쿼리→태그 의미매칭) | [x] | `backend/application/agent/filter_extractor.py` |
+| S36-B2 | RAG tag boost rerank (`ONTONG_TAG_BOOST_WEIGHT`) | [x] | `backend/application/agent/rag_agent.py` |
+| S36-B3 | Tag-only fallback (domain 0건 → 태그 필터 → 무필터) | [x] | `backend/application/agent/rag_agent.py` |
+| S36-B4 | RAG 평가 스크립트 (12 쿼리, baseline hit@5=1.0) | [x] | `tests/test_rag_tag_boost.py`, `tests/fixtures/rag_eval_queries.json` |
+
+---
+
+## 세션 37 (2026-04-09) — Path-Aware RAG + 대화형 경로 명확화
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| S37-P1-1 | 경로 프리픽스 함수 `_build_path_prefix()` | [x] | `wiki_indexer.py` |
+| S37-P1-2 | 모든 청크에 경로 프리픽스 적용 | [x] | `wiki_indexer.py` |
+| S37-P1-3 | 구조화된 경로 메타데이터 (`path_depth_1/2/stem`) | [x] | `wiki_indexer.py` |
+| S37-P1-4 | 재인덱싱 실행 + 검증 | [x] | `wiki_service.py` |
+| S37-P2-1 | `extract_path_filter()` 쿼리 경로 추출 | [x] | `filter_extractor.py` |
+| S37-P2-2 | wiki_search 스킬 경로 필터 통합 | [x] | `skills/wiki_search.py` |
+| S37-P3-1 | `_detect_path_ambiguity()` 경로 분산 분석 | [x] | `rag_agent.py` |
+| S37-P3-2 | _handle_qa() 명확화 이벤트 발행 통합 | [x] | `rag_agent.py` |
+| S37-P3-3 | `clarification_response_id` 활성화 + 경로 재검색 | [x] | `api/agent.py` |
+| S37-P3-4 | 세션 `path_preferences` 누적 | [x] | `session.py`, `context.py` |
+| S37-P4-1 | `_path_boost_rerank()` 경로 부스트 리랭크 | [x] | `rag_agent.py` |
+| S37-P4-2 | _handle_qa() 리랭크 통합 | [x] | `rag_agent.py` |
+| S37-E1 | 평가 + 회귀 테스트 | [x] | `tests/test_rag_tag_boost.py` 회귀 통과 |
+| S37-E2 | 브라우저 E2E 검증 | [x] | 사용자 데모 확인 완료 |
+| S37-DOC | 문서 동기화 (CHANGES, demo_guide, HANDOFF) | [x] | `toClaude/` |
+
+## 세션 37 버그 수정
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| S37-BF1 | 스킬 무시 버튼 무효 — `dismissed_skills` 프론트→백 전달 | [x] | `schemas.py`, `api/agent.py`, `sseClient.ts`, `AICopilot.tsx` |
+| S37-BF2 | 사이드바 스킬 목록 미표시 — FastAPI `redirect_slashes` + 라우트 slash 충돌 | [x] | `main.py`, `api/skill.py` |
+| S37-BF3 | 보안-점검-도우미 스킬 frontmatter 누락 (`type: skill`, `trigger`) | [x] | `wiki/_skills/보안/보안-점검-도우미.md` |
+| S37-BF4 | 채팅 첫 응답 지연 체감 — classify 전 즉시 thinking_step 이벤트 발행 | [x] | `api/agent.py` |
+
+## Status Simplification + Lineage/Versioning Overhaul
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| SL-1 | Status 단순화 — review/미설정 제거, draft/approved/deprecated만 | [x] | `schemas.py`, `local_fs.py` |
+| SL-2 | Approved 강등 — 내용 수정 시 자동 draft + undeprecate→draft | [x] | `wiki_service.py`, `conflict.py` |
+| SL-3 | 프론트엔드 타입/드롭다운/뱃지 업데이트 | [x] | `wiki.ts`, `DocumentInfoDrawer.tsx`, `MetadataTagBar.tsx`, `DocumentInfoBar.tsx`, `DocumentGraph.tsx` |
+| SL-4 | Scoring — review=70/unset=50 제거, draft 폴백 40 | [x] | `scoring_config.py`, `confidence.py` |
+| SL-5 | MetadataIndex — status/supersedes/superseded_by 저장 + 역참조 인덱스 | [x] | `metadata_index.py`, `wiki_service.py`, `main.py` |
+| SL-6 | Lineage 검증 — 자기참조/사이클/경쟁 대체/무후계 폐기 | [x] | `lineage_validator.py`, `wiki_service.py`, `api/wiki.py` |
+| SL-7 | Deprecation 연쇄 — 충돌 자동 해결, deprecated 제외, 0건 폴백 | [x] | `wiki_service.py`, `metadata_index.py`, `wiki_search.py` |
+| SL-8 | Version Chain API + Timeline UI | [x] | `api/wiki.py`, `VersionTimeline.tsx`, `LineageWidget.tsx` |
+| SL-9 | Reference Integrity + Deprecation UX | [x] | `wiki_service.py`, `TreeNav.tsx`, `api/metadata.py` |
+| SL-10 | Metadata Inheritance + Bulk Status | [x] | `api/wiki.py` |
+
+---
+
+## UI/UX Overhaul — Content-First Layout
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| UX-1 | TreeNav 접기 — collapsible prop, Cmd+B, 아이콘 스트립, localStorage 유지 | [x] | `app/page.tsx` |
+| UX-2 | AICopilot 접기 — 동일 패턴, Cmd+J | [x] | `app/page.tsx` |
+| UX-3 | DocumentInfoBar — 32px 단일 행 통합 정보 바 | [x] | `editors/DocumentInfoBar.tsx` |
+| UX-4 | DocumentInfoDrawer — 3탭 overlay drawer, Cmd+I | [x] | `editors/DocumentInfoDrawer.tsx` |
+| UX-5 | MarkdownEditor 리팩토링 — 3개 스택 컴포넌트 → InfoBar+InfoDrawer 교체 | [x] | `editors/MarkdownEditor.tsx` |
+| UX-6 | AI 팝아웃 — floating window 분리, 드래그/리사이즈, dock back, Cmd+J 토글 | [x] | `app/page.tsx` |
+
+---
+
+## Part 2 — 충돌 & Lineage
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| P2-2A | Lineage 사이클 감지 — visited set + warning 로그 | [x] | `rag_agent.py` |
+| P2-2C-BE | 검색 결과 deprecated 뱃지 — SourceRef에 superseded_by 필드, deprecated 소스 포함 | [x] | `schemas.py`, `rag_agent.py`, `sseClient.ts` |
+| P2-2C-FE | deprecated "폐기됨" 뱃지 + "→ 새 버전" 링크 | [x] | `AICopilot.tsx` |
+| P2-2B-BE | 폐기 되돌리기 API — POST /api/conflict/undeprecate | [x] | `api/conflict.py` |
+| P2-2B-FE | ConflictDashboard deprecated 문서 "되돌리기" 버튼 | [x] | `ConflictDashboard.tsx` |
+| P2-2D | 충돌 쌍 그룹핑 — 같은 file_a 공유 쌍을 그룹 렌더링 | [x] | `ConflictDashboard.tsx` |
+| P2-REDIS | 충돌 스캔 결과 Redis 영속화 + 기본 threshold 0.85 | [x] | `.env`, `conflict_service.py` |
+| P2-FIX1 | VersionTimeline `wiki:lineage-changed` 이벤트 리스너 — 폐기 되돌리기 후 타임라인 자동 갱신 | [x] | `VersionTimeline.tsx` |
+| P2-FIX2 | `_clear_stale_lineage_refs` MetadataIndex 갱신 누락 수정 — version-chain API stale 데이터 버그 | [x] | `wiki_service.py` |
+
+## 스코어링 중앙화 + UX 개선 (세션 39)
+
+| # | Task | 상태 | 파일 |
+|---|------|------|------|
+| S-1 | scoring_config.py 중앙 설정 생성 | [x] | `trust/scoring_config.py` |
+| S-2 | confidence.py → SCORING 참조 리팩터 | [x] | `trust/confidence.py` |
+| S-3 | search.py min_similarity 0.5→0.7 + composite 중앙화 | [x] | `api/search.py` |
+| S-4 | rag_agent.py boost floor 중앙화 | [x] | `rag_agent.py` |
+| S-5 | conflict_service.py 임계값 중앙화 | [x] | `conflict_service.py` |
+| S-6 | wiki_service.py auto_suggest 임계값 중앙화 | [x] | `wiki_service.py` |
+| U-1 | LinkedDocsPanel 기본 2건 + 더 보기 토글 | [x] | `LinkedDocsPanel.tsx` |
+| E-1 | GET /api/wiki/scoring-config 투명성 API | [x] | `api/wiki.py` |
+| V-1 | 신뢰도 pill 클릭 시 시그널 상세 팝오버 | [x] | `MarkdownEditor.tsx` |
+| V-2 | ScoringDashboard 관리자 페이지 | [x] | `ScoringDashboard.tsx`, `TreeNav.tsx`, `FileRouter.tsx` |
+| V-3 | AI소스 뱃지 툴팁 강화 (해석 메시지) | [x] | `AICopilot.tsx` |
+
+## Trust System Phase 3 — 읽기 시 맥락
+
+| # | Task | 상태 | 파일 |
+|---|------|------|------|
+| P3-1 | CitationTracker (Redis/InMemory) | [x] | `trust/citation_tracker.py`, `rag_agent.py` |
+| P3-2 | ConfidenceResult 확장 (citation_count, newer_alternatives) | [x] | `trust/confidence.py`, `trust/confidence_service.py` |
+| P3-3 | TrustBanner 컴포넌트 | [x] | `TrustBanner.tsx`, `MarkdownEditor.tsx` |
+| P3-4 | 와이어링 (main.py) | [x] | `main.py` |
+| P3-5 | 단위 테스트 14개 | [x] | `tests/test_phase3_trust.py` |
+
+## Trust System Phase 1 — Document Confidence Score
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| T1-1 | ConfidenceScorer 엔진 (신뢰도 0-100 계산) | [x] | `trust/confidence.py`, `trust/confidence_cache.py`, `trust/confidence_service.py` |
+| T1-2 | Confidence API 엔드포인트 | [x] | `api/wiki.py` — GET /confidence/{path}, /confidence-batch |
+| T1-3 | RAG 랭킹 통합 (신뢰도 기반 mild boost) | [x] | `rag_agent.py`, `schemas.py` — SourceRef 확장 |
+| T1-4 | 프론트엔드 신뢰도 뱃지 | [x] | `AICopilot.tsx` (소스 dot), `MarkdownEditor.tsx` (헤더 pill), `sseClient.ts` |
+| T1-5 | 와이어링 + 테스트 + 문서 | [x] | `main.py`, `tests/test_confidence.py` (28 pass) |
+
+## Trust System Phase 2 — Write-Time Related Document Nudge
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| T2-1 | 관련 문서 API (`GET /api/search/related`) | [x] | `api/search.py`, `schemas.py` (RelatedDocResult) |
+| T2-2 | LinkedDocsPanel AI 추천 섹션 | [x] | `LinkedDocsPanel.tsx` — "참고할 만한 문서" 섹션 |
+| T2-3 | 저장 시 자동 related 제안 | [x] | `wiki_service.py` — _auto_suggest_related() |
+| T2-4 | 와이어링 + 테스트 + 문서 | [x] | `main.py`, `tests/test_related_search.py` (12 pass) |
+
+## Trust System Phase 4 — Smart Conflict Resolution
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| P4-1 | TypedConflict 모델 + ConflictAnalysis LLM 모델 | [x] | `schemas.py`, `models.py` |
+| P4-2 | analyze_pair() + StoredConflict 확장 | [x] | `conflict_check.py`, `conflict_store.py`, `prompts/conflict_analyze_pair.md` |
+| P4-3 | 해결 액션 API (resolve, typed, analyze-pair) | [x] | `api/conflict.py`, `conflict_service.py` |
+| P4-4 | ConflictDashboard 유형 뱃지 + 해결 버튼 UI | [x] | `ConflictDashboard.tsx`, `TreeNav.tsx`, `useWorkspaceStore.ts` |
+| P4-5 | 관리 다이제스트 (BE + FE) | [x] | `trust/digest.py`, `MaintenanceDigest.tsx`, `FileRouter.tsx`, `main.py` |
+| P4-6 | 테스트 + 문서 업데이트 | [x] | `tests/test_phase4_smart_conflict.py` (13 pass) |
+
+## User-Driven Self-Healing — Phase A: Foundation Fixes
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| PA-1 | MetadataIndex에 updated/updated_by/created_by/related 필드 추가 | [x] | `metadata_index.py` — on_file_saved() 확장, rebuild() extended kwarg 지원 |
+| PA-2 | _get_backlink_count 버그 수정 (항상 0 반환 → related 기반 카운팅) | [x] | `confidence_service.py:191-208` |
+| PA-3 | _is_owner_active 버그 수정 (항상 False → updated_by/updated 기반 체크) | [x] | `confidence_service.py:210-243` |
+| PA-4 | 프론트엔드 사용자 ID를 백엔드 인증과 연결 | [x] | `auth/currentUser.ts`, `AuthContext.tsx`, `lockManager.ts`, `MarkdownEditor.tsx`, `api/auth.py` |
+| PA-5 | Phase A 테스트 작성 및 검증 | [x] | `tests/test_phase_a_confidence_signals.py` (16 pass) |
+
+## User-Driven Self-Healing — Phase B: User Feedback Loop
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| PB-1 | FeedbackTracker 백엔드 (InMemory + Redis) | [x] | `trust/feedback_tracker.py` — FeedbackTracker, InMemory/RedisFeedbackStore, FeedbackSummary |
+| PB-2 | Feedback API 엔드포인트 | [x] | `api/wiki.py` — POST/GET /api/wiki/feedback/{path}, main.py 와이어링 |
+| PB-3 | TrustBanner 피드백 버튼 | [x] | `TrustBanner.tsx` — "확인했음"/"수정 필요" 버튼 + 피드백 카운트 표시 |
+| PB-4 | AICopilot 소스 thumbs | [x] | `AICopilot.tsx` — 소스 카드 옆 thumbs up/down 버튼 |
+| PB-5 | Phase B 테스트 | [x] | `tests/test_phase_b_feedback.py` (12 pass) |
+
+## User-Driven Self-Healing — Phase C: Score Integration
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| PC-1 | Confidence 시그널 가중치 재조정 + user_feedback 추가 | [x] | `scoring_config.py` (freshness 25, backlinks 10, owner 10, user_feedback 15), `confidence.py` (_score_user_feedback + compute_confidence 확장) |
+| PC-2 | ConfidenceService 피드백 연동 | [x] | `confidence_service.py` (set_feedback_tracker, _get_feedback_counts), `main.py` 와이어링 순서 수정 |
+| PC-3 | "확인했음" → freshness 갱신 | [x] | `api/wiki.py` (_refresh_document_timestamp: verified 시 updated/updated_by frontmatter 갱신) |
+| PC-4 | Phase C 테스트 | [x] | `tests/test_phase_c_score_integration.py` (20 pass) |
+
+## User-Driven Self-Healing — Phase D: Knowledge Graph Unification
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| PD-1 | Relationship 모델 + GraphStore | [x] | `core/schemas.py` (Relationship, GraphResult, GraphStats), `graph/graph_store.py` (InMemory + Redis) |
+| PD-2 | GraphBuilder | [x] | `graph/graph_builder.py` — metadata.related/supersedes → related/supersedes, ConflictStore → conflicts |
+| PD-3 | Graph API + main.py 와이어링 | [x] | `api/graph.py` (GET /api/graph/{path}, GET /api/graph/stats), main.py 초기화 + tree_change 연동 |
+| PD-4 | Phase D 테스트 | [x] | `tests/test_phase_d_knowledge_graph.py` (22 pass) |

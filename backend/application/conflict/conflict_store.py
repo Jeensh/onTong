@@ -24,6 +24,18 @@ class StoredConflict:
     detected_at: float
     meta_a: dict = field(default_factory=dict)
     meta_b: dict = field(default_factory=dict)
+    # Phase 4: semantic analysis fields (populated by LLM analyze_pair)
+    conflict_type: str = ""       # "factual_contradiction" | "scope_overlap" | "temporal" | "none"
+    severity: str = ""            # "high" | "medium" | "low"
+    summary_ko: str = ""
+    claim_a: str = ""
+    claim_b: str = ""
+    suggested_resolution: str = ""  # "merge" | "scope_clarify" | "version_chain" | "dismiss"
+    resolution_detail: str = ""
+    analyzed_at: float = 0.0      # 0 = not yet analyzed
+    resolved: bool = False
+    resolved_by: str = ""
+    resolved_action: str = ""
 
 
 def _canonical_key(a: str, b: str) -> tuple[str, str]:
@@ -48,8 +60,19 @@ class ConflictStore(ABC):
         """Update stored metadata for all pairs involving file_path."""
 
     @abstractmethod
+    def update_analysis(self, file_a: str, file_b: str, analysis: dict) -> bool:
+        """Update semantic analysis fields for a conflict pair. Returns True if found."""
+
+    @abstractmethod
+    def resolve_pair(self, file_a: str, file_b: str, resolved_by: str, action: str) -> bool:
+        """Mark a conflict pair as resolved. Returns True if found."""
+
+    @abstractmethod
     def clear(self) -> None:
         """Remove all stored conflicts."""
+
+
+SIMILARITY_CHANGE_THRESHOLD = 0.05  # if similarity changes by more than this, reset resolved status
 
 
 class InMemoryConflictStore(ConflictStore):
@@ -58,11 +81,37 @@ class InMemoryConflictStore(ConflictStore):
         self._file_index: dict[str, set[tuple[str, str]]] = {}
 
     def replace_for_file(self, file_path: str, pairs: list[StoredConflict]) -> None:
+        # Snapshot existing resolved/analyzed state before removal
+        old_state: dict[tuple[str, str], StoredConflict] = {}
+        for key in self._file_index.get(file_path, set()):
+            old = self._conflicts.get(key)
+            if old and (old.resolved or old.analyzed_at > 0):
+                old_state[key] = old
+
         self.remove_for_file(file_path)
         for pair in pairs:
             key = _canonical_key(pair.file_a, pair.file_b)
-            # Ensure canonical order in stored data
             pair.file_a, pair.file_b = key
+
+            # Restore resolved/analyzed state if content hasn't changed significantly
+            prev = old_state.get(key)
+            if prev:
+                sim_delta = abs(pair.similarity - prev.similarity)
+                if sim_delta < SIMILARITY_CHANGE_THRESHOLD:
+                    # Content is essentially the same — preserve state
+                    pair.resolved = prev.resolved
+                    pair.resolved_by = prev.resolved_by
+                    pair.resolved_action = prev.resolved_action
+                    pair.conflict_type = prev.conflict_type
+                    pair.severity = prev.severity
+                    pair.summary_ko = prev.summary_ko
+                    pair.claim_a = prev.claim_a
+                    pair.claim_b = prev.claim_b
+                    pair.suggested_resolution = prev.suggested_resolution
+                    pair.resolution_detail = prev.resolution_detail
+                    pair.analyzed_at = prev.analyzed_at
+                # else: content changed significantly → fresh detection
+
             self._conflicts[key] = pair
             self._file_index.setdefault(pair.file_a, set()).add(key)
             self._file_index.setdefault(pair.file_b, set()).add(key)
@@ -94,6 +143,27 @@ class InMemoryConflictStore(ConflictStore):
                 else:
                     conflict.meta_b = new_meta
 
+    def update_analysis(self, file_a: str, file_b: str, analysis: dict) -> bool:
+        key = _canonical_key(file_a, file_b)
+        conflict = self._conflicts.get(key)
+        if not conflict:
+            return False
+        for field in ("conflict_type", "severity", "summary_ko", "claim_a", "claim_b",
+                      "suggested_resolution", "resolution_detail", "analyzed_at"):
+            if field in analysis:
+                setattr(conflict, field, analysis[field])
+        return True
+
+    def resolve_pair(self, file_a: str, file_b: str, resolved_by: str, action: str) -> bool:
+        key = _canonical_key(file_a, file_b)
+        conflict = self._conflicts.get(key)
+        if not conflict:
+            return False
+        conflict.resolved = True
+        conflict.resolved_by = resolved_by
+        conflict.resolved_action = action
+        return True
+
     def clear(self) -> None:
         self._conflicts.clear()
         self._file_index.clear()
@@ -123,6 +193,17 @@ class RedisConflictStore(ConflictStore):
             "detected_at": c.detected_at,
             "meta_a": c.meta_a,
             "meta_b": c.meta_b,
+            "conflict_type": c.conflict_type,
+            "severity": c.severity,
+            "summary_ko": c.summary_ko,
+            "claim_a": c.claim_a,
+            "claim_b": c.claim_b,
+            "suggested_resolution": c.suggested_resolution,
+            "resolution_detail": c.resolution_detail,
+            "analyzed_at": c.analyzed_at,
+            "resolved": c.resolved,
+            "resolved_by": c.resolved_by,
+            "resolved_action": c.resolved_action,
         })
 
     def _deserialize(self, raw: str) -> StoredConflict:
@@ -132,9 +213,17 @@ class RedisConflictStore(ConflictStore):
     def replace_for_file(self, file_path: str, pairs: list[StoredConflict]) -> None:
         pipe = self._redis.pipeline()
 
-        # 1. Get existing conflict keys for this file
+        # 1. Snapshot existing resolved/analyzed state before removal
         idx_key = f"{self.INDEX_PREFIX}{file_path}"
         old_keys = self._redis.smembers(idx_key)
+        old_state: dict[tuple[str, str], dict] = {}
+        for old_key in old_keys:
+            raw = self._redis.get(old_key)
+            if raw:
+                data = json.loads(raw)
+                if data.get("resolved") or data.get("analyzed_at", 0) > 0:
+                    ckey = _canonical_key(data["file_a"], data["file_b"])
+                    old_state[ckey] = data
 
         # 2. Delete old conflict keys and remove from other file's index
         for old_key in old_keys:
@@ -146,10 +235,22 @@ class RedisConflictStore(ConflictStore):
             pipe.delete(old_key)
         pipe.delete(idx_key)
 
-        # 3. Store new pairs
+        # 3. Store new pairs, preserving state for unchanged pairs
         for pair in pairs:
             a, b = _canonical_key(pair.file_a, pair.file_b)
             pair.file_a, pair.file_b = a, b
+
+            prev = old_state.get((a, b))
+            if prev:
+                sim_delta = abs(pair.similarity - prev.get("similarity", 0))
+                if sim_delta < SIMILARITY_CHANGE_THRESHOLD:
+                    for field in ("resolved", "resolved_by", "resolved_action",
+                                  "conflict_type", "severity", "summary_ko",
+                                  "claim_a", "claim_b", "suggested_resolution",
+                                  "resolution_detail", "analyzed_at"):
+                        if field in prev:
+                            setattr(pair, field, prev[field])
+
             rkey = _redis_conflict_key(a, b)
             pipe.set(rkey, self._serialize(pair))
             pipe.sadd(f"{self.INDEX_PREFIX}{a}", rkey)
@@ -211,6 +312,31 @@ class RedisConflictStore(ConflictStore):
                     data["meta_b"] = new_meta
                 pipe.set(ckey, json.dumps(data))
         pipe.execute()
+
+    def update_analysis(self, file_a: str, file_b: str, analysis: dict) -> bool:
+        rkey = _redis_conflict_key(file_a, file_b)
+        raw = self._redis.get(rkey)
+        if not raw:
+            return False
+        data = json.loads(raw)
+        for field in ("conflict_type", "severity", "summary_ko", "claim_a", "claim_b",
+                      "suggested_resolution", "resolution_detail", "analyzed_at"):
+            if field in analysis:
+                data[field] = analysis[field]
+        self._redis.set(rkey, json.dumps(data))
+        return True
+
+    def resolve_pair(self, file_a: str, file_b: str, resolved_by: str, action: str) -> bool:
+        rkey = _redis_conflict_key(file_a, file_b)
+        raw = self._redis.get(rkey)
+        if not raw:
+            return False
+        data = json.loads(raw)
+        data["resolved"] = True
+        data["resolved_by"] = resolved_by
+        data["resolved_action"] = action
+        self._redis.set(rkey, json.dumps(data))
+        return True
 
     def clear(self) -> None:
         cursor = 0

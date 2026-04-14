@@ -24,6 +24,17 @@ FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
 ALLOWED_EXTENSIONS = {".md", ".xlsx", ".pptx", ".pdf", ".txt", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 
 
+_VALID_STATUSES = {"draft", "approved", "deprecated"}
+
+
+def _normalize_status(raw_status: str) -> str:
+    """Normalize status to one of draft|approved|deprecated. Maps review/empty to draft."""
+    s = (raw_status or "").strip().lower()
+    if s in _VALID_STATUSES:
+        return s
+    return "draft"
+
+
 def _parse_frontmatter(raw: str) -> tuple[DocumentMetadata, str]:
     """Parse YAML frontmatter from raw content.
 
@@ -53,7 +64,8 @@ def _parse_frontmatter(raw: str) -> tuple[DocumentMetadata, str]:
         process=data.get("process", ""),
         error_codes=data.get("error_codes", []) or [],
         tags=data.get("tags", []) or [],
-        status=data.get("status", ""),
+        status=_normalize_status(data.get("status", "")),
+        prev_status=data.get("prev_status", ""),
         supersedes=data.get("supersedes", ""),
         superseded_by=data.get("superseded_by", ""),
         related=data.get("related", []) or [],
@@ -75,6 +87,8 @@ def _serialize_frontmatter(meta: DocumentMetadata, body: str) -> str:
         lines.append(f"process: {meta.process}")
     if meta.status:
         lines.append(f"status: {meta.status}")
+    if meta.prev_status:
+        lines.append(f"prev_status: {meta.prev_status}")
     if meta.supersedes:
         lines.append(f"supersedes: {meta.supersedes}")
     if meta.superseded_by:
@@ -127,13 +141,6 @@ def _inject_metadata(
     meta.updated = now
     if user_name:
         meta.updated_by = user_name
-
-    # Lineage cleanup: if status is no longer deprecated, clear supersedes/superseded_by
-    if meta.status != "deprecated":
-        if meta.supersedes:
-            meta.supersedes = ""
-        if meta.superseded_by:
-            meta.superseded_by = ""
 
     return _serialize_frontmatter(meta, body)
 
@@ -211,7 +218,8 @@ class LocalFSAdapter(StorageProvider):
         return False
 
     async def list_tree(self) -> list[WikiTreeNode]:
-        return self._build_tree(self.wiki_dir, "")
+        import asyncio
+        return await asyncio.to_thread(self._build_tree, self.wiki_dir, "")
 
     def _build_tree(self, directory: Path, prefix: str) -> list[WikiTreeNode]:
         nodes: list[WikiTreeNode] = []
@@ -227,7 +235,12 @@ class LocalFSAdapter(StorageProvider):
         return nodes
 
     async def list_subtree(self, prefix: str) -> list[WikiTreeNode]:
-        """List immediate children of a directory (one level, no recursion)."""
+        """List immediate children of a directory (one level, no recursion).
+        Runs in thread to avoid blocking event loop on large directories."""
+        import asyncio
+        return await asyncio.to_thread(self._list_subtree_sync, prefix)
+
+    def _list_subtree_sync(self, prefix: str) -> list[WikiTreeNode]:
         target_dir = self.wiki_dir / prefix if prefix else self.wiki_dir
         if not target_dir.is_dir():
             return []

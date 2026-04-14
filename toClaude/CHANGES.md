@@ -6,6 +6,397 @@
 
 ---
 
+## 2026-04-12 (Section 2 Modeling MVP — Full Implementation)
+
+### Section 2 Modeling MVP 완료 (18 tasks, 69 tests)
+- [x] **S2-INFRA** — Neo4j Community docker service + Neo4jClient + config
+- [x] **S2-PARSER** — CodeParser Protocol + tree-sitter Java parser (15 entity/relation types)
+- [x] **S2-GRAPH** — Code graph writer (Neo4j MERGE queries)
+- [x] **S2-GIT** — Git connector (clone/pull/diff/list_files)
+- [x] **S2-ONTOLOGY** — SCOR+ISA-95 template (30+ nodes) + OntologyStore CRUD
+- [x] **S2-MAPPING** — Mapping engine (YAML persistence, inheritance, gap detection)
+- [x] **S2-QUERY** — Deterministic impact analysis (term lookup → BFS → reverse mapping)
+- [x] **S2-CHANGE** — Change detector (diff → BROKEN/REVIEW/UNMAPPED classification)
+- [x] **S2-APPROVAL** — Approval workflow (draft → review → confirmed)
+- [x] **S2-API** — FastAPI endpoints (code, ontology, mapping, query, approval)
+- [x] **S2-FE** — Frontend: API client + 5 view components + ModelingSection shell
+- [x] **S2-E2E** — End-to-end integration test (7 tests)
+- [x] **S2-REVIEW** — Final code review fixes (security guards, type fixes, frontend enum mismatch)
+
+---
+
+## 2026-04-12 (Lineage Bugfix — VersionTimeline + MetadataIndex)
+
+### VersionTimeline 자동 갱신 수정
+- [x] **P2-FIX1** — `VersionTimeline.tsx`에 `wiki:lineage-changed` 이벤트 리스너 추가. 폐기 되돌리기 후 "전체 버전 히스토리" 즉시 갱신
+- [x] **P2-FIX2** — `wiki_service.py` `_clear_stale_lineage_refs()`에서 파일의 stale lineage 제거 후 MetadataIndex 미갱신 → version-chain API가 stale 체인 반환하던 버그 수정
+
+---
+
+## 2026-04-11 (Status Simplification + Lineage/Versioning Overhaul)
+
+### Phase 1: Status Simplification
+- [x] **SL-1** — review/미설정 제거, draft|approved|deprecated만 남김
+- [x] **SL-2** — 새 문서 자동 draft, approved 수정 시 자동 draft 강등
+- [x] **SL-3** — 프론트엔드 타입/드롭다운/뱃지 색상 업데이트
+
+### Phase 2: Scoring Update
+- [x] **SL-4** — review=70, unset=50 제거, draft 폴백 40
+
+### Phase 3: MetadataIndex Enrichment
+- [x] **SL-5** — status/supersedes/superseded_by 저장 + 역참조 인덱스
+
+### Phase 4: Lineage Write-Time Validation
+- [x] **SL-6** — 자기참조 차단, 사이클 감지, 경쟁 대체 경고
+
+### Phase 5: Deprecation Side Effects
+- [x] **SL-7** — 폐기 시 충돌 자동 해결, deprecated 제외, 0건 검색 폴백
+
+### Phase 6: Version Chain API + Timeline UI
+- [x] **SL-8** — version-chain API + VersionTimeline 프론트엔드 컴포넌트
+
+### Phase 7: Reference Integrity + Deprecation UX
+- [x] **SL-9** — 이동/삭제 시 참조 업데이트, TreeNav deprecated 표시, statuses API
+
+### Phase 8: Metadata Inheritance + Bulk Status
+- [x] **SL-10** — predecessor-context API, bulk-status API
+
+---
+
+## 2026-04-11 (UI/UX Overhaul — Content-First Layout)
+
+### Collapsible Side Panels
+- [x] **UX-1 TreeNav 접기** — react-resizable-panels collapsible prop, Cmd+B 단축키, 접힌 상태에서 아이콘 스트립 표시, localStorage 상태 유지
+- [x] **UX-2 AICopilot 접기** — 동일 패턴, Cmd+J 단축키
+
+### AI Copilot Popout
+- [x] **UX-6 AI 팝아웃** — AICopilot을 별도 floating window로 분리 가능. 드래그 이동 + 리사이즈. Cmd+J로 토글. 패널 복귀(dock back) 지원. `page.tsx`
+
+### Unified Document Info Bar
+- [x] **UX-3 DocumentInfoBar** — 32px 단일 행에 status badge, domain/process, confidence pill, stale dot, 연결 문서 수, feedback 아이콘 버튼, drawer 토글
+- [x] **UX-4 DocumentInfoDrawer** — 3탭(메타데이터/신뢰도/연결 문서) overlay drawer, Cmd+I 토글, Escape/외부 클릭으로 닫기
+- [x] **UX-5 MarkdownEditor 리팩토링** — MetadataTagBar + TrustBanner + LinkedDocsPanel 3개 스택 → DocumentInfoBar + DocumentInfoDrawer로 교체. 기존 기능 100% 보존
+
+---
+
+## 2026-04-11 (세션 42 — User-Driven Self-Healing Phase C+D)
+
+### Phase D — Knowledge Graph Unification
+- [x] **PD-1 Relationship 모델** — source, target, rel_type, strength, created_by, metadata. GraphResult/GraphStats 모델 추가
+- [x] **PD-2 GraphStore** — InMemoryGraphStore + RedisGraphStore. BFS get_graph(depth), stats, upsert 중복 제거, remove_all 양방향 정리
+- [x] **PD-3 GraphBuilder** — metadata.related → "related", supersedes → "supersedes", ConflictStore → "conflicts" (resolved 제외). rebuild_all + rebuild_file (incremental)
+- [x] **PD-4 Graph API** — GET /api/graph/{path}?depth=1&rel_type=, GET /api/graph/stats. main.py에서 startup 시 graph rebuild, tree_change 이벤트 시 incremental rebuild
+- [x] **PD-5 테스트** — test_phase_d_knowledge_graph.py (22 tests: Model 3, Store 10, Builder 7, Models 2)
+
+---
+
+## 2026-04-11 (세션 42 — User-Driven Self-Healing Phase C: Score Integration)
+
+### Phase C — Score Integration
+- [x] **PC-1 가중치 재조정** — freshness 30→25, backlinks 15→10, owner_activity 15→10, user_feedback(신규) 15. 합계 100 유지
+- [x] **PC-2 _score_user_feedback** — verified/(verified+needs_update) × 100. 피드백 없으면 50 (중립). compute_confidence에 feedback_verified, feedback_needs_update 파라미터 추가
+- [x] **PC-3 ConfidenceService 피드백 연동** — set_feedback_tracker(), _get_feedback_counts(). main.py에서 feedback_tracker를 confidence_svc보다 먼저 생성하도록 순서 수정
+- [x] **PC-4 "확인했음" → freshness 갱신** — POST /api/wiki/feedback/{path} action=verified 시 문서 frontmatter의 updated/updated_by 자동 갱신. 내용 변경 없이 stale 해제
+- [x] **PC-5 테스트** — test_phase_c_score_integration.py (20 tests: WeightConfig 3, ScoreUserFeedback 7, ComputeConfidence 5, ServiceFeedback 3, FreshnessRefresh 2)
+
+---
+
+## 2026-04-11 (세션 41 — User-Driven Self-Healing Phase A+B)
+
+### Phase B — User Feedback Loop
+- [x] **PB-1 FeedbackTracker** — InMemory + Redis 이중 구현. verified/needs_update/thumbs_up/thumbs_down 4종 액션. FeedbackSummary 모델 (카운트 + last_verified_at/by)
+- [x] **PB-2 Feedback API** — POST/GET /api/wiki/feedback/{path:path}. 피드백 기록 시 confidence 캐시 자동 무효화. main.py에 create_feedback_tracker() 와이어링
+- [x] **PB-3 TrustBanner 피드백 버튼** — "확인했음" (초록) / "수정 필요" (주황) 버튼. 피드백 카운트 + 마지막 확인자/시간 표시. 피드백 후 신뢰도 점수 자동 리프레시
+- [x] **PB-4 AICopilot 소스 thumbs** — 소스 카드 옆 ThumbsUp/ThumbsDown 아이콘. 클릭 시 thumbs_up/thumbs_down 피드백 전송
+- [x] **PB-5 테스트** — test_phase_b_feedback.py (12 tests: InMemoryStore 5, Tracker 5, Model 2)
+
+---
+
+## 2026-04-11 (세션 41 — User-Driven Self-Healing Phase A: Foundation Fixes)
+
+### Phase A — 기반 수리
+- [x] **PA-1 MetadataIndex 확장** — on_file_saved()에 updated/updated_by/created_by/related 파라미터 추가. rebuild()에 extended kwarg 추가. wiki_service, main.py, metadata.py의 모든 호출부 업데이트
+- [x] **PA-2 _get_backlink_count 버그 수정** — 루프 본문이 비어 항상 0 반환하던 버그. related 필드에서 현재 문서를 참조하는 다른 문서를 카운트하도록 수정
+- [x] **PA-3 _is_owner_active 버그 수정** — 루프 본문이 비어 항상 False 반환하던 버그. updated_by 매칭 + updated 타임스탬프 90일 체크 로직 구현. _parse_date() 유틸 추가
+- [x] **PA-4 프론트엔드 사용자 ID 연결** — currentUser.ts 싱글톤, AuthContext에서 setCurrentUser 호출, lockManager/MarkdownEditor에서 랜덤 SESSION_USER 제거 → getCurrentUserName() 사용. GET /api/auth/me 엔드포인트 추가
+- [x] **PA-5 테스트** — test_phase_a_confidence_signals.py (16 tests: MetadataIndex 확장 4, Backlink 4, Owner Activity 5, ParseDate 3)
+
+---
+
+## 2026-04-11 (세션 40 — Trust System Phase 4: Smart Conflict Resolution)
+
+### Phase 4 — Smart Conflict Resolution
+- [x] **P4-1 TypedConflict + ConflictAnalysis 모델** — `schemas.py`에 TypedConflict, `models.py`에 ConflictAnalysis LLM 출력 모델 추가
+- [x] **P4-2 analyze_pair() + StoredConflict 확장** — ConflictCheckSkill에 LLM 기반 페어 분석 static method 추가. StoredConflict에 conflict_type/severity/summary_ko/claim_a/claim_b/suggested_resolution/resolution_detail/analyzed_at/resolved/resolved_by/resolved_action 필드 확장. conflict_analyze_pair.md 프롬프트 생성
+- [x] **P4-3 해결 액션 API** — POST /resolve (dismiss/version_chain/scope_clarify/merge), GET /typed (분석된 충돌 목록), POST /analyze-pair (수동 AI 분석). ConflictStore에 update_analysis/resolve_pair 메서드 추가 (InMemory + Redis). ConflictDetectionService에 get_typed_pairs/resolve_pair/trigger_deep_analysis/update_analysis 추가
+- [x] **P4-4 ConflictDashboard 유형 뱃지 + 해결 UI** — 대시보드 전면 리라이트. 제목 "관련 문서 관리"로 변경. 유형 뱃지(사실 불일치/범위 중복/시간 차이/무관), 심각도 dot, AI 분석 버튼, 원클릭 해결 버튼 4종, claim 인용 표시
+- [x] **P4-5 관리 다이제스트** — DocumentDigestService (오래됨/신뢰도낮음/미해결충돌 그룹핑), GET /api/wiki/digest 엔드포인트, MaintenanceDigest.tsx 컴포넌트, 사이드바 설정에 "관리가 필요한 문서" 메뉴 추가
+- [x] **P4-6 테스트 + 문서** — test_phase4_smart_conflict.py 13 tests all pass
+
+### 스케일 대비 + UI 자기설명 개선
+- [x] **API 페이지네이션** — GET /conflict/typed에 limit/offset 추가 (기본 50, 최대 200). GET /wiki/digest에 limit/offset 추가 (섹션별 적용)
+- [x] **파일 스캔 안전 캡** — digest.py MAX_FILES_SCAN=100,000
+- [x] **ConflictDashboard UX** — 사용 가이드 토글 (유형별 의미, 해결 액션 설명), 미분석 뱃지에 안내 문구, 타입 뱃지 툴팁에 설명 추가, 클라이언트 페이지네이션 (20건/페이지)
+- [x] **MaintenanceDigest UX** — 각 섹션별 설명+조치방법 안내, 안내 배너 추가, 접기/펼치기 (기본 5건), 빈 상태 가이드 개선
+
+### 100K+ 문서 스케일 대비 (2차)
+- [x] **ConfidenceCache LRU** — OrderedDict 기반 LRU + TTL 이중 캐시 (max_size=5,000). 100K 문서 중 hot working set만 캐싱, 메모리 누수 방지
+- [x] **Digest 결과 캐싱** — DigestResult TTL 5분 캐시 + tree_change 이벤트로 자동 무효화
+- [x] **Digest async 스캔** — asyncio.to_thread()로 rglob 이동, 이벤트 루프 블로킹 방지. frontmatter 1KB만 읽기
+- [x] **EventBus 콜백** — event_bus.on("tree_change", callback) 패턴 추가. confidence + digest 캐시 자동 무효화
+- [x] **search_path 최적화** — full tree build 대신 list_file_paths() 사용 + early termination (limit 도달 시 즉시 중단)
+- [x] **reindex-pending 배치 제한** — REINDEX_BATCH_LIMIT=100, 나머지는 remaining 카운트로 반환
+- [x] **Storage I/O 비동기화** — list_tree(), list_subtree() 모두 asyncio.to_thread()로 이동. 100K 파일 디렉토리에서 이벤트 루프 블로킹 방지
+- [x] **충돌 해결 상태 보존 버그 수정** — replace_for_file()이 재인덱싱 시 resolved/analyzed 상태를 덮어쓰던 버그. 유사도 변동 < 0.05이면 상태 보존, > 0.05이면 리셋 (내용 변경 시 재감지). InMemory + Redis 양쪽 수정. 테스트 4건 추가 (총 17건)
+
+---
+
+## 2026-04-11 (세션 39 — Trust System Phase 3: 읽기 시 맥락)
+
+### Trust System Phase 3 — Read-Time Trust Context
+- [x] **P3-1 CitationTracker** — AI 답변 소스 인용 카운트 (Redis/InMemory). `rag_agent.py`에서 소스 emit 후 자동 기록. 파일: `trust/citation_tracker.py`, `rag_agent.py`
+- [x] **P3-2 ConfidenceResult 확장** — `citation_count` (인용 횟수) + `newer_alternatives` (신뢰도 < 40인 문서에 대한 더 높은 신뢰도 대안 3건). `NewerAlternative` 모델 추가. 파일: `trust/confidence.py`, `trust/confidence_service.py`
+- [x] **P3-3 TrustBanner 컴포넌트** — 에디터 상단에 신뢰도 pill(팝오버), 오래된 문서 경고, 최신 대안 링크, 인용 카운트 통합 표시. MarkdownEditor에서 기존 pill 코드 제거 후 TrustBanner로 대체. 파일: `TrustBanner.tsx`, `MarkdownEditor.tsx`
+- [x] **P3-4 와이어링** — main.py에서 CitationTracker 생성 → ConfidenceService + RAGAgent에 주입. 파일: `main.py`
+- [x] **P3-5 테스트** — 14개 단위 테스트 (CitationTracker, ConfidenceResult 확장, NewerAlternative, 직렬화). 파일: `tests/test_phase3_trust.py`
+
+---
+
+## 2026-04-11 (세션 39 — 스코어링 중앙화 + UX 개선)
+
+### 스코어링 설정 중앙화
+- [x] **S-1 scoring_config.py** — 모든 점수 가중치/임계값/공식을 `ScoringConfig` 데이터클래스 + `explain()` 메서드로 단일 파일에 집중. 파일: `trust/scoring_config.py`
+- [x] **S-2 confidence.py 리팩터** — 하드코딩 가중치(30/25/15/15/15)와 tier 임계값(70/40) → `SCORING.confidence` 참조로 교체. 파일: `trust/confidence.py`
+- [x] **S-3 search.py 리팩터** — 관련 문서 min_similarity 0.5→0.7(SCORING.related.min_similarity), composite 가중치 하드코딩 → `SCORING.related.w_similarity/w_confidence`. 파일: `api/search.py`
+- [x] **S-4 rag_agent.py 리팩터** — RAG boost floor 0.7 → `SCORING.rag_boost.floor`. 파일: `rag_agent.py`
+- [x] **S-5 conflict_service.py 리팩터** — SIMILARITY_THRESHOLD/HNSW_N_RESULTS/MAX_RESULTS → `SCORING.conflict.*`. 파일: `conflict_service.py`
+- [x] **S-6 wiki_service.py 리팩터** — auto_suggest 임계값 0.7 / top 3 → `SCORING.related.auto_suggest_similarity/auto_suggest_max`. 파일: `wiki_service.py`
+
+### 관련 문서 UX 개선
+- [x] **U-1 기본 2건 표시 + 더 보기** — LinkedDocsPanel에서 기본 2건만 보여주고 나머지는 "더 보기 (+N)" 토글. 파일: `LinkedDocsPanel.tsx`
+- [x] **U-2 결과 0건일 때 섹션 숨김** — 이미 구현 완료 (relatedDocs.length > 0 조건)
+
+### 스코어링 투명성 API
+- [x] **E-1 GET /api/wiki/scoring-config** — `SCORING.explain()` 반환. 모든 가중치/임계값/공식을 한국어로 설명. 파일: `api/wiki.py`
+
+### 사용자 투명성 + 관리자 대시보드
+- [x] **V-1 신뢰도 pill 팝오버** — 에디터 상단 pill 클릭 시 5개 시그널 상세(점수 바 + 가중치 + 설명) 팝오버. 클릭 외부 닫기. 파일: `MarkdownEditor.tsx`
+- [x] **V-2 ScoringDashboard 관리자 페이지** — 설정 사이드바에 "신뢰도 설정" 항목 추가. scoring-config API 호출하여 모든 가중치/임계값/공식을 카드 형태로 표시. 파일: `ScoringDashboard.tsx`, `TreeNav.tsx`, `FileRouter.tsx`, `workspace.ts`, `useWorkspaceStore.ts`
+- [x] **V-3 AI소스 뱃지 툴팁 강화** — 호버 시 신뢰도 + 해석 메시지("높음 — 신뢰할 수 있는 문서" 등) 표시. 줄바꿈으로 가독성 개선. 파일: `AICopilot.tsx`
+
+---
+
+## 2026-04-11 (세션 38 — Trust System Phase 2: Write-Time Related Document Nudge)
+
+### Trust System Phase 2 — 작성 시 넛지
+- [x] **T2-1 관련 문서 API** — `GET /api/search/related?path=X&limit=5`. HNSW 후보 발견 → 파일 평균 임베딩 cosine 비교 → 신뢰도+메타데이터 보강. 정렬: `0.6*sim + 0.4*(conf/100)`. 시스템 경로 제외. 파일: `api/search.py`, `schemas.py`
+- [x] **T2-2 LinkedDocsPanel 확장** — "참고할 만한 문서" 섹션 추가 (Sparkles 아이콘 + 신뢰도 dot + 유사도%). 파일 열 때 + 500ms 디바운스 fetch. 파일: `LinkedDocsPanel.tsx`
+- [x] **T2-3 저장 시 자동 related** — `_bg_index()` 완료 후 `_auto_suggest_related()` 호출. `related` 비어있을 때만, similarity>0.7 상위 3건 frontmatter에 자동 추가. 파일: `wiki_service.py`
+- [x] **T2-4 와이어링+테스트** — `main.py`에서 chroma/confidence_svc → wiki_service, search_api에 주입. 12개 테스트 통과. 파일: `main.py`, `tests/test_related_search.py`
+
+---
+
+## 2026-04-09 (세션 38 — Trust System Phase 1: Document Confidence Score)
+
+### Trust System Phase 1 — 문서 신뢰도 점수
+- [x] **T1-1 ConfidenceScorer 엔진** — 5개 시그널(최신성 30, 상태 25, 메타완성도 15, 백링크 15, 소유자활동 15) 가중 합산 → 0-100 점수 + tier(high/medium/low) + stale 플래그. 파일: `trust/confidence.py`, `trust/confidence_cache.py`, `trust/confidence_service.py`, `trust/__init__.py`
+- [x] **T1-2 Confidence API** — `GET /api/wiki/confidence/{path}`, `GET /api/wiki/confidence-batch?paths=`. 파일: `api/wiki.py`
+- [x] **T1-3 RAG 랭킹 통합** — `_build_sources()`에 confidence_service 전달, 신뢰도 기반 mild boost (`0.7 + 0.3 * conf/100`), `SourceRef`에 `confidence_score` + `confidence_tier` 필드 추가. 파일: `rag_agent.py`, `schemas.py`
+- [x] **T1-4 프론트엔드 뱃지** — AICopilot 소스에 초록/노랑/회색 신뢰도 dot + 툴팁, MarkdownEditor 헤더에 신뢰도 pill(점수+메시지). 파일: `AICopilot.tsx`, `MarkdownEditor.tsx`, `sseClient.ts`
+- [x] **T1-5 와이어링+테스트** — main.py에서 ConfidenceService 생성→wiki_api, RAGAgent에 주입. 28개 단위 테스트 통과. 파일: `main.py`, `tests/test_confidence.py`
+
+---
+
+## 2026-04-09 (세션 37 — Path-Aware RAG + 대화형 경로 명확화 + 버그 수정)
+
+### 버그 수정
+- [x] **스킬 무시 버튼 무효** — 프론트에서 "무시" 클릭해도 백엔드가 독자적으로 auto-match → 적용됨. `ChatRequest.dismissed_skills` 필드 추가, 프론트에서 무시 목록 전송, 백엔드에서 해당 스킬 건너뜀. 파일: `schemas.py`, `api/agent.py`, `sseClient.ts`, `AICopilot.tsx`
+- [x] **사이드바 스킬 목록 미표시** — FastAPI 307 trailing slash redirect ↔ Next.js 308 strip slash가 무한 리다이렉트 루프 생성. `redirect_slashes=False` + 라우트 `"/"` → `""` 수정. 파일: `main.py`, `api/skill.py`
+- [x] **보안-점검-도우미 frontmatter 누락** — `type: skill`, `trigger` 필드 없어서 스킬 로더가 무시. frontmatter 보완. 파일: `wiki/_skills/보안/보안-점검-도우미.md`
+- [x] **채팅 첫 응답 지연 체감** — `main_router.classify()` LLM 호출 동안 UI 무반응. classify 시작 전 즉시 `thinking_step(routing, start)` 이벤트 발행. 파일: `api/agent.py`
+
+### Part 2 — 충돌 & Lineage
+- [x] **2A 사이클 감지** — `_resolve_superseded_chain`에 `visited` set 추가, 재방문 시 break + warning. 파일: `rag_agent.py`
+- [x] **2C deprecated 뱃지** — `SourceRef.superseded_by` 필드 추가, deprecated 소스도 검색 결과에 포함, FE에 "폐기됨" 뱃지 + "→ 새 버전" 링크. 파일: `schemas.py`, `rag_agent.py`, `sseClient.ts`, `AICopilot.tsx`
+- [x] **2B 폐기 되돌리기** — `POST /api/conflict/undeprecate` API + ConflictDashboard "되돌리기" 버튼. 파일: `api/conflict.py`, `ConflictDashboard.tsx`
+- [x] **2D 쌍 그룹핑** — 같은 file_a를 공유하는 충돌 쌍을 그룹 렌더링 (주 문서 + 충돌 문서 목록). 파일: `ConflictDashboard.tsx`
+- [x] **충돌 스캔 결과 영속화** — `.env`에 `REDIS_URL` 추가 → RedisConflictStore 활성화. 서버 재시작해도 스캔 결과 유지. 기본 threshold 0.95 → 0.85로 변경 (`ONTONG_CONFLICT_THRESHOLD` 환경변수). 파일: `.env`, `conflict_service.py`
+
+### Path-Aware RAG
+
+### Phase 1 — 인덱싱 변경 (L1 + L2A)
+- [x] **P1-1~3** — `_build_path_prefix()` + 모든 청크에 `[분류: X > Y] [문서: Z]` 프리픽스 + `path_depth_1/2/stem` 메타데이터. 재인덱싱 완료 (172 chunks).
+
+### Phase 2 — 쿼리 경로 필터링 (L2B + L2C)
+- [x] **P2-1~2** — `extract_path_filter()` + wiki_search 스킬 `path_preference` 파라미터 통합
+
+### Phase 3 — 경로 분산 감지 + 대화형 명확화 (L3)
+- [x] **P3-1~4** — `_detect_path_ambiguity()` (min_paths=3, dominance=0.70), `ClarificationRequestEvent` 발행, `clarification_response_id` 활성화, 세션 `path_preferences` 누적
+
+### Phase 4 — 경로 부스트 리랭크 (L4)
+- [x] **P4-1~2** — `_path_boost_rerank()` (recency decay, weight=0.08) + _handle_qa 통합
+
+### 평가 + 문서
+- [x] **E1** — 기존 RAG 12쿼리 회귀 테스트 통과 (hit@5=1.0, MRR=1.0)
+- [x] **E2** — 브라우저 E2E 검증 완료
+- [x] **DOC** — CHANGES/TODO/demo_guide 동기화
+
+---
+
+## 2026-04-07 ~ 2026-04-08 (세션 36 — 태그 자동화 고도화 + RAG tag boost)
+
+### Phase A — 추천 정확도 + 중복 방지
+- [x] **A1 프롬프트 외부화** — `auto_tag_pass1.md`, `auto_tag_pass2.md`, `auto_tag.md` (fallback)
+- [x] **A2 컨텍스트 확장** — filename/parent_dir, neighbor tags/domains, related docs tags 신호 주입
+- [x] **A3 2-pass 계층 추론** — Pass1: domain/process → Pass2: tags scoped to domain (domain_tags top 50 주입)
+- [x] **A4 Few-shot 예시** — `auto_tag_examples.json` 7개 도메인 예시, Pass2 프롬프트에 동적 주입
+- [x] **A5 Always-normalize + 스키마 확장** — 모든 추천 태그를 `tag_registry.find_similar` 3층 통과
+  (auto-replace<0.35 / LLM-confirm<0.55 / soft-alternative<0.65). `TagAlternative`, `tag_replaced`, `tag_alternatives` 필드 추가
+- [x] **A6 Soft UI** — AutoTagButton에 alternatives 칩 표시, 클릭 시 치환 수락, 정규화 toast
+- [x] **A7 Confidence 자동 보정** — alternatives 수 / 재사용 비율 / neighbor 도메인 일치도 반영
+- [x] **A8 회귀 테스트** — `tests/test_auto_tag_quality.py`, 27개 샘플에 대해 **domain 정확도 100%, 평균 conf 0.85, 22건 자동 치환** 베이스라인 기록
+
+### Phase B — Query-time tag boost + 평가
+- [x] **B1 extract_query_tags** — `filter_extractor.py`에 쿼리→기존 태그 의미 매칭 (거리 0.55)
+- [x] **B2 RAG boost rerank** — `RAGAgent._tag_boost_rerank`로 태그 교집합만큼 cosine 거리 감산, `ONTONG_TAG_BOOST_WEIGHT` 환경변수
+- [x] **B3 Tag-only fallback** — domain/process 필터 0건 시 태그 교집합 필터로 재시도 → 그것도 0이면 무필터
+- [x] **B4 평가 스크립트** — `tests/test_rag_tag_boost.py` + `rag_eval_queries.json` (12 쿼리). **Baseline hit@5=1.0, MRR=1.0** (천장 효과, 회귀 없음)
+
+---
+
+## 2026-04-05 (세션 33 — Domain-Process 계층 구조 + 데이터 클린업)
+
+- [x] **템플릿 구조 변경** — flat `{domains[], processes[]}` → hierarchical `{domain_processes: {domain: [procs]}}`
+- [x] **백엔드 CRUD API** — domain/process 계층 CRUD (`POST/DELETE /templates/domain`, `/domain/{d}/process`)
+- [x] **레거시 마이그레이션** — 기존 flat 템플릿 자동 감지 → hierarchical 변환
+- [x] **프론트엔드 cascade UI** — domain 선택 → 해당 process만 표시, domain 변경 시 process 리셋
+- [x] **위키 데이터 클린업** — 기존 20개 문서 삭제, 7개 도메인별 21개 샘플 문서 생성
+- [x] **filter_extractor 동적 키워드** — 하드코딩 → templates.json에서 동적 로드 (lazy import로 테스트 호환)
+- [x] **metadata_service 프롬프트** — 도메인/프로세스 목록을 templates에서 동적 생성
+- [x] **AutoTagButton confidence** — 신뢰도 뱃지(색상 3단계), domain/process 개별 수락, 저신뢰 태그 흐림 처리
+- [x] **메타데이터 validation** — DomainSelect 템플릿 외 값 노란 경고, wiki_service 저장 시 warning 로그
+- [x] **related 문서 편집 UI** — MetadataTagBar에 관련 문서 TagInput(파일 경로 자동완성) + lineage 읽기전용 표시
+- [x] **Bulk auto-tag API** — `POST /api/metadata/suggest-bulk` (배치 처리, apply 옵션)
+- [x] **UntaggedDashboard 업그레이드** — bulk API 연동, 미리보기/전체적용, confidence 표시, 진행률 바
+- [x] **Materialized metadata index** — `.ontong/metadata_index.json` 증분 업데이트 (save/delete/reindex)
+- [x] **Lazy tag search API** — `GET /api/metadata/tags/search?q=` (debounce prefix match)
+- [x] **Lazy path search API** — `GET /api/wiki/search-path?q=` (related 문서 자동완성)
+- [x] **MetadataTagBar lazy refactor** — `fetchAllTags()` + `fetchTree()` 제거 → templates O(1) + debounce search
+- [x] **UntaggedDashboard pagination** — offset/limit 페이지네이션 + `/api/metadata/stats` 인덱스 기반
+- [x] **TagInput onSearch prop** — 정적 suggestions + async debounce search 이중 지원
+- [x] **DomainProcessPicker** — Domain/Process 드롭다운 2개 → 트리형 통합 셀렉터 1개 (도메인 펼치면 하위 프로세스 lazy 표시)
+- [x] **MetadataTagBar 복원** — DomainProcessPicker 적용 취소, 기존 DomainSelect 2개(Domain/Process) 방식으로 복원
+- [x] **MetadataTemplateEditor 트리 구조** — Domain/Process/Tags 3섹션 → Domain-Process 트리(도메인 클릭→프로세스→파일) + Tags 2섹션으로 개편. lazy loading 적용.
+- [x] **사이드바 태그 브라우저 트리 구조** — Domain/Process/Tags 3섹션 → Domain→Process→Files 트리 + Tags 2섹션. Process lazy loading 적용.
+
+## 2026-04-06 (세션 34 — 10만 문서 스케일 성능 최적화)
+
+- [x] **역인덱스 추가** — metadata_index에 `domain_files`, `process_files`, `tag_files` 역인덱스. rebuild/save/delete 모두 증분 유지.
+- [x] **`/files-by-tag` O(n)→O(1)** — 인덱스 기반 조회 + pagination(`offset`, `limit`) 지원. 전체 스캔 제거.
+- [x] **`/tags/search` pagination** — `{tags: [{name, count}], total}` 형식으로 변경, offset/limit 지원.
+- [x] **`/suggest-bulk` 병렬화** — `asyncio.gather` + `Semaphore(5)` 동시 LLM 호출 (순차→병렬).
+- [x] **사이드바 파일 목록 limit** — 프로세스/태그 하위 파일 20건 단위 + "더보기" 버튼.
+- [x] **사이드바 태그 뱃지 limit+검색** — 상위 30개 표시 + 검색 input + 이전/다음 페이지네이션.
+- [x] **UntaggedDashboard bulk 단순화** — 프론트에서 3건 청크 분할 제거, 백엔드 병렬에 위임.
+- [x] **Layer 1: 프롬프트 태그 주입** — LLM suggest 시 기존 태그 상위 100개를 프롬프트에 주입, 재사용 강제 지시
+- [x] **Layer 2: 임베딩+LLM 태그 정규화** — ChromaDB tag_registry 컬렉션, 유사도 <0.08 자동치환, 0.08~0.20 LLM 확인
+- [x] **Tag Registry** — `tag_registry.py` NEW, ChromaDB 기반 의미적 태그 저장소, 서버 시작 시 인덱스에서 벌크 동기화
+- [x] **Smart Friction** — TagInput에서 새 태그 입력 시 ��사 태그 확인 → "기존 태그를 사용하시겠습니까?" 프롬프트
+- [x] **태그 건수 자동완성** — TagInput `onSearchWithCount` prop, 드롭다운에 건수 표시 (수렴 유도)
+- [x] **유사 태그 그룹 대시보드** — 관리 페이지에서 "분석 실행" → 유사 태그 그룹 표시 + 클릭 병합
+- [x] **고아 태그 표시** — 1건 이하 사용 태그 목록 표시
+- [x] **태그 병합 API** — `POST /tags/merge?source=&target=` 전체 문서 일괄 업데이트 + 레지스트리 정리
+- [x] **임베딩 임계값 교정** — OpenAI text-embedding-3-small 단문 한국어 실측 기반 임계값 대폭 상향 (auto-replace 0.08→0.35, LLM confirm 0.20→0.55, API filter 0.25→0.60, groups 0.20→0.55). 유사 태그 그룹 4건 정상 검출 확인.
+
+## 2026-04-07 (세션 35 — Smart Friction 레이턴시 최적화)
+
+- [x] **Smart Friction 체감 지연 제거** — `/tags/similar`가 OpenAI 임베딩 왕복으로 560ms 소요하여 Enter 누를 때 답답함. TagInput에서 디바운스된 search 콜백과 함께 `onCheckSimilar`를 백그라운드로 선제 호출하여 캐시에 저장. 사용자가 드롭다운 훑어보는 동안 워밍되어 Enter 시점엔 캐시 히트 → 체감 0ms.
+- [x] **similarCache LRU 50개 제한** — `Map` 삽입 순서 특성으로 가벼운 LRU 구현(재삽입으로 recency 갱신, 초과 시 oldest eviction). 장시간 세션에서의 메모리 누수 방지.
+
+---
+
+## 2026-04-05 (세션 32 — 사용자별 AI 페르소나 커스터마이징)
+
+- [x] **Persona API** — `POST /api/persona/ensure` (템플릿 자동 생성), `POST /api/persona/invalidate`
+- [x] **시스템 프롬프트 병합** — `build_system_prompt(username, storage)`, 60초 TTL 캐시, Q&A+스킬 경로 적용
+- [x] **AgentContext.username** — 인증된 사용자명 전달
+- [x] **자유 마크다운 페르소나** — Settings 버튼 → 워크스페이스에서 ontong.local.md 탭 열기 (Tiptap 에디터)
+- [x] **가이드 템플릿** — 처음 열 때 "나에 대해/응답 스타일/참고 사항" 가이드 자동 생성
+- [x] **자동 캐시 무효화** — wiki save 시 persona 파일이면 캐시 클리어
+- [x] **빈 템플릿 감지** — 가이드 주석만 있는 상태(미작성)는 프롬프트에 주입 안 함
+
+---
+
+## 2026-04-05 (세션 31b — 스킬 UX 개선: 사용자 교육 & 가이드)
+
+- [x] **스킬 소개 배너** — TreeNav 스킬 섹션 상단에 일회성 안내 ("스킬이란?"), localStorage 기반 닫기
+- [x] **빈 상태 → 액션 유도** — 내 스킬/공용 스킬 빈 상태에 아이콘+설명+CTA ("첫 번째 스킬 만들기")
+- [x] **스킬 피커 교육** — 채팅 피커 헤더 서브텍스트, 빈 상태 안내, 자동제안 설명 추가
+- [x] **스킬 생성 가이드** — 다이얼로그 헤더 개선, 트리거 힌트, 6-Layer 라벨 인라인 설명
+- [x] **탭 툴팁 개선** — "스킬 — AI 응답을 커스터마이징하는 템플릿"
+
+---
+
+## 2026-04-05 (세션 31 — 훅 시스템 + Completion Protocol + 스킬 고도화)
+
+- [x] **AG-3-3: PreSkill/PostSkill 훅 시스템** — SkillHook protocol, HookRegistry, PreHookResult, QuerySanitizeHook(pre), DeprecatedDocHook(post), main.py 등록
+- [x] **CompletionStatus 확장** — SkillResult에 DONE/DONE_WITH_CONCERNS/BLOCKED/NEEDS_CONTEXT enum 추가, 자동 상태 추론
+- [x] **AG-4-3: 사용자 확인 루프** — ClarificationRequestEvent SSE, ChatRequest.clarification_response_id, AgentContext.emit_clarification()
+- [x] **Per-Skill allowed-tools** — SkillMeta/SkillCreateRequest에 allowed_tools 필드, skill_loader YAML 파싱, context.py 우선순위 적용, skill_api 마크다운 템플릿
+- [x] **스킬 크리에이터 UI 강화** — SkillCreateDialog에 allowed-tools 체크박스 UI, TypeScript 타입 동기화
+- [x] **agent-architecture.md 업데이트** — 훅, CompletionStatus, Clarification, per-skill tools 문서화
+- [x] **test_ag33_hooks.py** — 14 tests (CompletionStatus 5, HookRegistry 6, BuiltinHooks 3)
+
+---
+
+## 2026-04-05 (세션 30 — 고도화 완료 + 문서화 + Claude 전환)
+
+- [x] **Claude API 키 설정** — `anthropic/claude-sonnet-4-20250514`로 모델 전환, .env gitignore 확인
+- [x] **CORS 3001 포트 추가** — 프론트엔드 포트 변경(3001) 대응
+- [x] **README.md 업데이트** — AI Copilot 섹션 v3 고도화 내용 반영, 구 Self-Reflective Pipeline 제거
+- [x] **docs/agent-architecture.md 신규** — 에이전트 v3 아키텍처 기술 문서 (파이프라인, ReAct, 스킬, 권한, 세션, 프롬프트)
+- [x] **demo_guide.md 업데이트** — AG-2~4 데모 시나리오 12개 + 트러블슈팅 추가
+- [x] **테스트 격리 수정** — AG-3-1/3-2 pytest 크로스테스트 모듈 캐시 문제 해결 (importlib.reload)
+
+---
+
+## 2026-04-04 (세션 29 — 에이전트 고도화 착수)
+
+- [x] **agent_bible(claw-code-parity) 분석** — 6개 영역 + 3개 심층 분석, 9개 분석 문서 작성
+- [x] **99_adoption_plan.md v3 확정** — 전문가 리뷰 반영 (하이브리드 라우팅 삭제, topic_shift 추가, 훅 후퇴 등)
+- [x] **TODO.md 에이전트 고도화 태스크 추가** — AG-1~4, 17 tasks
+- [x] **.env LLM 모델 복원** — `gpt-4o-mini` → `gpt-4o` (API 키 권한 해결)
+- [x] **AG-1-1: ontong.md 생성** — 에이전트 성격/규칙 정의 (`backend/ontong.md`)
+- [x] **AG-1-2: 시스템 프롬프트 교체** — FINAL_ANSWER_SYSTEM_PROMPT → `get_system_prompt()` (ontong.md 로드)
+- [x] **AG-1-3: 토큰 기반 히스토리** — `history[-6:]` → `build_history_window()` (4000 토큰 예산)
+- [x] **AG-1-4: 구조화된 대화 요약** — 예산 초과 시 규칙 기반 요약 (Scope/Requests/Docs/Skills/Last response)
+- [x] **AG-1-5: Continuation instruction** — ontong.md Context Awareness 강화 + 요약 프리픽스에 지시 내장
+- [x] **AG-1-6: query_augment + topic_shift** — QueryAugmentResult 구조화 출력, 주제 전환 시 히스토리 미주입
+- [x] **AG-1-7: 스킬 프롬프트 마크다운 분리** — 4개 스킬 프롬프트 .md 파일로 분리 + prompt_loader.py
+- [x] **AG-1-8: Cognitive Reflect 제거** — 3단계 자기성찰 파이프라인 제거, LLM 1회 절약, 충돌 감지는 conflict_check 스킬로 전담
+- [x] **AG-2-1: 스킬별 도구 풀 제한** — INTENT_ALLOWED_SKILLS 매핑 + run_skill() 차단 로직
+- [x] **AG-2-2: 파이프라인 병렬화** — api/agent.py에서 routing+augment 병렬화 이미 구현, 추가 병렬화 여지 제한적
+- [x] **AG-2-3: SkillResult feedback 필드** — `feedback`/`retry_hint` 필드 추가, wiki_search에서 deprecated 문서 필터 시 경고 반환, rag_agent에서 thinking_step으로 표시
+- [x] **AG-3-1: 세션 JSONL 영속성** — 인메모리 → JSONL append 방식, 서버 재시작 후 대화 복원, `session_store.append_message()` API 추가, path traversal 방지
+- [x] **AG-3-2: 스킬 권한 매핑** — `PermissionLevel` enum (READ/WRITE/EXECUTE), `SKILL_PERMISSIONS` 매핑, WRITE 스킬은 editor/admin 역할 필요, 권한 부족 시 retry_hint 반환
+- [x] **AG-4-1: Q&A ReAct 자율 검색** — 검색 결과 품질 평가 후 자동 재검색 (최대 3턴), `SearchEvaluation` 모델, `qa_react.md` 프롬프트, 규칙 기반 fast-path (관련도 40%↑ → 즉시 답변)
+- [x] **AG-4-2: 검색 자기 평가 + 재검색 전략** — qa_react.md에 충분성 체크리스트 + 5단계 재검색 전략(구체화→시간→동의어→상위개념→탐색) 보강
+- [x] **.env 모델 변경** — `openai/gpt-4o-mini` → `anthropic/claude-sonnet-4-20250514` (Claude API 키 적용 완료)
+
+---
+
+## 2026-04-04 (세션 28 — 외부 접속 환경 구축 + 인프라 수정)
+
+- [x] **외부 접속 환경 구축** — cloudflared → ngrok 고정 도메인(`architecturally-televisional-fumiko.ngrok-free.dev`) 전환
+- [x] **SSE 스트리밍 프록시 추가** — `frontend/src/app/api/agent/chat/route.ts` (Next.js rewrite 버퍼링 우회)
+- [x] **sseClient.ts 수정** — 외부 접속 시 Next.js API route 경유, localhost는 직접 백엔드 호출
+- [x] **Next.js production 빌드 전환** — dev 모드 85개 청크 → prod 5개 번들 (외부 접속 속도 개선)
+- [x] **.env LLM 모델 변경** — `gpt-4o` → `gpt-4o-mini` (API 키 권한 이슈)
+- [x] **ChromaDB 강제 재인덱싱** — `force=true`로 해시 캐시 초기화 후 236 청크 인덱싱
+- [ ] **ngrok 자동 시작 스크립트** — 매 세션마다 수동 실행 필요, 자동화 미구현
+
+---
+
 ## 2026-04-01 (세션 27 — Phase 0 스캐폴딩 + 개발자 C 환경 구축)
 
 - [x] **shared/contracts/ 생성** — `simulation.py` typed 계약 (DemandForecastParams, InventoryOptimizeParams, LeadTimeAnalysisParams, SimulationJob 등)

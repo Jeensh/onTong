@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { fetchAllTags } from "@/lib/api/metadata";
-import type { DocumentMetadata, MetadataTagsResponse } from "@/types";
+import { fetchTemplates, searchTagsWithCount, checkSimilarTags, searchPaths } from "@/lib/api/metadata";
+import type { DocumentMetadata, MetadataTemplates } from "@/types";
 import { TagInput } from "./TagInput";
 import { DomainSelect } from "./DomainSelect";
 import { AutoTagButton } from "./AutoTagButton";
@@ -28,36 +28,39 @@ interface MetadataTagBarProps {
   metadata: DocumentMetadata;
   content: string;
   onChange: (metadata: DocumentMetadata) => void;
+  filePath?: string;
 }
 
 export function MetadataTagBar({
   metadata,
   content,
   onChange,
+  filePath,
 }: MetadataTagBarProps) {
   const [collapsed, setCollapsed] = useState(true);
-  const [allTags, setAllTags] = useState<MetadataTagsResponse>({
-    domains: [],
-    processes: [],
-    error_codes: [],
-    tags: [],
+  const [templates, setTemplates] = useState<MetadataTemplates>({
+    domain_processes: {},
+    tag_presets: [],
   });
-  const [templateDomains, setTemplateDomains] = useState<string[]>([]);
-  const [templateProcesses, setTemplateProcesses] = useState<string[]>([]);
 
+  // Only fetch templates (O(1) — static JSON file)
   useEffect(() => {
-    fetchAllTags()
-      .then(setAllTags)
-      .catch(() => {});
-    // Load templates for default options
-    fetch("/api/metadata/templates")
-      .then((r) => r.json())
-      .then((t) => {
-        setTemplateDomains(t.domains || []);
-        setTemplateProcesses(t.processes || []);
-      })
+    fetchTemplates()
+      .then(setTemplates)
       .catch(() => {});
   }, []);
+
+  // Domain list from templates only
+  const domainOptions = useMemo(
+    () => Object.keys(templates.domain_processes).sort(),
+    [templates]
+  );
+
+  // Process list filtered by selected domain
+  const processOptions = useMemo(() => {
+    if (!metadata.domain) return [];
+    return templates.domain_processes[metadata.domain] || [];
+  }, [metadata.domain, templates]);
 
   const updateField = useCallback(
     <K extends keyof DocumentMetadata>(key: K, value: DocumentMetadata[K]) => {
@@ -92,7 +95,6 @@ export function MetadataTagBar({
               <span className={`inline-block rounded px-1 py-0 mr-1 text-[10px] font-medium ${
                 metadata.status === "approved" ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400" :
                 metadata.status === "deprecated" ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400" :
-                metadata.status === "review" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400" :
                 "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
               }`}>
                 {metadata.status}
@@ -116,13 +118,19 @@ export function MetadataTagBar({
             <DomainSelect
               label="Domain"
               value={metadata.domain}
-              options={[...new Set([...templateDomains, ...allTags.domains])]}
-              onChange={(v) => updateField("domain", v)}
+              options={domainOptions}
+              onChange={(v) => {
+                if (v !== metadata.domain) {
+                  onChange({ ...metadata, domain: v, process: "" });
+                } else {
+                  updateField("domain", v);
+                }
+              }}
             />
             <DomainSelect
               label="Process"
               value={metadata.process}
-              options={[...new Set([...templateProcesses, ...allTags.processes])]}
+              options={processOptions}
               onChange={(v) => updateField("process", v)}
             />
           </div>
@@ -133,7 +141,9 @@ export function MetadataTagBar({
             </span>
             <TagInput
               tags={metadata.tags}
-              suggestions={allTags.tags}
+              suggestions={templates.tag_presets}
+              onSearchWithCount={searchTagsWithCount}
+              onCheckSimilar={checkSimilarTags}
               onChange={(tags) => updateField("tags", tags)}
             />
           </div>
@@ -148,19 +158,43 @@ export function MetadataTagBar({
                 onChange={(e) => updateField("status", e.target.value as DocumentMetadata["status"])}
                 className="h-7 rounded-md border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
-                <option value="">-- 미설정 --</option>
                 <option value="draft">Draft</option>
-                <option value="review">Review</option>
                 <option value="approved">Approved</option>
                 <option value="deprecated">Deprecated</option>
               </select>
             </div>
           </div>
 
+          {/* Related documents — lazy path search */}
+          <div>
+            <span className="text-xs text-muted-foreground mb-1 block">
+              관련 문서
+            </span>
+            <TagInput
+              tags={metadata.related}
+              onSearch={searchPaths}
+              onChange={(related) => updateField("related", related)}
+              placeholder="문서 경로 입력..."
+            />
+          </div>
+
+          {/* Lineage (read-only) */}
+          {(metadata.supersedes || metadata.superseded_by) && (
+            <div className="flex items-center gap-4 flex-wrap text-[11px] text-muted-foreground">
+              {metadata.supersedes && (
+                <span>대체한 문서: <span className="text-foreground/70">{metadata.supersedes}</span></span>
+              )}
+              {metadata.superseded_by && (
+                <span>대체됨: <span className="text-foreground/70">{metadata.superseded_by}</span></span>
+              )}
+            </div>
+          )}
+
           <AutoTagButton
             content={content}
             currentMetadata={metadata}
             onAccept={handleAutoAccept}
+            filePath={filePath}
           />
 
           {/* Read-only audit info */}

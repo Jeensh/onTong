@@ -8,17 +8,11 @@ from typing import Any
 from backend.core.schemas import ApprovalRequestEvent, WikiEditAction
 from backend.core.session import session_store
 from backend.application.agent.skill import SkillResult
+from backend.application.agent.skills.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
 
-EDIT_SYSTEM_PROMPT = (
-    "당신은 사내 Wiki 문서 수정 전문가입니다. "
-    "사용자의 요청에 따라 기존 문서를 수정하세요.\n\n"
-    "## 규칙\n"
-    "- YAML frontmatter(--- 사이의 내용)는 그대로 유지하세요.\n"
-    "- 사용자가 요청한 부분만 수정하고, 나머지는 최대한 보존하세요.\n"
-    "- 수정된 전체 문서를 반환하세요 (frontmatter 포함).\n"
-)
+EDIT_SYSTEM_PROMPT = load_prompt("wiki_edit")
 
 
 class WikiEditSkill:
@@ -70,7 +64,8 @@ class WikiEditSkill:
             # Build conversation context
             history_text = ""
             if history:
-                recent = history[-6:]
+                from backend.application.agent.rag_agent import build_history_window
+                recent = build_history_window(history, max_tokens=1500)
                 history_text = "\n".join(
                     f"{'User' if h['role'] == 'user' else 'Assistant'}: {h['content'][:200]}"
                     for h in recent

@@ -1,0 +1,53 @@
+{
+  "description": "RAG evaluation queries. Each entry lists the query and the expected answer doc paths (any hit in top-K counts as correct).",
+  "queries": [
+    {
+      "query": "캐시 장애 어떻게 대응해",
+      "expected": ["wiki/인프라/캐시-장애-대응-매뉴얼.md", "wiki/인프라/cache-troubleshooting.md"]
+    },
+    {
+      "query": "Redis 캐싱 전략",
+      "expected": ["wiki/인프라/캐싱-전략-가이드.md"]
+    },
+    {
+      "query": "주문 처리 절차 알려줘",
+      "expected": ["wiki/SCM/주문-처리-절차.md"]
+    },
+    {
+      "query": "발주 검수 기준이 뭐야",
+      "expected": ["wiki/SCM/발주-검수-기준.md"]
+    },
+    {
+      "query": "재고 실사 어떻게 해",
+      "expected": ["wiki/SCM/재고-실사-절차.md"]
+    },
+    {
+      "query": "ERP 인터페이스 오류 대응",
+      "expected": ["wiki/ERP/인터페이스-오류-대응.md"]
+    },
+    {
+      "query": "월말 결산 절차",
+      "expected": ["wiki/재무/월말-결산-절차.md"]
+    },
+    {
+      "query": "신규 입사자 온보딩",
+      "expected": ["wiki/인사/신규입사자-온보딩.md"]
+    },
+    {
+      "query": "설비 보전 점검 체크",
+      "expected": ["wiki/MES/설비보전-점검표.md"]
+    },
+    {
+      "query": "생산계획은 어떻게 수립해",
+      "expected": ["wiki/MES/생산계획-수립-가이드.md"]
+    },
+    {
+      "query": "예산 편성은 어떻게",
+      "expected": ["wiki/기획/예산-편성-절차.md"]
+    },
+    {
+      "query": "서버 장애 처리 절차",
+      "expected": ["wiki/인프라/서버-장애처리-절차.md"]
+    }
+  ]
+}

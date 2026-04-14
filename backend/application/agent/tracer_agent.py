@@ -26,11 +26,8 @@ class TracerAgent:
         self, request: ChatRequest, **kwargs
     ) -> AsyncGenerator[str, None]:
         msg = (
-            "디버그 추적 에이전트는 현재 Phase 2에서 개발 예정입니다.\n\n"
-            "이 에이전트가 완성되면 다음을 수행합니다:\n"
-            "- Git 커밋 히스토리 파싱\n"
-            "- Pydantic AI ReAct 루프로 코드 의존성 추적\n"
-            "- DB 유효성 검사로 데이터 불일치 경계 파악"
+            "디버그 추적 기능은 아직 준비 중입니다. "
+            "현재는 위키 기반 질의응답만 지원하니, 문서 내용을 묻는 형태로 질문해 주세요."
         )
         yield f"event: content_delta\ndata: {ContentDelta(delta=msg).model_dump_json()}\n\n"
         yield f"event: done\ndata: {DoneEvent().model_dump_json()}\n\n"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import logging
 from dataclasses import dataclass
@@ -20,6 +21,9 @@ HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
 MAX_CHUNK_TOKENS = 500  # approximate token limit per chunk
 OVERLAP_TOKENS = 50
 
+# System directories that should NOT get path prefixes
+_SYSTEM_PATH_PREFIXES = ("_skills/", "_personas/", ".ontong/")
+
 
 @dataclass
 class Chunk:
@@ -33,6 +37,49 @@ class Chunk:
 def _estimate_tokens(text: str) -> int:
     """Rough token estimate: ~1.5 chars per token for mixed Korean/English."""
     return max(1, len(text) // 3)
+
+
+def _build_path_prefix(file_path: str) -> str:
+    """Build normalized path context prefix for embedding enrichment.
+
+    Example:
+        "인프라/네트워크/캐시-장애-대응.md"
+        → "[분류: 인프라 > 네트워크] [문서: 캐시 장애 대응]"
+    """
+    if any(file_path.startswith(sp) for sp in _SYSTEM_PATH_PREFIXES):
+        return ""
+
+    cleaned = file_path.removesuffix(".md")
+    parts = cleaned.split("/")
+    if not parts:
+        return ""
+
+    # Normalize: hyphens/underscores → spaces
+    def _norm(s: str) -> str:
+        return s.replace("-", " ").replace("_", " ")
+
+    doc_name = _norm(parts[-1])
+    folders = parts[:-1]
+
+    if folders:
+        hierarchy = " > ".join(_norm(f) for f in folders)
+        return f"[분류: {hierarchy}] [문서: {doc_name}]"
+    return f"[문서: {doc_name}]"
+
+
+def _extract_path_depths(file_path: str) -> dict[str, str]:
+    """Extract structured path metadata for ChromaDB filtering.
+
+    Returns dict with path_depth_1, path_depth_2, path_stem.
+    """
+    cleaned = file_path.removesuffix(".md")
+    parts = cleaned.split("/")
+
+    return {
+        "path_depth_1": parts[0] if len(parts) > 1 else "",
+        "path_depth_2": parts[1] if len(parts) > 2 else "",
+        "path_stem": parts[-1].replace("-", " ").replace("_", " ") if parts else "",
+    }
 
 
 def _split_by_headings(content: str) -> list[tuple[str, str]]:
@@ -100,37 +147,40 @@ class WikiIndexer:
         sections = _split_by_headings(wiki_file.content)
         chunks: list[Chunk] = []
 
-        # For short documents (likely structured data like personnel info),
-        # prepend file path as context to improve embedding quality
-        total_content = wiki_file.content.strip()
-        is_short_doc = _estimate_tokens(total_content) < 150
+        # Build path prefix for embedding enrichment (L1: Path-Aware RAG)
+        path_embed_enabled = os.environ.get("ONTONG_PATH_EMBED_ENABLED", "true").lower() == "true"
+        path_prefix = _build_path_prefix(wiki_file.path) if path_embed_enabled else ""
 
         for idx, (heading, body) in enumerate(sections):
             full_text = f"{heading}\n{body}" if heading else body
-            # Enrich short structured docs with file context for better embedding
-            if is_short_doc and not heading:
-                file_label = wiki_file.path.replace("/", " > ").replace(".md", "")
-                full_text = f"[문서: {file_label}]\n{full_text}"
-            tokens = _estimate_tokens(full_text)
+
+            if path_prefix:
+                prefixed_text = f"{path_prefix}\n{full_text}"
+            else:
+                prefixed_text = full_text
+
+            tokens = _estimate_tokens(prefixed_text)
 
             if tokens <= MAX_CHUNK_TOKENS:
                 chunks.append(Chunk(
                     id=f"{wiki_file.path}::chunk_{idx}",
                     file_path=wiki_file.path,
                     heading=heading,
-                    content=full_text,
+                    content=prefixed_text,
                     token_estimate=tokens,
                 ))
             else:
                 # Split long sections with overlap
+                # Only prepend path prefix to first sub-chunk to avoid duplication
                 sub_texts = _split_long_text(full_text, MAX_CHUNK_TOKENS, OVERLAP_TOKENS)
                 for sub_idx, sub in enumerate(sub_texts):
+                    content = f"{path_prefix}\n{sub}" if path_prefix and sub_idx == 0 else sub
                     chunks.append(Chunk(
                         id=f"{wiki_file.path}::chunk_{idx}_{sub_idx}",
                         file_path=wiki_file.path,
                         heading=heading,
-                        content=sub,
-                        token_estimate=_estimate_tokens(sub),
+                        content=content,
+                        token_estimate=_estimate_tokens(content),
                     ))
 
         return chunks
@@ -157,6 +207,9 @@ class WikiIndexer:
         Auto-generated from DocumentMetadata fields so new fields are
         never accidentally omitted. list[str] fields use pipe-delimited
         format for $contains queries; str fields pass through as-is.
+
+        Also includes structured path fields (path_depth_1/2, path_stem)
+        for query-time filtering (L2: Path-Aware RAG).
         """
         meta = wiki_file.metadata
         result = {}
@@ -168,6 +221,10 @@ class WikiIndexer:
             else:
                 # str, int, float, bool — ChromaDB supports natively
                 result[field_name] = value
+
+        # Structured path metadata for pre-filtering at scale
+        result.update(_extract_path_depths(wiki_file.path))
+
         return result
 
     async def index_file(self, wiki_file: WikiFile, force: bool = False) -> int:

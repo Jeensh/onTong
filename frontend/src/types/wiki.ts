@@ -1,6 +1,6 @@
 // ── Wiki ──────────────────────────────────────────────────────────────
 
-export type DocumentStatus = "draft" | "review" | "approved" | "deprecated" | "";
+export type DocumentStatus = "draft" | "approved" | "deprecated";
 
 export interface DocumentMetadata {
   domain: string;
@@ -29,6 +29,12 @@ export interface WikiFile {
   links: string[];
 }
 
+export interface TagAlternative {
+  tag: string;
+  distance: number;
+  count: number;
+}
+
 export interface MetadataSuggestion {
   domain: string;
   process: string;
@@ -36,6 +42,8 @@ export interface MetadataSuggestion {
   tags: string[];
   confidence: number;
   reasoning: string;
+  tag_alternatives?: Record<string, TagAlternative[]>;
+  tag_replaced?: Record<string, string>;
 }
 
 export interface MetadataTagsResponse {
@@ -43,6 +51,11 @@ export interface MetadataTagsResponse {
   processes: string[];
   error_codes: string[];
   tags: string[];
+}
+
+export interface MetadataTemplates {
+  domain_processes: Record<string, string[]>;
+  tag_presets: string[];
 }
 
 export interface WikiTreeNode {
@@ -111,6 +124,7 @@ export interface SkillMeta {
   category: string;
   priority: number;
   pinned: boolean;
+  allowed_tools: string[];
 }
 
 export interface SkillListResponse {
@@ -135,6 +149,7 @@ export interface SkillCreateRequest {
   checklist?: string;         // ## 체크리스트 — include/exclude
   output_format?: string;     // ## 출력 형식 — response structure
   self_regulation?: string;   // ## 제한사항 — limits/boundaries
+  allowed_tools?: string[];   // per-skill built-in skill restrictions
 }
 
 export interface SkillContext {
@@ -156,4 +171,27 @@ export interface HybridSearchResult {
   score: number;
   tags: string[];
   status: string;
+}
+
+// ── Conflict ────────────────────────────────────────────────────────
+
+export type ConflictType = "factual_contradiction" | "scope_overlap" | "temporal" | "none";
+export type ConflictSeverity = "high" | "medium" | "low";
+export type ConflictResolution = "merge" | "scope_clarify" | "version_chain" | "dismiss";
+
+export interface TypedConflict {
+  file_a: string;
+  file_b: string;
+  conflict_type: ConflictType;
+  severity: ConflictSeverity;
+  summary_ko: string;
+  claim_a: string;
+  claim_b: string;
+  suggested_resolution: ConflictResolution;
+  resolution_detail: string;
+  analyzed_at: number;
+  resolved: boolean;
+  resolved_by: string;
+  resolved_action: string;
+  similarity: number;
 }

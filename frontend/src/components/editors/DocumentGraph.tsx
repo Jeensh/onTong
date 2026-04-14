@@ -31,7 +31,6 @@ const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
 
 const STATUS_COLORS: Record<string, string> = {
   approved: "#22c55e",
-  review: "#3b82f6",
   draft: "#9ca3af",
   deprecated: "#ef4444",
 };

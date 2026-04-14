@@ -82,12 +82,15 @@ Code change without document sync = incomplete work. Never let docs drift from c
 
 At the start of every new session (e.g., "하던 일 이어서 하자"), ALWAYS:
 
-1. **Read `toClaude/CHANGES.md`** — check for unprocessed `[ ]` items
-2. **Process pending changes FIRST** — before resuming normal work
-3. After processing, mark items `[x]` and reflect in TODO.md / master_plan.md as needed
-4. Then read `toClaude/TODO.md` and resume from the next incomplete step
+1. **Read `toClaude/HANDOFF.md` FIRST** — 다음 작업, 최근 컨텍스트, 환경 설정. 다른 컴퓨터로 이동해 ~/.claude 메모리가 없는 경우에도 이 파일만 있으면 이어서 가능.
+2. **Read `toClaude/CHANGES.md`** — check for unprocessed `[ ]` items
+3. **Process pending changes FIRST** — before resuming normal work
+4. After processing, mark items `[x]` and reflect in TODO.md / master_plan.md as needed
+5. Then read `toClaude/TODO.md` and resume from the next incomplete step
 
 Never skip step 1. The user may have added requirements between sessions.
+
+**HANDOFF.md 갱신 의무**: 세션 종료 전 또는 큰 작업 단위 완료 시 `toClaude/HANDOFF.md`의 "다음 세션 첫 작업" 섹션을 최신으로 유지할 것.
 
 ---
 

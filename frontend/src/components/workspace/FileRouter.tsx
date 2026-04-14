@@ -11,6 +11,8 @@ import { UntaggedDashboard } from "@/components/editors/UntaggedDashboard";
 import { ConflictDashboard } from "@/components/editors/ConflictDashboard";
 import { DiffViewer } from "@/components/editors/DiffViewer";
 import { PermissionEditor } from "@/components/admin/PermissionEditor";
+import { ScoringDashboard } from "@/components/editors/ScoringDashboard";
+import { MaintenanceDigest } from "@/components/editors/MaintenanceDigest";
 
 const DocumentGraph = dynamic(
   () => import("@/components/editors/DocumentGraph").then((m) => m.DocumentGraph),
@@ -58,6 +60,10 @@ export function FileRouter({ filePath, fileType, tabId }: FileRouterProps) {
       return <DocumentGraph />;
     case "permission-editor":
       return <PermissionEditor />;
+    case "scoring-dashboard":
+      return <ScoringDashboard />;
+    case "maintenance-digest":
+      return <MaintenanceDigest />;
     case "document-compare": {
       // filePath format: __compare__pathA__pathB__
       const match = filePath.match(/^__compare__(.+?)__(.+?)__$/);

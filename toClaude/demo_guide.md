@@ -1,4 +1,437 @@
-# onTong 데모 가이드 (Wiki 완성 + 3-Section Platform v2 진행 중)
+# onTong 데모 가이드 (Wiki 완성 + Section 2 Modeling MVP 완료)
+
+---
+
+## Section 2: Modeling MVP (2026-04-12)
+
+> Section 2는 코드 분석 → 도메인 매핑 → 영향분석 도구입니다. 아래 시나리오는 Neo4j가 실행 중이어야 합니다.
+
+### 사전 준비
+```bash
+docker compose up -d neo4j   # Neo4j 시작 (7474/7687 포트)
+# 백엔드/프론트엔드 시작 (기존과 동일)
+```
+
+### 시나리오 1: Java 프로젝트 파싱
+1. 왼쪽 SectionNav에서 "Modeling" 클릭
+2. "Code Graph" 탭 선택
+3. Git URL 입력 (Java 프로젝트) → "Parse" 클릭
+4. **확인**: 클래스, 메서드, 필드, 호출관계가 그래프로 표시
+
+### 시나리오 2: SCOR 도메인 온톨로지 로드
+1. "Domain Ontology" 탭 선택
+2. "Load SCOR Template" 클릭
+3. **확인**: Plan/Source/Make/Deliver/Return L1 프로세스 + L2 하위 프로세스 트리 표시
+4. 노드 추가: Name/Kind/Parent 입력 → "Add" 클릭 → 트리에 반영
+
+### 시나리오 3: 코드↔도메인 매핑
+1. "Mapping" 탭 선택 → 3컬럼 뷰 (Code | Mappings | Domain)
+2. Code entity + Domain node 선택 → "Add Mapping" 클릭
+3. **확인**: 매핑 목록에 새 항목 (status: draft)
+4. "Gaps" 클릭 → 매핑되지 않은 코드 엔티티 목록 표시
+
+### 시나리오 4: 영향 분석 (Impact Analysis)
+1. "Impact Analysis" 탭 선택
+2. 검색어 입력 (예: "SafetyStockCalculator" 또는 "InventoryPlanning")
+3. **확인**: 영향받는 도메인 프로세스 목록 + BFS 깊이 + 미매핑 엔티티 수 표시
+4. 미매핑 용어 입력 → "매핑되지 않은 용어입니다" 메시지 표시
+
+### 시나리오 5: 승인 워크플로우
+1. "Approval" 탭 선택
+2. 매핑 제출 (mapping code + domain 입력) → Pending 목록에 표시
+3. Approve/Reject 클릭 → 상태 변경 확인
+
+### 트러블슈팅
+- Neo4j 연결 실패: `docker compose logs neo4j` 확인, 7687 포트 열려 있는지 체크
+- "No module named 'neo4j'": `uv pip install neo4j tree-sitter tree-sitter-java`
+- 프론트엔드에서 API 에러: Next.js proxy가 `/api/modeling/*`를 백엔드로 전달하는지 확인
+
+---
+
+## UI/UX Overhaul: Content-First Layout
+
+### 시나리오 1: Collapsible Side Panels
+
+1. 브라우저에서 위키 문서 열기
+2. `Cmd+B` (macOS) 또는 `Ctrl+B` (Windows) → 왼쪽 TreeNav 사이드바가 접힘. 폴더 아이콘 스트립만 남음
+3. 다시 `Cmd+B` 또는 스트립 클릭 → 사이드바 복원
+4. `Cmd+J` → 오른쪽 AI 코파일럿 접힘. Sparkles 아이콘 스트립만 남음
+5. 페이지 새로고침 → 접힘 상태 유지됨 (localStorage)
+6. **확인**: 양쪽 패널 접으면 편집 영역이 화면 대부분 차지
+
+### 시나리오 2: Unified Document Info Bar
+
+1. 문서 열기 → 상단에 32px 높이의 Info Bar 표시
+2. **확인**: Status 뱃지(approved/draft 등), Domain·Process, 신뢰도 점수 pill, 연결 문서 수 뱃지가 한 줄에 표시
+3. 신뢰도 pill 클릭 → 6개 시그널 상세 팝오버 표시
+4. 오래된 문서 → amber 점 표시 (stale 표시)
+5. ✓ 아이콘 클릭 → "확인했음" 피드백 전송
+6. ✎ 아이콘 클릭 → "수정 필요" 피드백 전송
+
+### 시나리오 3: Document Info Drawer
+
+1. Info Bar 오른쪽 ▼ 버튼 클릭 또는 `Cmd+I` → Drawer 오픈
+2. **메타데이터 탭**: Domain, Process, Tags, Status, Related 편집 가능. AutoTag 버튼 작동
+3. **신뢰도 탭**: 전체 시그널 breakdown, stale 경고, 최신 대안 문서, 피드백 상세
+4. **연결 문서 탭**: supersedes/superseded_by, 역참조, 관련 문서, AI 추천 문서, 그래프 링크
+5. Escape 또는 drawer 바깥 클릭 → Drawer 닫힘
+6. **확인**: Drawer가 에디터 위에 overlay로 표시 (콘텐츠를 밀어내지 않음)
+
+### 시나리오 4: 키보드 단축키
+
+| 단축키 | 동작 |
+|--------|------|
+| Cmd+B | TreeNav 사이드바 토글 |
+| Cmd+J | AI 코파일럿 토글 |
+| Cmd+I | Document Info Drawer 토글 |
+| Cmd+K | 검색 Command Palette |
+| Cmd+S | 저장 |
+
+### 시나리오 5: AI 코파일럿 팝아웃
+
+1. AI 코파일럿 패널 상단 `↗` (ExternalLink) 아이콘 클릭
+2. **확인**: AI 패널이 접히고, 화면 우하단에 floating window로 분리됨
+3. 타이틀 바 드래그 → 창 이동 가능
+4. 우하단 모서리 드래그 → 리사이즈 가능 (최소 360×300)
+5. 타이틀 바의 `⊞` (PanelRightClose) 버튼 클릭 또는 `Cmd+J` → 패널로 복귀
+6. **확인**: 팝아웃 상태에서도 채팅 입력/응답 정상 작동
+7. **확인**: 패널 복귀 시 기존 채팅 히스토리 유지
+
+### Troubleshooting
+
+- **Drawer가 안 열림**: Cmd+I 확인. 소스 모드에서도 Drawer는 동작함
+- **접힌 패널이 복원 안 됨**: localStorage에서 `ontong_panel_tree_collapsed`, `ontong_panel_ai_collapsed` 확인
+- **신뢰도 pill이 안 보임**: 백엔드 서버(port 8001) 실행 여부 확인. confidence API 응답 필요
+- **팝아웃 창이 안 보임**: 화면 밖에 있을 수 있음. 페이지 새로고침하면 우하단으로 초기화됨
+
+---
+
+## Phase A: 신뢰도 시그널 수정 + 사용자 ID 연결
+
+### 시나리오 1: Backlink Count 작동 확인
+
+1. 문서 A의 frontmatter에 `related: [문서B경로]` 추가 후 저장
+2. `curl localhost:8001/api/wiki/confidence/문서B경로`
+3. **확인**: `signals.backlinks` > 0 (이전에는 항상 0)
+
+### 시나리오 2: Owner Activity 작동 확인
+
+1. 문서 저장 (updated_by가 자동 기록됨)
+2. `curl localhost:8001/api/wiki/confidence/해당문서경로`
+3. **확인**: `signals.owner_activity` = 100 (90일 이내 편집한 사용자)
+
+### 시나리오 3: 사용자 인증 API
+
+1. `curl localhost:8001/api/auth/me`
+2. **확인**: `{"id": "dev-user", "name": "개발자", "email": "dev@ontong.local", "roles": ["admin"]}`
+
+### 시나리오 4: 프론트엔드 사용자 ID 통합
+
+1. 브라우저에서 문서 편집 → 저장
+2. frontmatter의 `updated_by` 확인 → "개발자" (이전: 랜덤 user-xxxxx)
+3. 잠금(lock) 사용자 이름도 인증된 사용자명으로 표시
+
+## Phase B: 사용자 피드백 데모
+
+### 시나리오 5: TrustBanner에서 "확인했음" 피드백
+
+1. 아무 문서 열기
+2. 상단 신뢰도 배너 하단에 **"확인했음"** / **"수정 필요"** 버튼 확인
+3. **"확인했음"** 클릭
+4. **확인**: "확인 1회" 카운트 표시 + "(마지막 확인: 개발자, 방금 전)" 표시
+5. 다시 클릭 → "확인 2회"로 증가
+
+### 시나리오 6: TrustBanner에서 "수정 필요" 피드백
+
+1. **"수정 필요"** 클릭
+2. **확인**: "수정 요청 1회" 추가 표시
+3. 신뢰도 점수가 피드백을 반영하는지 확인 (Phase C에서 점수 반영 예정)
+
+### 시나리오 7: AICopilot 소스 피드백
+
+1. AI 채팅에서 질문 → 답변 받기
+2. 답변 하단 소스 카드 옆에 👍/👎 아이콘 확인
+3. 👍 클릭 → 해당 문서에 thumbs_up 피드백 기록됨
+4. **API 확인**: `curl localhost:8001/api/wiki/feedback/해당문서` → thumbs_up_count 증가
+
+### 시나리오 8: Feedback API 직접 테스트
+
+```bash
+# 피드백 기록
+curl -X POST localhost:8001/api/wiki/feedback/some-doc.md \
+  -H "Content-Type: application/json" -d '{"action": "verified"}'
+# → {"ok": true, "feedback": {"verified_count": 1, ...}}
+
+# 피드백 조회
+curl localhost:8001/api/wiki/feedback/some-doc.md
+# → {"verified_count": 1, "needs_update_count": 0, ...}
+```
+
+---
+
+## Phase C: 피드백 → 점수 통합 데모
+
+### 시나리오 9: 피드백이 신뢰도 점수에 반영 확인
+
+1. 문서의 현재 신뢰도 확인: `curl localhost:8001/api/wiki/confidence/{path}`
+2. "확인했음" 피드백 3회 전송:
+   ```bash
+   curl -X POST localhost:8001/api/wiki/feedback/{path} \
+     -H "Content-Type: application/json" -d '{"action": "verified"}'
+   ```
+3. 다시 신뢰도 확인 → `signals.user_feedback` = 100.0, 점수 상승 확인
+4. "수정 필요" 피드백 3회 전송 → `signals.user_feedback` 하락 확인
+
+### 시나리오 10: "확인했음"이 freshness도 갱신
+
+1. Stale 문서(12개월+ 미수정) 선택
+2. `curl localhost:8001/api/wiki/confidence/{path}` → `stale: true` 확인
+3. "확인했음" 피드백 전송
+4. 다시 confidence 확인 → `stale: false`, `signals.freshness` 상승
+5. 문서 frontmatter의 `updated` 필드가 현재 시각으로 갱신 확인
+
+### 시나리오 11: 가중치 변경 확인
+
+```bash
+curl localhost:8001/api/wiki/confidence/{path}
+# signals 필드에 6개 시그널 확인:
+# freshness(25%), status(25%), metadata_completeness(15%),
+# backlinks(10%), owner_activity(10%), user_feedback(15%)
+```
+
+---
+
+## Phase D: Knowledge Graph 데모
+
+### 시나리오 12: Graph Stats 확인
+
+```bash
+curl localhost:8001/api/graph/stats
+# → {"total_nodes": N, "total_edges": M, "type_distribution": {"related": X, "conflicts": Y}}
+```
+
+### 시나리오 13: 문서별 관계 조회
+
+```bash
+curl "localhost:8001/api/graph/SCM/공정-관리-기준-v1.md"
+# → center, relationships: [{source, target, rel_type, strength, created_by, ...}]
+
+# depth=2로 2-hop 탐색
+curl "localhost:8001/api/graph/SCM/공정-관리-기준-v1.md?depth=2"
+
+# rel_type 필터
+curl "localhost:8001/api/graph/SCM/공정-관리-기준-v1.md?rel_type=related"
+```
+
+### 시나리오 14: 관계 자동 반영
+
+1. 문서 A의 frontmatter에 `related: [문서B]` 추가 후 저장
+2. `curl localhost:8001/api/graph/문서A` → "related" 관계 존재 확인
+3. `curl localhost:8001/api/graph/문서B` → 역방향으로도 조회 가능
+
+---
+
+## 스케일 대비 + UI 자기설명 개선 데모
+
+### 시나리오 1: 관련 문서 관리 — 사용 가이드
+
+1. 좌측 사이드바 → **관련 문서 관리** 메뉴 열기
+2. **"사용 가이드 보기"** 링크 클릭
+3. **확인**:
+   - 처리 순서 (전체 스캔 → AI 분석 → 해결 액션) 설명 표시
+   - 유형별 의미: 사실 불일치(빨강), 범위 중복(노랑), 시간 차이(파랑), 무관(회색) + 각 설명
+   - 해결 액션 4종: 범위 명시, 버전 체인, 병합 제안, 무시 + 각각 언제 사용하는지 설명
+4. 가이드 닫기 → 토글 정상 작동
+
+### 시나리오 2: 관련 문서 관리 — 페이지네이션
+
+1. 전체 스캔 실행 (충분한 문서가 있는 경우)
+2. 20건 이상 결과 시 하단에 페이지네이션 표시
+3. **확인**: "전체 N건 중 1–20건" 표시, 이전/다음 버튼
+
+### 시나리오 3: 관리가 필요한 문서 — 섹션 설명
+
+1. 좌측 사이드바 → **관리가 필요한 문서** 메뉴 열기
+2. **확인**:
+   - 상단 안내 배너: 대시보드 설명 + 작성자 필터 안내
+   - 각 섹션(오래된 문서/신뢰도 낮은 문서/미해결 관련 문서)에 설명 + "조치 방법:" 안내
+   - 5건 이상인 섹션에 "나머지 N건 더 보기" 접기/펼치기 버튼
+3. 빈 상태일 때: "모든 문서가 양호한 상태입니다" 안내 표시
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| 가이드 토글 안 보임 | ConflictDashboard 구버전 | 프론트엔드 빌드 확인 (npm run dev) |
+| 페이지네이션 안 보임 | 결과 20건 미만 | 전체 스캔 + threshold 낮춰서 충분한 결과 생성 |
+| 섹션 설명 안 보임 | MaintenanceDigest 구버전 | 프론트엔드 빌드 확인 |
+
+---
+
+## Part 2 데모 — 충돌 & Lineage (2A/2B/2C/2D)
+
+### 사전 준비
+
+```bash
+# 서버 실행 확인
+curl -s http://localhost:8001/health | python3 -m json.tool
+
+# 충돌 전체 스캔 (threshold 0.85로 낮춰서 더 많은 쌍 감지)
+curl -s -X POST "http://localhost:8001/api/conflict/full-scan?threshold=0.85"
+
+# 5초 후 결과 확인
+curl -s "http://localhost:8001/api/conflict/duplicates?filter=all&threshold=0.85"
+```
+
+예상 결과: 최소 2쌍 — `공정-관리-기준-v1 ↔ v2` (0.95), `test-create ↔ test-create2` (0.88)
+
+---
+
+### 시나리오 1: 충돌 대시보드 그룹핑 (2D)
+
+1. 좌측 사이드바 → **문서 충돌 감지** 메뉴 열기
+2. 임계값을 **0.85**로 조정 → **새로고침** 클릭
+3. **확인**: 같은 문서가 여러 쌍에 걸쳐있으면 하나의 카드로 그룹핑
+   - 주 문서가 위에, 충돌 문서들이 아래 들여쓰기로 표시
+   - 각 충돌 문서마다 유사도 % + "나란히 비교" 버튼
+4. **필터 탭**: "미해결" / "해결됨" / "전체" 전환 확인
+
+---
+
+### 시나리오 2: 폐기 처리 (기존 기능 확인)
+
+1. 충돌 대시보드에서 `공정-관리-기준-v1.md` 카드 확인
+   - v1은 이미 deprecated 상태일 수 있음 → 시나리오 3으로 이동
+   - deprecated가 아니면: **"폐기(deprecated) 처리"** 버튼 클릭
+2. **확인**: 버튼 클릭 후 카드가 반투명 + status "deprecated" 표시
+3. "해결됨" 탭으로 전환 → 해당 쌍이 이동했는지 확인
+
+---
+
+### 시나리오 3: 폐기 되돌리기 (2B) ⭐ 신규
+
+1. "해결됨" 또는 "전체" 탭에서 deprecated 문서 찾기
+2. deprecated 문서 카드의 **"되돌리기"** 버튼 (녹색 ↻) 클릭
+3. **확인**:
+   - 토스트: "→ approved (복원됨)"
+   - 카드가 다시 불투명 + status "approved"로 변경
+   - "미해결" 탭으로 전환 → 해당 쌍이 다시 미해결로 표시
+4. **Lineage 정리 확인**: 복원된 문서의 frontmatter에서 `superseded_by` 필드가 빈 값인지 확인
+   ```bash
+   # v1 문서 frontmatter 확인
+   head -10 wiki/SCM/공정-관리-기준-v1.md
+   ```
+
+---
+
+### 시나리오 4: 검색 결과 deprecated 뱃지 (2C) ⭐ 신규
+
+> 이 테스트를 위해 먼저 문서 하나를 deprecated로 만들어야 합니다.
+
+**준비:**
+```bash
+# v1을 다시 deprecated로 설정 (v2가 대체)
+curl -s -X POST "http://localhost:8001/api/conflict/deprecate?path=SCM/공정-관리-기준-v1.md&superseded_by=SCM/공정-관리-기준-v2.md"
+```
+
+**테스트:**
+1. 채팅에서 **"공정 관리 기준 알려줘"** 입력
+2. 답변 하단 소스 목록 확인:
+   - `공정-관리-기준-v1.md` → 빨간 취소선 + **"폐기됨"** 뱃지 + **"→ 새 버전"** 링크
+   - `공정-관리-기준-v2.md` → 정상 표시 (approved 아이콘)
+3. **"→ 새 버전"** 링크 클릭 → `공정-관리-기준-v2.md`가 에디터에서 열리는지 확인
+4. deprecated 문서 자체를 클릭 → 에디터에서 열리지만 취소선/빨간색으로 구분됨
+
+---
+
+### 시나리오 5: Lineage 사이클 감지 (2A)
+
+> 백엔드 로직 테스트 — UI에는 직접 보이지 않음. 로그로 확인.
+
+```bash
+# 의도적 사이클 생성: A → B → A
+# 1) v1의 superseded_by를 v2로 설정 (이미 위에서 완료)
+# 2) v2의 superseded_by를 v1으로 설정 (사이클!)
+head -10 wiki/SCM/공정-관리-기준-v2.md
+# superseded_by 필드에 v1 경로를 수동 입력 후 검색 시 로그 확인
+
+# 채팅으로 "공정 관리 기준" 검색 → 백엔드 로그에서 확인:
+# "Supersede cycle detected: SCM/공정-관리-기준-v1.md -> ... -> SCM/공정-관리-기준-v1.md"
+```
+
+이 시나리오는 edge case 방어 확인용 — 정상 운영 시에는 발생하지 않음.
+
+---
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| 충돌 대시보드 비어있음 | 스캔 안 했거나 threshold 너무 높음 | "전체 스캔" 버튼 클릭 + threshold 0.85 |
+| 되돌리기 버튼 안 보임 | 문서가 deprecated가 아님 | "해결됨" 또는 "전체" 탭에서 확인 |
+| deprecated 뱃지 안 보임 | 검색 결과에 deprecated 문서가 없음 | deprecated 문서와 관련된 키워드로 검색 |
+| "→ 새 버전" 링크 없음 | `superseded_by` 미설정 | deprecate API 호출 시 `superseded_by` 파라미터 포함 |
+
+---
+
+## 세션 37 데모 — Path-Aware RAG + 대화형 경로 명확화
+
+### 배경
+수십만 문서 엔터프라이즈 위키에서 "장애 대응 절차" 같은 쿼리는 인프라/SCM/ERP 등 여러 영역에 매칭. 기존엔 경로 정보를 RAG에 활용하지 않아 도메인이 섞인 결과를 반환.
+
+### 접근
+4-Layer 설계: (L1) 경로 프리픽스 임베딩, (L2) path_depth 메타데이터 필터, (L3) 경로 분산 감지→대화형 명확화, (L4) 세션 경로 부스트 리랭크.
+
+### 데모 시나리오
+
+#### 1. 경로 임베딩 효과 확인
+1. 채팅에서 "인프라 캐시 장애 대응" 입력
+2. 기대: 인프라 문서가 상위 노출 (path_depth_1 필터 + 경로 프리픽스 임베딩 효과)
+
+#### 2. 경로 명확화 (핵심 기능)
+1. 채팅에서 도메인 모호한 질문 입력 (예: "장애 대응 절차")
+2. 결과가 3개 이상 경로에 분산되면 → 버튼형 명확화 질문 표시
+3. "인프라" 버튼 클릭 → 인프라 장애 대응 문서 기반 답변
+4. 후속 질문 "캐시 관련은?" → 세션 path_preference로 인프라 문서 자동 우선
+
+#### 3. 환경변수 토글
+- `ONTONG_PATH_DISAMBIG_ENABLED=false` → 명확화 비활성 (기존 동작)
+- `ONTONG_PATH_BOOST_WEIGHT=0` → 부스트 비활성
+- `ONTONG_PATH_EMBED_ENABLED=false` → 경로 프리픽스 없이 인덱싱 (재인덱싱 필요)
+
+### 측정
+- 기존 RAG 테스트 12개 쿼리: hit@5=1.0, MRR=1.0 유지 (회귀 없음)
+- 경로 필터 적용 검색: 인프라 문서만 반환 확인
+- path_depth_1/2/stem 메타데이터 ChromaDB 저장 확인
+
+### 트러블슈팅
+- 명확화 안 뜸: `ONTONG_PATH_DISAMBIG_MIN_PATHS` 값 확인 (기본 3). 현재 문서가 적으면 3개 경로에 분산되지 않을 수 있음.
+- 재인덱싱 필요 시: `curl -X POST "http://localhost:8001/api/wiki/reindex?force=true" -H "Authorization: Bearer test-token"`
+
+---
+
+## 세션 36 데모 — 태그 자동화 고도화 (Phase A+B)
+
+### 배경
+기존 AutoTag는 도메인 무관 top-100 태그에서 추천 → 중복/오분류 발생. 또 태그는 저장만 되고 RAG 검색에 반영되지 않음.
+
+### 접근
+- **Phase A**: 2-pass 추론 (domain→tags), 경로/이웃/관련문서 신호, 7개 few-shot, **always-normalize** (거리 3층), Soft alternatives UI
+- **Phase B**: 쿼리→태그 의미매칭, RAG 검색 후 태그 교집합 부스트 rerank, domain 0건 시 태그-only fallback
+
+### 데모 시나리오
+1. **Auto-Tag 정규화 확인** — 인프라 디렉토리 문서(예: `wiki/인프라/캐시-장애-대응-매뉴얼.md`) 편집 → MetadataBar "Auto-Tag" 클릭 → `Redis→레디스`, `캐싱→캐시`, `장애대응→장애처리` 자동 치환 토스트
+2. **Soft alternatives 칩** — 신규 추천 태그 옆에 `→ SOP (14건)` 같은 기존 태그 칩이 보이고 클릭 시 치환됨
+3. **도메인 정확도** — SCM 문서에는 인프라 태그가 나오지 않음 (2-pass 스코핑 효과)
+4. **RAG 채팅** — "캐시 장애 어떻게 대응해" / "월말 결산 절차" → 정답 문서가 상위 노출 (tag boost 효과)
+
+### 측정 (`tests/fixtures/*.json`)
+- `auto_tag_baseline.json`: domain 정확도 **100%** (27/27), 평균 confidence 0.85, 자동 치환 22건
+- `rag_eval_baseline.json`: baseline hit@5 **1.0**, MRR **1.0** (12 쿼리)
+
+### 트러블슈팅
+- Auto-Tag가 10~15초 걸림 → 2-pass + 정규화 LLM confirm 때문. 정상.
+- alternatives 칩이 안 보임 → 해당 태그가 이미 기존 태그와 충분히 가까워 자동 치환됐거나 (`tag_replaced`), 유사 후보가 0.65 이상으로 멀리 있음
 
 ---
 
@@ -438,12 +871,124 @@ npm run dev
 ### Z. 사이드바 섹션 전환 + 메타데이터 관리 (Phase 2)
 
 1. 사이드바 상단에 3개 아이콘 탭 확인: 파일 트리 / 태그 브라우저 / 관리
-2. **태그 브라우저**: Tags 아이콘 클릭 → Domain/Process/Tags 목록 표시
-3. 태그 클릭 → 해당 태그가 달린 문서 목록 표시 → 문서 클릭 시 탭으로 열림
+2. **태그 브라우저**: Tags 아이콘 클릭 → Domain/Process 트리 + Tags 표시
+   - Domain 클릭 → 하위 Process 목록 펼침 (프로세스 수 표시)
+   - Process 클릭 → 해당 문서 목록 lazy 로딩 (문서 수 표시)
+   - 문서 클릭 → 탭으로 열기
+3. 태그 뱃지 클릭 → 해당 태그가 달린 문서 목록 표시 → 문서 클릭 시 탭으로 열림
 4. **관리**: Settings 아이콘 클릭 → "메타데이터 템플릿" / "미태깅 문서" 메뉴
-5. "메타데이터 템플릿" 클릭 → Workspace에 관리 탭 열림 → Domain/Process/Tags 추가·삭제
+5. "메타데이터 템플릿" 클릭 → Workspace에 관리 탭 열림 → Domain-Process 트리 + Tags 관리
+   - 도메인 클릭 → 하위 프로세스 목록 펼침 + 관련 문서 수 표시
+   - 프로세스 클릭 → 해당 프로세스 문서 목록 lazy 로딩
+   - 문서 클릭 → 해당 파일 탭으로 열기
+   - 도메인/프로세스 추가·삭제 가능, Tags는 별도 섹션에서 관리
 6. "미태깅 문서" 클릭 → 미태깅 목록 + 태그 통계 → "일괄 자동 태깅" 버튼
 7. 에러코드 자동 추출: DG320 등이 본문에 있는 문서 저장 시 frontmatter에 자동 주입 확인
+
+### ZZ. 태그 품질 시스템 (세션 34)
+
+> 태그 분산 방지 + 유사 태그 병합 + 고아 태그 정리 기능입니다.
+> 테스트 전 **백엔드 재시작** 필수 (tag_registry ChromaDB 초기화).
+
+#### 사전 준비
+
+```bash
+# 백엔드 재시작 (tag_registry 초기화 필요)
+# 기존 uvicorn 프로세스 종료 후:
+cd ~/workspace/ai/onTong
+source venv/bin/activate
+set -a && source .env && set +a
+uvicorn backend.main:app --host 0.0.0.0 --port 8001
+
+# 리인덱스 (샘플 문서 반영)
+curl -X POST "http://localhost:8001/api/wiki/reindex?force=true"
+```
+
+#### 테스트용 샘플 데이터 (이미 생성됨)
+
+의도적으로 분산된 태그가 포함된 문서:
+
+| 파일 | 분산 태그 |
+|------|----------|
+| `인프라/캐시-장애-대응-매뉴얼.md` | **캐시**, Redis, **장애대응** |
+| `인프라/캐싱-전략-가이드.md` | **캐싱**, 성능최적화 |
+| `인프라/cache-troubleshooting.md` | **cache**, **레디스** |
+| `인프라/서버-장애처리-절차.md` | **장애처리**, SOP |
+| `인프라/네트워크-보안-정책.md` | 네트워크, 보안정책, 방화벽 |
+| `SCM/재고-실사-절차.md` | 재고관리, **희귀태그테스트** (고아) |
+
+#### ZZ-1. 태그 건강도 대시보드 (브라우저)
+
+1. 사이드바 관리 → "메타데이터 템플릿" 클릭
+2. 페이지 하단 **"태그 건강도"** 섹션 확인
+3. **"분석 실행"** 클릭
+4. 확인 사항:
+   - **유사 태그 그룹**: "캐시"/"캐싱"/"cache", "장애대응"/"장애처리", "Redis"/"레디스" 등 그룹 표시
+   - **고아 태그**: "희귀태그테스트" 등 1건 이하 사용 태그 노란색 뱃지
+5. 유사 그룹에서 **병합 버튼** 클릭 (예: `"캐싱" → "캐시"`)
+   - 확인 다이얼로그 → "확인"
+   - 성공 토스트 + 해당 문서의 태그가 자동 변경됨
+
+#### ZZ-2. Smart Friction — 수동 태그 입력 (브라우저)
+
+1. 아무 `.md` 문서 열기 → MetadataTagBar 펼치기 (Metadata 클릭)
+2. Tags 입력란에 **"캐싱"** 입력 후 Enter
+3. 확인 사항:
+   - "유사한 태그가 있습니다" 프롬프트 표시
+   - **"캐시 (N건)"** 버튼이 표시됨
+   - [캐시 사용] 클릭 → "캐시"가 태그로 추가됨
+4. 다시 **"장애처리"** 입력 후 Enter
+   - "장애대응 (N건)" 유사 태그 제안 확인
+5. **"그래도 '장애처리' 생성"** 클릭 → 새 태그로 강제 생성 확인
+
+#### ZZ-3. 태그 건수 자동완성 (브라우저)
+
+1. Tags 입력란에 **"캐"** 입력
+2. 드롭다운에 태그 + **건수** 표시 확인:
+   - `캐시  2건`
+   - `캐싱  1건`
+3. 건수가 큰 "캐시"를 자연스럽게 선택하도록 유도
+
+#### ZZ-4. 유사 태그 API 확인 (터미널)
+
+```bash
+# 유사 태그 검색
+curl "http://localhost:8001/api/metadata/tags/similar?tag=%EC%BA%90%EC%8B%B1&top_k=5"
+# → "캐시", "cache" 등 유사 태그 반환 (서버 재시작 후에만 작동)
+
+# 유사 그룹 조회 (default threshold=0.55)
+curl "http://localhost:8001/api/metadata/tags/similar-groups"
+# → 정책↔보안정책, 장애대응↔장애처리, 캐싱↔캐시, Redis↔cache 4그룹
+
+# 고아 태그 조회
+curl "http://localhost:8001/api/metadata/tags/orphans?min_docs=1"
+# → 1건 이하 사용 태그 목록
+
+# 태그 병합
+curl -X POST "http://localhost:8001/api/metadata/tags/merge?source=%EC%BA%90%EC%8B%B1&target=%EC%BA%90%EC%8B%9C"
+# → {"merged": "캐싱", "into": "캐시", "updated_documents": 1}
+```
+
+#### ZZ-5. LLM 자동태깅 정규화 (브라우저 — LLM API 키 필요)
+
+> ⚠️ 이 테스트는 LLM API 호출이 발생합니다. 최소한으로만 테스트하세요.
+
+1. 미태깅 문서 하나를 열거나, 기존 문서의 Auto-Tag 버튼 클릭
+2. 확인 사항:
+   - 제안된 태그가 기존 태그(캐시, 장애대응 등)와 **동일한 이름**으로 나오는지 확인
+   - Layer 1: LLM이 프롬프트의 기존 태그 목록에서 선택
+   - Layer 2: 새 태그 제안 시 임베딩 유사 검색으로 기존 태그로 자동 치환
+3. 백엔드 로그에서 `Tag auto-normalized` 또는 `Tag LLM-normalized` 메시지 확인
+
+#### ZZ-6. 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| 유사 태그 검색 결과 비어있음 | tag_registry 미초기화 | **백엔드 재시작** 필수 |
+| 유사 그룹이 안 나옴 | 태그 수가 너무 적거나 threshold 낮음 | threshold=0.60으로 올려서 재시도 (OpenAI 임베딩은 단문에서 거리가 큼) |
+| Smart Friction 프롬프트 안 나옴 | 유사 태그가 없거나 tag_registry 미연결 | 백엔드 재시작 + reindex |
+| 건수 표시 안 됨 | `onSearchWithCount` 미연동 | 프론트 재시작 후 확인 |
+| 병합 후 문서 태그 안 바뀜 | 캐시 | 브라우저 새로고침 후 문서 다시 열기 |
 
 ### AA. RAG 성능 고도화 — LLM 호출 병렬화 + 제거 (Phase 2-A Step 1)
 
@@ -2291,3 +2836,1258 @@ curl http://localhost:7474/
 | import-linter 위반 | 섹션 간 직접 import | shared Protocol 경유로 변경 |
 | Section 2↔3 통신 오류 | typed contract 불일치 | `shared/contracts/simulation.py` 확인 |
 | 시뮬레이션 타임아웃 | job queue 미동작 | 백엔드 로그 + job status 확인 |
+
+---
+
+## 에이전트 고도화 (AG-1) 데모 시나리오
+
+### AG-1-4: 구조화된 대화 요약
+
+**테스트 시나리오**: 긴 대화에서 맥락 유지 확인
+
+1. 10회 이상 대화를 주고받으며 다양한 주제 질문
+2. 이전 대화에서 언급된 문서/주제를 참조하는 질문
+3. 기대: 에이전트가 이전 대화 맥락을 자연스럽게 유지
+
+**검증 포인트**:
+- 대화가 토큰 예산(4000) 초과 시 이전 내용이 구조화 요약으로 전환
+- 요약에 "대화 규모", "이전 요청", "참조된 문서" 포함
+- 요약의 존재를 인정하는 메타 발언 없음 ("이전 대화를 요약하면..." 금지)
+
+### AG-1-5: Continuation Instruction
+
+**테스트 시나리오**: 요약 후 자연스러운 이어가기
+
+1. 긴 대화 후 이전 주제에 대한 후속 질문
+2. 기대: "이전 대화를 보면..." 같은 표현 없이 바로 답변
+3. 기대: 주제가 완전히 바뀌면 이전 맥락을 섞지 않음
+
+### AG-1-6: Query Augment + 주제 전환 감지
+
+**테스트 시나리오**: 주제 전환 시 컨텍스트 오염 방지
+
+1. "후판 공정계획 알려줘" → "담당자 누구야?" (후속 질문 — topic_shift=false)
+   - 기대: 쿼리가 "후판 공정계획 담당자"로 보강됨
+2. "후판 공정계획 알려줘" → "회의실 예약 방법은?" (주제 전환 — topic_shift=true)
+   - 기대: 이전 히스토리가 답변에 영향 안 줌
+3. thinking step에서 "[주제 전환]" 라벨 확인
+
+**검증 포인트**:
+- thinking_step에 쿼리 보강 결과 표시
+- 주제 전환 감지 시 히스토리가 LLM에 전달되지 않음
+- 프롬프트에 "주어/목적어 복원" 규칙 포함
+
+---
+
+## 에이전트 고도화 (AG-2~4) 데모 시나리오
+
+### AG-2-3: SkillResult feedback 필드
+
+**테스트 시나리오**: deprecated 문서 필터링 경고
+
+1. deprecated 상태의 문서가 있는 주제로 검색
+2. 기대: 검색 결과에서 deprecated 문서가 제외됨
+3. 기대: 서버 로그에 "Excluded deprecated docs" 출력
+
+**검증 방법**:
+```bash
+# 서버 로그 확인
+tail -f /tmp/ontong_backend.log | grep -i "deprecated\|feedback"
+```
+
+**검증 포인트**:
+- wiki_search에서 deprecated 문서 필터 후 feedback 문자열 반환
+- rag_agent에서 thinking_step "info" 이벤트로 표시
+
+### AG-3-1: 세션 JSONL 영속성
+
+**테스트 시나리오**: 서버 재시작 후 대화 복원
+
+1. 채팅에서 여러 메시지 주고받기
+```bash
+curl -s -N -X POST http://localhost:8001/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer test-token" \
+  -d '{"message":"장애대응 플레이북 알려줘","session_id":"demo-persist"}' \
+  --max-time 20 | head -5
+```
+
+2. JSONL 파일 확인
+```bash
+cat data/sessions/demo-persist.jsonl
+```
+
+3. 서버 재시작 후 동일 session_id로 후속 질문
+```bash
+# 서버 재시작
+kill $(lsof -ti:8001); sleep 2
+venv/bin/python -m backend.main &>/tmp/ontong_backend.log &
+sleep 4
+
+# 동일 세션으로 후속 질문
+curl -s -N -X POST http://localhost:8001/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer test-token" \
+  -d '{"message":"아까 그 플레이북에서 P1 기준은?","session_id":"demo-persist"}' \
+  --max-time 20 | head -5
+```
+
+**검증 포인트**:
+- `data/sessions/{session_id}.jsonl`에 user/assistant 메시지 기록
+- 서버 재시작 후 이전 대화 맥락 유지
+- 후속 질문에서 이전 답변 참조 가능
+
+### AG-3-2: 스킬 권한 매핑
+
+**테스트 시나리오**: viewer 역할로 문서 편집 차단
+
+```bash
+# 직접 run_skill 호출 (Python)
+venv/bin/python -c "
+import asyncio
+from unittest.mock import MagicMock
+# (모듈 스텁 생략)
+from backend.application.agent.context import AgentContext
+
+ctx = AgentContext(
+    request=MagicMock(), chroma=MagicMock(), storage=MagicMock(),
+    session_store=MagicMock(), user_roles=['viewer'], intent_action='edit',
+)
+r = asyncio.run(ctx.run_skill('wiki_edit'))
+print(f'success={r.success}, error={r.error}, hint={r.retry_hint}')
+# 기대: success=False, error='권한 부족...', hint='관리자에게...'
+"
+```
+
+**검증 포인트**:
+- viewer → wiki_edit: `권한 부족` 에러 + retry_hint 반환
+- editor/admin → wiki_edit: 권한 통과
+- viewer → wiki_search (READ): 정상 허용
+
+### AG-4-1: Q&A ReAct 자율 검색
+
+**테스트 시나리오**: 관련도 낮을 때 자동 재검색
+
+```bash
+# 직접 _evaluate_search_results 호출 (Python)
+venv/bin/python -c "
+import asyncio, os, sys
+# (.env 로딩 생략)
+from backend.application.agent.rag_agent import RAGAgent
+from unittest.mock import MagicMock
+
+agent = RAGAgent(chroma=MagicMock(), storage=MagicMock())
+
+# 관련도 20% (threshold 25% 미만) → LLM 평가 트리거
+r = asyncio.run(agent._evaluate_search_results(
+    query='2025년에 변경된 연차 규정 알려줘',
+    search_query='연차 규정',
+    documents=['서버 관리 규정 문서입니다...'],
+    metadatas=[{'path':'/서버관리/규정.md'}],
+    distances=[0.80],
+    ctx=MagicMock(),
+))
+print(f'sufficient: {r[\"sufficient\"]}')
+print(f'reason: {r[\"reason\"]}')
+print(f'retry_query: {r[\"retry_query\"]}')
+# 기대: sufficient=False, retry_query에 구체화된 검색어
+"
+```
+
+**검증 포인트**:
+- 관련도 40%+ → rule-based fast-path (LLM 호출 없이 즉시 sufficient)
+- 관련도 25% 미만 → LLM이 insufficient 판단 + 재검색 쿼리 생성
+- 재검색 쿼리가 원본과 다름 (구체화/동의어/날짜 추가)
+- 최대 3턴 후 중단 (무한 루프 방지)
+- 빈 결과 → 즉시 insufficient (LLM 호출 없음)
+
+### AG-4-2: 재검색 전략 5단계
+
+**검증 방법**: qa_react.md 프롬프트 내용 확인
+```bash
+cat backend/application/agent/skills/prompts/qa_react.md
+```
+
+**검증 포인트**:
+- 구체화 → 시간 → 동의어 → 상위개념 전략 포함
+- 충분성 체크리스트 (핵심 키워드, 시간 범위, 구체적 수치) 포함
+- 비용 통제 규칙 (부분 충분 → sufficient=true) 포함
+
+---
+
+## 에이전트 고도화 v3 전체 데모 체크리스트
+
+| # | 항목 | 검증 방법 | 상태 |
+|---|------|----------|------|
+| 1 | ontong.md 인격 적용 | 채팅에서 톤/스타일 확인 | |
+| 2 | 토큰 히스토리 | 10회+ 대화 후 맥락 유지 | |
+| 3 | 구조화된 요약 | 긴 대화 → 요약 메타발언 없음 | |
+| 4 | topic_shift | 주제 전환 후 오염 없음 | |
+| 5 | 프롬프트 .md 분리 | prompts/ 디렉토리 5개 파일 | |
+| 6 | Cognitive Reflect 제거 | thinking_step에 cognitive_reflect 없음 | |
+| 7 | 스킬 도구 풀 제한 | question intent → wiki_write 차단 | |
+| 8 | SkillResult feedback | deprecated 문서 경고 로그 | |
+| 9 | 세션 JSONL 영속성 | 재시작 후 대화 복원 | |
+| 10 | 스킬 권한 매핑 | viewer → WRITE 차단 | |
+| 11 | ReAct 자율 검색 | 낮은 관련도 → 재검색 | |
+| 12 | 재검색 전략 | qa_react.md 5단계 전략 | |
+
+### AG-3-3: PreSkill/PostSkill 훅 시스템
+
+**검증 방법**: 훅 동작 확인 (백엔드 로그 + 채팅)
+
+1. **QuerySanitizeHook (pre-hook)**: 공백 과다 쿼리 정리
+   ```
+   채팅에 "  후판    공정   계획  " 입력 (공백 과다)
+   ```
+   - 백엔드 로그에서 `QuerySanitizeHook` 로그 확인
+   - 검색 결과가 정상적으로 반환됨 (공백이 정리된 쿼리로 검색)
+
+2. **DeprecatedDocHook (post-hook)**: 폐기 문서 경고
+   - deprecated 상태 문서가 검색 결과에 포함되면 feedback에 경고 추가
+   - 백엔드 로그: `Search feedback: 폐기(deprecated) 문서 N건이 검색 결과에 포함`
+
+3. **빈 쿼리 차단**: 공백만 입력 시 훅이 차단
+   - QuerySanitizeHook이 `allow=False` 반환 → 검색 실행 안 됨
+
+4. **pytest 확인**:
+   ```bash
+   python3 -m pytest tests/test_ag33_hooks.py -v
+   # 14/14 PASSED (CompletionStatus 5, HookRegistry 6, BuiltinHooks 3)
+   ```
+
+**확인 포인트**:
+- 훅 등록: 백엔드 시작 로그에 "Default hooks registered" 출력
+- pre-hook 차단 시 SkillResult.status == BLOCKED
+- post-hook feedback 주입 시 status == DONE_WITH_CONCERNS
+
+### AG-3-3b: CompletionStatus 확장
+
+**검증 방법**: SkillResult 상태 4단계 확인
+
+| 상태 | 값 | 트리거 조건 | 확인 방법 |
+|------|-----|-------------|-----------|
+| DONE | `done` | 정상 완료 | 일반 질문 → 답변 정상 |
+| DONE_WITH_CONCERNS | `concerns` | 완료 + 경고 | deprecated 문서 포함 검색 |
+| BLOCKED | `blocked` | 진행 불가 | 권한 없는 사용자의 WRITE 시도 |
+| NEEDS_CONTEXT | `needs_context` | 사용자 확인 필요 | (에이전트가 명시적으로 설정 시) |
+
+```bash
+# 자동 상태 추론 확인 (pytest)
+python3 -m pytest tests/test_ag33_hooks.py::TestCompletionStatus -v
+```
+
+### AG-4-3: 사용자 확인 루프 (ClarificationRequestEvent)
+
+**검증 방법**: SSE 이벤트 타입 + 프론트엔드 타입 확인
+
+1. **백엔드 스키마 확인**:
+   ```bash
+   python3 -c "from backend.core.schemas import ClarificationRequestEvent; print(ClarificationRequestEvent.model_fields.keys())"
+   # dict_keys(['event', 'request_id', 'question', 'options', 'context'])
+   ```
+
+2. **ChatRequest에 clarification_response_id 필드 존재**:
+   ```bash
+   python3 -c "from backend.core.schemas import ChatRequest; print('clarification_response_id' in ChatRequest.model_fields)"
+   # True
+   ```
+
+3. **AgentContext.emit_clarification() 유틸리티**:
+   ```bash
+   python3 -c "
+   from backend.application.agent.context import AgentContext
+   sse = AgentContext.emit_clarification('어떤 공정을 말씀하시나요?', ['후판', '열연', '냉연'])
+   print(sse[:80])
+   "
+   # event: clarification_request\ndata: {"event":"clarification_request",...
+   ```
+
+4. **프론트엔드 타입 동기화**: `npx tsc --noEmit` 에러 없음
+
+### Per-Skill Allowed Tools (스킬별 도구 제한)
+
+**검증 방법**: 스킬 생성 → allowed-tools 확인
+
+1. **UI에서 생성**:
+   - 좌측 사이드바 → ⚡ 스킬 탭 → + 버튼 → 톱니바퀴 (고급)
+   - "고급 설정 (6-Layer)" 펼치기
+   - 하단 **"허용 도구 (Allowed Tools)"** 에서 원하는 도구 체크
+   - 생성 후 wiki 파일에서 `allowed-tools:` YAML 확인
+
+2. **API로 확인**:
+   ```bash
+   # 스킬 생성 (allowed-tools 포함)
+   curl -s http://localhost:8001/api/skills/ -X POST \
+     -H "Content-Type: application/json" \
+     -d '{
+       "title": "테스트 도구 제한",
+       "trigger": ["도구테스트"],
+       "allowed_tools": ["wiki_search", "llm_generate"]
+     }' | python3 -m json.tool
+
+   # allowed_tools 필드 확인
+   curl -s http://localhost:8001/api/skills/ | python3 -c "
+   import json, sys
+   data = json.load(sys.stdin)
+   for s in data.get('system', []) + data.get('personal', []):
+       if s.get('allowed_tools'):
+           print(f\"{s['title']}: {s['allowed_tools']}\")
+   "
+   ```
+
+3. **동작 확인**: allowed_tools가 설정된 스킬 선택 후 질문 → context.py에서 user_skill.allowed_tools가 INTENT_ALLOWED_SKILLS보다 우선 적용
+
+### 스킬 UX 개선 — 사용자 교육 & 가이드
+
+**검증 방법**: 브라우저에서 직접 확인
+
+1. **소개 배너 (일회성)**:
+   - ⚡ 스킬 탭 클릭 → 상단에 "스킬이란?" 배너 표시
+   - X 클릭 → 배너 사라짐
+   - 페이지 새로고침 → 배너 다시 안 나타남
+   - (리셋: 개발자도구 → `localStorage.removeItem("ontong:skill-intro-dismissed")`)
+
+2. **빈 상태 CTA**:
+   - 스킬 0개 상태 → "아직 만든 스킬이 없습니다" + Zap 아이콘
+   - "+ 첫 번째 스킬 만들기" 클릭 → 인라인 생성 폼 열림
+   - 공용 스킬 빈 상태 → "범위를 '공용'으로 선택하면..." 안내
+
+3. **채팅 피커 교육**:
+   - 채팅 입력란 ⚡ 버튼 클릭 → 드롭다운 상단에 "스킬을 적용하면 AI가 정해진 역할과 형식으로 답변합니다" 서브텍스트
+   - 스킬 0개일 때: "왼쪽 사이드바 ⚡ 탭에서 스킬을 만들어보세요" 안내
+
+4. **자동 제안 교육**:
+   - 트리거 키워드 매칭 시 배너에 "입력 내용에 맞는 스킬이 있습니다" 부연
+
+5. **생성 다이얼로그 개선**:
+   - 톱니바퀴 → 고급 생성 열기
+   - 헤더: Zap 아이콘 + "이름과 설명만 입력해도 바로 사용할 수 있습니다"
+   - 트리거 라벨: "— 이 단어가 포함되면 자동 제안" 힌트
+   - 고급 설정 펼치면: "각 항목은 선택 사항입니다. 필요한 것만 채우세요"
+   - 6-Layer 라벨에 각각 한 줄 설명 (역할→"AI의 페르소나와 톤" 등)
+
+6. **탭 툴팁**:
+   - 좌측 하단 ⚡ 아이콘에 마우스 올리면 "스킬 — AI 응답을 커스터마이징하는 템플릿" 표시
+
+### 사용자별 AI 페르소나 설정 (자유 마크다운)
+
+**검증 방법**: 브라우저 + curl
+
+1. **파일 열기**:
+   - AICopilot 헤더 → 톱니바퀴(Settings) 아이콘 클릭
+   - 워크스페이스에 `ontong.local.md` 탭이 열림
+   - 처음이면 가이드 템플릿 표시 (나에 대해/응답 스타일/참고 사항)
+
+2. **자유롭게 편집**:
+   - Tiptap 에디터로 마크다운 자유 작성
+   - 예시:
+     ```
+     ## 나에 대해
+     물류팀 DevOps 엔지니어. 인프라/배포 관련 문서를 주로 본다.
+
+     ## 응답 스타일
+     - 캐주얼하게 답변해줘
+     - 코드 예시 항상 포함
+     - 영어 기술 용어 번역하지 마
+     - 표 형식으로 정리해줘
+     ```
+   - 저장 (Ctrl+S 또는 자동저장)
+
+3. **답변 톤 비교**:
+   - 편집 전: "휴가 규정 알려줘" → 기본 톤 답변
+   - 편집 후: 같은 질문 → 커스텀 스타일 적용된 답변
+   - 캐시 최대 60초 후 반영 (저장 시 즉시 무효화됨)
+
+4. **빈 템플릿 확인**:
+   - 가이드 주석만 있고 실제 내용 미작성 → 프롬프트에 주입되지 않음 (정상)
+
+5. **API 직접 확인**:
+   ```bash
+   # 파일 없으면 템플릿 생성
+   curl -X POST http://localhost:8001/api/persona/ensure
+   # → {"path": "_personas/@개발자/ontong.local.md", "created": true}
+
+   # 캐시 수동 무효화
+   curl -X POST http://localhost:8001/api/persona/invalidate
+   ```
+
+6. **저장 파일 확인** (서버 측):
+   - `wiki/_personas/@개발자/ontong.local.md` 파일 존재 확인
+   - 자유 마크다운 내용이 그대로 저장됨
+
+---
+
+### 스킬 크리에이터 6-Layer + 참조 문서 (기존 확인)
+
+**검증 방법**: 고급 생성 → 모든 필드 동작
+
+1. 톱니바퀴 → 고급 생성 다이얼로그
+2. 역할/지시사항/워크플로우/체크리스트/출력형식/제한사항 각각 입력
+3. 참조 문서 피커: 문서 검색 → 선택 → 뱃지 표시 → X로 제거
+4. 허용 도구: 체크박스 선택 → 생성
+5. 생성된 스킬 파일 열기 → YAML frontmatter에 `allowed-tools:` 포함 확인
+6. 스킬 내용에 `[[문서명]]` 위키링크 포함 확인
+
+---
+
+### 에이전트 고도화 전체 데모 체크리스트 (v3 최종)
+
+| # | 기능 | 데모 시나리오 | 통과 |
+|---|------|--------------|------|
+| 1 | ontong.md 인격 | "안녕" → 톤 확인 | |
+| 2 | 토큰 기반 히스토리 | 8턴 이상 대화 → 맥락 유지 | |
+| 3 | 구조화된 요약 | 긴 대화 후 요약 확인 (로그) | |
+| 4 | 주제 전환 감지 | 다른 주제 질문 → 이전 맥락 안 섞임 | |
+| 5 | Query Augment | 후속 질문 → 보강된 쿼리 확인 | |
+| 6 | SkillResult feedback | deprecated 문서 → 경고 | |
+| 7 | 스킬별 도구 풀 제한 | allowed_tools 설정 스킬 동작 | |
+| 8 | 파이프라인 병렬화 | thinking_step SSE 순서 확인 | |
+| 9 | 세션 JSONL 영속성 | 서버 재시작 후 대화 복원 | |
+| 10 | 스킬 권한 매핑 | viewer → WRITE 차단 | |
+| 11 | ReAct 자율 검색 | 낮은 관련도 → 재검색 | |
+| 12 | 재검색 전략 | qa_react.md 5단계 전략 | |
+| 13 | **훅 시스템** | 공백 과다 쿼리 → 정리 후 검색 | |
+| 14 | **CompletionStatus** | DONE/BLOCKED/CONCERNS 상태 확인 | |
+| 15 | **사용자 확인 루프** | ClarificationRequestEvent 스키마 확인 | |
+| 16 | **Per-skill allowed-tools** | 스킬 생성 → 도구 제한 동작 | |
+| 17 | **스킬 UX 교육** | 소개 배너 + 빈 상태 CTA + 피커 안내 | |
+| 18 | **사용자별 페르소나** | Settings → ontong.local.md 편집 → 자유 마크다운 → 답변 스타일 변화 | |
+
+### 트러블슈팅
+
+**LLM 호출 실패 (401/403)**:
+- `.env`에서 `LITELLM_MODEL` 확인 (현재 `anthropic/claude-sonnet-4-20250514`)
+- API 키 확인: `curl https://api.anthropic.com/v1/messages -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" -d '{"model":"claude-sonnet-4-20250514","max_tokens":10,"messages":[{"role":"user","content":"hi"}]}' -H "Content-Type: application/json"`
+- 크레딧 부족 시: https://console.anthropic.com/settings/billing
+
+**ReAct 재검색이 트리거 안 됨**:
+- 정상 동작임. 위키 236개 문서에서 대부분 40%+ 관련도 나옴
+- 재검색은 관련도 25% 미만에서만 트리거 (비용 통제 설계)
+- 직접 테스트: `_evaluate_search_results(distances=[0.80])` 호출
+
+**세션 파일 안 생김**:
+- `data/sessions/` 디렉토리 존재 확인
+- 백엔드 로그에서 "Failed to persist" 확인
+- session_id에 특수문자 있으면 sanitize됨
+
+**스킬 소개 배너가 안 보임**:
+- localStorage에 `ontong:skill-intro-dismissed`가 이미 설정됨
+- 리셋: 개발자도구 Console → `localStorage.removeItem("ontong:skill-intro-dismissed")`
+
+**훅이 등록 안 됨**:
+- 백엔드 시작 로그에서 "Default hooks registered" 확인
+- `hooks.py`의 `register_default_hooks()` 가 `main.py`에서 호출되는지 확인
+
+---
+
+## 세션 33 — Domain-Process 계층 구조 + 데이터 클린업
+
+### 19. 메타데이터 템플릿 API
+
+```bash
+# 전체 템플릿 조회
+curl -s http://localhost:8001/api/metadata/templates | python3 -m json.tool
+# → domain_processes: {SCM: [...], ERP: [...], ...} 구조 확인
+
+# 도메인 목록
+curl -s http://localhost:8001/api/metadata/templates/domains | python3 -m json.tool
+
+# 특정 도메인의 프로세스
+curl -s http://localhost:8001/api/metadata/templates/processes/SCM | python3 -m json.tool
+# → {"domain": "SCM", "processes": ["주문", "품질", "진행", "공정", "물류"]}
+
+# 도메인 추가
+curl -s -X POST http://localhost:8001/api/metadata/templates/domain \
+  -H "Content-Type: application/json" \
+  -d '{"name": "테스트도메인", "processes": ["프로세스A"]}' | python3 -m json.tool
+
+# 도메인 삭제
+curl -s -X DELETE http://localhost:8001/api/metadata/templates/domain/테스트도메인 | python3 -m json.tool
+
+# 프로세스 추가 (도메인 하위)
+curl -s -X POST http://localhost:8001/api/metadata/templates/domain/SCM/process \
+  -H "Content-Type: application/json" \
+  -d '{"name": "테스트프로세스"}' | python3 -m json.tool
+
+# 프로세스 삭제
+curl -s -X DELETE http://localhost:8001/api/metadata/templates/domain/SCM/process/테스트프로세스 | python3 -m json.tool
+```
+
+### 20. Domain-Process Cascade UI
+
+1. 좌측 트리에서 아무 문서 클릭 (예: `SCM/주문-처리-절차.md`)
+2. 에디터 상단 **Metadata** 접기/펼치기
+3. **Domain 드롭다운**: SCM, ERP, MES, 인프라, 기획, 재무, 인사 확인
+4. **SCM 선택** → Process 드롭다운에 **주문, 품질, 진행, 공정, 물류**만 표시
+5. **Domain을 ERP로 변경** → Process가 자동 초기화 (빈값) → ERP 프로세스 표시
+6. Domain 미선택 시 Process에 전체 목록 표시
+
+### 21. 샘플 문서 확인
+
+**도메인별 문서 수**: 7개 도메인, 총 21개 문서
+- SCM: 5개 (주문, 발주, 물류, 공정v1 deprecated, 공정v2)
+- ERP: 3개 (마스터데이터, 모듈관리, 인터페이스)
+- MES: 3개 (생산계획, 실적관리, 설비보전)
+- 인프라: 3개 (서버, 모니터링, 보안)
+- 기획: 2개 (예산, 프로젝트)
+- 재무: 2개 (결산, 세무)
+- 인사: 3개 (온보딩, 교육, 평가)
+
+**Lineage 테스트**: `SCM/공정-관리-기준-v1.md` (deprecated) → `SCM/공정-관리-기준-v2.md` (approved)
+
+### 22. 채팅 필터 테스트 (reindex 후)
+
+```bash
+# 먼저 reindex 실행
+curl -X POST http://localhost:8001/api/wiki/reindex
+
+# 채팅 테스트 — 도메인 필터링 확인
+curl -s -N -X POST http://localhost:8001/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "SCM 주문 처리 절차를 알려줘", "session_id": "test-filter"}'
+# → sources에 SCM 도메인 문서가 우선 표시
+
+curl -s -N -X POST http://localhost:8001/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "설비보전 점검표 보여줘", "session_id": "test-filter2"}'
+# → MES/설비보전-점검표.md가 sources에 포함
+```
+
+### 23. AutoTagButton confidence 표시
+
+1. 아무 문서 열기 → Metadata 펼치기
+2. **Auto-Tag** 버튼 클릭
+3. 확인:
+   - 신뢰도 뱃지 (초록 70%+, 노랑 50~69%, 빨강 <50%)
+   - domain/process 제안 뱃지 (현재 비어있을 때만 표시)
+   - 개별 수락 체크 버튼
+   - 신뢰도 50% 미만 태그는 흐림 처리
+
+### 24. Related 문서 편집
+
+1. 문서 열기 → Metadata 펼치기
+2. "관련 문서" 섹션 확인
+3. 입력란에 문서 경로 타이핑 → 자동완성 드롭다운
+4. Enter로 추가, X로 삭제
+5. supersedes/superseded_by는 읽기전용 표시 확인 (SCM/공정-관리-기준-v1.md 열어보기)
+
+### 25. Bulk Auto-tag (미태깅 대시보드)
+
+```bash
+# 미태깅 문서 확인
+curl -s http://localhost:8001/api/metadata/untagged | python3 -m json.tool
+
+# Bulk 미리보기 (apply=false)
+curl -s -X POST http://localhost:8001/api/metadata/suggest-bulk \
+  -H "Content-Type: application/json" \
+  -d '{"paths": ["SCM/주문-처리-절차.md"], "apply": false}' | python3 -m json.tool
+
+# Bulk 적용 (apply=true)
+curl -s -X POST http://localhost:8001/api/metadata/suggest-bulk \
+  -H "Content-Type: application/json" \
+  -d '{"paths": ["SCM/주문-처리-절차.md"], "apply": true}' | python3 -m json.tool
+```
+
+**UI 테스트**: TreeNav 좌측 하단 "미태깅" 뱃지 클릭 → 대시보드 열기 → "미리보기" → confidence 확인 → "전체 자동 태깅"
+
+---
+
+## 세션 35 — Smart Friction 레이턴시 최적화 (2026-04-07)
+
+### 배경
+`/tags/similar` 엔드포인트는 OpenAI 임베딩 왕복으로 매 호출당 **560ms**가 고정적으로 소요된다. 기존 TagInput은 사용자가 Enter를 누를 때 비로소 이 호출을 시작해, 태그 추가 시 눈에 띄게 답답했다.
+
+### 개선 방식
+디바운스된 자동완성 검색(`/tags/search`, 3ms)과 **동일한 타이밍**에 `onCheckSimilar`를 백그라운드로 선제 호출하여 결과를 `similarCacheRef` Map에 저장한다. 사용자가 드롭다운을 훑어보는 자연스러운 공백(보통 1~2초)을 네트워크 왕복 시간으로 활용하는 **병렬화** 전략이다. Enter 시점엔 캐시 히트 → 체감 0ms.
+
+메모리 관리를 위해 Map 삽입 순서 특성을 이용한 경량 LRU(최대 50개)를 함께 구현했다. 히트 시 `delete` 후 재삽입으로 recency를 갱신하고, 초과 시 `keys().next()`로 oldest를 evict.
+
+### 데모 절차
+1. 아무 문서 열기 → MetadataTagBar 태그 입력란 포커스
+2. `캐싱` 타이핑 → 드롭다운에 `캐시 N건` 표시 확인 (200ms)
+3. **1초 정도 기다린 후** Enter → 유사 태그 프롬프트가 **즉시** 표시되는지 확인 (캐시 히트)
+4. 대조군: 다른 새 태그(예: `레디스풀링`) 타이핑 후 **바로 Enter** → 최악의 경우 560ms 대기 (캐시 미스, 기존과 동일)
+
+### 측정
+- `curl -s -o /dev/null -w "%{time_total}s\n" "http://localhost:8001/api/metadata/tags/similar?tag=캐싱"` → ~0.56s
+- `curl -s -o /dev/null -w "%{time_total}s\n" "http://localhost:8001/api/metadata/tags/search?q=캐&with_count=true"` → ~0.003s
+
+### 스케일 특성
+병목은 OpenAI 임베딩 API 고정 비용이며 ChromaDB HNSW 검색은 O(log N)이므로, 태그 수가 10만개가 되어도 쿼리 레이턴시는 거의 변하지 않는다. LRU 50개 제한으로 장시간 세션 메모리도 상수.
+
+### 변경 파일
+- `frontend/src/components/editors/metadata/TagInput.tsx`
+
+---
+
+## Trust System Phase 1 데모 — 문서 신뢰도 점수
+
+### 사전 준비
+
+```bash
+# 서버 실행 확인
+curl -s http://localhost:8001/health | python3 -m json.tool
+
+# 단위 테스트 확인
+venv/bin/python -m pytest tests/test_confidence.py -v
+```
+
+### 시나리오 1: Confidence API 테스트
+
+```bash
+# 단일 문서 신뢰도 조회 (아무 wiki 파일 경로)
+curl -s "http://localhost:8001/api/wiki/confidence/개발운영/캐시-장애-대응-매뉴얼.md" | python3 -m json.tool
+
+# 배치 조회
+curl -s "http://localhost:8001/api/wiki/confidence-batch?paths=개발운영/캐시-장애-대응-매뉴얼.md,SCM운영/공정-관리-기준-v1.md" | python3 -m json.tool
+```
+
+**확인**:
+- `score`: 0-100 숫자
+- `tier`: "high" | "medium" | "low"
+- `stale`: true/false
+- `signals`: 5개 시그널 점수 (freshness, status, metadata_completeness, backlinks, owner_activity)
+
+### 시나리오 2: 에디터 헤더 신뢰도 pill
+
+1. 아무 문서 열기
+2. 에디터 상단 MetadataTagBar 아래에 **신뢰도 pill** 확인
+   - 초록: "신뢰도 XX" (high, 70+)
+   - 노랑: "신뢰도 XX — 검증 필요" (medium, 40-69)
+   - 회색: "신뢰도 XX — 최신 정보가 아닐 수 있습니다" (low, 0-39)
+
+### 시나리오 3: AI 채팅 소스 신뢰도 dot
+
+1. AI 채팅에서 질문 (예: "캐시 장애 대응 절차 알려줘")
+2. 답변 아래 소스 태그 확인
+3. 각 소스 뱃지 오른쪽에 **색상 dot** 표시:
+   - 초록 (high), 노랑 (medium), 회색 (low)
+4. dot 호버 시 툴팁: "신뢰도 XX" / "신뢰도 XX — 검증 권장" / "신뢰도 XX — 오래된 문서"
+
+### 시나리오 4: RAG 랭킹 부스트 확인
+
+```bash
+# AI 질문 후 소스 순서 확인 — 높은 신뢰도 문서가 상위에 올라와야 함
+# 같은 관련도의 문서라도 신뢰도 높은 것이 먼저 (mild boost)
+```
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| 신뢰도 pill 미표시 | 서버 미실행 또는 API 503 | `curl localhost:8001/health` 확인 |
+| 소스에 dot 미표시 | confidence_score=-1 반환 | `main.py`에서 confidence_svc 주입 확인 |
+| 모든 문서 점수 동일 | 메타데이터 없음 | MetadataIndex 재빌드 (POST /api/wiki/reindex) |
+
+### 변경 파일
+- `backend/application/trust/confidence.py` — 스코어링 엔진
+- `backend/application/trust/confidence_cache.py` — TTL 캐시
+- `backend/application/trust/confidence_service.py` — 서비스 오케스트레이터
+- `backend/api/wiki.py` — API 엔드포인트
+- `backend/application/agent/rag_agent.py` — RAG 랭킹 통합
+- `backend/core/schemas.py` — SourceRef 확장
+- `backend/main.py` — 와이어링
+- `frontend/src/components/AICopilot.tsx` — 소스 신뢰도 dot
+- `frontend/src/components/editors/MarkdownEditor.tsx` — 에디터 신뢰도 pill
+- `frontend/src/lib/api/sseClient.ts` — SSE 타입 확장
+
+---
+
+## Trust System Phase 2 데모 — 작성 시 관련 문서 넛지
+
+### 사전 준비
+
+```bash
+# 서버 실행 확인
+curl -s http://localhost:8001/health | python3 -m json.tool
+
+# 테스트 확인
+venv/bin/python -m pytest tests/test_related_search.py -v
+```
+
+### 시나리오 1: 관련 문서 API 테스트
+
+```bash
+# 특정 문서의 관련 문서 조회
+curl -s "http://localhost:8001/api/search/related?path=개발운영/캐시-장애-대응-매뉴얼.md&limit=5" | python3 -m json.tool
+```
+
+**확인**:
+- 배열 반환 (최대 5건)
+- 각 항목: `path`, `title`, `snippet`, `similarity` (0.5~1.0), `confidence_score`, `confidence_tier`, `relationship`
+- `relationship`: "similar_topic" | "same_domain" | "shared_tags"
+- 시스템 경로(`_skills/`, `_personas/`) 미포함
+
+### 시나리오 2: LinkedDocsPanel "참고할 만한 문서"
+
+1. 아무 문서 열기 (충분한 내용이 있는 문서)
+2. "연결된 문서" 패널 확인
+3. **기존 섹션** (lineage, backlinks) 아래에 **"✨ 참고할 만한 문서"** 섹션 확인
+   - 각 문서: 신뢰도 dot (초록/노랑/회색) + 문서명 + 유사도%
+   - 문서명 클릭 → 해당 문서 탭으로 이동
+4. 처음 로딩 시 spinner (Loader2) 표시
+
+### 시나리오 3: 저장 시 자동 related 제안
+
+1. **새 문서 생성** (related 필드 없는 문서)
+2. 캐시 관련 내용 작성 후 저장
+3. 5~10초 후 문서 다시 열기
+4. **확인**: frontmatter에 `related:` 필드가 자동 추가됨 (similarity > 0.7인 상위 3건)
+5. 이미 `related`가 있는 문서는 변경 없음
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| 관련 문서 0건 | ChromaDB 미인덱싱 | POST /api/wiki/reindex 실행 |
+| LinkedDocsPanel 안 보임 | 연결 문서 0건 + 관련 문서 0건 | 인덱싱 완료 후 새로고침 |
+| 자동 related 미추가 | 이미 related 있음 또는 similarity < 0.7 | frontmatter 확인, threshold 확인 |
+| API 503 | ConfidenceService 미주입 | main.py 와이어링 확인 |
+
+### 변경 파일
+- `backend/api/search.py` — `/related` 엔드포인트
+- `backend/core/schemas.py` — `RelatedDocResult` 모델
+- `backend/application/wiki/wiki_service.py` — `_auto_suggest_related()`
+- `backend/main.py` — chroma/confidence 와이어링
+- `frontend/src/components/editors/LinkedDocsPanel.tsx` — AI 추천 섹션
+
+---
+
+## 스코어링 중앙화 + UX 개선 데모
+
+### 스코어링 설정 확인 API
+
+```bash
+# 모든 스코어링 파라미터를 한국어로 확인
+curl -s http://localhost:8001/api/wiki/scoring-config | python3 -m json.tool
+```
+
+기대: confidence(가중치/tier/stale), related_documents(유사도/자동제안/UI), rag_boost(공식), conflict_detection(임계값) 섹션이 한국어 설명과 함께 반환.
+
+### 관련 문서 UX 개선 확인
+
+1. **min_similarity 0.7 적용 확인**
+```bash
+curl -s "http://localhost:8001/api/search/related?path=인프라/캐시-장애-대응-매뉴얼.md&limit=10" | python3 -m json.tool
+```
+기대: similarity < 0.7인 문서는 결과에 포함되지 않음.
+
+2. **LinkedDocsPanel 기본 2건 + "더 보기"** — 브라우저에서 관련 문서 3건 이상인 문서 열기 → 기본 2건만 표시, "더 보기 (+N)" 버튼 클릭 시 전체 표시.
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| scoring-config 404 | wiki.py에 엔드포인트 미추가 | `api/wiki.py` 확인 |
+| related 결과 너무 적음 | min_similarity 0.7로 상향 | threshold 조정 가능 (scoring_config.py) |
+| 더 보기 버튼 안 보임 | 관련 문서 2건 이하 | 정상 동작 (3건 이상일 때만 표시) |
+
+### 변경 파일
+- `backend/application/trust/scoring_config.py` — 중앙 설정 (모든 가중치/임계값)
+- `backend/application/trust/confidence.py` — SCORING 참조로 리팩터
+- `backend/api/search.py` — SCORING.related 참조
+- `backend/api/wiki.py` — `/scoring-config` 엔드포인트
+- `backend/application/agent/rag_agent.py` — SCORING.rag_boost 참조
+- `backend/application/conflict/conflict_service.py` — SCORING.conflict 참조
+- `backend/application/wiki/wiki_service.py` — SCORING.related 참조
+- `frontend/src/components/editors/LinkedDocsPanel.tsx` — 기본 2건 + 더 보기
+
+---
+
+## 사용자 투명성 + 관리자 대시보드 데모
+
+### 1. 신뢰도 pill 상세 팝오버
+1. 아무 문서를 에디터에서 열기 (예: `인프라/캐시-장애-대응-매뉴얼.md`)
+2. 상단 MetadataTagBar 아래의 **신뢰도 pill** (초록/노랑/회색 배경) 클릭
+3. 기대: 5개 시그널 상세가 팝오버로 표시
+   - 최신성 (30%) — 진행 바 + 점수
+   - 문서 상태 (25%)
+   - 메타데이터 (15%)
+   - 역참조 (15%)
+   - 작성자 활동 (15%)
+4. 팝오버 바깥 클릭 → 닫힘
+
+### 2. 관리자 페이지 — 신뢰도 설정
+1. 사이드바 상단의 **톱니바퀴 아이콘** 클릭
+2. "관리" 섹션에서 **"신뢰도 설정"** (초록 게이지 아이콘) 클릭
+3. 기대: 4개 섹션이 카드 형태로 표시
+   - 문서 신뢰도 점수 — 공식, 가중치 5개, 등급 기준, 오래된 문서 기준
+   - 관련 문서 발견 — 복합 정렬 공식, 최소 유사도, 자동 제안, 기본 표시 개수
+   - AI 검색 순위 보정 — 공식, 효과
+   - 유사 문서 감지 — 유사도 임계값
+4. 상단 파란 안내 배너에 "점수는 어떻게 활용되나요?" 설명 확인
+
+### 3. AI 소스 뱃지 툴팁
+1. AI 채팅에서 아무 질문 → 답변의 소스 문서에 마우스 호버
+2. 기대: 여러 줄 툴팁 (관련도, 신뢰도+해석, 작성자, 수정일, 상태)
+
+### 트러블슈팅
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| pill 팝오버 안 뜸 | 빌드 미반영 | HMR 새로고침 확인 |
+| 설정 페이지 빈 화면 | API 503 | 백엔드 실행 확인 |
+| 시그널 바가 다 0 | signals 필드 미반환 | confidence API 응답 확인 |
+
+### 변경 파일
+- `frontend/src/components/editors/MarkdownEditor.tsx` — 신뢰도 pill 팝오버
+- `frontend/src/components/editors/ScoringDashboard.tsx` — 관리자 대시보드 (새 파일)
+- `frontend/src/components/TreeNav.tsx` — "신뢰도 설정" 메뉴 항목
+- `frontend/src/components/workspace/FileRouter.tsx` — scoring-dashboard 라우팅
+- `frontend/src/types/workspace.ts` — VirtualTabType 확장
+- `frontend/src/lib/workspace/useWorkspaceStore.ts` — 탭 타이틀
+- `frontend/src/components/AICopilot.tsx` — 소스 뱃지 툴팁 강화
+
+---
+
+## Trust System Phase 3 데모 — 읽기 시 맥락
+
+### 사전 준비
+서버 실행 확인: `curl -s http://localhost:8001/health | python3 -m json.tool`
+
+### 1. TrustBanner 기본 동작
+1. 브라우저에서 아무 문서 열기 (예: `인프라/캐시-장애-대응-매뉴얼.md`)
+2. 기대: MetadataTagBar 아래에 TrustBanner 표시
+   - 신뢰도 pill (초록/노랑/회색) 클릭 → 시그널 상세 팝오버
+   - 기존 MarkdownEditor의 pill이 아닌 TrustBanner 컴포넌트에서 렌더
+
+### 2. 인용 카운트 확인
+1. AI 채팅에서 질문 → 소스 문서가 인용됨
+2. 해당 문서를 에디터에서 열기
+3. 기대: TrustBanner에 "AI 답변에서 N회 인용" 표시
+
+```bash
+# API로 확인
+curl -s "http://localhost:8001/api/wiki/confidence/인프라/캐시-장애-대응-매뉴얼.md" | python3 -m json.tool
+# citation_count 필드 확인
+```
+
+### 3. 오래된 문서 경고 배너
+- `stale_months >= 12`인 문서를 열면 노란 배너: "N개월 이상 수정되지 않았습니다"
+- 최근 수정된 문서에는 배너 안 뜸
+
+### 4. 최신 대안 패널
+- 신뢰도 < 40인 문서를 열면 파란 패널: "이 주제의 최신 문서: [문서명] (신뢰도 XX)"
+- 신뢰도 높은 문서에는 패널 안 뜸
+
+### 트러블슈팅
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| TrustBanner 안 보임 | confidence API 503 | 백엔드 실행 확인 |
+| 인용 카운트 항상 0 | AI 채팅 미사용 | 채팅으로 질문 후 확인 |
+| 최신 대안 안 뜸 | 신뢰도 >= 40 | 정상 (낮은 신뢰도 문서에만 표시) |
+| pill 팝오버 스타일 깨짐 | TrustBanner로 이전 중 누락 | TrustBanner.tsx 확인 |
+
+### 변경 파일
+- `backend/application/trust/citation_tracker.py` — 인용 카운트 (새 파일)
+- `backend/application/trust/confidence.py` — NewerAlternative 모델, ConfidenceResult 확장
+- `backend/application/trust/confidence_service.py` — citation_tracker/chroma 연동, newer_alternatives 조회
+- `backend/application/agent/rag_agent.py` — 소스 emit 후 인용 기록
+- `backend/main.py` — CitationTracker 와이어링
+- `frontend/src/components/editors/TrustBanner.tsx` — 통합 신뢰 배너 (새 파일)
+- `frontend/src/components/editors/MarkdownEditor.tsx` — 기존 pill 제거, TrustBanner 사용
+- `tests/test_phase3_trust.py` — 14개 테스트
+
+---
+
+## Trust System Phase 4 데모 — 스마트 충돌 해결
+
+### 사전 준비
+
+```bash
+# 서버 실행 확인
+curl -s http://localhost:8001/health | python3 -m json.tool
+
+# 전체 스캔 (충돌 쌍 생성)
+curl -s -X POST "http://localhost:8001/api/conflict/full-scan?threshold=0.85"
+
+# 10초 후 typed 충돌 확인
+curl -s "http://localhost:8001/api/conflict/typed?filter=all" | python3 -m json.tool
+```
+
+### 1. 관련 문서 관리 대시보드 (리네이밍)
+- 사이드바 설정(톱니바퀴) → "관련 문서 관리" 클릭
+- 이전 "문서 충돌 감지" → 이제 "관련 문서 관리"
+- 유사 문서 쌍 목록 표시 (미분석 상태)
+
+### 2. AI 분석 (유형 분류)
+- 쌍 카드에서 **"AI 분석"** 버튼 클릭
+- LLM이 두 문서를 비교하여 유형 분류:
+  - **사실 불일치** (빨간 뱃지) — 같은 질문, 다른 답
+  - **범위 중복** (노란 뱃지) — 같은 영역, 다른 범위
+  - **시간 차이** (파란 뱃지) — 구버전/신버전 관계
+  - **무관** (회색 뱃지) — 오탐
+- claim_a / claim_b에 구체적 인용 표시
+- 추천 해결 방법 파란 박스로 표시
+
+```bash
+# 수동 분석 API
+curl -s -X POST "http://localhost:8001/api/conflict/analyze-pair?file_a=문서A경로&file_b=문서B경로" | python3 -m json.tool
+```
+
+### 3. 원클릭 해결
+- **무시**: 오탐으로 표시 → resolved
+- **범위 명시**: 양쪽 문서의 `related` 필드에 상호 링크 추가
+- **버전 체인**: 구 문서 deprecated + supersedes/superseded_by 설정
+- **병합 제안**: resolved로 표시 (향후 LLM 병합 초안 예정)
+
+```bash
+# 해결 API
+curl -s -X POST "http://localhost:8001/api/conflict/resolve" \
+  -H "Content-Type: application/json" \
+  -d '{"file_a":"docs/a.md","file_b":"docs/b.md","action":"dismiss","resolved_by":"admin"}' | python3 -m json.tool
+```
+
+### 4. 관리가 필요한 문서 다이제스트
+- 사이드바 설정 → "관리가 필요한 문서" 클릭
+- 세 섹션으로 그룹핑:
+  - **오래된 문서** (12개월+ 미수정)
+  - **신뢰도 낮은 문서** (점수 < 40)
+  - **미해결 관련 문서** (충돌 미해결)
+- 사용자 필터로 본인 문서만 확인 가능
+
+```bash
+# 다이제스트 API
+curl -s "http://localhost:8001/api/wiki/digest" | python3 -m json.tool
+curl -s "http://localhost:8001/api/wiki/digest?user_filter=admin" | python3 -m json.tool
+```
+
+### 5. 저장 시 자동 심층 분석
+- 문서 저장 → 인덱싱 → 충돌 감지 → 유사도 > 0.9인 상위 3쌍 자동 LLM 분석
+- 대시보드에서 분석 결과 자동 반영 (별도 조작 불필요)
+
+### 트러블슈팅
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| typed API 빈 결과 | 전체 스캔 미실행 | POST /full-scan 먼저 실행 |
+| AI 분석 실패 | LLM 연결 문제 | .env의 LLM 설정 확인 |
+| 해결 버튼 에러 | 문서 경로 변경 | 새로고침 후 재시도 |
+| 다이제스트 503 | digest_service 미초기화 | 백엔드 재시작 |
+| 대시보드 "미분석" 표시 | 아직 LLM 분석 안 됨 | "AI 분석" 버튼 클릭 |
+
+### 변경 파일
+- `backend/core/schemas.py` — TypedConflict 모델
+- `backend/application/agent/models.py` — ConflictAnalysis LLM 출력 모델
+- `backend/application/agent/skills/conflict_check.py` — analyze_pair() static method
+- `backend/application/agent/skills/prompts/conflict_analyze_pair.md` — 분석 프롬프트
+- `backend/application/conflict/conflict_store.py` — StoredConflict 확장, update_analysis/resolve_pair
+- `backend/application/conflict/conflict_service.py` — get_typed_pairs, resolve_pair, trigger_deep_analysis
+- `backend/api/conflict.py` — POST /resolve, GET /typed, POST /analyze-pair
+- `backend/application/trust/digest.py` — DocumentDigestService (새 파일)
+- `backend/api/wiki.py` — GET /digest 엔드포인트
+- `backend/application/wiki/wiki_service.py` — 저장 시 deep analysis 트리거
+- `backend/main.py` — digest_svc 와이어링
+- `frontend/src/types/wiki.ts` — TypedConflict, ConflictType 등 타입
+- `frontend/src/components/editors/ConflictDashboard.tsx` — 전면 리라이트
+- `frontend/src/components/editors/MaintenanceDigest.tsx` — 다이제스트 컴포넌트 (새 파일)
+- `frontend/src/components/workspace/FileRouter.tsx` — maintenance-digest 라우트
+- `frontend/src/types/workspace.ts` — maintenance-digest VirtualTabType
+- `frontend/src/lib/workspace/useWorkspaceStore.ts` — 탭 타이틀 추가
+- `frontend/src/components/TreeNav.tsx` — 사이드바 메뉴 추가 + 레이블 변경
+- `tests/test_phase4_smart_conflict.py` — 13개 테스트
+
+---
+
+## Status Simplification + Lineage/Versioning Overhaul (2026-04-11)
+
+> 67개 자동 테스트 통과, TS 빌드 클린. 아래는 서버 기동 후 **브라우저 UI 기반** 통합 검증 시나리오.
+
+### 사전 준비
+
+1. 서비스 기동 (터미널에서)
+   - `docker compose up -d chroma redis`
+   - `source venv/bin/activate && set -a && source .env && set +a && uvicorn backend.main:app --host 0.0.0.0 --port 8001`
+   - 별도 터미널: `cd frontend && npm run dev`
+2. 브라우저에서 `http://localhost:3000` 접속
+
+---
+
+### 시나리오 1: 상태 3종화 확인
+
+**목적**: 상태 드롭다운에 draft / approved / deprecated 3개만 존재하는지 확인
+
+1. 왼쪽 TreeNav에서 **아무 문서** 클릭하여 열기
+2. 우측 상단 **ℹ️ 아이콘** (또는 `Cmd+I`) 클릭 → Document Info Drawer 열기
+3. 메타데이터 탭에서 **상태(Status) 드롭다운** 클릭
+4. **확인**:
+   - `Draft`, `Approved`, `Deprecated` **3개만** 표시
+   - `Review`, `-- 미설정 --` 옵션이 **없어야** 함
+
+---
+
+### 시나리오 2: 새 문서 기본 상태 = Draft
+
+**목적**: 새로 만든 문서가 자동으로 draft 상태가 되는지 확인
+
+1. TreeNav 상단의 **+ 새 문서** 버튼 클릭
+2. 폴더: `test-lineage`, 파일명: `새문서.md` 입력 → 생성
+3. 에디터에 아무 내용 입력 후 **저장** (`Cmd+S`)
+4. **ℹ️ Drawer** 열기 → 메타데이터 탭
+5. **확인**: 상태가 **Draft**로 표시됨 (직접 설정하지 않았는데 자동)
+
+---
+
+### 시나리오 3: Approved 자동 강등
+
+**목적**: approved 문서의 **본문**을 수정하면 자동으로 draft로 강등되는지 확인
+
+**준비 — Approved 문서 만들기**
+1. `test-lineage/새문서.md`를 열고 Drawer에서 상태를 **Approved**로 변경 → 저장
+2. Drawer 닫고 다시 열어서 상태가 **Approved**인지 확인
+
+**테스트 — 본문 수정**
+3. 에디터에서 **본문 내용을 수정** (예: 문장 추가) → 저장
+4. Drawer 열기
+5. **확인**: 상태가 **Draft**로 자동 강등됨
+
+**테스트 — 메타데이터만 수정 (강등 안 됨)**
+6. Drawer에서 상태를 다시 **Approved**로 변경 → 저장
+7. Drawer에서 **태그만 추가** (본문 수정 없이) → 저장
+8. **확인**: 상태가 여전히 **Approved** (메타데이터만 변경이라 강등 안 됨)
+
+---
+
+### 시나리오 4: "새 버전 만들기" (우클릭 메뉴)
+
+**목적**: 우클릭으로 쉽게 새 버전 문서를 생성하고, lineage가 자동 연결되는지 확인
+
+1. 새 문서 생성: `test-lineage/배포가이드-v1.md`, 내용 작성
+2. Drawer에서 domain: `IT`, 태그: `배포` 추가 → 저장
+3. TreeNav에서 `배포가이드-v1.md`를 **우클릭** → **"새 버전 만들기"** 클릭
+4. 다이얼로그에 파일명이 **`배포가이드-v2.md`로 자동 제안**됨을 확인
+5. **생성** 버튼 클릭
+6. **확인**:
+   - `배포가이드-v2.md`가 자동으로 열림
+   - Drawer 열기 → `이전 버전(supersedes)` 필드에 `배포가이드-v1.md` 자동 설정됨
+   - domain: `IT`, 태그: `배포`가 **자동 상속**됨
+7. `배포가이드-v1.md` 열기 → Drawer 확인
+   - `새 버전(superseded_by)` 필드에 `배포가이드-v2.md`가 **자동 설정**됨 (양방향 링크)
+
+---
+
+### 시나리오 5: "새 버전 작성" (Drawer 버튼)
+
+**목적**: Drawer 내 버튼으로도 새 버전을 생성할 수 있는지 확인
+
+1. `배포가이드-v2.md` 열기 → Drawer 열기
+2. **"새 버전 작성"** 버튼 클릭
+3. 파일명 입력란에 **`배포가이드-v3.md`** 자동 제안됨 확인
+4. **생성** 클릭
+5. **확인**:
+   - v3 문서 열림, supersedes에 v2 자동 설정
+   - v2 문서의 superseded_by에 v3 자동 설정 (양방향)
+   - v2의 "새 버전 작성" 버튼이 이제 **사라짐** (이미 superseded_by가 있으므로)
+
+---
+
+### 시나리오 6: 버전 체인 타임라인 UI
+
+**목적**: 3-node 체인 (v1→v2→v3)이 타임라인에 정상 표시되는지 확인
+
+1. `배포가이드-v1.md` 열기 → Drawer에서 상태를 **Deprecated**로 변경 → 저장
+2. `배포가이드-v2.md` 열기 → Drawer에서 상태를 **Deprecated**로 변경 → 저장
+3. `배포가이드-v3.md` 열기 → Drawer에서 상태를 **Approved**로 변경 → 저장
+4. `배포가이드-v2.md` 클릭하여 열기
+5. **확인**: 상단에 **amber 배너** "이 문서는 폐기되었습니다" + 새 버전 링크
+6. **"전체 버전 히스토리"** 버튼 클릭
+7. **확인**: 수직 타임라인에:
+   - v1 (deprecated)
+   - v2 (deprecated, **현재 문서 하이라이트**)
+   - v3 (approved, 초록)
+8. v3 노드 클릭 → 해당 문서로 이동
+
+---
+
+### 시나리오 7: Lineage 검증 — 자기참조/사이클 차단
+
+**목적**: 잘못된 lineage 설정이 차단되는지 확인
+
+**자기참조**
+1. 새 문서 생성: `test-lineage/자기참조.md`
+2. Drawer 열기 → `이전 버전(supersedes)` 필드에 **`test-lineage/자기참조.md`** (자기 자신) 입력 → 저장
+3. **확인**: 에러 메시지 — 저장 실패
+
+**사이클**
+4. 새 문서 생성: `test-lineage/사이클-A.md`
+   - Drawer에서 `이전 버전(supersedes)` = `test-lineage/사이클-B.md` → 저장
+5. 새 문서 생성: `test-lineage/사이클-B.md`
+   - Drawer에서 `이전 버전(supersedes)` = `test-lineage/사이클-A.md` → 저장
+6. **확인**: B 저장 시 에러 — 사이클 감지
+
+---
+
+### 시나리오 8: TreeNav deprecated 스타일
+
+**목적**: TreeNav에서 deprecated 파일이 시각적으로 구분되는지 확인
+
+1. 왼쪽 TreeNav에서 `test-lineage/` 폴더 펼치기
+2. **확인**:
+   - `배포가이드-v1.md`, `배포가이드-v2.md` → **취소선(line-through) + 반투명(50% opacity)**
+   - `배포가이드-v3.md` → 정상 표시 (취소선 없음, 불투명)
+3. deprecated 문서를 클릭해도 정상적으로 열리는지 확인
+
+---
+
+### 시나리오 9: Deprecated 배너 + 후속 문서 링크
+
+**목적**: deprecated 문서를 열었을 때 경고 배너와 후속 문서 링크가 표시되는지 확인
+
+1. `배포가이드-v1.md` 클릭하여 열기
+2. **확인**: 상단에 **amber/red 배너** 표시
+   - "이 문서는 폐기되었습니다"
+   - 새 버전 링크: `배포가이드-v2.md` (클릭 가능)
+3. 링크 클릭 → `배포가이드-v2.md`로 이동
+4. v2에서도 배너 확인 → v3 링크 클릭 → v3(approved)로 이동
+5. **확인**: v3(approved)에는 deprecated 배너가 **없음**
+
+---
+
+### 시나리오 10: 상태 드롭다운으로 직접 Deprecate
+
+**목적**: UI에서 상태를 deprecated로 변경하고 부수 효과 확인
+
+1. `test-lineage/새문서.md` 열기
+2. Drawer에서 상태를 **Deprecated**로 변경 → 저장
+3. **확인**: TreeNav에서 해당 파일이 **취소선 + 반투명**으로 변경됨
+4. **확인**: 문서 상단에 deprecated 배너 표시 (superseded_by 없으면 "대체 문서 없음" 안내)
+
+---
+
+### 시나리오 11: AI 코파일럿 검색 — deprecated 제외
+
+**목적**: AI 검색에서 deprecated 문서가 제외되고, 활성 문서 기반으로 답변하는지 확인
+
+1. 우측 **AI 코파일럿** 패널 열기 (`Cmd+J`)
+2. "공정 관리 기준에 대해 알려줘"로 질문
+3. **확인**:
+   - 소스에 `SCM/공정-관리-기준-v2.md` (활성)가 표시
+   - `SCM/공정-관리-기준-v1.md` (deprecated)는 소스에 **없음**
+   - 탐색 과정 펼치면 amber ⓘ 아이콘으로 "폐기된 문서 N건이 검색 결과에서 제외됨" 메시지 표시
+4. 답변 내용이 v2 기준 (불량률 목표 1.5%, AI 기반 실시간 감지 등)인지 확인
+
+---
+
+### 시나리오 12: 문서 삭제 시 참조 보호
+
+**목적**: 다른 문서가 참조 중인 파일은 삭제가 차단되는지 확인
+
+1. TreeNav에서 `배포가이드-v2.md`를 **우클릭 → 삭제**
+2. **확인**: 삭제 차단 또는 경고 — "이 문서를 참조하는 문서가 있습니다: 배포가이드-v3.md"
+3. 참조가 없는 문서 (예: `자기참조.md`)를 삭제 → **정상 삭제됨**
+
+---
+
+### 시나리오 13: 종합 워크플로우
+
+**목적**: 실제 업무 시나리오 재현 — 문서 작성 → 승인 → 새 버전 만들기 → 구버전 자동 폐기
+
+1. 새 문서 `test-lineage/보안정책-v1.md` 생성, 내용 작성 후 저장
+   - **확인**: 기본 상태 **Draft**
+2. Drawer에서 domain: `보안`, 태그: `정책` 추가 → 상태를 **Approved**로 변경 → 저장
+3. 정책이 바뀌었다고 가정:
+   - TreeNav에서 `보안정책-v1.md` **우클릭 → 새 버전 만들기**
+   - 파일명 `보안정책-v2.md` 확인 → **생성**
+4. **확인**:
+   - v2가 자동으로 열림, supersedes에 v1 자동 설정
+   - v1을 열어보면 superseded_by에 v2 **자동 설정**됨 (양방향)
+   - v2에 domain: `보안`, 태그: `정책` **자동 상속**됨
+5. v1을 열고 상태를 **Deprecated**로 변경 → 저장
+6. **확인**:
+   - TreeNav: v1은 취소선, v2는 정상
+   - v1 열기: deprecated 배너 + v2 링크
+   - v2 열기: "전체 버전 히스토리" 버튼 → 타임라인에 v1→v2 표시
+   - AI 코파일럿에서 "보안정책" 검색 → v2가 상위 결과
+
+### 시나리오 14: 새 버전 생성 검증 (엣지 케이스)
+
+**목적**: 새 버전 만들기의 방어 로직 확인
+
+1. **Deprecated 문서에서 차단**: v1을 deprecated 상태로 만든 후, TreeNav에서 **우클릭**
+   - **확인**: 컨텍스트 메뉴에 "새 버전 만들기" 항목이 **표시되지 않음**
+2. **이미 새 버전이 있는 문서에서 차단**: v1에 superseded_by가 설정된 상태에서 (API로) 새 버전 시도
+   - **확인**: "이미 새 버전이 존재합니다: 보안정책-v2.md" 에러
+3. **자동 폐기 + 상태 복원**: approved 상태인 v2에서 새 버전 v3 생성
+   - **확인**: v2가 자동 deprecated, 토스트에 "이전 버전이 자동으로 폐기 처리되었습니다" 표시
+   - v3를 삭제 → v2가 **approved로 복원** (draft가 아님)
+4. **삭제 다이얼로그**: TreeNav에서 문서 우클릭 → 삭제
+   - **확인**: 브라우저 기본 confirm 대신 스타일된 Dialog 표시, Enter로 실행 가능
+
+### 시나리오 15: 폐기 되돌리기
+
+**목적**: deprecated된 문서를 원래 상태로 복원
+
+**사전 조건**: 시나리오 13에서 v1이 deprecated 상태
+
+1. 좌측 사이드바에서 **관련 문서 관리** (AlertTriangle 아이콘) 탭 열기
+2. 상단 필터에서 **해결됨** 탭 클릭
+3. v1 ↔ v2 쌍 찾기 — `version_chain` 또는 `auto_deprecated`로 해결된 항목
+4. **"폐기 되돌리기"** 버튼 클릭 (amber 색상 Undo 아이콘)
+5. **확인**:
+   - 토스트: "폐기 되돌리기 완료 — 보안정책-v1.md → approved"
+   - v1 열기: status가 **approved** (원래 상태로 복원, draft가 아님)
+   - v1의 superseded_by가 **비어있음**
+   - v2의 supersedes가 **비어있음** (양방향 정리)
+   - TreeNav: v1의 취소선 **제거됨**
+   - **VersionTimeline**: v2에서 "전체 버전 히스토리" 열면 v1이 **더 이상 표시되지 않음** (체인 분리 확인)
+   - v1에서 "전체 버전 히스토리" 열면 **v1만 단독** 또는 이전 체인만 표시
+
+### 시나리오 16: 삭제 시 참조 보호 + Lineage 자동 정리
+
+**목적**: 삭제 시 관련 문서 참조 보호 및 lineage 자동 정리 확인
+
+1. v1의 related에 v2를 수동 추가 → 저장
+2. v2를 TreeNav에서 삭제 시도
+   - **확인**: "삭제할 수 없습니다 — 참조 문서: 보안정책-v1.md" 토스트 (파일명만 표시)
+3. v1에서 related 제거 후 저장
+4. 다시 v2 삭제 시도 → 성공
+   - **확인**: v1의 superseded_by가 자동 정리됨
+
+---
+
+### 정리
+
+테스트 완료 후 `test-lineage/` 폴더를 TreeNav에서 삭제하여 정리.
+
+---
+
+### Troubleshooting
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| 상태 드롭다운에 review 남아있음 | 프론트엔드 빌드 캐시 | `rm -rf frontend/.next && npm run dev` |
+| TreeNav 취소선 안 보임 | statuses API 빈 응답 | 터미널에서 `curl -s localhost:8001/api/wiki/reindex -X POST` → metadata index 재빌드 |
+| version-chain에 1개만 | 양방향 자동 링크 실패 | "새 버전 만들기"로 생성하면 자동 연결. 수동 입력 시 저장 후 상대 문서도 확인 |
+| approved 강등 안 됨 | 본문을 수정하지 않음 | 메타데이터가 아닌 **본문 텍스트**를 실제로 변경해야 강등 발생 |
+| 자기참조 에러가 안 나옴 | lineage_validator 미로드 | 백엔드 서버 재시작 |
+| VersionTimeline 로딩만 표시 | API 프록시 문제 | `next.config.ts` rewrites에 `/api/wiki/version-chain` 포함 확인 |
+| 폐기 되돌리기 후 타임라인 안 바뀜 | MetadataIndex 미갱신 | 백엔드 서버 재시작 (P2-FIX2로 수정 완료) |
+| deprecated 배너 안 보임 | LineageWidget 미렌더링 | 문서에 superseded_by 필드가 실제로 저장되었는지 Drawer에서 확인 |
+
+### 변경 파일 요약
+
+**Backend (8 파일 수정, 1 파일 생성)**
+- `backend/core/schemas.py` — status default "draft"
+- `backend/infrastructure/storage/local_fs.py` — _normalize_status() 읽기 시 정규화
+- `backend/application/trust/scoring_config.py` — review/unset 제거
+- `backend/application/trust/confidence.py` — STATUS_SCORES 업데이트
+- `backend/application/metadata/metadata_index.py` — 역참조 인덱스 + 조회 API 5개
+- `backend/application/wiki/wiki_service.py` — 자동 강등, lineage 검증, 폐기 훅, 참조 업데이트
+- `backend/api/wiki.py` — version-chain, predecessor-context, bulk-status, delete force
+- `backend/api/metadata.py` — GET /statuses
+- `backend/application/wiki/lineage_validator.py` — **신규** 계보 검증기
+
+**Frontend (5 파일 수정, 1 파일 생성)**
+- `frontend/src/types/wiki.ts` — DocumentStatus 타입
+- `frontend/src/lib/markdown/frontmatterSync.ts` — emptyMetadata default
+- `frontend/src/components/editors/DocumentInfoDrawer.tsx` — 드롭다운
+- `frontend/src/components/editors/metadata/MetadataTagBar.tsx` — 드롭다운/뱃지
+- `frontend/src/components/editors/DocumentInfoBar.tsx` — statusColors
+- `frontend/src/components/editors/DocumentGraph.tsx` — STATUS_COLORS
+- `frontend/src/components/editors/LineageWidget.tsx` — 강화 배너 + 타임라인 연동
+- `frontend/src/components/TreeNav.tsx` — deprecated 스타일 + statuses fetch
+- `frontend/src/components/editors/VersionTimeline.tsx` — **신규** 타임라인 UI
+
+**Tests (5 파일 생성, 67 tests)**
+- `tests/test_p2b2_status_field.py` (18), `tests/test_metadata_index_enriched.py` (17)
+- `tests/test_lineage_validation.py` (14), `tests/test_deprecation_side_effects.py` (6)
+- `tests/test_version_chain.py` (5), `tests/test_reference_integrity.py` (7)

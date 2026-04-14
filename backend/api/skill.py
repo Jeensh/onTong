@@ -126,6 +126,10 @@ def _build_skill_markdown(body: SkillCreateRequest) -> str:
         lines.append(f"priority: {body.priority}")
     if body.pinned:
         lines.append("pinned: true")
+    if body.allowed_tools:
+        lines.append("allowed-tools:")
+        for tool in body.allowed_tools:
+            lines.append(f"  - {tool}")
     lines.append("---")
     lines.append("")
     lines.append(f"# {body.title}")
@@ -214,7 +218,7 @@ def _build_skill_markdown(body: SkillCreateRequest) -> str:
     return "\n".join(lines)
 
 
-@router.get("/")
+@router.get("")
 async def list_skills(user: User = Depends(get_current_user)) -> SkillListResponse:
     """List skills accessible to the current user (including disabled)."""
     if not _skill_loader:
@@ -329,7 +333,7 @@ async def _write_skill_file(path: str, content: str) -> None:
         await f.write(content)
 
 
-@router.post("/")
+@router.post("")
 async def create_skill(body: SkillCreateRequest, user: User = Depends(get_current_user)) -> SkillMeta:
     """Create a new skill document."""
     if not _storage or not _skill_loader:

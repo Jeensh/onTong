@@ -8,7 +8,7 @@ Validates:
 
 import json
 import pytest
-from backend.application.agent.rag_agent import RAGAgent, COGNITIVE_REFLECT_PROMPT, FINAL_ANSWER_SYSTEM_PROMPT
+from backend.application.agent.rag_agent import RAGAgent, get_system_prompt
 from backend.core.schemas import ConflictWarningEvent
 
 
@@ -100,13 +100,16 @@ class TestConflictPrompts:
     """P2B-1-2 & P2B-1-3: System prompts include conflict detection rules."""
 
     def test_final_prompt_has_conflict_rules(self):
-        assert "문서 간 내용 차이 감지" in FINAL_ANSWER_SYSTEM_PROMPT
-        assert "최종수정일" in FINAL_ANSWER_SYSTEM_PROMPT
+        system_prompt = get_system_prompt()
+        assert "충돌" in system_prompt or "Conflict" in system_prompt
+        assert "최종수정" in system_prompt or "최근" in system_prompt
 
-    def test_cognitive_prompt_has_conflict_check(self):
-        assert "CONFLICT_CHECK" in COGNITIVE_REFLECT_PROMPT
-        assert "has_conflict" in COGNITIVE_REFLECT_PROMPT
-        assert "conflict_details" in COGNITIVE_REFLECT_PROMPT
+    def test_conflict_check_prompt_exists(self):
+        """Conflict detection is now handled by conflict_check skill prompt."""
+        from backend.application.agent.skills.prompt_loader import load_prompt
+        prompt = load_prompt("conflict_check")
+        assert "conflict" in prompt.lower()
+        assert "Korean" in prompt or "한국어" in prompt
 
 
 if __name__ == "__main__":

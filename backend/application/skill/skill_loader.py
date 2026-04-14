@@ -196,6 +196,11 @@ class UserSkillLoader:
 
         pinned = bool(data.get("pinned", False))
 
+        # Per-skill allowed-tools (built-in skill restrictions)
+        allowed_tools = data.get("allowed-tools") or data.get("allowed_tools") or []
+        if isinstance(allowed_tools, str):
+            allowed_tools = [t.strip() for t in allowed_tools.split(",") if t.strip()]
+
         return SkillMeta(
             path=path,
             title=title,
@@ -210,6 +215,7 @@ class UserSkillLoader:
             category=category,
             priority=priority,
             pinned=pinned,
+            allowed_tools=allowed_tools,
         )
 
     @staticmethod

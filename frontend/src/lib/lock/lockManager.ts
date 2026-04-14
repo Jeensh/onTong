@@ -8,11 +8,7 @@
  */
 
 import { batchRefreshLock } from "@/lib/api/wiki";
-
-const SESSION_USER =
-  typeof window !== "undefined"
-    ? localStorage.getItem("wiki_user") || `user-${Math.random().toString(36).slice(2, 8)}`
-    : "anonymous";
+import { getCurrentUserName } from "@/lib/auth/currentUser";
 
 const REFRESH_INTERVAL = 120_000; // 2 minutes
 
@@ -41,7 +37,7 @@ class LockManager {
   private async refresh(): Promise<void> {
     if (this.activePaths.size === 0) return;
     try {
-      await batchRefreshLock([...this.activePaths], SESSION_USER);
+      await batchRefreshLock([...this.activePaths], getCurrentUserName());
     } catch {
       // Silently ignore — locks will expire naturally and re-acquire on next edit
     }

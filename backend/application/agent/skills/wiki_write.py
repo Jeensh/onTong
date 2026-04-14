@@ -8,15 +8,11 @@ from typing import Any
 from backend.core.schemas import ApprovalRequestEvent, WikiWriteAction
 from backend.core.session import session_store
 from backend.application.agent.skill import SkillResult
+from backend.application.agent.skills.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
 
-WRITE_SYSTEM_PROMPT = (
-    "당신은 사내 Wiki 기술 문서 작성 전문가입니다. "
-    "사용자의 요청에 맞는 Wiki 문서를 Markdown 형식으로 작성하세요.\n\n"
-    "path는 적절한 파일명(한글 가능, .md 확장자), "
-    "content는 완전한 Markdown 문서입니다."
-)
+WRITE_SYSTEM_PROMPT = load_prompt("wiki_write")
 
 
 class WikiWriteSkill:

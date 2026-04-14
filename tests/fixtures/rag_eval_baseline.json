@@ -1,0 +1,356 @@
+{
+  "baseline": {
+    "boost_weight": 0.0,
+    "n_queries": 12,
+    "hit@5": 1.0,
+    "mrr": 1.0,
+    "per_query": [
+      {
+        "query": "캐시 장애 어떻게 대응해",
+        "expected": [
+          "wiki/인프라/캐시-장애-대응-매뉴얼.md",
+          "wiki/인프라/cache-troubleshooting.md"
+        ],
+        "top5": [
+          "wiki/인프라/캐시-장애-대응-매뉴얼.md",
+          "wiki/인프라/서버-장애처리-절차.md",
+          "wiki/_skills/장애대응/장애-초기대응-도우미.md",
+          "wiki/_personas/@개발자/ontong.local.md",
+          "wiki/인프라/보안-점검-체크리스트.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "Redis 캐싱 전략",
+        "expected": [
+          "wiki/인프라/캐싱-전략-가이드.md"
+        ],
+        "top5": [
+          "wiki/인프라/캐싱-전략-가이드.md",
+          "wiki/인프라/캐시-장애-대응-매뉴얼.md",
+          "wiki/인프라/보안-점검-체크리스트.md",
+          "wiki/_personas/@개발자/ontong.local.md",
+          "wiki/인프라/서버-장애처리-절차.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "주문 처리 절차 알려줘",
+        "expected": [
+          "wiki/SCM/주문-처리-절차.md"
+        ],
+        "top5": [
+          "wiki/SCM/주문-처리-절차.md",
+          "wiki/SCM/재고-실사-절차.md",
+          "wiki/ERP/마스터데이터-관리-지침.md",
+          "wiki/SCM/물류-배송-관리.md",
+          "wiki/SCM/발주-검수-기준.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "발주 검수 기준이 뭐야",
+        "expected": [
+          "wiki/SCM/발주-검수-기준.md"
+        ],
+        "top5": [
+          "wiki/SCM/발주-검수-기준.md",
+          "wiki/SCM/공정-관리-기준-v1.md",
+          "wiki/SCM/공정-관리-기준-v2.md",
+          "wiki/인사/인사평가-기준.md",
+          "wiki/MES/설비보전-점검표.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "재고 실사 어떻게 해",
+        "expected": [
+          "wiki/SCM/재고-실사-절차.md"
+        ],
+        "top5": [
+          "wiki/SCM/재고-실사-절차.md",
+          "wiki/SCM/발주-검수-기준.md",
+          "wiki/SCM/주문-처리-절차.md",
+          "wiki/재무/세무-신고-일정.md",
+          "wiki/MES/생산계획-수립-가이드.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "ERP 인터페이스 오류 대응",
+        "expected": [
+          "wiki/ERP/인터페이스-오류-대응.md"
+        ],
+        "top5": [
+          "wiki/ERP/인터페이스-오류-대응.md",
+          "wiki/ERP/마스터데이터-관리-지침.md",
+          "wiki/인프라/cache-troubleshooting.md",
+          "wiki/SCM/발주-검수-기준.md",
+          "wiki/인프라/서버-구성-현황.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "월말 결산 절차",
+        "expected": [
+          "wiki/재무/월말-결산-절차.md"
+        ],
+        "top5": [
+          "wiki/재무/월말-결산-절차.md",
+          "wiki/SCM/주문-처리-절차.md",
+          "wiki/SCM/공정-관리-기준-v2.md",
+          "wiki/SCM/재고-실사-절차.md",
+          "wiki/기획/예산-편성-절차.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "신규 입사자 온보딩",
+        "expected": [
+          "wiki/인사/신규입사자-온보딩.md"
+        ],
+        "top5": [
+          "wiki/인사/신규입사자-온보딩.md",
+          "wiki/기획/예산-편성-절차.md",
+          "wiki/MES/생산계획-수립-가이드.md",
+          "wiki/기획/프로젝트-관리-표준.md",
+          "wiki/인사/인사평가-기준.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "설비 보전 점검 체크",
+        "expected": [
+          "wiki/MES/설비보전-점검표.md"
+        ],
+        "top5": [
+          "wiki/MES/설비보전-점검표.md",
+          "wiki/재무/세무-신고-일정.md",
+          "wiki/인프라/보안-점검-체크리스트.md",
+          "wiki/재무/월말-결산-절차.md",
+          "wiki/_skills/보안/보안-점검-도우미.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "생산계획은 어떻게 수립해",
+        "expected": [
+          "wiki/MES/생산계획-수립-가이드.md"
+        ],
+        "top5": [
+          "wiki/MES/생산계획-수립-가이드.md",
+          "wiki/기획/예산-편성-절차.md",
+          "wiki/SCM/주문-처리-절차.md",
+          "wiki/MES/실적-집계-기준.md",
+          "wiki/기획/프로젝트-관리-표준.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "예산 편성은 어떻게",
+        "expected": [
+          "wiki/기획/예산-편성-절차.md"
+        ],
+        "top5": [
+          "wiki/기획/예산-편성-절차.md",
+          "wiki/_skills/장애대응/장애-초기대응-도우미.md",
+          "wiki/코드-테스트.md",
+          "wiki/_personas/@개발자/ontong.local.md",
+          "wiki/인사/교육훈련-체계.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "서버 장애 처리 절차",
+        "expected": [
+          "wiki/인프라/서버-장애처리-절차.md"
+        ],
+        "top5": [
+          "wiki/인프라/서버-장애처리-절차.md",
+          "wiki/인프라/캐시-장애-대응-매뉴얼.md",
+          "wiki/SCM/주문-처리-절차.md",
+          "wiki/SCM/재고-실사-절차.md",
+          "wiki/_skills/장애대응/장애-초기대응-도우미.md"
+        ],
+        "rank": 1
+      }
+    ]
+  },
+  "with_boost": {
+    "boost_weight": 0.05,
+    "n_queries": 12,
+    "hit@5": 1.0,
+    "mrr": 1.0,
+    "per_query": [
+      {
+        "query": "캐시 장애 어떻게 대응해",
+        "expected": [
+          "wiki/인프라/캐시-장애-대응-매뉴얼.md",
+          "wiki/인프라/cache-troubleshooting.md"
+        ],
+        "top5": [
+          "wiki/인프라/캐시-장애-대응-매뉴얼.md",
+          "wiki/인프라/서버-장애처리-절차.md",
+          "wiki/_skills/장애대응/장애-초기대응-도우미.md",
+          "wiki/_personas/@개발자/ontong.local.md",
+          "wiki/인프라/보안-점검-체크리스트.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "Redis 캐싱 전략",
+        "expected": [
+          "wiki/인프라/캐싱-전략-가이드.md"
+        ],
+        "top5": [
+          "wiki/인프라/캐싱-전략-가이드.md",
+          "wiki/인프라/캐시-장애-대응-매뉴얼.md",
+          "wiki/인프라/보안-점검-체크리스트.md",
+          "wiki/_personas/@개발자/ontong.local.md",
+          "wiki/인프라/서버-장애처리-절차.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "주문 처리 절차 알려줘",
+        "expected": [
+          "wiki/SCM/주문-처리-절차.md"
+        ],
+        "top5": [
+          "wiki/SCM/주문-처리-절차.md",
+          "wiki/SCM/재고-실사-절차.md",
+          "wiki/ERP/마스터데이터-관리-지침.md",
+          "wiki/SCM/물류-배송-관리.md",
+          "wiki/SCM/발주-검수-기준.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "발주 검수 기준이 뭐야",
+        "expected": [
+          "wiki/SCM/발주-검수-기준.md"
+        ],
+        "top5": [
+          "wiki/SCM/발주-검수-기준.md",
+          "wiki/SCM/공정-관리-기준-v1.md",
+          "wiki/SCM/공정-관리-기준-v2.md",
+          "wiki/인사/인사평가-기준.md",
+          "wiki/MES/설비보전-점검표.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "재고 실사 어떻게 해",
+        "expected": [
+          "wiki/SCM/재고-실사-절차.md"
+        ],
+        "top5": [
+          "wiki/SCM/재고-실사-절차.md",
+          "wiki/SCM/발주-검수-기준.md",
+          "wiki/SCM/주문-처리-절차.md",
+          "wiki/재무/세무-신고-일정.md",
+          "wiki/MES/생산계획-수립-가이드.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "ERP 인터페이스 오류 대응",
+        "expected": [
+          "wiki/ERP/인터페이스-오류-대응.md"
+        ],
+        "top5": [
+          "wiki/ERP/인터페이스-오류-대응.md",
+          "wiki/ERP/마스터데이터-관리-지침.md",
+          "wiki/인프라/cache-troubleshooting.md",
+          "wiki/SCM/발주-검수-기준.md",
+          "wiki/인프라/서버-구성-현황.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "월말 결산 절차",
+        "expected": [
+          "wiki/재무/월말-결산-절차.md"
+        ],
+        "top5": [
+          "wiki/재무/월말-결산-절차.md",
+          "wiki/SCM/주문-처리-절차.md",
+          "wiki/SCM/공정-관리-기준-v2.md",
+          "wiki/SCM/재고-실사-절차.md",
+          "wiki/기획/예산-편성-절차.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "신규 입사자 온보딩",
+        "expected": [
+          "wiki/인사/신규입사자-온보딩.md"
+        ],
+        "top5": [
+          "wiki/인사/신규입사자-온보딩.md",
+          "wiki/기획/예산-편성-절차.md",
+          "wiki/MES/생산계획-수립-가이드.md",
+          "wiki/기획/프로젝트-관리-표준.md",
+          "wiki/인사/인사평가-기준.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "설비 보전 점검 체크",
+        "expected": [
+          "wiki/MES/설비보전-점검표.md"
+        ],
+        "top5": [
+          "wiki/MES/설비보전-점검표.md",
+          "wiki/재무/세무-신고-일정.md",
+          "wiki/인프라/보안-점검-체크리스트.md",
+          "wiki/재무/월말-결산-절차.md",
+          "wiki/_skills/보안/보안-점검-도우미.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "생산계획은 어떻게 수립해",
+        "expected": [
+          "wiki/MES/생산계획-수립-가이드.md"
+        ],
+        "top5": [
+          "wiki/MES/생산계획-수립-가이드.md",
+          "wiki/기획/예산-편성-절차.md",
+          "wiki/SCM/주문-처리-절차.md",
+          "wiki/MES/실적-집계-기준.md",
+          "wiki/기획/프로젝트-관리-표준.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "예산 편성은 어떻게",
+        "expected": [
+          "wiki/기획/예산-편성-절차.md"
+        ],
+        "top5": [
+          "wiki/기획/예산-편성-절차.md",
+          "wiki/_skills/장애대응/장애-초기대응-도우미.md",
+          "wiki/코드-테스트.md",
+          "wiki/_personas/@개발자/ontong.local.md",
+          "wiki/인사/교육훈련-체계.md"
+        ],
+        "rank": 1
+      },
+      {
+        "query": "서버 장애 처리 절차",
+        "expected": [
+          "wiki/인프라/서버-장애처리-절차.md"
+        ],
+        "top5": [
+          "wiki/인프라/서버-장애처리-절차.md",
+          "wiki/인프라/캐시-장애-대응-매뉴얼.md",
+          "wiki/SCM/주문-처리-절차.md",
+          "wiki/SCM/재고-실사-절차.md",
+          "wiki/_skills/장애대응/장애-초기대응-도우미.md"
+        ],
+        "rank": 1
+      }
+    ]
+  }
+}

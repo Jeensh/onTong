@@ -1,26 +1,26 @@
-"""Tests for Phase 2-B Step 2: Metadata-based document status/trust display.
+"""Tests for document status field.
 
 Validates:
-1. DocumentMetadata status field
+1. DocumentMetadata status field (simplified: draft | approved | deprecated)
 2. SourceRef extended fields
-3. ChromaDB metadata includes status
-4. Frontmatter parsing/serialization of status
+3. Frontmatter parsing/serialization of status
+4. Status normalization (review/"" → draft)
 """
 
 import pytest
 from backend.core.schemas import DocumentMetadata, SourceRef
-from backend.infrastructure.storage.local_fs import _parse_frontmatter, _serialize_frontmatter
+from backend.infrastructure.storage.local_fs import _parse_frontmatter, _serialize_frontmatter, _normalize_status
 
 
 class TestDocumentMetadataStatus:
-    """P2B-2-1: status field on DocumentMetadata."""
+    """Status field on DocumentMetadata."""
 
-    def test_default_empty(self):
+    def test_default_draft(self):
         meta = DocumentMetadata()
-        assert meta.status == ""
+        assert meta.status == "draft"
 
     def test_valid_statuses(self):
-        for s in ["draft", "review", "approved", "deprecated"]:
+        for s in ["draft", "approved", "deprecated"]:
             meta = DocumentMetadata(status=s)
             assert meta.status == s
 
@@ -30,8 +30,33 @@ class TestDocumentMetadataStatus:
         assert data["status"] == "approved"
 
 
+class TestStatusNormalization:
+    """Status normalization: review/empty → draft."""
+
+    def test_review_to_draft(self):
+        assert _normalize_status("review") == "draft"
+
+    def test_empty_to_draft(self):
+        assert _normalize_status("") == "draft"
+
+    def test_none_to_draft(self):
+        assert _normalize_status(None) == "draft"
+
+    def test_approved_unchanged(self):
+        assert _normalize_status("approved") == "approved"
+
+    def test_deprecated_unchanged(self):
+        assert _normalize_status("deprecated") == "deprecated"
+
+    def test_draft_unchanged(self):
+        assert _normalize_status("draft") == "draft"
+
+    def test_unknown_to_draft(self):
+        assert _normalize_status("garbage") == "draft"
+
+
 class TestSourceRefExtended:
-    """P2B-2-3: SourceRef with updated, updated_by, status fields."""
+    """SourceRef with updated, updated_by, status fields."""
 
     def test_new_fields(self):
         s = SourceRef(
@@ -54,7 +79,7 @@ class TestSourceRefExtended:
 
 
 class TestFrontmatterStatusParsing:
-    """P2B-2-1: Frontmatter parsing includes status."""
+    """Frontmatter parsing includes status with normalization."""
 
     def test_parse_status(self):
         raw = "---\ndomain: IT\nstatus: approved\n---\nContent"
@@ -62,27 +87,32 @@ class TestFrontmatterStatusParsing:
         assert meta.status == "approved"
         assert body == "Content"
 
-    def test_parse_no_status(self):
+    def test_parse_no_status_defaults_to_draft(self):
         raw = "---\ndomain: HR\n---\nContent"
         meta, body = _parse_frontmatter(raw)
-        assert meta.status == ""
+        assert meta.status == "draft"
+
+    def test_parse_review_normalized_to_draft(self):
+        raw = "---\nstatus: review\n---\nContent"
+        meta, body = _parse_frontmatter(raw)
+        assert meta.status == "draft"
 
     def test_serialize_status(self):
         meta = DocumentMetadata(domain="IT", status="deprecated")
         result = _serialize_frontmatter(meta, "Body")
         assert "status: deprecated" in result
 
-    def test_serialize_empty_status(self):
-        """Empty status should not appear in frontmatter."""
-        meta = DocumentMetadata(domain="IT")
+    def test_serialize_draft_status(self):
+        """Draft status should appear in frontmatter."""
+        meta = DocumentMetadata(domain="IT", status="draft")
         result = _serialize_frontmatter(meta, "Body")
-        assert "status" not in result
+        assert "status: draft" in result
 
     def test_roundtrip(self):
-        meta = DocumentMetadata(domain="SCM", status="review", created_by="김철수")
+        meta = DocumentMetadata(domain="SCM", status="approved", created_by="김철수")
         serialized = _serialize_frontmatter(meta, "Hello")
         parsed_meta, body = _parse_frontmatter(serialized)
-        assert parsed_meta.status == "review"
+        assert parsed_meta.status == "approved"
         assert parsed_meta.domain == "SCM"
         assert body == "Hello"
 

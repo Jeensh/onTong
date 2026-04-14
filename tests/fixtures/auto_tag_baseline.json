@@ -1,0 +1,517 @@
+{
+  "summary": {
+    "total": 29,
+    "domain_accuracy": 1.0,
+    "avg_confidence": 0.823,
+    "avg_elapsed_sec": 11.19,
+    "tags_replaced_total": 23,
+    "docs_with_alternatives": 76
+  },
+  "results": [
+    {
+      "path": "wiki/ERP/마스터데이터-관리-지침.md",
+      "expected_domain": "ERP",
+      "suggested_domain": "ERP",
+      "process": "마스터데이터",
+      "tags": [
+        "마스터데이터",
+        "가이드",
+        "거래처",
+        "품목",
+        "BOM"
+      ],
+      "tag_replaced": {},
+      "tag_alternatives_count": 4,
+      "confidence": 0.775,
+      "elapsed_sec": 15.54
+    },
+    {
+      "path": "wiki/ERP/모듈별-권한-설정.md",
+      "expected_domain": "ERP",
+      "suggested_domain": "ERP",
+      "process": "모듈관리",
+      "tags": [
+        "권한관리",
+        "정책",
+        "가이드"
+      ],
+      "tag_replaced": {
+        "보안정책": "정책",
+        "사용자관리": "권한관리"
+      },
+      "tag_alternatives_count": 1,
+      "confidence": 0.875,
+      "elapsed_sec": 12.28
+    },
+    {
+      "path": "wiki/ERP/인터페이스-오류-대응.md",
+      "expected_domain": "ERP",
+      "suggested_domain": "ERP",
+      "process": "인터페이스",
+      "tags": [
+        "장애처리",
+        "인터페이스",
+        "오류코드",
+        "troubleshooting"
+      ],
+      "tag_replaced": {
+        "장애대응": "장애처리"
+      },
+      "tag_alternatives_count": 3,
+      "confidence": 0.775,
+      "elapsed_sec": 13.1
+    },
+    {
+      "path": "wiki/MES/생산계획-수립-가이드.md",
+      "expected_domain": "MES",
+      "suggested_domain": "MES",
+      "process": "생산계획",
+      "tags": [
+        "가이드",
+        "SOP",
+        "생산",
+        "계획수립"
+      ],
+      "tag_replaced": {},
+      "tag_alternatives_count": 3,
+      "confidence": 0.785,
+      "elapsed_sec": 10.57
+    },
+    {
+      "path": "wiki/MES/설비보전-점검표.md",
+      "expected_domain": "MES",
+      "suggested_domain": "MES",
+      "process": "설비보전",
+      "tags": [
+        "양식",
+        "SOP",
+        "가이드",
+        "점검",
+        "설비가동률"
+      ],
+      "tag_replaced": {
+        "설비관리": "설비가동률"
+      },
+      "tag_alternatives_count": 3,
+      "confidence": 0.785,
+      "elapsed_sec": 11.24
+    },
+    {
+      "path": "wiki/MES/실적-집계-기준.md",
+      "expected_domain": "MES",
+      "suggested_domain": "MES",
+      "process": "실적관리",
+      "tags": [
+        "실적관리",
+        "생산",
+        "품질관리",
+        "SOP"
+      ],
+      "tag_replaced": {},
+      "tag_alternatives_count": 4,
+      "confidence": 0.785,
+      "elapsed_sec": 12.48
+    },
+    {
+      "path": "wiki/SCM/test-create.md",
+      "expected_domain": "SCM",
+      "suggested_domain": "SCM",
+      "process": "",
+      "tags": [
+        "가이드"
+      ],
+      "tag_replaced": {},
+      "tag_alternatives_count": 0,
+      "confidence": 0.7,
+      "elapsed_sec": 6.53
+    },
+    {
+      "path": "wiki/SCM/test-create2.md",
+      "expected_domain": "SCM",
+      "suggested_domain": "SCM",
+      "process": "",
+      "tags": [
+        "SOP"
+      ],
+      "tag_replaced": {},
+      "tag_alternatives_count": 1,
+      "confidence": 0.5,
+      "elapsed_sec": 7.4
+    },
+    {
+      "path": "wiki/SCM/공정-관리-기준-v1.md",
+      "expected_domain": "SCM",
+      "suggested_domain": "SCM",
+      "process": "공정",
+      "tags": [
+        "공정",
+        "SOP",
+        "품질관리",
+        "불량률",
+        "검사기준",
+        "보안정책"
+      ],
+      "tag_replaced": {
+        "정책": "보안정책"
+      },
+      "tag_alternatives_count": 5,
+      "confidence": 0.8250000000000001,
+      "elapsed_sec": 15.12
+    },
+    {
+      "path": "wiki/SCM/공정-관리-기준-v2.md",
+      "expected_domain": "SCM",
+      "suggested_domain": "SCM",
+      "process": "공정",
+      "tags": [
+        "공정",
+        "품질관리",
+        "검사기준",
+        "불량률",
+        "SOP"
+      ],
+      "tag_replaced": {},
+      "tag_alternatives_count": 5,
+      "confidence": 0.8350000000000001,
+      "elapsed_sec": 13.67
+    },
+    {
+      "path": "wiki/SCM/물류-배송-관리.md",
+      "expected_domain": "SCM",
+      "suggested_domain": "SCM",
+      "process": "물류",
+      "tags": [
+        "물류",
+        "배송",
+        "SOP",
+        "가이드"
+      ],
+      "tag_replaced": {},
+      "tag_alternatives_count": 3,
+      "confidence": 0.785,
+      "elapsed_sec": 10.02
+    },
+    {
+      "path": "wiki/SCM/발주-검수-기준.md",
+      "expected_domain": "SCM",
+      "suggested_domain": "SCM",
+      "process": "품질",
+      "tags": [
+        "품질관리",
+        "검사기준",
+        "SOP",
+        "가이드"
+      ],
+      "tag_replaced": {},
+      "tag_alternatives_count": 3,
+      "confidence": 0.8350000000000001,
+      "elapsed_sec": 10.53
+    },
+    {
+      "path": "wiki/SCM/재고-실사-절차.md",
+      "expected_domain": "SCM",
+      "suggested_domain": "SCM",
+      "process": "물류",
+      "tags": [
+        "실사",
+        "재고관리",
+        "SOP",
+        "가이드"
+      ],
+      "tag_replaced": {},
+      "tag_alternatives_count": 3,
+      "confidence": 0.8350000000000001,
+      "elapsed_sec": 13.41
+    },
+    {
+      "path": "wiki/SCM/주문-처리-절차.md",
+      "expected_domain": "SCM",
+      "suggested_domain": "SCM",
+      "process": "주문",
+      "tags": [
+        "주문",
+        "SOP",
+        "가이드",
+        "재고관리"
+      ],
+      "tag_replaced": {},
+      "tag_alternatives_count": 3,
+      "confidence": 0.8350000000000001,
+      "elapsed_sec": 12.38
+    },
+    {
+      "path": "wiki/기획/예산-편성-절차.md",
+      "expected_domain": "기획",
+      "suggested_domain": "기획",
+      "process": "예산",
+      "tags": [
+        "SOP",
+        "가이드",
+        "예산",
+        "절차",
+        "집행"
+      ],
+      "tag_replaced": {},
+      "tag_alternatives_count": 4,
+      "confidence": 0.785,
+      "elapsed_sec": 10.29
+    },
+    {
+      "path": "wiki/기획/프로젝트-관리-표준.md",
+      "expected_domain": "기획",
+      "suggested_domain": "기획",
+      "process": "프로젝트",
+      "tags": [
+        "SOP",
+        "프로젝트",
+        "모듈관리",
+        "표준",
+        "절차"
+      ],
+      "tag_replaced": {
+        "관리": "모듈관리"
+      },
+      "tag_alternatives_count": 4,
+      "confidence": 0.785,
+      "elapsed_sec": 8.41
+    },
+    {
+      "path": "wiki/인사/교육훈련-체계.md",
+      "expected_domain": "인사",
+      "suggested_domain": "인사",
+      "process": "교육",
+      "tags": [
+        "교육",
+        "보안정책",
+        "가이드",
+        "법정교육"
+      ],
+      "tag_replaced": {
+        "정책": "보안정책",
+        "직무교육": "법정교육"
+      },
+      "tag_alternatives_count": 2,
+      "confidence": 0.83,
+      "elapsed_sec": 12.8
+    },
+    {
+      "path": "wiki/인사/신규입사자-온보딩.md",
+      "expected_domain": "인사",
+      "suggested_domain": "인사",
+      "process": "채용",
+      "tags": [
+        "온보딩",
+        "가이드",
+        "교육",
+        "수습평가",
+        "멘토링"
+      ],
+      "tag_replaced": {},
+      "tag_alternatives_count": 4,
+      "confidence": 0.7799999999999999,
+      "elapsed_sec": 10.37
+    },
+    {
+      "path": "wiki/인사/인사평가-기준.md",
+      "expected_domain": "인사",
+      "suggested_domain": "인사",
+      "process": "평가",
+      "tags": [
+        "수습평가",
+        "보안정책",
+        "가이드",
+        "MBO",
+        "실적관리"
+      ],
+      "tag_replaced": {
+        "평가": "수습평가",
+        "정책": "보안정책",
+        "성과관리": "실적관리"
+      },
+      "tag_alternatives_count": 1,
+      "confidence": 0.8799999999999999,
+      "elapsed_sec": 11.63
+    },
+    {
+      "path": "wiki/인프라/cache-troubleshooting.md",
+      "expected_domain": "인프라",
+      "suggested_domain": "인프라",
+      "process": "모니터링",
+      "tags": [
+        "cache",
+        "troubleshooting",
+        "레디스",
+        "가이드"
+      ],
+      "tag_replaced": {
+        "Redis": "레디스"
+      },
+      "tag_alternatives_count": 2,
+      "confidence": 0.9,
+      "elapsed_sec": 10.8
+    },
+    {
+      "path": "wiki/인프라/네트워크-보안-정책.md",
+      "expected_domain": "인프라",
+      "suggested_domain": "인프라",
+      "process": "보안",
+      "tags": [
+        "네트워크",
+        "정책",
+        "방화벽"
+      ],
+      "tag_replaced": {
+        "보안정책": "정책"
+      },
+      "tag_alternatives_count": 2,
+      "confidence": 0.9,
+      "elapsed_sec": 8.85
+    },
+    {
+      "path": "wiki/인프라/모니터링-알림-설정.md",
+      "expected_domain": "인프라",
+      "suggested_domain": "인프라",
+      "process": "모니터링",
+      "tags": [
+        "가이드",
+        "서버",
+        "장애처리",
+        "SOP"
+      ],
+      "tag_replaced": {
+        "장애대응": "장애처리"
+      },
+      "tag_alternatives_count": 2,
+      "confidence": 0.8650000000000001,
+      "elapsed_sec": 9.51
+    },
+    {
+      "path": "wiki/인프라/보안-점검-체크리스트.md",
+      "expected_domain": "인프라",
+      "suggested_domain": "인프라",
+      "process": "보안",
+      "tags": [
+        "가이드",
+        "정책",
+        "서버",
+        "방화벽"
+      ],
+      "tag_replaced": {
+        "보안정책": "정책"
+      },
+      "tag_alternatives_count": 2,
+      "confidence": 0.8650000000000001,
+      "elapsed_sec": 8.57
+    },
+    {
+      "path": "wiki/인프라/서버-구성-현황.md",
+      "expected_domain": "인프라",
+      "suggested_domain": "인프라",
+      "process": "서버",
+      "tags": [
+        "서버",
+        "가이드",
+        "보안정책"
+      ],
+      "tag_replaced": {
+        "정책": "보안정책"
+      },
+      "tag_alternatives_count": 1,
+      "confidence": 0.915,
+      "elapsed_sec": 8.45
+    },
+    {
+      "path": "wiki/인프라/서버-장애처리-절차.md",
+      "expected_domain": "인프라",
+      "suggested_domain": "인프라",
+      "process": "서버",
+      "tags": [
+        "서버",
+        "장애대응",
+        "troubleshooting",
+        "가이드"
+      ],
+      "tag_replaced": {
+        "장애처리": "장애대응"
+      },
+      "tag_alternatives_count": 2,
+      "confidence": 0.9,
+      "elapsed_sec": 10.8
+    },
+    {
+      "path": "wiki/인프라/캐시-장애-대응-매뉴얼.md",
+      "expected_domain": "인프라",
+      "suggested_domain": "인프라",
+      "process": "모니터링",
+      "tags": [
+        "레디스",
+        "장애처리",
+        "가이드",
+        "캐시"
+      ],
+      "tag_replaced": {
+        "Redis": "레디스",
+        "장애대응": "장애처리",
+        "캐싱": "캐시"
+      },
+      "tag_alternatives_count": 0,
+      "confidence": 1.0,
+      "elapsed_sec": 13.46
+    },
+    {
+      "path": "wiki/인프라/캐싱-전략-가이드.md",
+      "expected_domain": "인프라",
+      "suggested_domain": "인프라",
+      "process": "서버",
+      "tags": [
+        "캐시",
+        "가이드",
+        "레디스",
+        "성능최적화"
+      ],
+      "tag_replaced": {
+        "캐싱": "캐시",
+        "Redis": "레디스"
+      },
+      "tag_alternatives_count": 1,
+      "confidence": 0.95,
+      "elapsed_sec": 11.59
+    },
+    {
+      "path": "wiki/재무/세무-신고-일정.md",
+      "expected_domain": "재무",
+      "suggested_domain": "재무",
+      "process": "세무",
+      "tags": [
+        "SOP",
+        "보안정책",
+        "세무신고",
+        "일정관리",
+        "체크리스트"
+      ],
+      "tag_replaced": {
+        "정책": "보안정책"
+      },
+      "tag_alternatives_count": 3,
+      "confidence": 0.775,
+      "elapsed_sec": 12.31
+    },
+    {
+      "path": "wiki/재무/월말-결산-절차.md",
+      "expected_domain": "재무",
+      "suggested_domain": "재무",
+      "process": "회계",
+      "tags": [
+        "결산",
+        "회계",
+        "SOP",
+        "체크리스트",
+        "재무제표"
+      ],
+      "tag_replaced": {},
+      "tag_alternatives_count": 5,
+      "confidence": 0.7999999999999999,
+      "elapsed_sec": 12.51
+    }
+  ]
+}

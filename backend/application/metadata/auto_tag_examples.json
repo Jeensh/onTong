@@ -1,0 +1,96 @@
+{
+  "examples": [
+    {
+      "domain": "인프라",
+      "input_excerpt": "Redis 캐시 노드가 OOM으로 다운된 경우의 복구 절차. 1) 모니터링 알람 확인 2) failover 노드 승격 3) 메모리 사용량 조사 4) maxmemory-policy 점검",
+      "filename": "캐시-장애-대응-매뉴얼.md",
+      "path": "wiki/인프라/캐시-장애-대응-매뉴얼.md",
+      "output": {
+        "domain": "인프라",
+        "process": "보안",
+        "tags": ["캐시", "Redis", "장애대응"],
+        "confidence": 0.92,
+        "reasoning": "경로(wiki/인프라/)와 본문 모두 인프라 캐시 운영을 명확히 가리키며, 기존 태그 캐시/Redis/장애대응을 그대로 재사용함"
+      }
+    },
+    {
+      "domain": "SCM",
+      "input_excerpt": "주문 생성 → 검증 → 승인 → 출하 단계. DG320 에러 발생 시 재고 차감을 롤백하고 주문 상태를 실패로 변경한다.",
+      "filename": "주문-처리-절차.md",
+      "path": "wiki/SCM/주문-처리-절차.md",
+      "output": {
+        "domain": "SCM",
+        "process": "주문",
+        "error_codes": ["DG320"],
+        "tags": ["주문", "SOP", "장애대응"],
+        "confidence": 0.95,
+        "reasoning": "경로상 SCM/주문 명확. 절차 문서이므로 SOP, 에러 처리 포함이라 장애대응 태그 부여. 모두 기존 태그 재사용."
+      }
+    },
+    {
+      "domain": "ERP",
+      "input_excerpt": "마스터데이터 코드 체계: 거래처 코드는 6자리 숫자로 구성. 신규 등록 시 중복 검증 후 인터페이스 모듈로 전송.",
+      "filename": "거래처-마스터-등록-가이드.md",
+      "path": "wiki/ERP/거래처-마스터-등록-가이드.md",
+      "output": {
+        "domain": "ERP",
+        "process": "마스터데이터",
+        "tags": ["마스터데이터", "거래처", "가이드"],
+        "confidence": 0.90,
+        "reasoning": "ERP/마스터데이터 도메인 명확. 가이드성 문서로 가이드 태그 사용."
+      }
+    },
+    {
+      "domain": "MES",
+      "input_excerpt": "라인 A의 일일 생산 실적 집계 기준. 설비 가동률, 양품률, 사이클타임을 시간 단위로 기록하며 품질 부적합 발생 시 즉시 라인 정지.",
+      "filename": "생산실적-집계-기준.md",
+      "path": "wiki/MES/생산실적-집계-기준.md",
+      "output": {
+        "domain": "MES",
+        "process": "실적관리",
+        "tags": ["실적관리", "생산", "품질관리"],
+        "confidence": 0.88,
+        "reasoning": "MES/실적관리 일치. 기존 빈출 태그 재사용."
+      }
+    },
+    {
+      "domain": "기획",
+      "input_excerpt": "2026년 신규 프로젝트 우선순위 평가 기준: 전략 정합성, 예산 효율, 실행 난이도 3축으로 점수화한다.",
+      "filename": "프로젝트-우선순위-평가.md",
+      "path": "wiki/기획/프로젝트-우선순위-평가.md",
+      "output": {
+        "domain": "기획",
+        "process": "프로젝트",
+        "tags": ["프로젝트", "전략", "예산"],
+        "confidence": 0.87,
+        "reasoning": "기획/프로젝트 도메인. 평가 기준 자체가 전략·예산을 다루므로 해당 태그 사용."
+      }
+    },
+    {
+      "domain": "재무",
+      "input_excerpt": "월별 결산 마감 일정과 부서별 비용 정산 제출 기한. 마감 후 수정은 차월 분개로 처리한다.",
+      "filename": "월결산-마감-일정.md",
+      "path": "wiki/재무/월결산-마감-일정.md",
+      "output": {
+        "domain": "재무",
+        "process": "결산",
+        "tags": ["결산", "회계", "정책"],
+        "confidence": 0.90,
+        "reasoning": "재무/결산 명확. 마감 정책이므로 정책 태그 추가."
+      }
+    },
+    {
+      "domain": "인사",
+      "input_excerpt": "신입사원 온보딩 1주차 과정: 회사 소개, 보안 교육, 사내 시스템 계정 발급, 멘토 배정.",
+      "filename": "신입-온보딩-1주차.md",
+      "path": "wiki/인사/신입-온보딩-1주차.md",
+      "output": {
+        "domain": "인사",
+        "process": "교육",
+        "tags": ["온보딩", "교육", "가이드"],
+        "confidence": 0.93,
+        "reasoning": "인사/교육 도메인. 온보딩은 인사 빈출 태그라 재사용."
+      }
+    }
+  ]
+}

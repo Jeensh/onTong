@@ -28,7 +28,9 @@ export type VirtualTabType =
   | "conflict-dashboard"
   | "document-compare"
   | "document-graph"
-  | "permission-editor";
+  | "permission-editor"
+  | "scoring-dashboard"
+  | "maintenance-digest";
 
 export type TabType = FileType | VirtualTabType;
 

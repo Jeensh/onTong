@@ -49,10 +49,12 @@ export interface AgentWrite {
 const VIRTUAL_TAB_TITLES: Record<VirtualTabType, string> = {
   "metadata-templates": "메타데이터 템플릿 관리",
   "untagged-dashboard": "미태깅 문서 대시보드",
-  "conflict-dashboard": "문서 충돌 감지",
+  "conflict-dashboard": "관련 문서 관리",
   "document-compare": "문서 비교",
   "document-graph": "문서 관계 그래프",
   "permission-editor": "접근 권한 관리",
+  "scoring-dashboard": "신뢰도 설정",
+  "maintenance-digest": "관리가 필요한 문서",
 };
 
 interface WorkspaceState {

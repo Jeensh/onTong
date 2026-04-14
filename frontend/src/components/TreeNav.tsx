@@ -25,6 +25,8 @@ import {
   Zap,
   Plus,
   X,
+  Gauge,
+  ClipboardList,
 } from "lucide-react";
 import {
   DndContext,
@@ -93,6 +95,8 @@ function ContextMenu({
   onDeleteFolder,
   onNewFileInFolder,
   onNewSubfolder,
+  onCreateNewVersion,
+  statusMap,
 }: {
   state: ContextMenuState;
   onClose: () => void;
@@ -101,6 +105,8 @@ function ContextMenu({
   onDeleteFolder: (path: string) => void;
   onNewFileInFolder: (folderPath: string) => void;
   onNewSubfolder: (folderPath: string) => void;
+  onCreateNewVersion?: (path: string) => void;
+  statusMap?: Record<string, string>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -148,6 +154,14 @@ function ContextMenu({
           >
             <Link className="h-3.5 w-3.5" /> 문서 링크 복사
           </button>
+          {!isDir && state.node!.path.endsWith(".md") && onCreateNewVersion && statusMap?.[state.node!.path] !== "deprecated" && (
+            <button
+              onClick={() => { onCreateNewVersion(state.node!.path); onClose(); }}
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-muted"
+            >
+              <Copy className="h-3.5 w-3.5" /> 새 버전 만들기
+            </button>
+          )}
           <div className="my-1 border-t" />
           <button
             onClick={() => { onRename(state.node!); onClose(); }}
@@ -248,6 +262,7 @@ function DraggableTreeItem({
   onCreateSubmit,
   onCreateCancel,
   onLoadChildren,
+  statusMap,
 }: {
   node: WikiTreeNode;
   depth: number;
@@ -262,6 +277,7 @@ function DraggableTreeItem({
   onCreateSubmit: (name: string) => void;
   onCreateCancel: () => void;
   onLoadChildren: (path: string) => Promise<void>;
+  statusMap?: Record<string, string>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [childLoading, setChildLoading] = useState(false);
@@ -372,7 +388,7 @@ function DraggableTreeItem({
                 onContextMenu={onContextMenu} onOpenTab={onOpenTab}
                 creatingIn={creatingIn} creatingType={creatingType}
                 onCreateSubmit={onCreateSubmit} onCreateCancel={onCreateCancel}
-                onLoadChildren={onLoadChildren} />
+                onLoadChildren={onLoadChildren} statusMap={statusMap} />
             ))}
           </div>
         )}
@@ -401,12 +417,15 @@ function DraggableTreeItem({
         ${node.path === activeFilePath
           ? "bg-primary/15 text-primary font-medium"
           : "hover:bg-muted/50"
-        } ${isDragging ? "opacity-40" : ""}`}
+        } ${isDragging ? "opacity-40" : ""}
+        ${statusMap?.[node.path] === "deprecated" ? "opacity-50" : ""}`}
       style={{ paddingLeft: `${indent}px` }}
     >
       <span className="w-3.5 shrink-0" />
       <File className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      <span className="truncate flex-1">{node.name}</span>
+      <span className={`truncate flex-1 ${statusMap?.[node.path] === "deprecated" ? "line-through" : ""}`}>
+        {node.name}
+      </span>
     </div>
   );
 }
@@ -438,109 +457,241 @@ interface UnusedImage {
 
 // ── Tag Browser Section ──────────────────────────────────────────────
 
+const SIDEBAR_FILE_LIMIT = 20;
+const SIDEBAR_TAG_LIMIT = 30;
+
 function TagBrowserSection({ onOpenTab }: { onOpenTab: (path: string) => void }) {
-  const [data, setData] = useState<{ domains: string[]; processes: string[]; tags: string[] } | null>(null);
+  const [templates, setTemplates] = useState<{ domain_processes: Record<string, string[]>; tag_presets: string[] } | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Domain tree state
   const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
+  const [expandedProcess, setExpandedProcess] = useState<string | null>(null);
+  const [processFiles, setProcessFiles] = useState<Record<string, { files: string[]; total: number }>>({});
+  const [loadingProcess, setLoadingProcess] = useState<string | null>(null);
+
+  // Tag state — paginated with search
+  const [tagSearch, setTagSearch] = useState("");
+  const [visibleTags, setVisibleTags] = useState<{ name: string; count: number }[]>([]);
+  const [tagTotal, setTagTotal] = useState(0);
+  const [tagOffset, setTagOffset] = useState(0);
   const [expandedTag, setExpandedTag] = useState<string | null>(null);
-  const [tagFiles, setTagFiles] = useState<{ tag: string; files: string[] } | null>(null);
+  const [tagFiles, setTagFiles] = useState<{ files: string[]; total: number }>({ files: [], total: 0 });
+  const tagSearchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
-    fetch("/api/metadata/tags")
+    fetch("/api/metadata/templates")
       .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false); })
+      .then((tmpl) => { setTemplates(tmpl); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
-  const fetchFilesByTag = useCallback(async (tag: string, field: string) => {
-    if (expandedTag === `${field}:${tag}`) {
+  // Load tags paginated
+  const loadTags = useCallback((query: string, offset: number) => {
+    fetch(`/api/metadata/tags/search?q=${encodeURIComponent(query)}&offset=${offset}&limit=${SIDEBAR_TAG_LIMIT}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setVisibleTags(d.tags || []);
+        setTagTotal(d.total || 0);
+        setTagOffset(offset);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => { loadTags("", 0); }, [loadTags]);
+
+  const handleTagSearch = useCallback((q: string) => {
+    setTagSearch(q);
+    clearTimeout(tagSearchTimer.current);
+    tagSearchTimer.current = setTimeout(() => loadTags(q, 0), 200);
+  }, [loadTags]);
+
+  const toggleDomain = useCallback((domain: string) => {
+    setExpandedDomain((prev) => (prev === domain ? null : domain));
+    setExpandedProcess(null);
+  }, []);
+
+  const fetchProcessFiles = useCallback((process: string, offset: number) => {
+    setLoadingProcess(process);
+    fetch(`/api/metadata/files-by-tag?field=process&value=${encodeURIComponent(process)}&offset=${offset}&limit=${SIDEBAR_FILE_LIMIT}`)
+      .then((r) => r.json())
+      .then((data: { files: string[]; total: number }) => {
+        setProcessFiles((prev) => {
+          const existing = prev[process];
+          if (existing && offset > 0) {
+            return { ...prev, [process]: { files: [...existing.files, ...data.files], total: data.total } };
+          }
+          return { ...prev, [process]: data };
+        });
+        setLoadingProcess(null);
+      })
+      .catch(() => setLoadingProcess(null));
+  }, []);
+
+  const toggleProcess = useCallback((process: string) => {
+    setExpandedProcess((prev) => {
+      const next = prev === process ? null : process;
+      if (next && !processFiles[process]) {
+        fetchProcessFiles(process, 0);
+      }
+      return next;
+    });
+  }, [processFiles, fetchProcessFiles]);
+
+  const toggleTag = useCallback((tag: string) => {
+    if (expandedTag === tag) {
       setExpandedTag(null);
-      setTagFiles(null);
+      setTagFiles({ files: [], total: 0 });
       return;
     }
-    try {
-      const res = await fetch(`/api/metadata/files-by-tag?field=${field}&value=${encodeURIComponent(tag)}`);
-      if (res.ok) {
-        const files: string[] = await res.json();
-        setTagFiles({ tag: `${field}:${tag}`, files });
-        setExpandedTag(`${field}:${tag}`);
-      }
-    } catch { /* ignore */ }
+    setExpandedTag(tag);
+    fetch(`/api/metadata/files-by-tag?field=tags&value=${encodeURIComponent(tag)}&offset=0&limit=${SIDEBAR_FILE_LIMIT}`)
+      .then((r) => r.json())
+      .then((data: { files: string[]; total: number }) => setTagFiles(data))
+      .catch(() => setTagFiles({ files: [], total: 0 }));
   }, [expandedTag]);
 
+  const loadMoreTagFiles = useCallback(() => {
+    if (!expandedTag) return;
+    const nextOffset = tagFiles.files.length;
+    fetch(`/api/metadata/files-by-tag?field=tags&value=${encodeURIComponent(expandedTag)}&offset=${nextOffset}&limit=${SIDEBAR_FILE_LIMIT}`)
+      .then((r) => r.json())
+      .then((data: { files: string[]; total: number }) => {
+        setTagFiles((prev) => ({ files: [...prev.files, ...data.files], total: data.total }));
+      })
+      .catch(() => {});
+  }, [expandedTag, tagFiles]);
+
   if (loading) return <div className="p-3 text-sm text-muted-foreground">태그 로딩 중...</div>;
-  if (!data) return <div className="p-3 text-sm text-muted-foreground">태그 데이터 없음</div>;
+  if (!templates) return <div className="p-3 text-sm text-muted-foreground">태그 데이터 없음</div>;
+
+  const domains = Object.keys(templates.domain_processes).sort();
 
   return (
     <div className="flex-1 overflow-auto text-sm">
-      {/* Domains */}
+      {/* Domain → Process → Files tree */}
       <div className="px-3 pt-3 pb-1">
-        <span className="text-xs font-semibold text-muted-foreground uppercase">Domain</span>
+        <span className="text-xs font-semibold text-muted-foreground uppercase">Domain / Process</span>
       </div>
-      {data.domains.length === 0 && <div className="px-3 text-xs text-muted-foreground">없음</div>}
-      {data.domains.map((d) => (
-        <div key={d}>
-          <button
-            onClick={() => { setExpandedDomain(expandedDomain === d ? null : d); fetchFilesByTag(d, "domain"); }}
-            className="flex items-center gap-1.5 px-3 py-1 w-full hover:bg-muted/50 text-left"
-          >
-            {expandedDomain === d ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-            <span className="text-xs font-medium">{d}</span>
-          </button>
-          {expandedTag === `domain:${d}` && tagFiles && (
-            <div className="pl-7">
-              {tagFiles.files.map((f) => (
-                <button key={f} onClick={() => onOpenTab(f)}
-                  className="block w-full text-left px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 truncate">
-                  {f}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
+      {domains.length === 0 && <div className="px-3 text-xs text-muted-foreground">없음</div>}
+      {domains.map((d) => {
+        const processes = templates.domain_processes[d] || [];
+        const isExpanded = expandedDomain === d;
 
-      {/* Processes */}
-      <div className="px-3 pt-3 pb-1">
-        <span className="text-xs font-semibold text-muted-foreground uppercase">Process</span>
-      </div>
-      {data.processes.length === 0 && <div className="px-3 text-xs text-muted-foreground">없음</div>}
-      {data.processes.map((p) => (
-        <button key={p} onClick={() => fetchFilesByTag(p, "process")}
-          className="flex items-center gap-1.5 px-3 py-1 w-full hover:bg-muted/50 text-left">
-          {expandedTag === `process:${p}` ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-          <span className="text-xs">{p}</span>
-        </button>
-      ))}
-      {data.processes.map((p) => (
-        expandedTag === `process:${p}` && tagFiles ? (
-          <div key={`files-${p}`} className="pl-7">
-            {tagFiles.files.map((f) => (
-              <button key={f} onClick={() => onOpenTab(f)}
-                className="block w-full text-left px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 truncate">
-                {f}
-              </button>
-            ))}
+        return (
+          <div key={d}>
+            <button
+              onClick={() => toggleDomain(d)}
+              className="flex items-center gap-1.5 px-3 py-1 w-full hover:bg-muted/50 text-left"
+            >
+              {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              <span className="text-xs font-medium">{d}</span>
+              <span className="text-[10px] text-muted-foreground ml-auto">{processes.length}</span>
+            </button>
+
+            {isExpanded && (
+              <div className="pl-4">
+                {processes.length === 0 && (
+                  <div className="px-3 py-1 text-[11px] text-muted-foreground">프로세스 없음</div>
+                )}
+                {processes.map((p) => {
+                  const isProcExpanded = expandedProcess === p;
+                  const pData = processFiles[p];
+                  const isLoading = loadingProcess === p;
+
+                  return (
+                    <div key={p}>
+                      <button
+                        onClick={() => toggleProcess(p)}
+                        className="flex items-center gap-1.5 px-3 py-1 w-full hover:bg-muted/50 text-left"
+                      >
+                        {isProcExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                        <span className="text-xs">{p}</span>
+                        {pData && <span className="text-[10px] text-muted-foreground ml-auto">{pData.total}</span>}
+                      </button>
+
+                      {isProcExpanded && (
+                        <div className="pl-5">
+                          {isLoading ? (
+                            <div className="px-2 py-1 text-[11px] text-muted-foreground">로딩 중...</div>
+                          ) : !pData || pData.files.length === 0 ? (
+                            <div className="px-2 py-1 text-[11px] text-muted-foreground">문서 없음</div>
+                          ) : (
+                            <>
+                              {pData.files.map((f) => (
+                                <button key={f} onClick={() => onOpenTab(f)}
+                                  className="block w-full text-left px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/50 truncate">
+                                  {f}
+                                </button>
+                              ))}
+                              {pData.files.length < pData.total && (
+                                <button
+                                  onClick={() => fetchProcessFiles(p, pData.files.length)}
+                                  className="block w-full text-left px-2 py-1 text-[11px] text-primary hover:underline"
+                                >
+                                  더보기 ({pData.total - pData.files.length}건 남음)
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        ) : null
-      ))}
+        );
+      })}
 
-      {/* Tags */}
-      <div className="px-3 pt-3 pb-1">
+      {/* Tags — with search + pagination */}
+      <div className="px-3 pt-3 pb-1 flex items-center justify-between">
         <span className="text-xs font-semibold text-muted-foreground uppercase">Tags</span>
+        {tagTotal > 0 && <span className="text-[10px] text-muted-foreground">{tagTotal}</span>}
       </div>
-      {data.tags.length === 0 && <div className="px-3 text-xs text-muted-foreground">없음</div>}
-      <div className="px-3 flex flex-wrap gap-1 pb-3">
-        {data.tags.map((t) => (
-          <button key={t} onClick={() => fetchFilesByTag(t, "tags")}
+      <div className="px-3 pb-1">
+        <input
+          value={tagSearch}
+          onChange={(e) => handleTagSearch(e.target.value)}
+          placeholder="태그 검색..."
+          className="w-full text-xs border rounded px-2 py-1 bg-background"
+        />
+      </div>
+      {visibleTags.length === 0 && <div className="px-3 text-xs text-muted-foreground">없음</div>}
+      <div className="px-3 flex flex-wrap gap-1 pb-1">
+        {visibleTags.map((t) => (
+          <button key={t.name} onClick={() => toggleTag(t.name)}
             className={`px-1.5 py-0.5 text-xs rounded border transition-colors ${
-              expandedTag === `tags:${t}` ? "bg-primary/15 border-primary/30 text-foreground" : "border-border text-muted-foreground hover:bg-muted"
+              expandedTag === t.name ? "bg-primary/15 border-primary/30 text-foreground" : "border-border text-muted-foreground hover:bg-muted"
             }`}>
-            {t}
+            {t.name}
+            {t.count > 0 && <span className="ml-0.5 text-[10px] opacity-60">{t.count}</span>}
           </button>
         ))}
       </div>
-      {expandedTag?.startsWith("tags:") && tagFiles && (
+      {tagTotal > SIDEBAR_TAG_LIMIT && (
+        <div className="px-3 pb-1 flex items-center gap-1">
+          <button
+            onClick={() => loadTags(tagSearch, Math.max(0, tagOffset - SIDEBAR_TAG_LIMIT))}
+            disabled={tagOffset === 0}
+            className="text-[10px] text-primary hover:underline disabled:opacity-30"
+          >
+            ◀ 이전
+          </button>
+          <span className="text-[10px] text-muted-foreground">
+            {tagOffset + 1}-{Math.min(tagOffset + SIDEBAR_TAG_LIMIT, tagTotal)} / {tagTotal}
+          </span>
+          <button
+            onClick={() => loadTags(tagSearch, tagOffset + SIDEBAR_TAG_LIMIT)}
+            disabled={tagOffset + SIDEBAR_TAG_LIMIT >= tagTotal}
+            className="text-[10px] text-primary hover:underline disabled:opacity-30"
+          >
+            다음 ▶
+          </button>
+        </div>
+      )}
+      {expandedTag && tagFiles.files.length > 0 && (
         <div className="px-3 pb-3">
           {tagFiles.files.map((f) => (
             <button key={f} onClick={() => onOpenTab(f)}
@@ -548,6 +699,14 @@ function TagBrowserSection({ onOpenTab }: { onOpenTab: (path: string) => void })
               {f}
             </button>
           ))}
+          {tagFiles.files.length < tagFiles.total && (
+            <button
+              onClick={loadMoreTagFiles}
+              className="block w-full text-left px-2 py-1 text-[11px] text-primary hover:underline"
+            >
+              더보기 ({tagFiles.total - tagFiles.files.length}건 남음)
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -787,6 +946,9 @@ function SkillsSection({ onOpenTab }: { onOpenTab: (path: string) => void }) {
   const [deleteTarget, setDeleteTarget] = useState<SkillMeta | null>(null);
   const [dragSkill, setDragSkill] = useState<SkillMeta | null>(null);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
+  const [showSkillIntro, setShowSkillIntro] = useState(() =>
+    typeof window !== "undefined" ? !localStorage.getItem("ontong:skill-intro-dismissed") : true
+  );
 
   const refreshSkills = useCallback(() => {
     fetchSkills().then(setSkills).catch(() => setSkills(null));
@@ -982,6 +1144,28 @@ function SkillsSection({ onOpenTab }: { onOpenTab: (path: string) => void }) {
         </div>
       </div>
 
+      {/* Intro banner — dismissible, shown once */}
+      {showSkillIntro && (
+        <div className="mx-3 mt-2 p-2.5 rounded-lg bg-primary/5 border border-primary/20 text-xs space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold flex items-center gap-1">
+              <Zap className="h-3 w-3 text-primary" />
+              스킬이란?
+            </span>
+            <button onClick={() => {
+              setShowSkillIntro(false);
+              localStorage.setItem("ontong:skill-intro-dismissed", "1");
+            }} className="text-muted-foreground hover:text-foreground">
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+          <p className="text-muted-foreground leading-relaxed">
+            스킬은 AI 코파일럿의 <strong className="text-foreground">응답 방식을 커스터마이징</strong>하는 템플릿입니다.
+            역할, 참조 문서, 출력 형식 등을 미리 정의해 두면, 질문할 때 자동으로 적용됩니다.
+          </p>
+        </div>
+      )}
+
       {/* Personal skills */}
       <div className="px-3 pt-2 pb-1 flex items-center justify-between">
         <span className="text-xs font-semibold text-muted-foreground uppercase">내 스킬</span>
@@ -1058,9 +1242,23 @@ function SkillsSection({ onOpenTab }: { onOpenTab: (path: string) => void }) {
       {personalFiltered.length > 0 ? (
         renderGroups(personalGroups)
       ) : (
-        !showCreate && <div className="px-3 py-2 text-xs text-muted-foreground">
-          {searchQuery ? "검색 결과 없음" : "스킬이 없습니다"}
-        </div>
+        !showCreate && (searchQuery ? (
+          <div className="px-3 py-2 text-xs text-muted-foreground">검색 결과 없음</div>
+        ) : (
+          <div className="px-3 py-4 text-center space-y-2">
+            <Zap className="h-6 w-6 mx-auto text-muted-foreground/50" />
+            <p className="text-xs text-muted-foreground">아직 만든 스킬이 없습니다</p>
+            <p className="text-[11px] text-muted-foreground/70">
+              자주 쓰는 질문 패턴이 있다면,<br />스킬로 만들어 AI 응답을 맞춤 설정하세요.
+            </p>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="text-xs text-primary hover:underline font-medium"
+            >
+              + 첫 번째 스킬 만들기
+            </button>
+          </div>
+        ))
       )}
 
       {/* Shared skills */}
@@ -1070,9 +1268,16 @@ function SkillsSection({ onOpenTab }: { onOpenTab: (path: string) => void }) {
       {systemFiltered.length > 0 ? (
         renderGroups(systemGroups)
       ) : (
-        <div className="px-3 py-2 text-xs text-muted-foreground">
-          {searchQuery ? "검색 결과 없음" : "공용 스킬이 없습니다"}
-        </div>
+        searchQuery ? (
+          <div className="px-3 py-2 text-xs text-muted-foreground">검색 결과 없음</div>
+        ) : (
+          <div className="px-3 py-3 text-center space-y-1">
+            <p className="text-xs text-muted-foreground">공용 스킬이 없습니다</p>
+            <p className="text-[11px] text-muted-foreground/70">
+              스킬 생성 시 &apos;범위&apos;를 &apos;공용&apos;으로 선택하면<br />여기에 표시됩니다.
+            </p>
+          </div>
+        )
       )}
 
       {/* Skill context menu */}
@@ -1089,7 +1294,7 @@ function SkillsSection({ onOpenTab }: { onOpenTab: (path: string) => void }) {
 
       {/* Skill delete confirmation dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-sm" onKeyDown={(e) => { if (e.key === "Enter") confirmDeleteSkill(); }}>
           <DialogHeader>
             <DialogTitle>스킬 삭제</DialogTitle>
             <DialogDescription>
@@ -1099,7 +1304,7 @@ function SkillsSection({ onOpenTab }: { onOpenTab: (path: string) => void }) {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>취소</Button>
-            <Button variant="destructive" onClick={confirmDeleteSkill}>삭제</Button>
+            <Button variant="destructive" onClick={confirmDeleteSkill} autoFocus>삭제</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1141,8 +1346,18 @@ function SettingsSection({ onOpenVirtualTab }: { onOpenVirtualTab: (tabType: imp
       >
         <AlertTriangle className="h-4 w-4 text-amber-500" />
         <div>
-          <div className="text-xs font-medium">문서 충돌 감지</div>
-          <div className="text-[11px] text-muted-foreground">유사/중복 문서 탐지 + 비교</div>
+          <div className="text-xs font-medium">관련 문서 관리</div>
+          <div className="text-[11px] text-muted-foreground">유사 문서 분류 + AI 분석 + 해결</div>
+        </div>
+      </button>
+      <button
+        onClick={() => onOpenVirtualTab("maintenance-digest")}
+        className="flex items-center gap-2 px-3 py-2 w-full hover:bg-muted/50 text-left"
+      >
+        <ClipboardList className="h-4 w-4 text-orange-500" />
+        <div>
+          <div className="text-xs font-medium">관리가 필요한 문서</div>
+          <div className="text-[11px] text-muted-foreground">오래됨 / 신뢰도 낮음 / 미해결 관련</div>
         </div>
       </button>
       <button
@@ -1163,6 +1378,16 @@ function SettingsSection({ onOpenVirtualTab }: { onOpenVirtualTab: (tabType: imp
         <div>
           <div className="text-xs font-medium">접근 권한 관리</div>
           <div className="text-[11px] text-muted-foreground">폴더/문서별 읽기·쓰기 제어</div>
+        </div>
+      </button>
+      <button
+        onClick={() => onOpenVirtualTab("scoring-dashboard")}
+        className="flex items-center gap-2 px-3 py-2 w-full hover:bg-muted/50 text-left"
+      >
+        <Gauge className="h-4 w-4 text-emerald-500" />
+        <div>
+          <div className="text-xs font-medium">신뢰도 설정</div>
+          <div className="text-[11px] text-muted-foreground">점수 가중치, 임계값, 공식 확인</div>
         </div>
       </button>
     </div>
@@ -1346,6 +1571,12 @@ export function TreeNav() {
   const [creatingType, setCreatingType] = useState<"file" | "folder" | null>(null);
   const [renamingNode, setRenamingNode] = useState<WikiTreeNode | null>(null);
   const [dragOverlay, setDragOverlay] = useState<WikiTreeNode | null>(null);
+  const [deprecatedMap, setDeprecatedMap] = useState<Record<string, string>>({});
+  const [newVersionTarget, setNewVersionTarget] = useState<string | null>(null);
+  const [newVersionName, setNewVersionName] = useState("");
+  const [newVersionCreating, setNewVersionCreating] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ path: string; type: "file" | "folder" } | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const openTab = useWorkspaceStore((s) => s.openTab);
   const openVirtualTab = useWorkspaceStore((s) => s.openVirtualTab);
@@ -1379,6 +1610,14 @@ export function TreeNav() {
 
   useEffect(() => { fetchTreeData(); }, [fetchTreeData]);
   useEffect(() => { if (treeVersion > 0) fetchTreeData(); }, [treeVersion, fetchTreeData]);
+
+  // Fetch document statuses for deprecated styling
+  useEffect(() => {
+    fetch("/api/metadata/statuses")
+      .then((r) => (r.ok ? r.json() : {}))
+      .then(setDeprecatedMap)
+      .catch(() => {});
+  }, [treeVersion]);
 
   // ── SSE real-time tree updates ─────────────────────────────────
   useEffect(() => {
@@ -1494,36 +1733,60 @@ export function TreeNav() {
 
   // ── Delete ──────────────────────────────────────────────────────
 
-  const handleDeleteFile = useCallback(async (path: string) => {
+  const handleDeleteFile = useCallback((path: string) => {
+    setDeleteConfirm({ path, type: "file" });
+  }, []);
+
+  const handleDeleteFolder = useCallback((path: string) => {
+    setDeleteConfirm({ path, type: "folder" });
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteConfirm) return;
+    const { path, type } = deleteConfirm;
     const name = path.split("/").pop() ?? path;
-    if (!confirm(`"${name}" 파일을 삭제하시겠습니까?`)) return;
+    setDeleteLoading(true);
     try {
-      const res = await fetch(`/api/wiki/file/${encodeURIComponent(path)}`, { method: "DELETE" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const tab = tabs.find((t) => t.filePath === path);
-      if (tab) closeTabById(tab.id);
+      const endpoint = type === "file"
+        ? `/api/wiki/file/${encodeURIComponent(path)}`
+        : `/api/wiki/folder/${encodeURIComponent(path)}`;
+      const res = await fetch(endpoint, { method: "DELETE" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const detail = body.detail;
+        if (res.status === 409 && detail?.referenced_by) {
+          const allRefs = detail.referenced_by as string[];
+          const names = allRefs.map((p: string) => p.split("/").pop());
+          const desc = names.length <= 3
+            ? `참조 문서: ${names.join(", ")}`
+            : `참조 문서: ${names.slice(0, 2).join(", ")} 외 ${names.length - 2}건`;
+          toast.error("삭제할 수 없습니다", {
+            description: `${desc}\n참조를 먼저 제거해주세요.`,
+            duration: 6000,
+          });
+          return;
+        }
+        const msg = typeof detail === "string" ? detail
+          : typeof detail?.message === "string" ? detail.message
+          : `서버 오류 (${res.status})`;
+        throw new Error(msg);
+      }
+      if (type === "file") {
+        const tab = tabs.find((t) => t.filePath === path);
+        if (tab) closeTabById(tab.id);
+      }
       toast.success(`"${name}" 삭제됨`);
       setTree((prev) => removeTreeNode(prev, path));
     } catch (err) {
-      toast.error(`삭제 실패: ${(err as Error).message}`);
+      toast.error("삭제 실패", {
+        description: (err as Error).message,
+        duration: 5000,
+      });
+    } finally {
+      setDeleteLoading(false);
+      setDeleteConfirm(null);
     }
-  }, [tabs, closeTabById]);
-
-  const handleDeleteFolder = useCallback(async (path: string) => {
-    const name = path.split("/").pop() ?? path;
-    if (!confirm(`"${name}" 폴더를 삭제하시겠습니까?\n(빈 폴더만 삭제 가능)`)) return;
-    try {
-      const res = await fetch(`/api/wiki/folder/${encodeURIComponent(path)}`, { method: "DELETE" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || `HTTP ${res.status}`);
-      }
-      toast.success(`"${name}" 폴더 삭제됨`);
-      setTree((prev) => removeTreeNode(prev, path));
-    } catch (err) {
-      toast.error(`폴더 삭제 실패: ${(err as Error).message}`);
-    }
-  }, []);
+  }, [deleteConfirm, tabs, closeTabById]);
 
   // ── Create ──────────────────────────────────────────────────────
 
@@ -1567,6 +1830,55 @@ export function TreeNav() {
     }
   }, [creatingIn, creatingType, openTab]);
 
+  // ── New Version ─────────────────────────────────────────────────
+
+  const handleNewVersionOpen = useCallback((path: string) => {
+    const name = path.split("/").pop()?.replace(".md", "") ?? "";
+    const vMatch = name.match(/^(.*?)[-_]?v(\d+)$/i);
+    const suggested = vMatch ? `${vMatch[1]}-v${parseInt(vMatch[2]) + 1}.md` : `${name}-v2.md`;
+    setNewVersionTarget(path);
+    setNewVersionName(suggested);
+  }, []);
+
+  const handleNewVersionSubmit = useCallback(async () => {
+    if (!newVersionTarget || !newVersionName.trim()) return;
+    setNewVersionCreating(true);
+    const folder = newVersionTarget.includes("/") ? newVersionTarget.substring(0, newVersionTarget.lastIndexOf("/")) : "";
+    const fileName = newVersionName.endsWith(".md") ? newVersionName : `${newVersionName}.md`;
+    const newPath = folder ? `${folder}/${fileName}` : fileName;
+
+    try {
+      const res = await fetch("/api/wiki/create-new-version", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ old_path: newVersionTarget, new_path: newPath }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const detail = typeof data.detail === "string" ? data.detail : `서버 오류 (${res.status})`;
+        throw new Error(detail);
+      }
+      const result = await res.json().catch(() => ({}));
+      toast.success(`새 버전 "${fileName}" 생성됨`, {
+        description: result.old_status === "deprecated" ? "이전 버전이 자동으로 폐기 처리되었습니다." : undefined,
+      });
+      // Update deprecated map for old doc
+      if (result.old_status === "deprecated" && newVersionTarget) {
+        setDeprecatedMap((prev) => ({ ...prev, [newVersionTarget]: "deprecated" }));
+      }
+      // Add to tree
+      const parentPath = folder;
+      const newNode: WikiTreeNode = { name: fileName, path: newPath, is_dir: false, children: [] };
+      setTree((prev) => addTreeNode(prev, parentPath, newNode));
+      openTab(newPath);
+      setNewVersionTarget(null);
+    } catch (err) {
+      toast.error("새 버전 생성 실패", { description: (err as Error).message, duration: 5000 });
+    } finally {
+      setNewVersionCreating(false);
+    }
+  }, [newVersionTarget, newVersionName, openTab]);
+
   // ── Render ──────────────────────────────────────────────────────
 
   if (loading) return <div className="p-3 text-sm text-muted-foreground">불러오는 중...</div>;
@@ -1592,7 +1904,7 @@ export function TreeNav() {
             <button onClick={() => setSection("tags")} className={sectionBtnClass("tags")} title="태그 브라우저">
               <Tags className="h-3.5 w-3.5" />
             </button>
-            <button onClick={() => setSection("skills")} className={sectionBtnClass("skills")} title="스킬">
+            <button onClick={() => setSection("skills")} className={sectionBtnClass("skills")} title="스킬 — AI 응답을 커스터마이징하는 템플릿">
               <Zap className="h-3.5 w-3.5" />
             </button>
             <button onClick={() => setSection("settings")} className={sectionBtnClass("settings")} title="관리">
@@ -1644,7 +1956,7 @@ export function TreeNav() {
                       creatingIn={creatingIn} creatingType={creatingType}
                       onCreateSubmit={handleCreateSubmit}
                       onCreateCancel={() => { setCreatingIn(null); setCreatingType(null); }}
-                      onLoadChildren={loadChildren} />
+                      onLoadChildren={loadChildren} statusMap={deprecatedMap} />
                   ))
               }
             </RootDropZone>
@@ -1688,8 +2000,62 @@ export function TreeNav() {
           onDeleteFolder={handleDeleteFolder}
           onNewFileInFolder={(p) => { setCreatingIn(p); setCreatingType("file"); }}
           onNewSubfolder={(p) => { setCreatingIn(p); setCreatingType("folder"); }}
+          onCreateNewVersion={handleNewVersionOpen}
+          statusMap={deprecatedMap}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteConfirm} onOpenChange={(open) => { if (!open) { setDeleteConfirm(null); setDeleteLoading(false); } }}>
+        <DialogContent className="sm:max-w-sm" onKeyDown={(e) => { if (e.key === "Enter" && !deleteLoading) confirmDelete(); }}>
+          <DialogHeader>
+            <DialogTitle>
+              {deleteConfirm?.type === "folder" ? "폴더 삭제" : "문서 삭제"}
+            </DialogTitle>
+            <DialogDescription>
+              <span className="font-semibold text-foreground">
+                {deleteConfirm?.path.split("/").pop()}
+              </span>
+              {deleteConfirm?.type === "folder"
+                ? " 폴더를 삭제하시겠습니까? (빈 폴더만 삭제 가능)"
+                : " 파일을 삭제하시겠습니까?"}
+              <br />이 작업은 되돌릴 수 없습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirm(null)} disabled={deleteLoading}>취소</Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={deleteLoading} autoFocus>
+              {deleteLoading ? "삭제 중..." : "삭제"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Version Dialog */}
+      <Dialog open={!!newVersionTarget} onOpenChange={(open) => { if (!open) setNewVersionTarget(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>새 버전 만들기</DialogTitle>
+            <DialogDescription>
+              {newVersionTarget?.split("/").pop()} 의 새 버전을 생성합니다. 메타데이터(domain, tags)가 자동 상속됩니다.
+            </DialogDescription>
+          </DialogHeader>
+          <input
+            value={newVersionName}
+            onChange={(e) => setNewVersionName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && newVersionName.trim()) handleNewVersionSubmit(); }}
+            placeholder="새 파일명.md"
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewVersionTarget(null)}>취소</Button>
+            <Button onClick={handleNewVersionSubmit} disabled={newVersionCreating || !newVersionName.trim()}>
+              {newVersionCreating ? "생성 중..." : "생성"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DndContext>
   );
 }
