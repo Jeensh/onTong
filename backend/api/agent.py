@@ -63,6 +63,8 @@ router = APIRouter(prefix="/api/agent", tags=["agent"], dependencies=[Depends(ge
 async def chat(request: ChatRequest, user: User = Depends(get_current_user)):
     """SSE streaming chat endpoint. Routes to appropriate agent."""
     current_user_roles = user.roles
+    from backend.core.auth.scope import get_user_scope
+    current_user_scope = get_user_scope(user)
 
     async def event_stream():
         try:
@@ -163,6 +165,7 @@ async def chat(request: ChatRequest, user: User = Depends(get_current_user)):
                 attached_context=attached_context,
                 augmented_query=augmented_query,
                 user_roles=current_user_roles,
+                user_scope=current_user_scope,
                 conflict_store=_conflict_store,
                 meta_index=_meta_index,
                 intent_action=intent.action,

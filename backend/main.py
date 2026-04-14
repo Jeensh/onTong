@@ -65,8 +65,16 @@ async def lifespan(app: FastAPI):
     """Application startup and shutdown."""
     logger.info("onTong Backend starting up...")
 
-    # Initialize auth
-    auth_provider = create_auth_provider(settings.auth_provider)
+    # Initialize group store (before auth, so provider can resolve groups)
+    from backend.core.auth.group_store import JSONGroupStore
+    from pathlib import Path
+    group_store = JSONGroupStore(path=Path("data/groups.json"))
+    group_api.init(group_store)
+
+    # Initialize auth (pass group_store for group resolution)
+    auth_provider = create_auth_provider(
+        settings.auth_provider, group_store=group_store
+    )
     await auth_provider.on_startup()
     init_auth(auth_provider)
     logger.info(f"Auth provider: {settings.auth_provider}")
@@ -162,6 +170,24 @@ async def lifespan(app: FastAPI):
 
     event_bus.on("tree_change", _on_tree_change)
 
+    # Recompute access_scope in ChromaDB when ACL changes
+    async def _on_acl_changed(data: dict):
+        path = data.get("path", "")
+        if not path:
+            return
+        from backend.core.auth.acl_store import acl_store
+        from backend.core.auth.scope import format_scope_for_chroma
+        scope = acl_store.compute_access_scope(path)
+        access_scope = {
+            "read": format_scope_for_chroma(scope["read"]),
+            "write": format_scope_for_chroma(scope["write"]),
+        }
+        updated = await indexer.update_access_scope(path, access_scope)
+        if updated:
+            logger.info("ACL changed for %s: updated %d chunks", path, updated)
+
+    event_bus.on("acl_changed", _on_acl_changed)
+
     # Wire up API modules
     graph_api.init(graph_store, graph_builder)
     wiki_api.init(wiki_service, confidence_service=confidence_svc, digest_service=digest_svc, feedback_tracker=feedback_tracker)
@@ -178,12 +204,6 @@ async def lifespan(app: FastAPI):
     skill_api.init(skill_loader, skill_matcher, storage)
     persona_api.init(storage)
     conflict_api.init(wiki_service, conflict_svc)
-
-    # Initialize group store and group API
-    from backend.core.auth.group_store import JSONGroupStore
-    from pathlib import Path
-    group_store = JSONGroupStore(path=Path("data/groups.json"))
-    group_api.init(group_store)
 
     # Initialize Section 2 (Modeling) with Neo4j
     from backend.modeling.infrastructure.neo4j_client import Neo4jClient

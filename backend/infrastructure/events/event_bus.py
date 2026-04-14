@@ -7,6 +7,7 @@ Clients subscribe via GET /api/events (SSE stream).
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 import time
@@ -38,22 +39,29 @@ class EventBus:
         self._callbacks: dict[str, list] = {}  # event_type → [callable]
 
     def on(self, event_type: str, callback) -> None:
-        """Register a synchronous callback for an event type.
+        """Register a callback (sync or async) for an event type.
 
-        Used for cache invalidation on tree_change events.
-        Callbacks must be fast (no I/O) — they run in the publish path.
+        Sync callbacks run inline in the publish path — keep them fast.
+        Async callbacks are scheduled as tasks on the running event loop.
         """
         self._callbacks.setdefault(event_type, []).append(callback)
 
     def publish(self, event_type: str, data: dict) -> None:
         event = Event(type=event_type, data=data)
 
-        # Fire synchronous callbacks first (cache invalidation, etc.)
+        # Fire callbacks (sync inline, async scheduled as tasks)
         for cb in self._callbacks.get(event_type, []):
-            try:
-                cb(data)
-            except Exception as e:
-                logger.warning("Event callback error for %s: %s", event_type, e)
+            if inspect.iscoroutinefunction(cb):
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(cb(data))
+                except RuntimeError:
+                    pass  # No event loop running
+            else:
+                try:
+                    cb(data)
+                except Exception as e:
+                    logger.warning("Event callback error for %s: %s", event_type, e)
 
         dead: list[asyncio.Queue] = []
         for q in self._subscribers:
