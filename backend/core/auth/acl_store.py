@@ -256,10 +256,16 @@ class ACLStore:
         # Exact match (document override)
         entry = self._acl.get(path)
         if entry and not entry.get("inherited", True):
-            return {
-                "read": list(entry.get("read", [])),
-                "write": list(entry.get("write", [])),
-            }
+            read_list = list(entry.get("read", []))
+            write_list = list(entry.get("write", []))
+            owner = entry.get("owner", "")
+            if owner:
+                owner_principal = f"@{owner}"
+                if owner_principal not in read_list:
+                    read_list.append(owner_principal)
+                if owner_principal not in write_list:
+                    write_list.append(owner_principal)
+            return {"read": read_list, "write": write_list}
 
         # Walk up folders
         parts = path.split("/")
@@ -267,10 +273,16 @@ class ACLStore:
             folder_path = "/".join(parts[:i]) + "/"
             folder_entry = self._acl.get(folder_path)
             if folder_entry:
-                return {
-                    "read": list(folder_entry.get("read", [])),
-                    "write": list(folder_entry.get("write", [])),
-                }
+                read_list = list(folder_entry.get("read", []))
+                write_list = list(folder_entry.get("write", []))
+                owner = folder_entry.get("owner", "")
+                if owner:
+                    owner_principal = f"@{owner}"
+                    if owner_principal not in read_list:
+                        read_list.append(owner_principal)
+                    if owner_principal not in write_list:
+                        write_list.append(owner_principal)
+                return {"read": read_list, "write": write_list}
 
         # No ACL → empty (deny all)
         return {"read": [], "write": []}
@@ -327,8 +339,7 @@ class ACLStore:
             for field in ("read", "write", "manage"):
                 principals: list[str] = entry.get(field, [])
                 if old_name in principals:
-                    idx = principals.index(old_name)
-                    principals[idx] = new_name
+                    entry[field] = [new_name if p == old_name else p for p in principals]
                     changed = True
         if changed:
             self._save()
@@ -340,7 +351,7 @@ class ACLStore:
             for field in ("read", "write", "manage"):
                 principals: list[str] = entry.get(field, [])
                 if group_name in principals:
-                    principals.remove(group_name)
+                    entry[field] = [p for p in principals if p != group_name]
                     changed = True
         if changed:
             self._save()

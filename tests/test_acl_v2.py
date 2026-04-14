@@ -344,6 +344,56 @@ class TestComputeAccessScope:
         assert scope["read"] == ["@alice"]
         assert scope["write"] == ["@alice"]
 
+    def test_scope_includes_owner_doc_override(self):
+        """Owner principal must appear in scope even if not in read/write lists."""
+        acl = {
+            "wiki/hr/salary.md": {
+                "owner": "hr-admin",
+                "read": ["hr-lead"],
+                "write": ["hr-lead"],
+                "manage": ["hr-admin"],
+                "inherited": False,
+            }
+        }
+        store = _make_store(acl)
+        scope = store.compute_access_scope("wiki/hr/salary.md")
+        assert "@hr-admin" in scope["read"]
+        assert "@hr-admin" in scope["write"]
+        assert "hr-lead" in scope["read"]
+
+    def test_scope_includes_owner_folder_inheritance(self):
+        """Owner principal from parent folder must appear in inherited scope."""
+        acl = {
+            "wiki/hr/": {
+                "owner": "hr-admin",
+                "read": ["hr-team"],
+                "write": ["hr-team"],
+                "manage": [],
+                "inherited": False,
+            }
+        }
+        store = _make_store(acl)
+        scope = store.compute_access_scope("wiki/hr/policy.md")
+        assert "@hr-admin" in scope["read"]
+        assert "@hr-admin" in scope["write"]
+        assert "hr-team" in scope["read"]
+
+    def test_scope_no_duplicate_owner(self):
+        """If owner is already in the list as @user, don't duplicate."""
+        acl = {
+            "wiki/doc.md": {
+                "owner": "alice",
+                "read": ["@alice", "team-a"],
+                "write": ["@alice"],
+                "manage": [],
+                "inherited": False,
+            }
+        }
+        store = _make_store(acl)
+        scope = store.compute_access_scope("wiki/doc.md")
+        assert scope["read"].count("@alice") == 1
+        assert scope["write"].count("@alice") == 1
+
 
 class TestBatchGroupOperations:
     """Batch operations for group rename/removal."""
@@ -404,6 +454,42 @@ class TestBatchGroupOperations:
         assert "hr-team" not in entry["read"]
         assert "all" in entry["read"]  # 'all' should remain
         assert "hr-team" not in entry["write"]
+
+    def test_rename_handles_all_occurrences(self):
+        """If a group appears multiple times in a field, all must be renamed."""
+        acl = {
+            "wiki/test/": {
+                "owner": "",
+                "read": ["team-a", "team-a"],
+                "write": ["team-a"],
+                "manage": [],
+                "inherited": False,
+            },
+        }
+        store = _make_store(acl)
+        store.rename_group_references("team-a", "team-b")
+        entry = store.get_all()["wiki/test/"]
+        assert "team-a" not in entry["read"]
+        assert entry["read"].count("team-b") == 2
+        assert entry["write"] == ["team-b"]
+
+    def test_remove_handles_all_occurrences(self):
+        """If a group appears multiple times in a field, all must be removed."""
+        acl = {
+            "wiki/test/": {
+                "owner": "",
+                "read": ["team-a", "team-a", "other"],
+                "write": ["team-a"],
+                "manage": [],
+                "inherited": False,
+            },
+        }
+        store = _make_store(acl)
+        store.remove_group_references("team-a")
+        entry = store.get_all()["wiki/test/"]
+        assert "team-a" not in entry["read"]
+        assert entry["read"] == ["other"]
+        assert entry["write"] == []
 
 
 class TestGetAccessiblePrefixes:
