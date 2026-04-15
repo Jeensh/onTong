@@ -32,20 +32,23 @@ export function ImpactQueryPanel({ repoId }: { repoId: string }) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold mb-1">Impact Analysis</h2>
-        <p className="text-sm text-muted-foreground">Analyze change impact across code and domain processes</p>
+        <h2 className="text-lg font-semibold mb-1">영향분석</h2>
+        <p className="text-sm text-muted-foreground">
+          코드 엔티티나 도메인 프로세스를 검색하면, 변경 시 영향받는 범위를 보여줍니다.
+          매핑된 코드-도메인 관계를 기반으로 영향 경로를 추적합니다.
+        </p>
       </div>
 
       {/* Query input */}
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <label className="text-xs font-medium text-foreground">Search Term</label>
+        <label className="text-xs font-medium text-foreground">검색어</label>
         <div className="flex gap-2">
           <input
             type="text"
             value={term}
             onChange={(e) => setTerm(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="e.g. OrderService, demand_planning"
+            placeholder="예: OrderService, InventoryManager, DemandPlanning"
             className="flex-1 px-3 py-1.5 text-sm bg-background border border-border rounded"
           />
           <button
@@ -54,7 +57,7 @@ export function ImpactQueryPanel({ repoId }: { repoId: string }) {
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             {analyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
-            Analyze
+            분석
           </button>
         </div>
       </div>
@@ -74,7 +77,7 @@ export function ImpactQueryPanel({ repoId }: { repoId: string }) {
             <div className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-4">
               <div className="flex items-center gap-2 mb-1">
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
-                <span className="text-sm font-medium text-amber-700 dark:text-amber-400">Not Found</span>
+                <span className="text-sm font-medium text-amber-700 dark:text-amber-400">검색 결과 없음</span>
               </div>
               <p className="text-xs text-muted-foreground">{result.message}</p>
             </div>
@@ -83,21 +86,21 @@ export function ImpactQueryPanel({ repoId }: { repoId: string }) {
           {/* Source entity */}
           {result.resolved && (
             <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-              <p className="text-sm font-medium">Source</p>
+              <p className="text-sm font-medium">검색 대상</p>
               <div className="grid grid-cols-3 gap-4 text-xs">
                 <div>
-                  <span className="text-muted-foreground">Term: </span>
+                  <span className="text-muted-foreground">검색어: </span>
                   <span className="font-mono font-medium">{result.source_term}</span>
                 </div>
                 {result.source_code_entity && (
                   <div>
-                    <span className="text-muted-foreground">Code Entity: </span>
+                    <span className="text-muted-foreground">코드 엔티티: </span>
                     <span className="font-mono">{result.source_code_entity}</span>
                   </div>
                 )}
                 {result.source_domain && (
                   <div>
-                    <span className="text-muted-foreground">Domain: </span>
+                    <span className="text-muted-foreground">도메인: </span>
                     <span className="font-mono">{result.source_domain}</span>
                   </div>
                 )}
@@ -109,8 +112,8 @@ export function ImpactQueryPanel({ repoId }: { repoId: string }) {
           {result.affected_processes.length > 0 && (
             <div className="rounded-lg border border-border bg-card">
               <div className="px-4 py-2.5 border-b border-border bg-muted/30 flex items-center justify-between">
-                <span className="text-sm font-medium">Affected Processes</span>
-                <span className="text-xs text-muted-foreground">{result.affected_processes.length} found</span>
+                <span className="text-sm font-medium">영향받는 프로세스</span>
+                <span className="text-xs text-muted-foreground">{result.affected_processes.length}개</span>
               </div>
               <div className="divide-y divide-border">
                 {result.affected_processes.map((proc, i) => (
@@ -118,7 +121,7 @@ export function ImpactQueryPanel({ repoId }: { repoId: string }) {
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">{proc.domain_name}</span>
                       <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                        distance: {proc.distance}
+                        거리: {proc.distance}
                       </span>
                     </div>
                     {proc.path.length > 0 && (
@@ -144,7 +147,7 @@ export function ImpactQueryPanel({ repoId }: { repoId: string }) {
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
                 <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                  Unmapped Entities ({result.unmapped_entities.length})
+                  미매핑 엔티티 ({result.unmapped_entities.length}개)
                 </span>
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -171,8 +174,13 @@ export function ImpactQueryPanel({ repoId }: { repoId: string }) {
       {!result && !error && !analyzing && (
         <div className="text-center py-12 text-muted-foreground space-y-2">
           <Search className="h-8 w-8 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">Enter a search term and click Analyze.</p>
-          <p className="text-xs">Search for code entity names, class names, or domain process terms.</p>
+          <p className="text-sm">코드 엔티티 또는 도메인 프로세스를 검색하세요.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            검색 예시: <span className="font-mono">OrderService</span>, <span className="font-mono">InventoryManager</span>, <span className="font-mono">DemandPlanning</span>
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            해당 엔티티를 변경할 때 영향받는 도메인 프로세스와 연관 코드를 확인할 수 있습니다.
+          </p>
         </div>
       )}
     </div>

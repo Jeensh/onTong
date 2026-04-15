@@ -1611,10 +1611,6 @@ export function TreeNav() {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("ontong:tree-section-wiki") !== "false";
   });
-  const [sectionSkills, setSectionSkills] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
-    return localStorage.getItem("ontong:tree-section-skills") !== "false";
-  });
 
   const { user } = useAuth();
 
@@ -1629,13 +1625,6 @@ export function TreeNav() {
     setSectionWiki((v) => {
       const next = !v;
       localStorage.setItem("ontong:tree-section-wiki", String(next));
-      return next;
-    });
-  }, []);
-  const toggleSectionSkills = useCallback(() => {
-    setSectionSkills((v) => {
-      const next = !v;
-      localStorage.setItem("ontong:tree-section-skills", String(next));
       return next;
     });
   }, []);
@@ -2001,11 +1990,10 @@ export function TreeNav() {
           const myDocNodes = userId
             ? tree.filter((n) => n.path === `@${userId}` || n.path.startsWith(`@${userId}/`))
             : [];
-          const skillNodes = tree.filter((n) => n.path === "_skills" || n.path.startsWith("_skills/"));
           const wikiNodes = tree.filter(
             (n) =>
               !myDocNodes.includes(n) &&
-              !skillNodes.includes(n) &&
+              n.path !== "_skills" && !n.path.startsWith("_skills/") &&
               !(userId && (n.path === `@${userId}` || n.path.startsWith(`@${userId}/`)))
           );
 
@@ -2040,7 +2028,7 @@ export function TreeNav() {
             </>
           );
 
-          const useSections = userId && (myDocNodes.length > 0 || skillNodes.length > 0);
+          const useSections = userId && myDocNodes.length > 0;
 
           return (
             <>
@@ -2059,7 +2047,6 @@ export function TreeNav() {
                   <>
                     {myDocNodes.length > 0 && renderSection("내 문서", myDocNodes, sectionMyDocs, toggleSectionMyDocs)}
                     {wikiNodes.length > 0 && renderSection("위키", wikiNodes, sectionWiki, toggleSectionWiki)}
-                    {skillNodes.length > 0 && renderSection("스킬", skillNodes, sectionSkills, toggleSectionSkills)}
                   </>
                 ) : (
                   tree.map((node) => (

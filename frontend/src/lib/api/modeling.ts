@@ -184,3 +184,21 @@ export async function getPendingReviews(repoId: string): Promise<{ reviews: Revi
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+// ── Seed Data ──
+
+export interface SeedResult {
+  status: string;
+  repo_id: string;
+  files_parsed: number;
+  entities_count: number;
+  relations_count: number;
+  ontology_nodes: number;
+  mappings_created: number;
+}
+
+export async function seedScmDemo(): Promise<SeedResult> {
+  const res = await fetch(`${API_BASE}/api/modeling/seed/scm-demo`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

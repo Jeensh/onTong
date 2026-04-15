@@ -70,8 +70,10 @@ export function ApprovalList({ repoId }: { repoId: string }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold mb-1">Approval Queue</h2>
-          <p className="text-sm text-muted-foreground">Review and approve mapping requests</p>
+          <h2 className="text-lg font-semibold mb-1">검토 요청</h2>
+          <p className="text-sm text-muted-foreground">
+            매핑 관리에서 제출된 검토 요청을 승인하거나 반려합니다.
+          </p>
         </div>
         <button
           onClick={fetchReviews}
@@ -79,7 +81,7 @@ export function ApprovalList({ repoId }: { repoId: string }) {
           className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
           {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-          Refresh
+          새로고침
         </button>
       </div>
 
@@ -102,8 +104,10 @@ export function ApprovalList({ repoId }: { repoId: string }) {
       {!loading && reviews.length === 0 && !error && (
         <div className="text-center py-12 text-muted-foreground space-y-2">
           <CheckSquare className="h-8 w-8 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">No pending reviews.</p>
-          <p className="text-xs">Submit mapping reviews from the Mapping view.</p>
+          <p className="text-sm">대기 중인 검토 요청이 없습니다.</p>
+          <p className="text-xs">
+            &ldquo;매핑 관리&rdquo; 탭에서 매핑을 추가한 뒤 검토를 요청하세요.
+          </p>
         </div>
       )}
 
@@ -130,9 +134,9 @@ export function ApprovalList({ repoId }: { repoId: string }) {
 
                 {/* Meta */}
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span>Requested by: <strong>{review.requested_by}</strong></span>
-                  {review.reviewer && <span>Reviewer: <strong>{review.reviewer}</strong></span>}
-                  {review.comment && <span>Comment: {review.comment}</span>}
+                  <span>요청자: <strong>{review.requested_by}</strong></span>
+                  {review.reviewer && <span>검토자: <strong>{review.reviewer}</strong></span>}
+                  {review.comment && <span>사유: {review.comment}</span>}
                 </div>
 
                 {/* Actions */}
@@ -144,7 +148,7 @@ export function ApprovalList({ repoId }: { repoId: string }) {
                       className="inline-flex items-center gap-1 rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
                     >
                       {isProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                      Approve
+                      승인
                     </button>
                     {!isRejecting ? (
                       <button
@@ -153,7 +157,7 @@ export function ApprovalList({ repoId }: { repoId: string }) {
                         className="inline-flex items-center gap-1 rounded-md border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 px-3 py-1.5 text-xs font-medium hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-50"
                       >
                         <X className="h-3 w-3" />
-                        Reject
+                        반려
                       </button>
                     ) : (
                       <div className="flex items-center gap-2 flex-1">
@@ -161,7 +165,7 @@ export function ApprovalList({ repoId }: { repoId: string }) {
                           type="text"
                           value={rejectComment}
                           onChange={(e) => setRejectComment(e.target.value)}
-                          placeholder="Rejection reason..."
+                          placeholder="반려 사유를 입력하세요..."
                           className="flex-1 px-2 py-1 text-xs bg-background border border-border rounded"
                           autoFocus
                         />
@@ -171,13 +175,13 @@ export function ApprovalList({ repoId }: { repoId: string }) {
                           className="inline-flex items-center gap-1 rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
                         >
                           {isProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
-                          Confirm
+                          확인
                         </button>
                         <button
                           onClick={() => { setRejectingId(null); setRejectComment(""); }}
                           className="text-xs text-muted-foreground hover:text-foreground"
                         >
-                          Cancel
+                          취소
                         </button>
                       </div>
                     )}

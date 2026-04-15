@@ -143,8 +143,11 @@ export function DomainOntologyEditor({ repoId }: { repoId: string }) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold mb-1">Domain Ontology</h2>
-        <p className="text-sm text-muted-foreground">SCOR + ISA-95 process hierarchy</p>
+        <h2 className="text-lg font-semibold mb-1">도메인 온톨로지</h2>
+        <p className="text-sm text-muted-foreground">
+          SCOR+ISA-95 기반의 도메인 프로세스 트리입니다.
+          코드 엔티티를 매핑할 대상 도메인 구조를 정의합니다.
+        </p>
       </div>
 
       {/* Actions */}
@@ -155,28 +158,28 @@ export function DomainOntologyEditor({ repoId }: { repoId: string }) {
           className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
           {loadingTemplate ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Network className="h-3.5 w-3.5" />}
-          Load SCOR Template
+          SCOR 템플릿 로드
         </button>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
           className="inline-flex items-center gap-1.5 rounded-md border border-border px-4 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
         >
           <Plus className="h-3.5 w-3.5" />
-          Add Node
+          노드 추가
         </button>
         <button
           onClick={fetchTree}
           disabled={loading}
           className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-50"
         >
-          Refresh
+          새로고침
         </button>
       </div>
 
       {/* Add node form */}
       {showAddForm && (
         <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-          <p className="text-sm font-medium">Add Domain Node</p>
+          <p className="text-sm font-medium">도메인 노드 추가</p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-muted-foreground">ID</label>
@@ -184,7 +187,7 @@ export function DomainOntologyEditor({ repoId }: { repoId: string }) {
                 type="text"
                 value={newId}
                 onChange={(e) => setNewId(e.target.value)}
-                placeholder="e.g. scor.plan.demand"
+                placeholder="예: SCOR/Plan/DemandPlanning"
                 className="w-full mt-1 px-2 py-1.5 text-sm bg-background border border-border rounded"
               />
             </div>
@@ -194,7 +197,7 @@ export function DomainOntologyEditor({ repoId }: { repoId: string }) {
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="Demand Planning"
+                placeholder="예: 수요 계획"
                 className="w-full mt-1 px-2 py-1.5 text-sm bg-background border border-border rounded"
               />
             </div>
@@ -211,12 +214,12 @@ export function DomainOntologyEditor({ repoId }: { repoId: string }) {
               </select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Parent ID (optional)</label>
+              <label className="text-xs text-muted-foreground">상위 노드 ID (선택)</label>
               <input
                 type="text"
                 value={newParentId}
                 onChange={(e) => setNewParentId(e.target.value)}
-                placeholder="scor.plan"
+                placeholder="예: SCOR/Plan"
                 className="w-full mt-1 px-2 py-1.5 text-sm bg-background border border-border rounded"
               />
             </div>
@@ -226,7 +229,7 @@ export function DomainOntologyEditor({ repoId }: { repoId: string }) {
               onClick={() => setShowAddForm(false)}
               className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
             >
-              Cancel
+              취소
             </button>
             <button
               onClick={handleAddNode}
@@ -234,7 +237,7 @@ export function DomainOntologyEditor({ repoId }: { repoId: string }) {
               className="inline-flex items-center gap-1 rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {adding && <Loader2 className="h-3 w-3 animate-spin" />}
-              Add
+              추가
             </button>
           </div>
         </div>
@@ -259,8 +262,8 @@ export function DomainOntologyEditor({ repoId }: { repoId: string }) {
       {!loading && nodes.length > 0 && (
         <div className="rounded-lg border border-border bg-card">
           <div className="px-4 py-2.5 border-b border-border bg-muted/30 flex items-center justify-between">
-            <span className="text-sm font-medium">Ontology Tree</span>
-            <span className="text-xs text-muted-foreground">{nodes.length} nodes</span>
+            <span className="text-sm font-medium">온톨로지 트리</span>
+            <span className="text-xs text-muted-foreground">{nodes.length}개 노드</span>
           </div>
           <div className="py-1 max-h-[500px] overflow-auto">
             {tree.map((node) => (
@@ -274,8 +277,11 @@ export function DomainOntologyEditor({ repoId }: { repoId: string }) {
       {!loading && !error && nodes.length === 0 && (
         <div className="text-center py-12 text-muted-foreground space-y-2">
           <Network className="h-8 w-8 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">No domain nodes found.</p>
-          <p className="text-xs">Load the SCOR template or add nodes manually.</p>
+          <p className="text-sm">도메인 노드가 없습니다.</p>
+          <p className="text-xs">
+            &ldquo;SCOR 템플릿 로드&rdquo; 버튼으로 표준 프로세스 구조를 불러오거나,<br />
+            &ldquo;노드 추가&rdquo;로 직접 도메인 구조를 생성하세요.
+          </p>
         </div>
       )}
     </div>
