@@ -4,11 +4,33 @@
 > 사용자가 "이어서 하자"라고 하면: 이 문서 → `CHANGES.md`의 `[ ]` → `TODO.md` 순으로 확인.
 > 이 문서는 `~/.claude/`의 메모리/플랜이 따라오지 않는 환경(다른 컴퓨터로 디렉토리 복사 등)을 위한 백업.
 
-마지막 업데이트: 2026-04-12
+마지막 업데이트: 2026-04-14
 
 ---
 
 ## 1. 다음 세션 첫 작업
+
+### ACL Domain Scoping 완료 (2026-04-14)
+
+**브랜치**: `feat/acl-domain-scoping` — 16 commits, 100 tests, TS clean, E2E 검증 완료.
+
+기업용 ACL 시스템으로 전환 완료:
+- **ACL Store v2**: default-deny, owner/manage, 폴더 상속, 개인 공간(@username/), thread-safe
+- **Multi-user Auth**: X-User-Id 헤더 기반, users.json, 그룹 해석
+- **ChromaDB Access Scope**: access_read/access_write 메타데이터 → 검색/RAG/충돌감지 사전 필터링
+- **Group CRUD + ACL API**: 그룹 관리, ACL 설정, manage 권한 체크
+- **Frontend**: TreeNav 섹션 구조(내 문서/위키/스킬), ShareDialog, PropertiesPanel, ContextMenu, useAuth
+- **Migration**: `scripts/migrate_acl.py` (기존 위키 폴더 초기 ACL + 개인 공간 생성)
+
+**⚠️ 다음 작업 전 확인**:
+1. `feat/acl-domain-scoping` 브랜치를 main에 merge할지 결정
+2. 마이그레이션 실행 여부 확인 (`python scripts/migrate_acl.py`)
+3. reindex로 ChromaDB access_scope 반영 (`curl -X POST http://localhost:8001/api/wiki/reindex`)
+
+**다음 후보 작업** (HANDOFF.md 5번 섹션 Part 3 참조):
+- 3A: 미보호 엔드포인트 권한 추가 (wiki CRUD + reindex에 require_write/require_admin)
+- 3B: 스킬 CRUD 권한 (personal/shared 분리)
+- 3C: 프론트엔드 권한 기반 UI 분기 (편집/삭제 메뉴 숨김, 읽기전용 모드)
 
 ### Section 2 Modeling MVP 완료 (2026-04-12)
 

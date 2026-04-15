@@ -1,4 +1,62 @@
-# onTong 데모 가이드 (Wiki 완성 + Section 2 Modeling MVP 완료)
+# onTong 데모 가이드 (Wiki 완성 + Section 2 Modeling MVP + ACL Domain Scoping)
+
+---
+
+## ACL Domain Scoping (2026-04-14)
+
+> 기업용 접근 권한 시스템. 개인 공간, 세밀한 ACL, ChromaDB access_scope, 사이드바 구조화.  
+> **브랜치**: `feat/acl-domain-scoping`
+
+### 사전 준비
+```bash
+# 기존 환경 + ACL 마이그레이션 (최초 1회)
+python scripts/migrate_acl.py
+curl -X POST http://localhost:8001/api/wiki/reindex  # access_scope 반영
+```
+
+### 시나리오 1: 사용자 전환 + 트리 ACL 필터링
+1. 기본 사용자(donghae, admin)로 접속 → 모든 폴더 보임 (manage 권한)
+2. `X-User-Id: kim` 헤더로 API 호출:
+   ```bash
+   curl -s http://localhost:8001/api/wiki/tree -H "X-User-Id: kim"
+   ```
+3. **확인**: kim은 ACL이 `read=all`인 폴더 + 자신의 `@kim` 개인 공간만 보임
+4. donghae의 개인 공간(`@donghae/`)은 kim에게 안 보임
+
+### 시나리오 2: ACL 설정 (관리자)
+1. 관리자로 인프라 폴더에 ACL 설정:
+   ```bash
+   curl -X PUT "http://localhost:8001/api/acl/인프라/" \
+     -H "X-User-Id: donghae" -H "Content-Type: application/json" \
+     -d '{"read":["인프라팀"],"write":["인프라팀"],"manage":["@donghae"]}'
+   ```
+2. **확인**: 인프라팀이 아닌 사용자(kim)는 인프라 폴더 접근 불가
+3. ACL 해제하면 다시 접근 가능
+
+### 시나리오 3: 그룹 관리
+1. 그룹 생성:
+   ```bash
+   curl -X POST http://localhost:8001/api/groups \
+     -H "X-User-Id: donghae" -H "Content-Type: application/json" \
+     -d '{"id":"infra-team","name":"인프라팀","type":"department","members":["kim","lee"]}'
+   ```
+2. 그룹 목록 확인: `curl http://localhost:8001/api/groups -H "X-User-Id: donghae"`
+3. 멤버 추가/제거: PUT `/api/groups/infra-team/members`
+
+### 시나리오 4: 개인 공간
+1. `curl http://localhost:8001/api/wiki/tree/personal -H "X-User-Id: kim"`
+2. **확인**: `@kim/` 폴더만 반환됨
+3. donghae가 `@kim/` 접근 시도 → admin이므로 접근 가능
+4. lee가 `@kim/` 접근 시도 → 거부 (개인 공간은 본인+admin만)
+
+### 시나리오 5: 인증 확인
+1. `curl http://localhost:8001/api/auth/me -H "X-User-Id: donghae"`
+2. **확인**: `{"id":"donghae","name":"동해","roles":["admin"],"groups":[]}`
+
+### 트러블슈팅
+- **트리가 비어 보임**: 마이그레이션 미실행 → `python scripts/migrate_acl.py` 실행
+- **ACL 변경 미반영**: 서버의 ACL 파일 감시 주기 30초 → 최대 30초 대기 또는 서버 재시작
+- **ChromaDB 검색에서 권한 필터 미적용**: `curl -X POST http://localhost:8001/api/wiki/reindex` 실행
 
 ---
 

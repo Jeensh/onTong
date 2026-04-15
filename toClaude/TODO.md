@@ -1088,3 +1088,28 @@ Step 1-C 백엔드(1C-5)부터 시작해줘
 | PD-2 | GraphBuilder | [x] | `graph/graph_builder.py` — metadata.related/supersedes → related/supersedes, ConflictStore → conflicts |
 | PD-3 | Graph API + main.py 와이어링 | [x] | `api/graph.py` (GET /api/graph/{path}, GET /api/graph/stats), main.py 초기화 + tree_change 연동 |
 | PD-4 | Phase D 테스트 | [x] | `tests/test_phase_d_knowledge_graph.py` (22 pass) |
+
+---
+
+## ACL Domain Scoping (기업용 접근 권한 고도화)
+
+> 단일 풀 개인위키 → 기업용 ECM 변환. 개인 공간, 세밀한 ACL, ChromaDB access_scope, 사이드바 구조화.
+> 브랜치: `feat/acl-domain-scoping` | 16 commits | 100 tests
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| ACL-1 | User 모델 확장 + Group 모델 & GroupStore | [x] | `auth/models.py`, `auth/group_store.py`, `data/users.json` |
+| ACL-2 | ACL Store v2 (default-deny, owner/manage, inheritance) | [x] | `auth/acl_store.py` (31+2 tests) |
+| ACL-3 | NoOpProvider 다중 사용자 — X-User-Id 헤더, 그룹 해석 | [x] | `auth/noop_provider.py` (17 tests) |
+| ACL-4 | Access Scope 계산 모듈 — ChromaDB 필터용 | [x] | `auth/scope.py` (10 tests) |
+| ACL-5 | ChromaDB 메타데이터 확장 — access_read/access_write 주입 | [x] | `wiki_indexer.py`, `wiki_service.py` |
+| ACL-6 | 검색 ACL 스코핑 — search/RAG/conflict 사전 필터링 | [x] | `wiki_search.py`, `rag_agent.py`, `conflict_service.py` |
+| ACL-7 | Group CRUD API + ACL API 확장 (manage 권한 체크) | [x] | `api/group.py`, `api/acl.py` (25 tests) |
+| ACL-8 | main.py 통합 + acl_changed 이벤트 핸들러 | [x] | `main.py`, `event_bus.py` (async callback) |
+| ACL-9 | Frontend 타입 + API 클라이언트 + useAuth 훅 | [x] | `types/auth.ts`, `lib/api/acl.ts`, `hooks/useAuth.ts` |
+| ACL-10 | 공통 ContextMenu 컴포넌트 (뷰포트 보정) | [x] | `components/ContextMenu.tsx` |
+| ACL-11 | ShareDialog + PropertiesPanel | [x] | `components/ShareDialog.tsx`, `components/PropertiesPanel.tsx` |
+| ACL-12 | TreeNav 섹션 분리 (내 문서/위키/스킬) + ACL 아이콘 | [x] | `components/TreeNav.tsx` |
+| ACL-13 | Backend tree API ACL 필터링 + 개인 공간 엔드포인트 | [x] | `api/wiki.py`, `core/schemas.py` |
+| ACL-14 | 마이그레이션 스크립트 | [x] | `scripts/migrate_acl.py` |
+| ACL-15 | 통합 검증 + 디렉터리 경로 해석 버그 수정 | [x] | 100 tests pass, TS clean, E2E API 검증 |
