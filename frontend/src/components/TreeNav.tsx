@@ -2119,7 +2119,7 @@ export function TreeNav() {
           {
             label: "새 문서",
             icon: <FilePlus className="h-3.5 w-3.5" />,
-            visible: isRoot || isDir,
+            visible: (isRoot || isDir) && canWrite,
             action: () => {
               const p = isRoot ? "__root__" : node!.path;
               setCreatingIn(p); setCreatingType("file");
@@ -2129,7 +2129,7 @@ export function TreeNav() {
           {
             label: "새 폴더",
             icon: <FolderPlus className="h-3.5 w-3.5" />,
-            visible: isRoot || isDir,
+            visible: (isRoot || isDir) && canWrite,
             action: () => {
               const p = isRoot ? "__root__" : node!.path;
               setCreatingIn(p); setCreatingType("folder");
@@ -2147,7 +2147,7 @@ export function TreeNav() {
           {
             label: "새 버전 만들기",
             icon: <Copy className="h-3.5 w-3.5" />,
-            visible: !isRoot && !isDir && node!.path.endsWith(".md") && deprecatedMap[node!.path] !== "deprecated",
+            visible: !isRoot && !isDir && canWrite && node!.path.endsWith(".md") && deprecatedMap[node!.path] !== "deprecated",
             action: () => { handleNewVersionOpen(node!.path); setContextMenu(null); },
           },
           {

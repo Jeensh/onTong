@@ -13,7 +13,7 @@ from backend.application.wiki.wiki_service import WikiService, index_status
 from backend.application.trust.confidence_service import ConfidenceService
 from backend.application.trust.scoring_config import SCORING
 from backend.core.auth import User, get_current_user
-from backend.core.auth.permission import require_read, require_write
+from backend.core.auth.permission import require_admin, require_read, require_write
 from backend.core.schemas import WikiFile, WikiTreeNode
 
 # Path traversal / injection patterns
@@ -220,7 +220,7 @@ async def save_file(path: str, body: SaveRequest, user: User = Depends(require_w
 
 
 @router.patch("/file/{path:path}")
-async def move_file(path: str, body: MoveRequest):
+async def move_file(path: str, body: MoveRequest, user: User = Depends(require_write)):
     """Rename or move a wiki file."""
     result = await _svc().move_file(path, body.new_path)
     if result is None:
@@ -329,7 +329,7 @@ async def create_new_version(body: CreateNewVersionRequest, user: User = Depends
 
 
 @router.post("/folder/{path:path}")
-async def create_folder(path: str):
+async def create_folder(path: str, user: User = Depends(require_write)):
     """Create a folder inside the wiki directory."""
     created = await _svc().create_folder(path)
     if not created:
@@ -338,7 +338,7 @@ async def create_folder(path: str):
 
 
 @router.patch("/folder/{path:path}")
-async def move_folder(path: str, body: MoveRequest):
+async def move_folder(path: str, body: MoveRequest, user: User = Depends(require_write)):
     """Rename or move a folder."""
     result = await _svc().move_folder(path, body.new_path)
     if not result:
@@ -347,7 +347,7 @@ async def move_folder(path: str, body: MoveRequest):
 
 
 @router.delete("/folder/{path:path}")
-async def delete_folder(path: str):
+async def delete_folder(path: str, user: User = Depends(require_write)):
     """Delete an empty folder from the wiki directory."""
     deleted = await _svc().delete_folder(path)
     if not deleted:
@@ -356,7 +356,7 @@ async def delete_folder(path: str):
 
 
 @router.post("/reindex")
-async def reindex(force: bool = False):
+async def reindex(force: bool = False, user: User = Depends(require_admin)):
     """Trigger reindex of wiki files. With force=true, reindex all regardless of hash."""
     count = await _svc().reindex_all(force=force)
     return {"total_chunks": count}
@@ -376,7 +376,7 @@ async def get_index_status():
 
 
 @router.post("/reindex/{path:path}")
-async def reindex_file(path: str):
+async def reindex_file(path: str, user: User = Depends(require_admin)):
     """Reindex a specific file (queue for background indexing)."""
     _validate_path(path)
     svc = _svc()
@@ -393,7 +393,7 @@ REINDEX_BATCH_LIMIT = 100  # max concurrent reindex tasks per call
 
 
 @router.post("/reindex-pending")
-async def reindex_pending():
+async def reindex_pending(user: User = Depends(require_admin)):
     """Reindex pending (stale) files, capped at REINDEX_BATCH_LIMIT per call.
 
     At 100K+ scale, creating unbounded async tasks would exhaust memory.

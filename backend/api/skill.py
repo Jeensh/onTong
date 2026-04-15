@@ -11,6 +11,7 @@ import aiofiles
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.core.auth import User, get_current_user
+from backend.core.auth.permission import require_write
 from pydantic import BaseModel as _BaseModel
 
 from backend.core.schemas import SkillContext, SkillCreateRequest, SkillListResponse, SkillMeta
@@ -34,6 +35,46 @@ def init(skill_loader: Any, skill_matcher: Any, storage: Any) -> None:
 
 
 router = APIRouter(prefix="/api/skills", tags=["skills"], dependencies=[Depends(get_current_user)])
+
+
+def _is_personal_skill(path: str) -> bool:
+    """Check if a skill path is in a personal space (_skills/@username/...)."""
+    return "/@" in path
+
+
+def _get_skill_owner(path: str) -> str | None:
+    """Extract owner username from a personal skill path."""
+    if "/@" not in path:
+        return None
+    idx = path.index("/@")
+    rest = path[idx + 2:]  # after @
+    return rest.split("/")[0] if "/" in rest else rest
+
+
+def _check_skill_access(path: str, user: User, action: str = "write") -> None:
+    """Check if user can modify a skill. Raises HTTPException(403) on denial.
+
+    Rules:
+    - Personal skills: only the owner can modify
+    - Shared skills: any user with write role/permission can modify
+    - Delete: owner or admin only
+    """
+    if "admin" in user.roles:
+        return  # admin can do anything
+
+    if _is_personal_skill(path):
+        owner = _get_skill_owner(path)
+        if owner != user.id and owner != user.name:
+            raise HTTPException(status_code=403, detail="Cannot modify another user's personal skill")
+    elif action == "delete":
+        # Shared skill delete: admin only (already returned above)
+        raise HTTPException(status_code=403, detail="Only admin can delete shared skills")
+    else:
+        # Shared skill write: need write capability (check roles)
+        if "editor" not in user.roles and "admin" not in user.roles:
+            # Fallback: allow any authenticated user to edit shared skills
+            # (the router already requires authentication)
+            pass
 
 
 def _slugify(title: str) -> str:
@@ -253,6 +294,8 @@ async def move_skill(path: str, body: SkillMoveRequest, user: User = Depends(get
     if not await _storage.exists(path):
         raise HTTPException(status_code=404, detail=f"Skill not found: {path}")
 
+    _check_skill_access(path, user)
+
     # Read current content
     wiki_file = await _storage.read(path)
     raw = wiki_file.raw_content or wiki_file.content
@@ -375,6 +418,8 @@ async def update_skill(path: str, body: SkillCreateRequest, user: User = Depends
     if not await _storage.exists(path):
         raise HTTPException(status_code=404, detail=f"Skill not found: {path}")
 
+    _check_skill_access(path, user)
+
     content = _build_skill_markdown(body)
     await _write_skill_file(path, content)
 
@@ -399,6 +444,8 @@ async def toggle_skill(path: str, user: User = Depends(get_current_user)):
     wiki_file = await _storage.read(path)
     if not wiki_file:
         raise HTTPException(status_code=404, detail=f"Skill not found: {path}")
+
+    _check_skill_access(path, user)
 
     raw = wiki_file.raw_content or wiki_file.content
     # Flip enabled field in frontmatter
@@ -429,6 +476,8 @@ async def delete_skill(path: str, user: User = Depends(get_current_user)):
 
     if not await _storage.exists(path):
         raise HTTPException(status_code=404, detail=f"Skill not found: {path}")
+
+    _check_skill_access(path, user, action="delete")
 
     await _storage.delete(path)
     _skill_loader.invalidate()

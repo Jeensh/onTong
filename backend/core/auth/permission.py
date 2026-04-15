@@ -50,6 +50,15 @@ async def require_manage(
     return user
 
 
+async def require_admin(
+    user: User = Depends(get_current_user),
+) -> User:
+    """Dependency that requires admin role."""
+    if "admin" not in user.roles:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
 def _extract_path(request: Request) -> str | None:
     """Extract wiki file path from request path parameters."""
     return request.path_params.get("path")
