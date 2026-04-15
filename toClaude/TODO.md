@@ -1113,3 +1113,11 @@ Step 1-C 백엔드(1C-5)부터 시작해줘
 | ACL-13 | Backend tree API ACL 필터링 + 개인 공간 엔드포인트 | [x] | `api/wiki.py`, `core/schemas.py` |
 | ACL-14 | 마이그레이션 스크립트 | [x] | `scripts/migrate_acl.py` |
 | ACL-15 | 통합 검증 + 디렉터리 경로 해석 버그 수정 | [x] | 100 tests pass, TS clean, E2E API 검증 |
+
+### Part 3: 엔드포인트 권한 강화
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| P3-A | require_admin + 미보호 엔드포인트 권한 적용 | [x] | `permission.py`, `api/wiki.py` |
+| P3-B | 스킬 CRUD 권한 (personal=본인, shared delete=admin) | [x] | `api/skill.py` |
+| P3-C | 프론트엔드 권한 기반 UI 분기 (메뉴 숨김 + 읽기전용 배너) | [x] | `TreeNav.tsx`, `MarkdownEditor.tsx` |

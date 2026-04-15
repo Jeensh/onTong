@@ -53,6 +53,24 @@ curl -X POST http://localhost:8001/api/wiki/reindex  # access_scope 반영
 1. `curl http://localhost:8001/api/auth/me -H "X-User-Id: donghae"`
 2. **확인**: `{"id":"donghae","name":"동해","roles":["admin"],"groups":[]}`
 
+### 시나리오 6: 엔드포인트 권한 (Part 3)
+1. **reindex는 admin만**:
+   ```bash
+   curl -s -X POST http://localhost:8001/api/wiki/reindex -H "X-User-Id: kim"
+   # → {"detail":"Admin access required"}
+   curl -s -X POST http://localhost:8001/api/wiki/reindex -H "X-User-Id: donghae"
+   # → {"total_chunks": N}
+   ```
+2. **읽기전용 폴더에서 생성 거부**:
+   ```bash
+   # 인사/ 폴더를 read-only로 설정
+   curl -X PUT "http://localhost:8001/api/acl/인사/" -H "X-User-Id: donghae" \
+     -H "Content-Type: application/json" -d '{"read":["all"],"write":["admin"]}'
+   # kim이 폴더 생성 시도 → 403
+   curl -X POST "http://localhost:8001/api/wiki/folder/인사/test" -H "X-User-Id: kim"
+   ```
+3. **에디터 읽기전용 배너**: write 권한 없는 문서 열면 "편집 권한이 없습니다" 배너 표시
+
 ### 트러블슈팅
 - **트리가 비어 보임**: 마이그레이션 미실행 → `python scripts/migrate_acl.py` 실행
 - **ACL 변경 미반영**: 서버의 ACL 파일 감시 주기 30초 → 최대 30초 대기 또는 서버 재시작

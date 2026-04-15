@@ -27,10 +27,12 @@
 2. 마이그레이션 실행 여부 확인 (`python scripts/migrate_acl.py`)
 3. reindex로 ChromaDB access_scope 반영 (`curl -X POST http://localhost:8001/api/wiki/reindex`)
 
-**다음 후보 작업** (HANDOFF.md 5번 섹션 Part 3 참조):
-- 3A: 미보호 엔드포인트 권한 추가 (wiki CRUD + reindex에 require_write/require_admin)
-- 3B: 스킬 CRUD 권한 (personal/shared 분리)
-- 3C: 프론트엔드 권한 기반 UI 분기 (편집/삭제 메뉴 숨김, 읽기전용 모드)
+**Part 3 완료** (2026-04-15):
+- 3A: require_admin (reindex) + require_write (create/move/delete folder/file) ✅
+- 3B: 스킬 CRUD 권한 (personal=본인, shared delete=admin) ✅
+- 3C: 프론트엔드 UI 분기 (메뉴 숨김 + "편집 권한 없습니다" 읽기전용 배너) ✅
+
+**다음 후보 작업**: Part 2 (충돌 & Lineage) — HANDOFF 4번 섹션 참조
 
 ### Section 2 Modeling MVP 완료 (2026-04-12)
 
@@ -201,7 +203,7 @@ API 호출로 4그룹 모두 정상 검출 확인됨. 브라우저 UI 검증만 
 
 ---
 
-## 5. Part 3 (권한 관리) — 미착수
+## 5. Part 3 (권한 관리) — ✅ 완료 (2026-04-15)
 
 ### 3A. 미보호 엔드포인트 권한 추가
 **파일**: `backend/api/wiki.py`
