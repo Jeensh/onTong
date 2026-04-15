@@ -2066,7 +2066,6 @@ export function TreeNav() {
                   ))
                 )}
               </RootDropZone>
-              <UnusedImagesPanel />
             </>
           );
         })()}
@@ -2080,7 +2079,12 @@ export function TreeNav() {
         )}
 
         {section === "settings" && (
-          <SettingsSection onOpenVirtualTab={openVirtualTab} />
+          <div className="flex flex-col h-full">
+            <div className="flex-1 overflow-auto">
+              <SettingsSection onOpenVirtualTab={openVirtualTab} />
+            </div>
+            <UnusedImagesPanel />
+          </div>
         )}
       </div>
 
