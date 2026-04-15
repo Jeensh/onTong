@@ -281,6 +281,44 @@ class ConflictDetectionService:
             })
         return results
 
+    def get_grouped_pairs(
+        self,
+        filter_mode: str = "unresolved",
+        threshold: float | None = None,
+    ) -> list[dict]:
+        """Group conflict pairs by file_a: "A conflicts with [B, C, D]".
+
+        Returns list of dicts:
+          { "file": "path/a.md", "conflicts": [ { "file": "b.md", "similarity": 0.9, ... }, ... ] }
+        """
+        pairs = self.get_pairs(filter_mode=filter_mode, threshold=threshold)
+        groups: dict[str, list[DuplicatePair]] = {}
+        for pair in pairs:
+            groups.setdefault(pair.file_a, []).append(pair)
+            # Also index by file_b to catch reverse direction
+            if pair.file_b not in groups:
+                groups.setdefault(pair.file_b, [])
+        # Merge: for each unique file, collect all conflicting files
+        seen_pairs: set[tuple[str, str]] = set()
+        result: list[dict] = []
+        for file_key in sorted(groups.keys()):
+            conflicts = []
+            for pair in groups[file_key]:
+                other = pair.file_b if pair.file_a == file_key else pair.file_a
+                pair_id = tuple(sorted([file_key, other]))
+                if pair_id in seen_pairs:
+                    continue
+                seen_pairs.add(pair_id)
+                conflicts.append({
+                    "file": other,
+                    "similarity": pair.similarity,
+                    "resolved": pair.resolved,
+                    "meta": pair.meta_b if pair.file_a == file_key else pair.meta_a,
+                })
+            if conflicts:
+                result.append({"file": file_key, "conflicts": conflicts})
+        return result
+
     def resolve_pair(self, file_a: str, file_b: str, resolved_by: str, action: str) -> bool:
         """Mark a conflict pair as resolved."""
         return self.store.resolve_pair(file_a, file_b, resolved_by, action)

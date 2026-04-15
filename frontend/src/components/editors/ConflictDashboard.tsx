@@ -399,6 +399,36 @@ export function ConflictDashboard() {
           </div>
         )}
 
+        {/* Grouped summary — show when multiple conflicts share the same file */}
+        {!loading && pairs.length > 2 && (() => {
+          const fileCount = new Map<string, number>();
+          for (const p of pairs) {
+            fileCount.set(p.file_a, (fileCount.get(p.file_a) || 0) + 1);
+            fileCount.set(p.file_b, (fileCount.get(p.file_b) || 0) + 1);
+          }
+          const hotFiles = Array.from(fileCount.entries())
+            .filter(([, count]) => count >= 2)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5);
+          if (hotFiles.length === 0) return null;
+          return (
+            <div className="rounded-md border bg-muted/30 p-3 space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">여러 문서와 충돌하는 파일:</p>
+              {hotFiles.map(([file, count]) => (
+                <button
+                  key={file}
+                  className="flex items-center gap-2 text-xs hover:text-primary transition-colors w-full text-left"
+                  onClick={() => openTab(file)}
+                >
+                  <FileText className="h-3 w-3 flex-shrink-0" />
+                  <span className="truncate flex-1">{file.replace(/\.md$/, "")}</span>
+                  <span className="text-muted-foreground">{count}건 충돌</span>
+                </button>
+              ))}
+            </div>
+          );
+        })()}
+
         {!loading && pairs.length > 0 && (
           <div className="space-y-3">
             {pairs.map((pair) => {

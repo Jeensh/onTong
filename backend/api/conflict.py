@@ -56,6 +56,16 @@ async def get_duplicates(
     return svc.get_pairs(filter_mode=filter, threshold=threshold)
 
 
+@router.get("/grouped")
+async def get_grouped_duplicates(
+    threshold: float = Query(default=SIMILARITY_THRESHOLD, ge=0.5, le=1.0),
+    filter: str = Query(default="unresolved", pattern="^(unresolved|resolved|all)$"),
+):
+    """Return conflicts grouped by file: 'A conflicts with [B, C]'."""
+    svc = _conflict()
+    return svc.get_grouped_pairs(filter_mode=filter, threshold=threshold)
+
+
 @router.post("/full-scan")
 async def trigger_full_scan(
     threshold: float = Query(default=SIMILARITY_THRESHOLD, ge=0.5, le=1.0),
