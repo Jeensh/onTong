@@ -371,10 +371,10 @@ function DraggableTreeItem({
               <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             )}
             {expanded
-              ? <FolderOpen className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              : <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              ? <FolderOpen className={`h-3.5 w-3.5 shrink-0 ${node.name.startsWith("@") ? "text-emerald-500" : node.name.startsWith("_") ? "text-muted-foreground/50" : "text-primary/70"}`} />
+              : <Folder className={`h-3.5 w-3.5 shrink-0 ${node.name.startsWith("@") ? "text-emerald-500" : node.name.startsWith("_") ? "text-muted-foreground/50" : "text-primary/70"}`} />
             }
-            <span className="truncate flex-1">{node.name}</span>
+            <span className={`truncate flex-1 ${node.name.startsWith("_") ? "text-muted-foreground" : ""}`}>{node.name}</span>
             {node.my_permission === "read" && (
               <span title="읽기 전용"><Lock className="h-3 w-3 shrink-0 text-muted-foreground/60 ml-1" /></span>
             )}
