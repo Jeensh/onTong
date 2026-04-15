@@ -195,10 +195,104 @@ export interface SeedResult {
   relations_count: number;
   ontology_nodes: number;
   mappings_created: number;
+  sim_entities?: number;
 }
 
 export async function seedScmDemo(): Promise<SeedResult> {
   const res = await fetch(`${API_BASE}/api/modeling/seed/scm-demo`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// ── Engine API ──
+
+export interface EngineQueryRequest {
+  query: string;
+  repo_id: string;
+  depth?: number;
+  use_llm?: boolean;
+}
+
+export interface SimulationParam {
+  entity_id: string;
+  param_name: string;
+  param_type: string;
+  default_value: string;
+  current_value: string;
+  min_value: string | null;
+  max_value: string | null;
+  step: string | null;
+  unit: string;
+  description: string;
+  formula: string | null;
+}
+
+export interface SimulationOutput {
+  metric_name: string;
+  label: string;
+  before_value: string;
+  after_value: string;
+  change_pct: number;
+  unit: string;
+}
+
+export interface AffectedProcessRef {
+  domain_id: string;
+  domain_name: string;
+  distance: number;
+}
+
+export interface ParametricSimResult {
+  entity_id: string;
+  entity_name: string;
+  params_before: Record<string, string>;
+  params_after: Record<string, string>;
+  outputs: SimulationOutput[];
+  affected_processes: AffectedProcessRef[];
+  message: string;
+}
+
+export interface EngineStatus {
+  repo_id: string;
+  mapping_count: number;
+  total_mappings: number;
+  simulatable_entities: number;
+  total_registered: number;
+  ready: boolean;
+}
+
+export async function engineQuery(query: string, repoId: string, useLlm = false): Promise<ImpactResult> {
+  const res = await fetch(`${API_BASE}/api/modeling/engine/query`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, repo_id: repoId, use_llm: useLlm }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function engineSimulate(
+  entityId: string,
+  repoId: string,
+  params: Record<string, string>,
+): Promise<ParametricSimResult> {
+  const res = await fetch(`${API_BASE}/api/modeling/engine/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ entity_id: entityId, repo_id: repoId, params }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function engineGetParams(entityId: string): Promise<{ params: SimulationParam[] }> {
+  const res = await fetch(`${API_BASE}/api/modeling/engine/params/${entityId}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function engineStatus(repoId: string): Promise<EngineStatus> {
+  const res = await fetch(`${API_BASE}/api/modeling/engine/status?repo_id=${repoId}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
