@@ -1936,7 +1936,7 @@ export function TreeNav() {
   if (error) return <div className="p-3 text-sm text-destructive">트리 로드 실패: {error}</div>;
 
   const sectionBtnClass = (s: SidebarSection) =>
-    `p-1.5 rounded transition-colors ${section === s ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`;
+    `flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${section === s ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`;
 
   return (
     <DndContext
@@ -1950,16 +1950,20 @@ export function TreeNav() {
         <div className="flex items-center px-3 py-2 border-b shrink-0">
           <div className="flex items-center gap-1 flex-1">
             <button onClick={() => setSection("files")} className={sectionBtnClass("files")} title="파일 트리">
-              <FolderTree className="h-3.5 w-3.5" />
+              <FolderTree className="h-3.5 w-3.5 shrink-0" />
+              <span>파일</span>
             </button>
             <button onClick={() => setSection("tags")} className={sectionBtnClass("tags")} title="태그 브라우저">
-              <Tags className="h-3.5 w-3.5" />
+              <Tags className="h-3.5 w-3.5 shrink-0" />
+              <span>태그</span>
             </button>
             <button onClick={() => setSection("skills")} className={sectionBtnClass("skills")} title="스킬 — AI 응답을 커스터마이징하는 템플릿">
-              <Zap className="h-3.5 w-3.5" />
+              <Zap className="h-3.5 w-3.5 shrink-0" />
+              <span>스킬</span>
             </button>
             <button onClick={() => setSection("settings")} className={sectionBtnClass("settings")} title="관리">
-              <Settings className="h-3.5 w-3.5" />
+              <Settings className="h-3.5 w-3.5 shrink-0" />
+              <span>관리</span>
             </button>
           </div>
           <button onClick={() => openSearch(true)}
