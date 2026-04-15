@@ -144,7 +144,8 @@ def _calc_shipment_tracker(params: dict[str, str]) -> list[SimulationOutput]:
     d_interval = 4.0
     checks_per_day_before = 24 / d_interval
     checks_per_day_after = 24 / interval
-    detected_before = 10 if 24 <= 24 else 5
+    d_threshold = 24.0
+    detected_before = 10 if d_threshold <= 24 else 5
     detected_after = 10 if delay_threshold <= 24 else 5
     return [
         SimulationOutput(metric_name="daily_checks", label="일 추적 횟수",

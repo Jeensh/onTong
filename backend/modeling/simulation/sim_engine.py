@@ -45,6 +45,18 @@ class SimulationEngine:
         defaults = {p.param_name: p.default_value for p in registered_params}
         full_params = {**defaults, **params}
 
+        # Clamp params to registered min/max to prevent division-by-zero
+        for rp in registered_params:
+            val = full_params.get(rp.param_name, rp.default_value)
+            try:
+                fval = float(val)
+                if rp.min_value is not None and fval < float(rp.min_value):
+                    full_params[rp.param_name] = rp.min_value
+                if rp.max_value is not None and fval > float(rp.max_value):
+                    full_params[rp.param_name] = rp.max_value
+            except (ValueError, TypeError):
+                full_params[rp.param_name] = rp.default_value
+
         # Run calculation
         outputs = SimRegistry.calculate(entity_id, full_params)
 
