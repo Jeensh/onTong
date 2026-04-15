@@ -1,1 +1,1 @@
-"""Simulation execution engine — parametric models, Monte Carlo, job queue."""
+"""Simulation engine — parametric models for code entity what-if analysis."""
