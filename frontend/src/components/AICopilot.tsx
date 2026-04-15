@@ -799,13 +799,21 @@ export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {
       {/* Messages */}
       <div className="flex-1 overflow-auto px-4 py-3 space-y-4">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
-            <Sparkles className="h-8 w-8 opacity-30" />
-            <p className="text-sm">Wiki에 대해 질문해보세요</p>
-            <div className="text-xs space-y-1 text-center opacity-70">
-              <p>&quot;주문 처리 규칙 알려줘&quot;</p>
-              <p>&quot;DG320 에러 대응 방법은?&quot;</p>
-              <p>&quot;캐시 장애 대응 문서 만들어줘&quot;</p>
+          <div className="flex flex-col items-center justify-center h-full gap-4">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Sparkles className="h-6 w-6 text-primary" />
+            </div>
+            <p className="text-sm font-medium text-foreground">Wiki에 대해 질문해보세요</p>
+            <div className="flex flex-col gap-2 w-full max-w-[240px]">
+              {["주문 처리 규칙 알려줘", "DG320 에러 대응 방법은?", "캐시 장애 대응 문서 만들어줘"].map((q) => (
+                <button
+                  key={q}
+                  onClick={() => { setInput(q); }}
+                  className="text-xs text-left px-3 py-2 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/20 transition-all text-muted-foreground hover:text-foreground"
+                >
+                  &quot;{q}&quot;
+                </button>
+              ))}
             </div>
           </div>
         )}
