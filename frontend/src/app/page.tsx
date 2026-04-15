@@ -185,14 +185,14 @@ export default function Home() {
                 </div>
               </Panel>
 
-              <PanelResizeHandle className="w-1 bg-border hover:bg-primary/30 transition-colors cursor-col-resize" />
+              <PanelResizeHandle className="w-1.5 bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors cursor-col-resize group relative after:absolute after:inset-y-0 after:-inset-x-1 after:content-['']" />
 
               {/* Center: Workspace */}
               <Panel defaultSize={55} minSize={30}>
                 <WorkspacePanel />
               </Panel>
 
-              <PanelResizeHandle className="w-1 bg-border hover:bg-primary/30 transition-colors cursor-col-resize" />
+              <PanelResizeHandle className="w-1.5 bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors cursor-col-resize group relative after:absolute after:inset-y-0 after:-inset-x-1 after:content-['']" />
 
               {/* Right: AI Copilot (collapsible) */}
               <Panel
