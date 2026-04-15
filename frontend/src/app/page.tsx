@@ -16,7 +16,7 @@ import { useWorkspaceStore } from "@/lib/workspace/useWorkspaceStore";
 import { SectionNav } from "@/components/sections/SectionNav";
 import { SimulationSection } from "@/components/simulation/SimulationSection";
 import { ModelingSection } from "@/components/sections/ModelingSection";
-import { FolderTree, Sparkles, PanelRightClose } from "lucide-react";
+import { FolderTree, Sparkles, PanelRightClose, FileText, MessageSquare } from "lucide-react";
 
 function readBool(key: string, fallback: boolean): boolean {
   if (typeof window === "undefined") return fallback;
@@ -33,6 +33,18 @@ export default function Home() {
   const [treeCollapsed, setTreeCollapsed] = useState(() => readBool("ontong_panel_tree_collapsed", false));
   const [aiCollapsed, setAiCollapsed] = useState(() => readBool("ontong_panel_ai_collapsed", false));
   const [aiPopout, setAiPopout] = useState(false);
+
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<"tree" | "content" | "ai">("content");
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   // Popout floating window drag state
   const [popoutPos, setPopoutPos] = useState({ x: 0, y: 0 });
@@ -155,7 +167,40 @@ export default function Home() {
       <SectionNav />
       <SearchCommandPalette />
       <div className="flex-1 min-h-0">
-        {activeSection === "wiki" && (
+        {activeSection === "wiki" && (isMobile ? (
+          /* Mobile: single panel + bottom nav */
+          <div className="flex flex-col h-full">
+            <div className="flex-1 min-h-0 overflow-auto">
+              {mobilePanel === "tree" && <TreeNav />}
+              {mobilePanel === "content" && <WorkspacePanel />}
+              {mobilePanel === "ai" && <AICopilot />}
+            </div>
+            <nav className="flex items-center justify-around h-12 border-t bg-background shrink-0">
+              <button
+                onClick={() => setMobilePanel("tree")}
+                className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-md transition-colors ${mobilePanel === "tree" ? "text-primary" : "text-muted-foreground"}`}
+              >
+                <FolderTree className="h-5 w-5" />
+                <span className="text-[10px] font-medium">파일</span>
+              </button>
+              <button
+                onClick={() => setMobilePanel("content")}
+                className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-md transition-colors ${mobilePanel === "content" ? "text-primary" : "text-muted-foreground"}`}
+              >
+                <FileText className="h-5 w-5" />
+                <span className="text-[10px] font-medium">문서</span>
+              </button>
+              <button
+                onClick={() => setMobilePanel("ai")}
+                className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-md transition-colors ${mobilePanel === "ai" ? "text-primary" : "text-muted-foreground"}`}
+              >
+                <MessageSquare className="h-5 w-5" />
+                <span className="text-[10px] font-medium">AI</span>
+              </button>
+            </nav>
+          </div>
+        ) : (
+          /* Desktop: resizable three-panel layout */
           <div className="flex h-full">
             {/* Collapsed strip for tree */}
             {treeCollapsed && (
@@ -233,7 +278,7 @@ export default function Home() {
               </button>
             )}
           </div>
-        )}
+        ))}
 
         {activeSection === "modeling" && <ModelingSection />}
 
