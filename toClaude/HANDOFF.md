@@ -32,7 +32,9 @@
 - 3B: 스킬 CRUD 권한 (personal=본인, shared delete=admin) ✅
 - 3C: 프론트엔드 UI 분기 (메뉴 숨김 + "편집 권한 없습니다" 읽기전용 배너) ✅
 
-**다음 후보 작업**: Part 2 (충돌 & Lineage) — HANDOFF 4번 섹션 참조
+**Part 2 완료** (2026-04-15): 2A~2C 기존 구현 확인, 2D 충돌 쌍 그룹핑 신규 구현.
+
+**다음 후보 작업**: 사용자 논의 필요 (Part 2+3 모두 완료, ACL 기능 전체 구현 완료)
 
 ### Section 2 Modeling MVP 완료 (2026-04-12)
 
@@ -178,7 +180,7 @@ API 호출로 4그룹 모두 정상 검출 확인됨. 브라우저 UI 검증만 
 
 ---
 
-## 4. Part 2 (충돌 & Lineage) — 다음 작업
+## 4. Part 2 (충돌 & Lineage) — ✅ 완료 (2026-04-15)
 
 ### 2A. Lineage 사이클 감지 (~5줄)
 **파일**: `backend/application/agent/rag_agent.py` (`_resolve_superseded_chain`, ~line 1475)

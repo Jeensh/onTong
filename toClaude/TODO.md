@@ -1121,3 +1121,12 @@ Step 1-C 백엔드(1C-5)부터 시작해줘
 | P3-A | require_admin + 미보호 엔드포인트 권한 적용 | [x] | `permission.py`, `api/wiki.py` |
 | P3-B | 스킬 CRUD 권한 (personal=본인, shared delete=admin) | [x] | `api/skill.py` |
 | P3-C | 프론트엔드 권한 기반 UI 분기 (메뉴 숨김 + 읽기전용 배너) | [x] | `TreeNav.tsx`, `MarkdownEditor.tsx` |
+
+### Part 2: 충돌 & Lineage 보강
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| P2-A | Lineage 사이클 감지 (visited set + break) | [x] | `rag_agent.py` (기존 구현) |
+| P2-B | 폐기 되돌리기 (POST /undeprecate + 되돌리기 버튼) | [x] | `api/conflict.py`, `ConflictDashboard.tsx` (기존 구현) |
+| P2-C | 검색 결과 deprecated 뱃지 + 새 버전 링크 | [x] | `AICopilot.tsx` (기존 구현) |
+| P2-D | 충돌 쌍 그룹핑 (GET /grouped + hot files 요약) | [x] | `conflict_service.py`, `api/conflict.py`, `ConflictDashboard.tsx` |
