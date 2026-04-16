@@ -1,6 +1,8 @@
 # tests/test_source_api.py
 """Tests for source file tree API endpoint."""
 
+from unittest.mock import MagicMock
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -169,3 +171,64 @@ class TestSourceTreeSorting:
                 check_sorting(child)
 
         check_sorting(data)
+
+
+class TestFileContentEndpoint:
+    def test_file_content_returns_source(self, client):
+        """GET file content returns source code with correct language and entities list."""
+        file_path = "src/main/java/com/ontong/scm/inventory/SafetyStockCalculator.java"
+        resp = client.get(f"/api/modeling/source/file/scm-demo?path={file_path}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "package com.ontong.scm.inventory;" in data["content"]
+        assert data["language"] == "java"
+        assert isinstance(data["entities"], list)
+        assert data["path"] == file_path
+
+    def test_file_content_with_entity_positions(self, client):
+        """File content includes entity positions with mapping from Neo4j."""
+        mock_neo4j = MagicMock()
+        mock_neo4j.query.return_value = [
+            {
+                "qualified_name": "com.ontong.scm.inventory.SafetyStockCalculator",
+                "kind": "class",
+                "line_start": 2,
+                "line_end": 10,
+                "domain": "inventory/safety-stock",
+                "mapping_status": "confirmed",
+                "granularity": "class",
+            }
+        ]
+        # Temporarily set the neo4j client
+        original = source_api._neo4j_client
+        source_api._neo4j_client = mock_neo4j
+        try:
+            file_path = "src/main/java/com/ontong/scm/inventory/SafetyStockCalculator.java"
+            resp = client.get(f"/api/modeling/source/file/scm-demo?path={file_path}")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert len(data["entities"]) == 1
+            entity = data["entities"][0]
+            assert entity["fqn"] == "com.ontong.scm.inventory.SafetyStockCalculator"
+            assert entity["start_line"] == 2
+            assert entity["end_line"] == 10
+            assert entity["mapping"] is not None
+            assert entity["mapping"]["domain_path"] == "inventory/safety-stock"
+            assert entity["mapping"]["status"] == "confirmed"
+            assert entity["mapping"]["granularity"] == "class"
+        finally:
+            source_api._neo4j_client = original
+
+    def test_file_content_path_traversal_blocked(self, client):
+        """Path traversal via ../../ in path query param returns 403."""
+        resp = client.get(
+            "/api/modeling/source/file/scm-demo?path=../../etc/passwd"
+        )
+        assert resp.status_code == 403
+
+    def test_file_content_nonexistent_file(self, client):
+        """Non-existent file path returns 404."""
+        resp = client.get(
+            "/api/modeling/source/file/scm-demo?path=src/NoSuchFile.java"
+        )
+        assert resp.status_code == 404

@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter(prefix="/api/modeling/source", tags=["modeling-source"])
 logger = logging.getLogger(__name__)
@@ -21,6 +21,14 @@ HIDDEN_DIRS = {".git", ".svn", ".hg", "__pycache__", ".idea", ".vscode", "node_m
 BINARY_EXTENSIONS = {
     ".class", ".jar", ".war", ".pyc", ".so", ".dll", ".exe",
     ".png", ".jpg", ".gif", ".zip", ".tar", ".gz",
+}
+
+# Language detection from file extension
+LANGUAGE_MAP = {
+    ".java": "java", ".py": "python", ".ts": "typescript", ".tsx": "typescript",
+    ".js": "javascript", ".jsx": "javascript", ".xml": "xml", ".json": "json",
+    ".yaml": "yaml", ".yml": "yaml", ".properties": "properties", ".md": "markdown",
+    ".sql": "sql", ".sh": "shell", ".gradle": "groovy",
 }
 
 
@@ -111,3 +119,78 @@ async def get_source_tree(repo_id: str):
 
     tree = _build_tree(repo_path, repo_path)
     return tree
+
+
+def _get_entities_for_file(repo_id: str, file_path: str) -> list[dict[str, Any]]:
+    """Query Neo4j for code entities defined in the given file."""
+    if _neo4j_client is None:
+        return []
+
+    query = """
+    MATCH (e:CodeEntity {repo_id: $repo_id, file_path: $file_path})
+    OPTIONAL MATCH (e)-[r:MAPPED_TO]->(d:DomainNode)
+    RETURN e.qualified_name as qualified_name, e.kind as kind,
+           e.line_start as line_start, e.line_end as line_end,
+           d.id as domain, r.status as mapping_status, r.granularity as granularity
+    ORDER BY e.line_start
+    """
+    records = _neo4j_client.query(query, {"repo_id": repo_id, "file_path": file_path})
+
+    entities: list[dict[str, Any]] = []
+    for rec in records:
+        mapping = None
+        if rec.get("domain") is not None:
+            mapping = {
+                "domain_path": rec["domain"],
+                "status": rec.get("mapping_status"),
+                "granularity": rec.get("granularity"),
+            }
+        entities.append({
+            "fqn": rec["qualified_name"],
+            "kind": rec["kind"],
+            "start_line": rec["line_start"],
+            "end_line": rec["line_end"],
+            "mapping": mapping,
+        })
+    return entities
+
+
+@router.get("/file/{repo_id}")
+async def get_file_content(repo_id: str, path: str = Query(...)):
+    """Return file content with entity position data for a source file."""
+    try:
+        repo_path = _resolve_repo_path(repo_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Repository '{repo_id}' not found")
+
+    # Security: prevent path traversal within the repo
+    full_path = (repo_path / path).resolve()
+    if not str(full_path).startswith(str(repo_path.resolve())):
+        raise HTTPException(status_code=403, detail="Path traversal not allowed")
+
+    if not full_path.is_file():
+        raise HTTPException(status_code=404, detail=f"File not found: {path}")
+
+    # Reject binary files
+    suffix = full_path.suffix.lower()
+    if suffix in BINARY_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Binary files are not supported")
+
+    # Read file content
+    try:
+        content = full_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File is not valid UTF-8 text")
+
+    # Detect language
+    language = LANGUAGE_MAP.get(suffix, "text")
+
+    # Get entities from Neo4j
+    entities = _get_entities_for_file(repo_id, path)
+
+    return {
+        "path": path,
+        "language": language,
+        "content": content,
+        "entities": entities,
+    }
