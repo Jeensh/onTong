@@ -31,39 +31,53 @@ def init(repos_dir: Path, neo4j_client=None) -> None:
 
 
 def _resolve_repo_path(repo_id: str) -> Path:
-    """Resolve repo path: check repos_dir first, then sample-repos fallback."""
+    """Resolve repo path: check repos_dir first, then sample-repos fallback.
+
+    Includes path traversal protection via resolve() + is_relative_to().
+    """
     # Primary: repos_dir / repo_id
     if _repos_dir is not None:
-        candidate = _repos_dir / repo_id
-        if candidate.exists() and candidate.is_dir():
+        base = _repos_dir.resolve()
+        candidate = (base / repo_id).resolve()
+        if candidate.is_relative_to(base) and candidate.is_dir():
             return candidate
 
     # Fallback: walk up from __file__ to find sample-repos / repo_id
     current = Path(__file__).resolve()
     for parent in current.parents:
-        candidate = parent / "sample-repos" / repo_id
-        if candidate.exists() and candidate.is_dir():
+        sample_base = (parent / "sample-repos").resolve()
+        candidate = (sample_base / repo_id).resolve()
+        if candidate.is_relative_to(sample_base) and candidate.is_dir():
             return candidate
 
     raise FileNotFoundError(f"Repository '{repo_id}' not found")
 
 
-def _build_tree(dir_path: Path, base_path: Path) -> dict[str, Any]:
+MAX_TREE_DEPTH = 30
+
+
+def _build_tree(dir_path: Path, base_path: Path, depth: int = 0) -> dict[str, Any]:
     """Recursively build a file tree node for a directory."""
     rel = dir_path.relative_to(base_path)
-    rel_str = str(rel) if str(rel) != "." else ""
+    rel_str = rel.as_posix() if str(rel) != "." else ""
 
     children: list[dict[str, Any]] = []
+
+    if depth >= MAX_TREE_DEPTH:
+        return {"name": dir_path.name, "type": "directory", "path": rel_str, "children": []}
+
     try:
-        entries = sorted(dir_path.iterdir(), key=lambda p: p.name.lower())
+        entries = list(dir_path.iterdir())
     except PermissionError:
         entries = []
 
     for entry in entries:
-        if entry.name in HIDDEN_DIRS:
+        if entry.name in HIDDEN_DIRS or entry.name.startswith("."):
+            continue
+        if entry.is_symlink():
             continue
         if entry.is_dir():
-            child_node = _build_tree(entry, base_path)
+            child_node = _build_tree(entry, base_path, depth + 1)
             children.append(child_node)
         elif entry.is_file():
             if entry.suffix.lower() in BINARY_EXTENSIONS:
@@ -72,7 +86,7 @@ def _build_tree(dir_path: Path, base_path: Path) -> dict[str, Any]:
             children.append({
                 "name": entry.name,
                 "type": "file",
-                "path": str(child_rel),
+                "path": child_rel.as_posix(),
                 "children": [],
             })
 

@@ -107,6 +107,33 @@ class TestSourceTreeEndpoint:
         resp = client.get("/api/modeling/source/tree/nonexistent-repo")
         assert resp.status_code == 404
 
+    def test_path_traversal_rejected(self, client, sample_repo):
+        """Path traversal via .. in repo_id is rejected."""
+        # Create a directory outside the repos_dir to prove it's not exposed
+        outside = sample_repo.parent / "outside-secret"
+        outside.mkdir(exist_ok=True)
+        (outside / "secret.txt").write_text("sensitive data")
+
+        resp = client.get("/api/modeling/source/tree/../outside-secret")
+        assert resp.status_code == 404
+
+    def test_symlinks_excluded(self, client, sample_repo):
+        """Symlinks inside a repo are not followed."""
+        import os
+        repo = sample_repo / "scm-demo"
+        os.symlink("/tmp", repo / "symlink-escape")
+
+        resp = client.get("/api/modeling/source/tree/scm-demo")
+        data = resp.json()
+
+        names = []
+        def collect(node):
+            names.append(node["name"])
+            for c in node.get("children", []):
+                collect(c)
+        collect(data)
+        assert "symlink-escape" not in names
+
 
 class TestSourceTreeSorting:
     def test_directories_first_then_alphabetical(self, client):

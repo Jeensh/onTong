@@ -27,7 +27,11 @@ router.include_router(source_api.router)
 
 def init(neo4j_client=None, repos_dir: Path | None = None) -> None:
     """Initialize Section 2 API with dependencies."""
+    resolved_repos_dir = repos_dir or Path("/tmp/ontong-repos")
+
     if neo4j_client is None:
+        # Source API works without Neo4j (filesystem only)
+        source_api.init(repos_dir=resolved_repos_dir, neo4j_client=None)
         logger.info("Modeling API initialized (no Neo4j — limited mode)")
         return
 
@@ -39,7 +43,7 @@ def init(neo4j_client=None, repos_dir: Path | None = None) -> None:
     from backend.modeling.query.query_engine import QueryEngine
     from backend.modeling.approval.approval_service import ApprovalService
 
-    git = GitConnector(repos_dir or Path("/tmp/ontong-repos"))
+    git = GitConnector(resolved_repos_dir)
     parser = JavaParser()
     writer = CodeGraphWriter(neo4j_client)
     onto_store = OntologyStore(neo4j_client)
