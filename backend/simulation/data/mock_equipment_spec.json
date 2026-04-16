@@ -1,0 +1,40 @@
+{
+  "continuous_caster": [
+    {
+      "id": "CC-01",
+      "name": "1연주설비",
+      "mold_thickness": 250,
+      "width_min": 900,
+      "width_max": 1600,
+      "length_min": 4500,
+      "length_max": 12000
+    },
+    {
+      "id": "CC-02",
+      "name": "2연주설비",
+      "mold_thickness": 300,
+      "width_min": 950,
+      "width_max": 1650,
+      "length_min": 5000,
+      "length_max": 11500
+    }
+  ],
+  "hot_rolling_mill": [
+    {
+      "id": "HR-A",
+      "name": "열연 A라인",
+      "width_min": 900,
+      "width_max": 1570,
+      "length_min": 4500,
+      "length_max": 12000
+    },
+    {
+      "id": "HR-B",
+      "name": "열연 B라인",
+      "width_min": 950,
+      "width_max": 1480,
+      "length_min": 5000,
+      "length_max": 11800
+    }
+  ]
+}

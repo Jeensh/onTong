@@ -41,6 +41,8 @@ from backend.application.skill.skill_matcher import SkillMatcher
 from backend.infrastructure.events.event_bus import event_bus
 from backend.modeling.api import modeling as modeling_api
 from backend.simulation.api import simulation as simulation_api
+from backend.simulation.api.slab_agent import router as slab_agent_router
+from backend.simulation.api.custom_agent import router as custom_agent_router
 from backend.simulation.client.modeling_client import create_modeling_client
 from backend.simulation.client.config import use_mock as simulation_use_mock
 
@@ -153,6 +155,7 @@ app = FastAPI(
 _cors_origins = [settings.frontend_url]
 if settings.environment == "development":
     _cors_origins.append("http://localhost:3000")
+    _cors_origins.append("http://localhost:3001")
 
 app.add_middleware(
     CORSMiddleware,
@@ -188,6 +191,8 @@ app.include_router(acl_api.router)
 app.include_router(skill_api.router)
 app.include_router(modeling_api.router)
 app.include_router(simulation_api.router)
+app.include_router(slab_agent_router)
+app.include_router(custom_agent_router)
 
 
 # Global exception handler

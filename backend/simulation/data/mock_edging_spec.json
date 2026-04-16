@@ -1,0 +1,28 @@
+{
+  "edging_table": [
+    {
+      "line_id": "HR-A",
+      "target_width_min": 900,
+      "target_width_max": 1200,
+      "edging_ability_min": 20,
+      "edging_ability_max": 180,
+      "rm_pass_count": 3
+    },
+    {
+      "line_id": "HR-A",
+      "target_width_min": 1201,
+      "target_width_max": 1570,
+      "edging_ability_min": 20,
+      "edging_ability_max": 120,
+      "rm_pass_count": 3
+    },
+    {
+      "line_id": "HR-B",
+      "target_width_min": 950,
+      "target_width_max": 1300,
+      "edging_ability_min": 20,
+      "edging_ability_max": 150,
+      "rm_pass_count": 3
+    }
+  ]
+}
