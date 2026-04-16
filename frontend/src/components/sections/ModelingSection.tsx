@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   Code,
   Network,
+  GitBranch,
   GitCompare,
   Search,
   CheckSquare,
@@ -23,9 +24,10 @@ import { ImpactQueryPanel } from "./modeling/ImpactQueryPanel";
 import { ApprovalList } from "./modeling/ApprovalList";
 import { AnalysisConsole } from "./modeling/AnalysisConsole";
 import { SimulationPanel } from "./modeling/SimulationPanel";
+import { MappingWorkbench } from "./modeling/MappingWorkbench";
 import { seedScmDemo, getCodeGraph, getOntologyTree, getMappings } from "@/lib/api/modeling";
 
-type ModelingView = "analysis" | "simulation" | "code" | "ontology" | "mapping" | "impact" | "approval";
+type ModelingView = "analysis" | "simulation" | "workbench" | "code" | "ontology" | "mapping" | "impact" | "approval";
 
 interface NavItem {
   id: ModelingView;
@@ -38,6 +40,7 @@ interface NavItem {
 const MAIN_NAV: NavItem[] = [
   { id: "analysis", label: "분석 콘솔", icon: <Search size={18} />, description: "자연어 영향 분석" },
   { id: "simulation", label: "시뮬레이션", icon: <Zap size={18} />, description: "파라미터 what-if 분석" },
+  { id: "workbench", label: "매핑 워크벤치", icon: <GitBranch size={18} />, description: "코드-도메인 시각 매핑" },
 ];
 
 const SETTINGS_NAV: NavItem[] = [
@@ -259,5 +262,7 @@ function ViewRouter({
       return <ImpactQueryPanel repoId={repoId} />;
     case "approval":
       return <ApprovalList repoId={repoId} />;
+    case "workbench":
+      return <MappingWorkbench repoId={repoId} />;
   }
 }
