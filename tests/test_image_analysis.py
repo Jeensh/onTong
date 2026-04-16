@@ -190,3 +190,96 @@ class TestVisionProviders:
         from backend.application.image.vision_provider import create_vision_provider
         provider = create_vision_provider("ollama", model="llava:7b", ollama_url="http://localhost:11434")
         assert provider.provider_name == "ollama/llava:7b"
+
+
+class TestImageAnalyzer:
+    """Test ImageAnalyzer orchestrator (OCR + Vision → sidecar)."""
+
+    @pytest.mark.asyncio
+    async def test_analyze_creates_sidecar(self, tmp_path):
+        from backend.application.image.analyzer import ImageAnalyzer
+        from backend.application.image.ocr_engine import OCREngine
+        from backend.application.image.vision_provider import NoopVisionProvider
+        from backend.application.image.models import load_sidecar
+        from PIL import Image, ImageDraw
+
+        img = Image.new("RGB", (300, 80), color="white")
+        draw = ImageDraw.Draw(img)
+        draw.text((10, 20), "Test OCR Text", fill="black")
+        img_path = tmp_path / "test_analyze.png"
+        img.save(img_path)
+
+        analyzer = ImageAnalyzer(
+            ocr=OCREngine(languages=["en"], gpu=False),
+            vision=NoopVisionProvider(),
+        )
+        analysis = await analyzer.analyze(img_path)
+
+        assert len(analysis.ocr_text) > 0
+        assert analysis.description == ""
+        assert analysis.provider == "none"
+        assert analysis.ocr_engine == "easyocr"
+
+        sidecar = load_sidecar(img_path)
+        assert sidecar is not None
+        assert sidecar.ocr_text == analysis.ocr_text
+
+    @pytest.mark.asyncio
+    async def test_analyze_skips_if_fresh(self, tmp_path):
+        from backend.application.image.analyzer import ImageAnalyzer
+        from backend.application.image.ocr_engine import OCREngine
+        from backend.application.image.vision_provider import NoopVisionProvider
+        from backend.application.image.models import ImageAnalysis, save_sidecar
+        from datetime import datetime, timezone
+        import time
+
+        img_path = tmp_path / "cached.png"
+        img_path.write_bytes(b"fake image")
+        time.sleep(0.05)
+
+        save_sidecar(img_path, ImageAnalysis(
+            ocr_text="cached text", description="cached desc",
+            provider="test", ocr_engine="test",
+            processed_at=datetime.now(timezone.utc),
+        ))
+
+        analyzer = ImageAnalyzer(
+            ocr=OCREngine(languages=["en"], gpu=False),
+            vision=NoopVisionProvider(),
+        )
+        analysis = await analyzer.analyze(img_path)
+
+        assert analysis.ocr_text == "cached text"
+        assert analysis.description == "cached desc"
+
+    @pytest.mark.asyncio
+    async def test_analyze_force_reprocess(self, tmp_path):
+        from backend.application.image.analyzer import ImageAnalyzer
+        from backend.application.image.ocr_engine import OCREngine
+        from backend.application.image.vision_provider import NoopVisionProvider
+        from backend.application.image.models import ImageAnalysis, save_sidecar
+        from PIL import Image, ImageDraw
+        from datetime import datetime, timezone
+        import time
+
+        img = Image.new("RGB", (300, 80), color="white")
+        draw = ImageDraw.Draw(img)
+        draw.text((10, 20), "Fresh Text", fill="black")
+        img_path = tmp_path / "force.png"
+        img.save(img_path)
+        time.sleep(0.05)
+
+        save_sidecar(img_path, ImageAnalysis(
+            ocr_text="old", description="old",
+            provider="old", ocr_engine="old",
+            processed_at=datetime.now(timezone.utc),
+        ))
+
+        analyzer = ImageAnalyzer(
+            ocr=OCREngine(languages=["en"], gpu=False),
+            vision=NoopVisionProvider(),
+        )
+        analysis = await analyzer.analyze(img_path, force=True)
+
+        assert analysis.ocr_text != "old"
+        assert analysis.provider == "none"
