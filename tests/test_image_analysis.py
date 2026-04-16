@@ -160,3 +160,33 @@ class TestOCREngine:
         engine = OCREngine(languages=["en"], gpu=False)
         text = asyncio.run(engine.extract_text(img_path))
         assert isinstance(text, str)
+
+
+class TestVisionProviders:
+    """Test Vision LLM provider abstraction."""
+
+    @pytest.mark.asyncio
+    async def test_noop_provider_returns_empty(self, tmp_path):
+        from backend.application.image.vision_provider import NoopVisionProvider
+        provider = NoopVisionProvider()
+        img_path = tmp_path / "test.png"
+        img_path.write_bytes(b"fake")
+        result = await provider.describe(img_path, "some ocr text")
+        assert result == ""
+        assert provider.provider_name == "none"
+
+    @pytest.mark.asyncio
+    async def test_ollama_provider_has_correct_name(self):
+        from backend.application.image.vision_provider import OllamaVisionProvider
+        provider = OllamaVisionProvider(model="llava:13b", ollama_url="http://localhost:11434")
+        assert provider.provider_name == "ollama/llava:13b"
+
+    def test_create_vision_provider_noop(self):
+        from backend.application.image.vision_provider import create_vision_provider
+        provider = create_vision_provider("none")
+        assert provider.provider_name == "none"
+
+    def test_create_vision_provider_ollama(self):
+        from backend.application.image.vision_provider import create_vision_provider
+        provider = create_vision_provider("ollama", model="llava:7b", ollama_url="http://localhost:11434")
+        assert provider.provider_name == "ollama/llava:7b"
