@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import APIRouter
 
-from backend.modeling.api import code_api, ontology_api, mapping_api, query_api, seed_api, engine_api
+from backend.modeling.api import code_api, ontology_api, mapping_api, query_api, seed_api, engine_api, source_api
 from backend.modeling.api import approval_api as modeling_approval_api
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,7 @@ router.include_router(query_api.router)
 router.include_router(modeling_approval_api.router)
 router.include_router(seed_api.router)
 router.include_router(engine_api.router)
+router.include_router(source_api.router)
 
 
 def init(neo4j_client=None, repos_dir: Path | None = None) -> None:
@@ -60,6 +61,8 @@ def init(neo4j_client=None, repos_dir: Path | None = None) -> None:
     term_resolver = TermResolver()
 
     engine_api.init(query_eng, mapping_svc, sim_engine, term_resolver, git)
+
+    source_api.init(repos_dir=git.repos_dir, neo4j_client=neo4j_client)
 
     logger.info("Modeling API fully initialized with Neo4j")
 
