@@ -115,6 +115,9 @@ export function SourceViewer({ repoId, highlightEntity, onEntityClick }: SourceV
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
   const decorationsRef = useRef<string[]>([]);
+  const fileDataRef = useRef<SourceFileResponse | null>(null);
+  const onEntityClickRef = useRef(onEntityClick);
+  onEntityClickRef.current = onEntityClick;
 
   // Load file tree
   useEffect(() => {
@@ -138,6 +141,11 @@ export function SourceViewer({ repoId, highlightEntity, onEntityClick }: SourceV
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [repoId]);
+
+  // Keep fileDataRef in sync
+  useEffect(() => {
+    fileDataRef.current = fileData;
+  }, [fileData]);
 
   // Load file content
   const handleFileClick = useCallback(
@@ -219,21 +227,23 @@ export function SourceViewer({ repoId, highlightEntity, onEntityClick }: SourceV
       editorRef.current = editor;
       monacoRef.current = monaco;
 
-      // Click handler: detect clicks on entity lines
+      // Click handler: use refs to always access latest fileData/onEntityClick
       editor.onMouseDown((e) => {
-        if (!fileData || !onEntityClick) return;
+        const currentFileData = fileDataRef.current;
+        const currentOnEntityClick = onEntityClickRef.current;
+        if (!currentFileData || !currentOnEntityClick) return;
         const lineNumber = e.target.position?.lineNumber;
         if (!lineNumber) return;
 
-        const entity = fileData.entities.find(
+        const entity = currentFileData.entities.find(
           (ent) => lineNumber >= ent.start_line && lineNumber <= ent.end_line
         );
-        if (entity && fileData.path) {
-          onEntityClick(entity.fqn, fileData.path);
+        if (entity && currentFileData.path) {
+          currentOnEntityClick(entity.fqn, currentFileData.path);
         }
       });
     },
-    [fileData, onEntityClick]
+    []
   );
 
   return (
