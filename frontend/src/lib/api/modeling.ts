@@ -296,3 +296,58 @@ export async function engineStatus(repoId: string): Promise<EngineStatus> {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+// ── Source Viewer ──
+
+export interface SourceTreeNode {
+  name: string;
+  type: "file" | "directory";
+  path: string;
+  children?: SourceTreeNode[];
+}
+
+export interface SourceEntityMapping {
+  domain_path: string;
+  status: "draft" | "review" | "confirmed";
+  granularity: string;
+}
+
+export interface SourceEntity {
+  fqn: string;
+  kind: string;
+  start_line: number;
+  end_line: number;
+  mapping: SourceEntityMapping | null;
+}
+
+export interface SourceFileResponse {
+  path: string;
+  language: string;
+  content: string;
+  entities: SourceEntity[];
+}
+
+export async function getSourceTree(repoId: string): Promise<SourceTreeNode> {
+  const res = await fetch(`${API_BASE}/api/modeling/source/tree/${repoId}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function getSourceFile(repoId: string, path: string): Promise<SourceFileResponse> {
+  const res = await fetch(`${API_BASE}/api/modeling/source/file/${repoId}?path=${encodeURIComponent(path)}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export interface EntityLocation {
+  qualified_name: string;
+  file_path: string;
+  line_start: number;
+  line_end: number;
+}
+
+export async function getEntityLocation(repoId: string, fqn: string): Promise<EntityLocation> {
+  const res = await fetch(`${API_BASE}/api/modeling/source/entity/${repoId}/${fqn}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
