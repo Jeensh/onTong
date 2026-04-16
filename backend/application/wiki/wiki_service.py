@@ -75,6 +75,7 @@ class WikiService:
         self._meta_index = None    # MetadataIndex, set from main.py
         self._chroma = None        # ChromaWrapper, set from main.py
         self._confidence_svc = None  # ConfidenceService, set from main.py
+        self._image_queue = None  # ImageProcessingQueue, set from main.py
 
     def set_metadata_index(self, idx) -> None:
         """Set metadata index service (called from main.py after init)."""
@@ -91,6 +92,10 @@ class WikiService:
     def set_confidence_service(self, svc) -> None:
         """Set confidence scoring service (called from main.py after init)."""
         self._confidence_svc = svc
+
+    def set_image_queue(self, queue) -> None:
+        """Set image processing queue (called from main.py after init)."""
+        self._image_queue = queue
 
     async def get_tree(self) -> list[WikiTreeNode]:
         return await self.storage.list_tree()
@@ -159,6 +164,9 @@ class WikiService:
         # Background indexing — save returns immediately
         index_status.mark_pending(path)
         asyncio.create_task(self._bg_index(wiki_file, access_scope=access_scope))
+        # Background image analysis — process new images for search enrichment
+        if self._image_queue:
+            asyncio.create_task(self._bg_image_process(wiki_file))
         event_bus.publish("tree_change", {"action": "update", "path": path})
         logger.info(f"Saved: {path} (indexing queued)")
         return wiki_file
@@ -368,6 +376,24 @@ class WikiService:
             event_bus.publish("index_status", {"action": "error", "path": wiki_file.path})
         finally:
             index_status.mark_done(wiki_file.path)
+
+    async def _bg_image_process(self, wiki_file: WikiFile) -> None:
+        """Background image processing: extract text + generate descriptions."""
+        try:
+            from pathlib import Path
+            from backend.core.config import settings
+            result = await self._image_queue.process_document_images(
+                wiki_file.content, Path(settings.wiki_dir)
+            )
+            if result["processed"] > 0:
+                logger.info(
+                    f"Image analysis for {wiki_file.path}: "
+                    f"{result['processed']} processed, {result['skipped']} skipped"
+                )
+                # Re-index to pick up new image descriptions
+                await self.indexer.index_file(wiki_file, force=True)
+        except Exception as e:
+            logger.warning(f"Background image processing failed for {wiki_file.path}: {e}")
 
     async def _auto_suggest_related(self, wiki_file: WikiFile) -> None:
         """After indexing, find top related files and add to metadata.related (if empty).

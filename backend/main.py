@@ -29,6 +29,10 @@ from backend.application.trust.citation_tracker import create_citation_tracker
 from backend.application.trust.feedback_tracker import create_feedback_tracker
 from backend.application.agent.simulator_agent import SimulatorAgent
 from backend.application.agent.tracer_agent import TracerAgent
+from backend.application.image.analyzer import ImageAnalyzer
+from backend.application.image.ocr_engine import OCREngine
+from backend.application.image.vision_provider import create_vision_provider
+from backend.application.image.queue import ImageProcessingQueue
 from backend.api import wiki as wiki_api
 from backend.api import search as search_api
 from backend.api import agent as agent_api
@@ -146,6 +150,26 @@ async def lifespan(app: FastAPI):
     wiki_service.set_conflict_service(conflict_svc)
     wiki_service.set_chroma(chroma)
     wiki_service.set_confidence_service(confidence_svc)
+
+    # Initialize image analysis pipeline (if enabled)
+    if settings.image_analysis_enabled:
+        _ocr = OCREngine(
+            languages=settings.image_ocr_languages.split(","),
+            gpu=settings.image_ocr_gpu,
+            confidence_threshold=settings.image_ocr_confidence,
+        )
+        _vision = create_vision_provider(
+            provider=settings.image_vision_provider,
+            model=settings.image_vision_model,
+            ollama_url=settings.ollama_host,
+        )
+        _img_analyzer = ImageAnalyzer(ocr=_ocr, vision=_vision)
+        _img_queue = ImageProcessingQueue(_img_analyzer)
+        wiki_service.set_image_queue(_img_queue)
+        logger.info(
+            f"Image analysis: OCR={settings.image_ocr_engine}, "
+            f"Vision={settings.image_vision_provider}/{settings.image_vision_model}"
+        )
 
     # Build digest service
     from backend.application.trust.digest import DocumentDigestService
