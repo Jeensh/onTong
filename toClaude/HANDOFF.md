@@ -10,6 +10,22 @@
 
 ## 1. 다음 세션 첫 작업
 
+### Phase 2a: Source Viewer + Mapping Workbench 완료 (2026-04-16)
+
+**브랜치**: `main` — 10 commits, 14 source API tests, TS clean.
+
+코드-도메인 매핑 워크벤치 구현:
+- **Source API**: 파일 트리 + 파일 내용 + 엔티티 위치 조회 (path traversal/symlink 방어)
+- **SourceViewer**: 파일 트리 + Monaco read-only 에디터 + 엔티티 gutter marker
+- **MappingCanvas**: React Flow 도메인 온톨로지 그래프 + 엔티티 패널 + 드래그-드롭 매핑
+- **MappingWorkbench**: 55/45 분할 패널 + 캔버스↔뷰어 양방향 연동
+- **ModelingSection**: "매핑 워크벤치" 사이드바 탭 추가
+
+**설계 문서**: `docs/superpowers/specs/2026-04-16-source-viewer-mapping-workbench-design.md`
+**구현 플랜**: `docs/superpowers/plans/2026-04-16-source-viewer-mapping-workbench.md`
+
+**다음 후보**: 브라우저 UI 검증, Docker Sandbox (독립 기능), Phase 1b (실제 Neo4j BFS)
+
 ### Section 2 Modeling Engine Phase 1a 완료 (2026-04-16)
 
 **브랜치**: `main` — 11 commits, 28 tests, TS clean, UI + API 검증 완료.

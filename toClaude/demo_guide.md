@@ -2,6 +2,65 @@
 
 ---
 
+## Mapping Workbench (2026-04-16)
+
+> 소스 코드 뷰어 + 도메인 그래프 캔버스 + 분할 패널 워크벤치.
+> **브랜치**: `main`
+
+### 사전 준비
+```bash
+# Backend
+cd /Users/donghae/workspace/ai/onTong
+source .venv/bin/activate && set -a && source .env && set +a
+uvicorn backend.main:app --host 0.0.0.0 --port 8001
+
+# Frontend (별도 터미널)
+cd frontend && npm run dev
+
+# 데모 데이터 시드
+curl -s -X POST http://localhost:8001/api/modeling/seed/scm-demo | python3 -m json.tool
+```
+
+### 시나리오 1: 소스 파일 트리 탐색
+1. `http://localhost:3000` → Modeling 탭 → "SCM 데모 프로젝트 로드"
+2. 사이드바에서 **"매핑 워크벤치"** 클릭
+3. 오른쪽 패널에 파일 트리 표시됨
+4. Java 파일 클릭 → Monaco 에디터에 구문 강조 소스 표시
+5. **확인**: 파일 검색 필터로 "Safety" 입력 → 해당 파일만 표시
+
+### 시나리오 2: 도메인 그래프 탐색
+1. 왼쪽 패널에 SCOR 도메인 그래프 표시 (React Flow)
+2. 초록색 노드 = 코드 매핑 있음, 회색 = 매핑 없음
+3. 노드 클릭 → 하단 엔티티 패널에 연결된 코드 엔티티 표시
+
+### 시나리오 3: 양방향 연동
+1. 왼쪽 캔버스에서 도메인 노드 클릭 → 오른쪽 뷰어가 해당 엔티티 파일 열고 스크롤
+2. 오른쪽 뷰어에서 엔티티 라인 클릭 → 왼쪽 캔버스에서 도메인 노드 하이라이트
+
+### 시나리오 4: 드래그-드롭 매핑 생성
+1. 하단 엔티티 패널에서 빨간 점(미매핑) 엔티티를 도메인 노드로 드래그
+2. 매핑 생성 후 노드 색상 변경 확인
+
+### API 직접 테스트
+```bash
+# 파일 트리
+curl -s http://localhost:8001/api/modeling/source/tree/scm-demo | python3 -m json.tool
+
+# 파일 내용 + 엔티티 위치
+curl -s "http://localhost:8001/api/modeling/source/file/scm-demo?path=src/main/java/com/ontong/scm/inventory/SafetyStockCalculator.java" | python3 -m json.tool
+
+# 엔티티 위치 조회
+curl -s http://localhost:8001/api/modeling/source/entity/scm-demo/com.ontong.scm.inventory.SafetyStockCalculator | python3 -m json.tool
+```
+
+### 트러블슈팅
+- **워크벤치 빈 화면**: SCM 데모 프로젝트가 로드되었는지 확인 (시드 API 호출)
+- **파일 트리 에러**: sample-repos/scm-demo 디렉토리 존재 확인
+- **그래프 노드 없음**: 온톨로지 트리가 시드되었는지 확인
+- **드래그 매핑 실패**: Neo4j 연결 상태 확인
+
+---
+
 ## ACL Domain Scoping (2026-04-14)
 
 > 기업용 접근 권한 시스템. 개인 공간, 세밀한 ACL, ChromaDB access_scope, 사이드바 구조화.  

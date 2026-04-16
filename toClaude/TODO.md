@@ -855,7 +855,27 @@ Step 1-C 백엔드(1C-5)부터 시작해줘
 | E1a-9 | SimulationPanel (파라미터 슬라이더 + before/after) | [x] | `frontend/.../modeling/SimulationPanel.tsx` |
 | E1a-10 | Sidebar Restructure (MAIN/SETTINGS nav, 기본탭=analysis) | [x] | `frontend/.../ModelingSection.tsx` |
 
-> 28 tests, TS clean, UI+API 검증 완료. 다음: Phase 1b (실제 BFS 의존성), Phase 2 (코드 편집 샌드박스).
+> 28 tests, TS clean, UI+API 검증 완료. 다음: Phase 2a (소스 뷰어 + 매핑 캔버스).
+
+### Phase 2a — Source Viewer + Mapping Workbench (구현 완료 ✅)
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| E2a-1 | Source API (파일 트리 + 내용 + 엔티티 위치) | [x] | `backend/modeling/api/source_api.py` |
+| E2a-2 | Source Viewer (파일 트리 + Monaco 읽기 전용) | [x] | `frontend/.../modeling/SourceViewer.tsx` |
+| E2a-3 | Mapping Canvas (React Flow 도메인 그래프) | [x] | `frontend/.../modeling/MappingCanvas.tsx` |
+| E2a-4 | Canvas 코드 엔티티 패널 + 드래그 매핑 | [x] | `frontend/.../modeling/MappingCanvas.tsx` |
+| E2a-5 | Mapping Workbench 통합 (분할 패널 + 양방향 연동) | [x] | `frontend/.../modeling/MappingWorkbench.tsx` |
+| E2a-6 | Sidebar + ModelingSection 통합 | [x] | `frontend/.../ModelingSection.tsx` |
+
+### 향후 인프라 확장 (Phase 2a 완료 후)
+
+| # | Task | 트리거 조건 | 상태 | 비고 |
+|---|------|-----------|------|------|
+| INFRA-1 | Docker Sandbox (컨테이너 생성/실행/삭제) | 샌드박스 Phase 착수 시 | [ ] | Docker Engine API 접근 필요 |
+| INFRA-2 | Redis 파일 트리 캐싱 | 대규모 repo (10만+ 파일) 대응 시 | [ ] | 현재 직접 스캔으로 충분 |
+| INFRA-3 | 매핑 이력 추적 (Audit Trail) | 매핑 변경 이력 요구 시 | [ ] | 현재 YAML은 이력 관리 약함 |
+| INFRA-4 | WebSocket 실시간 동기화 | 멀티유저 동시 매핑 지원 시 | [ ] | 현재 단일 사용자 충분 |
 
 ---
 
