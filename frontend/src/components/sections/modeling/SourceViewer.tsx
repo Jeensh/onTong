@@ -21,6 +21,7 @@ import {
 interface SourceViewerProps {
   repoId: string;
   highlightEntity?: string | null;
+  openFilePath?: string | null;       // NEW
   onEntityClick?: (fqn: string, filePath: string) => void;
 }
 
@@ -104,7 +105,7 @@ function hasMatchingChild(node: SourceTreeNode, filter: string): boolean {
 
 // ── Main Component ──
 
-export function SourceViewer({ repoId, highlightEntity, onEntityClick }: SourceViewerProps) {
+export function SourceViewer({ repoId, highlightEntity, openFilePath, onEntityClick }: SourceViewerProps) {
   const [tree, setTree] = useState<SourceTreeNode | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -169,6 +170,22 @@ export function SourceViewer({ repoId, highlightEntity, onEntityClick }: SourceV
       return next;
     });
   }, []);
+
+  // Auto-open file when openFilePath changes
+  useEffect(() => {
+    if (openFilePath && openFilePath !== selectedFile) {
+      handleFileClick(openFilePath);
+      // Expand parent directories
+      const parts = openFilePath.split("/");
+      const dirs = new Set(expandedDirs);
+      let current = "";
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = current ? `${current}/${parts[i]}` : parts[i];
+        dirs.add(current);
+      }
+      setExpandedDirs(dirs);
+    }
+  }, [openFilePath]);
 
   // Highlight entity in editor
   useEffect(() => {

@@ -3,6 +3,7 @@
 import React, { useCallback, useRef, useState } from "react";
 import { MappingCanvas } from "./MappingCanvas";
 import { SourceViewer } from "./SourceViewer";
+import { getEntityLocation } from "@/lib/api/modeling";
 
 interface MappingWorkbenchProps {
   repoId: string;
@@ -12,6 +13,7 @@ export function MappingWorkbench({ repoId }: MappingWorkbenchProps) {
   const [splitPercent, setSplitPercent] = useState(55);
   const [highlightEntity, setHighlightEntity] = useState<string | null>(null);
   const [highlightDomain, setHighlightDomain] = useState<string | null>(null);
+  const [openFilePath, setOpenFilePath] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
 
@@ -30,10 +32,17 @@ export function MappingWorkbench({ repoId }: MappingWorkbenchProps) {
     setHighlightDomain(fqn);
   }, []);
 
-  // Canvas entity panel → Viewer: entity clicked → open its file
-  const handleEntityClickInCanvas = useCallback((fqn: string) => {
-    setHighlightEntity(fqn);
-  }, []);
+  // Canvas entity panel → Viewer: entity clicked → resolve file and open
+  const handleEntityClickInCanvas = useCallback(async (fqn: string) => {
+    try {
+      const loc = await getEntityLocation(repoId, fqn);
+      setOpenFilePath(loc.file_path);
+      setHighlightEntity(fqn);
+    } catch {
+      // Entity not found in Neo4j, just set highlight
+      setHighlightEntity(fqn);
+    }
+  }, [repoId]);
 
   // Resizer
   const handleMouseDown = useCallback(() => {
@@ -83,6 +92,7 @@ export function MappingWorkbench({ repoId }: MappingWorkbenchProps) {
         <SourceViewer
           repoId={repoId}
           highlightEntity={highlightEntity}
+          openFilePath={openFilePath}
           onEntityClick={handleEntityClickInViewer}
         />
       </div>
