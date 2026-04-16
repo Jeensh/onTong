@@ -509,3 +509,114 @@ Some text
 """
         paths = extract_image_paths(content)
         assert paths == ["assets/img1.png", "assets/img2.jpg"]
+
+
+class TestEndToEndImageSearch:
+    """Integration test: image descriptions flow through to indexable chunks."""
+
+    def test_indexer_chunks_include_image_descriptions(self, tmp_path):
+        """Full pipeline: sidecar exists → WikiIndexer.chunk() produces enriched text."""
+        from backend.application.wiki.wiki_indexer import WikiIndexer
+        from backend.application.image.models import ImageAnalysis, save_sidecar
+        from backend.core.schemas import WikiFile, DocumentMetadata
+        from datetime import datetime, timezone
+        from unittest.mock import MagicMock
+
+        # Set up wiki dir with assets
+        wiki_dir = tmp_path / "wiki"
+        wiki_dir.mkdir()
+        assets_dir = wiki_dir / "assets"
+        assets_dir.mkdir()
+
+        # Create image + sidecar
+        img_path = assets_dir / "screenshot1.png"
+        img_path.write_bytes(b"fake image")
+        save_sidecar(img_path, ImageAnalysis(
+            ocr_text="결제 실패 에러 500",
+            description="결제 화면 스크린샷. HTTP 500 에러 메시지와 '서버 응답 없음' 표시.",
+            provider="test", ocr_engine="easyocr",
+            processed_at=datetime.now(timezone.utc),
+        ))
+
+        # Create a wiki file with image reference
+        md_content = "# 결제 장애 보고\n\n![](assets/screenshot1.png)\n\n담당: 김OO"
+
+        wiki_file = WikiFile(
+            path="IT/결제-장애-보고.md",
+            title="결제 장애 보고",
+            content=md_content,
+            raw_content=f"---\ndomain: IT\n---\n{md_content}",
+            metadata=DocumentMetadata(domain="IT"),
+        )
+
+        chroma_mock = MagicMock()
+
+        # Temporarily override settings.wiki_dir for the test
+        from backend.core.config import settings
+        original_wiki_dir = settings.wiki_dir
+        settings.wiki_dir = wiki_dir
+        try:
+            indexer = WikiIndexer(chroma_mock)
+            chunks = indexer.chunk(wiki_file)
+        finally:
+            settings.wiki_dir = original_wiki_dir
+
+        # The chunk should contain the image description
+        chunk_texts = " ".join(c.content for c in chunks)
+        assert "결제 화면 스크린샷" in chunk_texts
+        assert "HTTP 500 에러" in chunk_texts
+        assert "담당: 김OO" in chunk_texts
+        # Original image markdown should be replaced
+        assert "![](assets/screenshot1.png)" not in chunk_texts
+
+    def test_image_only_document_is_searchable(self, tmp_path):
+        """A document with only images should produce non-empty chunks."""
+        from backend.application.wiki.wiki_indexer import WikiIndexer
+        from backend.application.image.models import ImageAnalysis, save_sidecar
+        from backend.core.schemas import WikiFile, DocumentMetadata
+        from datetime import datetime, timezone
+        from unittest.mock import MagicMock
+
+        wiki_dir = tmp_path / "wiki"
+        wiki_dir.mkdir()
+        assets_dir = wiki_dir / "assets"
+        assets_dir.mkdir()
+
+        # Two images, no text content besides heading
+        for name, desc in [
+            ("chat1.png", "카카오톡 대화. 김OO 고객이 결제 실패를 보고."),
+            ("chat2.png", "에러 화면 캡처. 서버 500 에러."),
+        ]:
+            p = assets_dir / name
+            p.write_bytes(b"fake")
+            save_sidecar(p, ImageAnalysis(
+                ocr_text="", description=desc,
+                provider="test", ocr_engine="easyocr",
+                processed_at=datetime.now(timezone.utc),
+            ))
+
+        md_content = "# CS 문의\n\n![](assets/chat1.png)\n\n![](assets/chat2.png)"
+
+        wiki_file = WikiFile(
+            path="CS/문의-기록.md",
+            title="CS 문의",
+            content=md_content,
+            raw_content=f"---\ndomain: CS\n---\n{md_content}",
+            metadata=DocumentMetadata(domain="CS"),
+        )
+
+        chroma_mock = MagicMock()
+
+        from backend.core.config import settings
+        original_wiki_dir = settings.wiki_dir
+        settings.wiki_dir = wiki_dir
+        try:
+            indexer = WikiIndexer(chroma_mock)
+            chunks = indexer.chunk(wiki_file)
+        finally:
+            settings.wiki_dir = original_wiki_dir
+
+        assert len(chunks) > 0
+        chunk_text = " ".join(c.content for c in chunks)
+        assert "결제 실패" in chunk_text
+        assert "서버 500 에러" in chunk_text
