@@ -141,8 +141,12 @@ function loadActiveSessionId(sessions: ChatSession[]): string {
 }
 
 export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {}) {
-  const [sessions, setSessions] = useState<ChatSession[]>(loadSessions);
-  const [activeSessionId, setActiveSessionId] = useState(() => loadActiveSessionId(loadSessions()));
+  const [initialState] = useState(() => {
+    const s = loadSessions();
+    return { sessions: s, activeId: loadActiveSessionId(s) };
+  });
+  const [sessions, setSessions] = useState<ChatSession[]>(initialState.sessions);
+  const [activeSessionId, setActiveSessionId] = useState(initialState.activeId);
   const [showSessionList, setShowSessionList] = useState(false);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -171,7 +175,7 @@ export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {
   const setAgentDiff = useWorkspaceStore((s) => s.setAgentDiff);
   const setAgentWrite = useWorkspaceStore((s) => s.setAgentWrite);
 
-  const activeSession = sessions.find((s) => s.id === activeSessionId)!;
+  const activeSession = sessions.find((s) => s.id === activeSessionId) ?? sessions[0];
   const messages = activeSession.messages;
 
   // Persist sessions to localStorage (debounced)
