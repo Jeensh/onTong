@@ -371,3 +371,141 @@ class TestIndexerEnrichment:
 
         assert "첫 번째 이미지" in enriched
         assert "두 번째 이미지" in enriched
+
+
+class TestImageProcessingQueue:
+    """Test async background processing queue."""
+
+    @pytest.mark.asyncio
+    async def test_queue_processes_images(self, tmp_path):
+        from backend.application.image.queue import ImageProcessingQueue
+        from backend.application.image.analyzer import ImageAnalyzer
+        from backend.application.image.ocr_engine import OCREngine
+        from backend.application.image.vision_provider import NoopVisionProvider
+        from backend.application.image.models import load_sidecar
+        from PIL import Image, ImageDraw
+
+        img = Image.new("RGB", (300, 80), color="white")
+        draw = ImageDraw.Draw(img)
+        draw.text((10, 20), "Queue Test", fill="black")
+        assets_dir = tmp_path / "assets"
+        assets_dir.mkdir()
+        img_path = assets_dir / "queued.png"
+        img.save(img_path)
+
+        analyzer = ImageAnalyzer(
+            ocr=OCREngine(languages=["en"], gpu=False),
+            vision=NoopVisionProvider(),
+        )
+        queue = ImageProcessingQueue(analyzer)
+        await queue.process_images([img_path])
+
+        sidecar = load_sidecar(img_path)
+        assert sidecar is not None
+        assert len(sidecar.ocr_text) > 0
+
+    @pytest.mark.asyncio
+    async def test_queue_processes_images_sync(self, tmp_path):
+        """Async version ensuring OCR pipeline processes images end-to-end."""
+        from backend.application.image.queue import ImageProcessingQueue
+        from backend.application.image.analyzer import ImageAnalyzer
+        from backend.application.image.ocr_engine import OCREngine
+        from backend.application.image.vision_provider import NoopVisionProvider
+        from backend.application.image.models import load_sidecar
+        from PIL import Image, ImageDraw
+
+        img = Image.new("RGB", (300, 80), color="white")
+        draw = ImageDraw.Draw(img)
+        draw.text((10, 20), "Queue Test", fill="black")
+        assets_dir = tmp_path / "assets"
+        assets_dir.mkdir()
+        img_path = assets_dir / "queued.png"
+        img.save(img_path)
+
+        analyzer = ImageAnalyzer(
+            ocr=OCREngine(languages=["en"], gpu=False),
+            vision=NoopVisionProvider(),
+        )
+        queue = ImageProcessingQueue(analyzer)
+        await queue.process_images([img_path])
+
+        sidecar = load_sidecar(img_path)
+        assert sidecar is not None
+        assert len(sidecar.ocr_text) > 0
+
+    @pytest.mark.asyncio
+    async def test_queue_skips_already_processed(self, tmp_path):
+        from backend.application.image.queue import ImageProcessingQueue
+        from backend.application.image.analyzer import ImageAnalyzer
+        from backend.application.image.ocr_engine import OCREngine
+        from backend.application.image.vision_provider import NoopVisionProvider
+        from backend.application.image.models import ImageAnalysis, save_sidecar
+        from datetime import datetime, timezone
+        import time
+
+        assets_dir = tmp_path / "assets"
+        assets_dir.mkdir()
+        img_path = assets_dir / "done.png"
+        img_path.write_bytes(b"fake")
+        time.sleep(0.05)
+
+        save_sidecar(img_path, ImageAnalysis(
+            ocr_text="already done", description="",
+            provider="none", ocr_engine="easyocr",
+            processed_at=datetime.now(timezone.utc),
+        ))
+
+        analyzer = ImageAnalyzer(
+            ocr=OCREngine(languages=["en"], gpu=False),
+            vision=NoopVisionProvider(),
+        )
+        queue = ImageProcessingQueue(analyzer)
+        result = await queue.process_images([img_path])
+
+        assert result["skipped"] == 1
+        assert result["processed"] == 0
+
+    @pytest.mark.asyncio
+    async def test_queue_skips_already_processed_sync(self, tmp_path):
+        """Async version ensuring skip logic works when sidecar is fresh."""
+        from backend.application.image.queue import ImageProcessingQueue
+        from backend.application.image.analyzer import ImageAnalyzer
+        from backend.application.image.ocr_engine import OCREngine
+        from backend.application.image.vision_provider import NoopVisionProvider
+        from backend.application.image.models import ImageAnalysis, save_sidecar
+        from datetime import datetime, timezone
+        import time
+
+        assets_dir = tmp_path / "assets"
+        assets_dir.mkdir()
+        img_path = assets_dir / "done.png"
+        img_path.write_bytes(b"fake")
+        time.sleep(0.05)
+
+        save_sidecar(img_path, ImageAnalysis(
+            ocr_text="already done", description="",
+            provider="none", ocr_engine="easyocr",
+            processed_at=datetime.now(timezone.utc),
+        ))
+
+        analyzer = ImageAnalyzer(
+            ocr=OCREngine(languages=["en"], gpu=False),
+            vision=NoopVisionProvider(),
+        )
+        queue = ImageProcessingQueue(analyzer)
+        result = await queue.process_images([img_path])
+
+        assert result["skipped"] == 1
+        assert result["processed"] == 0
+
+    def test_extract_image_paths_from_markdown(self):
+        from backend.application.image.queue import extract_image_paths
+
+        content = """# Test
+![](assets/img1.png)
+Some text
+![alt text](assets/img2.jpg)
+![](https://external.com/img.png)
+"""
+        paths = extract_image_paths(content)
+        assert paths == ["assets/img1.png", "assets/img2.jpg"]
