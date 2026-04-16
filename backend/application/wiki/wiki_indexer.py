@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import logging
@@ -133,6 +134,44 @@ def _split_long_text(text: str, max_tokens: int, overlap_tokens: int) -> list[st
     return chunks
 
 
+IMAGE_REF_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
+
+
+def enrich_chunk_with_images(chunk_text: str, wiki_root: Path) -> str:
+    """Replace image markdown references with their text descriptions.
+
+    Reads sidecar .meta.json files for each image reference. If a sidecar
+    exists, replaces the image reference with the description text.
+    Falls back to OCR text if no vision description is available.
+    Keeps original reference if no sidecar exists.
+    """
+
+    def _replace_image(match: re.Match) -> str:
+        image_rel_path = match.group(2)
+        image_path = wiki_root / image_rel_path
+        meta_path = image_path.parent / (image_path.name + ".meta.json")
+
+        if not meta_path.exists():
+            return match.group(0)
+
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception:
+            return match.group(0)
+
+        description = meta.get("description", "")
+        ocr_text = meta.get("ocr_text", "")
+
+        if description:
+            return f"\n[이미지: {description}]\n"
+        elif ocr_text:
+            return f"\n[이미지 텍스트: {ocr_text}]\n"
+
+        return match.group(0)
+
+    return IMAGE_REF_RE.sub(_replace_image, chunk_text)
+
+
 class WikiIndexer:
     def __init__(self, chroma: ChromaWrapper) -> None:
         self.chroma = chroma
@@ -153,6 +192,9 @@ class WikiIndexer:
 
         for idx, (heading, body) in enumerate(sections):
             full_text = f"{heading}\n{body}" if heading else body
+            # Enrich: replace image references with their text descriptions
+            wiki_root = Path(settings.wiki_dir)
+            full_text = enrich_chunk_with_images(full_text, wiki_root)
 
             if path_prefix:
                 prefixed_text = f"{path_prefix}\n{full_text}"

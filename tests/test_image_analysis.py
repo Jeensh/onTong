@@ -283,3 +283,91 @@ class TestImageAnalyzer:
 
         assert analysis.ocr_text != "old"
         assert analysis.provider == "none"
+
+
+class TestIndexerEnrichment:
+    """Test image description injection into wiki indexer chunks."""
+
+    def test_enrich_chunk_with_image_description(self, tmp_path):
+        from backend.application.wiki.wiki_indexer import enrich_chunk_with_images
+        from backend.application.image.models import ImageAnalysis, save_sidecar
+        from datetime import datetime, timezone
+
+        assets_dir = tmp_path / "assets"
+        assets_dir.mkdir()
+        img_path = assets_dir / "abc123.png"
+        img_path.write_bytes(b"fake")
+        save_sidecar(img_path, ImageAnalysis(
+            ocr_text="500 서버 에러",
+            description="결제 화면 에러 스크린샷. HTTP 500 응답.",
+            provider="noop", ocr_engine="easyocr",
+            processed_at=datetime.now(timezone.utc),
+        ))
+
+        chunk_text = "# 결제 문의\n\n![](assets/abc123.png)\n\n추가 메모"
+        enriched = enrich_chunk_with_images(chunk_text, tmp_path)
+
+        assert "결제 화면 에러 스크린샷" in enriched
+        assert "![](assets/abc123.png)" not in enriched
+        assert "추가 메모" in enriched
+        assert "[이미지:" in enriched
+
+    def test_enrich_chunk_ocr_only_fallback(self, tmp_path):
+        from backend.application.wiki.wiki_indexer import enrich_chunk_with_images
+        from backend.application.image.models import ImageAnalysis, save_sidecar
+        from datetime import datetime, timezone
+
+        assets_dir = tmp_path / "assets"
+        assets_dir.mkdir()
+        img_path = assets_dir / "def456.png"
+        img_path.write_bytes(b"fake")
+        save_sidecar(img_path, ImageAnalysis(
+            ocr_text="에러 코드 ERR-001",
+            description="",
+            provider="none", ocr_engine="easyocr",
+            processed_at=datetime.now(timezone.utc),
+        ))
+
+        chunk_text = "![에러 화면](assets/def456.png)"
+        enriched = enrich_chunk_with_images(chunk_text, tmp_path)
+
+        assert "이미지 텍스트: 에러 코드 ERR-001" in enriched
+
+    def test_enrich_chunk_no_sidecar_keeps_original(self, tmp_path):
+        from backend.application.wiki.wiki_indexer import enrich_chunk_with_images
+
+        chunk_text = "![](assets/no_meta.png)"
+        enriched = enrich_chunk_with_images(chunk_text, tmp_path)
+
+        assert enriched == chunk_text
+
+    def test_enrich_chunk_no_images_unchanged(self, tmp_path):
+        from backend.application.wiki.wiki_indexer import enrich_chunk_with_images
+
+        chunk_text = "Plain text with no images at all."
+        enriched = enrich_chunk_with_images(chunk_text, tmp_path)
+
+        assert enriched == chunk_text
+
+    def test_enrich_chunk_multiple_images(self, tmp_path):
+        from backend.application.wiki.wiki_indexer import enrich_chunk_with_images
+        from backend.application.image.models import ImageAnalysis, save_sidecar
+        from datetime import datetime, timezone
+
+        assets_dir = tmp_path / "assets"
+        assets_dir.mkdir()
+
+        for name, desc in [("img1.png", "첫 번째 이미지"), ("img2.png", "두 번째 이미지")]:
+            p = assets_dir / name
+            p.write_bytes(b"fake")
+            save_sidecar(p, ImageAnalysis(
+                ocr_text="", description=desc,
+                provider="noop", ocr_engine="easyocr",
+                processed_at=datetime.now(timezone.utc),
+            ))
+
+        chunk_text = "![](assets/img1.png)\n![](assets/img2.png)"
+        enriched = enrich_chunk_with_images(chunk_text, tmp_path)
+
+        assert "첫 번째 이미지" in enriched
+        assert "두 번째 이미지" in enriched
