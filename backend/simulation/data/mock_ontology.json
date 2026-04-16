@@ -1,0 +1,41 @@
+{
+  "nodes": [
+    {"id": "ORD-2024-0042", "type": "Order", "label": "주문 0042", "status": "ERROR"},
+    {"id": "ORD-2024-0055", "type": "Order", "label": "주문 0055", "status": "DESIGNED"},
+    {"id": "ORD-2024-0061", "type": "Order", "label": "주문 0061", "status": "DESIGNED"},
+    {"id": "ORD-2024-0078", "type": "Order", "label": "주문 0078", "status": "DESIGNED"},
+    {"id": "ORD-2024-0091", "type": "Order", "label": "주문 0091", "status": "DESIGNED"},
+    {"id": "CC-01", "type": "ContinuousCaster", "label": "1연주설비"},
+    {"id": "CC-02", "type": "ContinuousCaster", "label": "2연주설비"},
+    {"id": "HR-A", "type": "HotRollingMill", "label": "열연 A라인"},
+    {"id": "HR-B", "type": "HotRollingMill", "label": "열연 B라인"},
+    {"id": "EDGING-HR-A-1", "type": "EdgeSpec", "label": "A라인 Edging(폭900-1200)"},
+    {"id": "EDGING-HR-A-2", "type": "EdgeSpec", "label": "A라인 Edging(폭1201-1570)"},
+    {"id": "EDGING-HR-B-1", "type": "EdgeSpec", "label": "B라인 Edging(폭950-1300)"},
+    {"id": "SLAB-0042", "type": "Slab", "label": "Slab(0042) - 미설계"},
+    {"id": "SLAB-0055", "type": "Slab", "label": "Slab(0055) - 설계완료"},
+    {"id": "SLAB-0061", "type": "Slab", "label": "Slab(0061) - 설계완료"},
+    {"id": "SLAB-0078", "type": "Slab", "label": "Slab(0078) - 설계완료"},
+    {"id": "SLAB-0091", "type": "Slab", "label": "Slab(0091) - 설계완료"}
+  ],
+  "edges": [
+    {"from": "ORD-2024-0042", "to": "CC-01", "relation": "ASSIGNED_TO"},
+    {"from": "ORD-2024-0042", "to": "HR-A", "relation": "ROLLED_BY"},
+    {"from": "ORD-2024-0042", "to": "SLAB-0042", "relation": "PRODUCES"},
+    {"from": "HR-A", "to": "EDGING-HR-A-1", "relation": "HAS_EDGING_SPEC"},
+    {"from": "HR-A", "to": "EDGING-HR-A-2", "relation": "HAS_EDGING_SPEC"},
+    {"from": "ORD-2024-0055", "to": "CC-01", "relation": "ASSIGNED_TO"},
+    {"from": "ORD-2024-0055", "to": "HR-A", "relation": "ROLLED_BY"},
+    {"from": "ORD-2024-0055", "to": "SLAB-0055", "relation": "PRODUCES"},
+    {"from": "ORD-2024-0061", "to": "CC-02", "relation": "ASSIGNED_TO"},
+    {"from": "ORD-2024-0061", "to": "HR-B", "relation": "ROLLED_BY"},
+    {"from": "ORD-2024-0061", "to": "SLAB-0061", "relation": "PRODUCES"},
+    {"from": "HR-B", "to": "EDGING-HR-B-1", "relation": "HAS_EDGING_SPEC"},
+    {"from": "ORD-2024-0078", "to": "CC-01", "relation": "ASSIGNED_TO"},
+    {"from": "ORD-2024-0078", "to": "HR-A", "relation": "ROLLED_BY"},
+    {"from": "ORD-2024-0078", "to": "SLAB-0078", "relation": "PRODUCES"},
+    {"from": "ORD-2024-0091", "to": "CC-01", "relation": "ASSIGNED_TO"},
+    {"from": "ORD-2024-0091", "to": "HR-A", "relation": "ROLLED_BY"},
+    {"from": "ORD-2024-0091", "to": "SLAB-0091", "relation": "PRODUCES"}
+  ]
+}

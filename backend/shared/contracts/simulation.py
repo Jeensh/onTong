@@ -151,3 +151,47 @@ class ScenarioInfo(BaseModel):
     description: str
     parameter_schema: dict     # JSON Schema for the parameter model
     supported_outputs: list[OutputFormat]
+
+
+# ── Slab Size Simulator ───────────────────────────────────────────────
+
+class SlabSizeParams(BaseModel):
+    """Slab 설계 시뮬레이터 입력 파라미터."""
+    target_width: int = 1040        # 목표폭 (mm)
+    thickness: int = 250            # 두께 (mm)
+    target_length: int = 11700      # 목표길이 (mm)
+    unit_weight: int = 23800        # 단중 (kg)
+    split_count: int = 2            # 분할수
+    yield_rate: float = 0.943       # 실수율 (0~1)
+    assigned_rolling: str = "HR-A"  # 할당 열연설비
+    assigned_caster: str = "CC-01"  # 할당 연주설비
+
+
+class SlabDesignStep(BaseModel):
+    """SEQ 단계별 계산 결과."""
+    seq: int
+    name: str
+    result: dict
+    status: str          # "ok" | "warning" | "error"
+    message: str
+    details: dict | None = None
+
+
+class SlabDesignSummary(BaseModel):
+    """설계 요약 결과."""
+    width_range: dict           # {"lower": int, "upper": int}
+    length_range: dict          # {"lower": int, "upper": int}
+    weight_range: dict          # {"lower": int, "upper": int}
+    target_width: int
+    target_length: int
+    split_count: int
+    slab_count: int
+    unit_weight_per_split: float
+
+
+class SlabDesignResult(BaseModel):
+    """Slab 설계 계산 전체 결과."""
+    feasible: bool
+    steps: list[SlabDesignStep]
+    summary: SlabDesignSummary
+    overall_status: str          # "ok" | "warning" | "error"
