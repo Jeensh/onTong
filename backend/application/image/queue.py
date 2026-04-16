@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from pathlib import Path
@@ -35,32 +36,39 @@ class ImageProcessingQueue:
         self.analyzer = analyzer
 
     async def process_images(
-        self, image_paths: list[Path], force: bool = False
+        self, image_paths: list[Path], force: bool = False, max_concurrent: int = 1
     ) -> dict:
         """Process a list of image paths. Returns stats dict.
 
         Skips images that already have fresh sidecar files (unless force=True).
+        Uses asyncio.Semaphore for parallel processing when max_concurrent > 1.
         """
         processed = 0
         skipped = 0
         errors = 0
+        sem = asyncio.Semaphore(max_concurrent)
 
-        for img_path in image_paths:
+        async def _process_one(img_path: Path) -> str:
             if not img_path.exists():
                 logger.warning(f"Image not found, skipping: {img_path}")
-                errors += 1
-                continue
-
+                return "error"
             if not force and not needs_processing(img_path):
-                skipped += 1
-                continue
-
+                return "skipped"
             try:
-                await self.analyzer.analyze(img_path, force=force)
-                processed += 1
-                logger.debug(f"Processed image: {img_path.name}")
+                async with sem:
+                    await self.analyzer.analyze(img_path, force=True)
+                return "processed"
             except Exception as e:
                 logger.warning(f"Failed to process {img_path.name}: {e}")
+                return "error"
+
+        results = await asyncio.gather(*[_process_one(p) for p in image_paths])
+        for r in results:
+            if r == "processed":
+                processed += 1
+            elif r == "skipped":
+                skipped += 1
+            else:
                 errors += 1
 
         logger.info(

@@ -3,6 +3,7 @@
 Usage:
     python -m backend.cli.backfill_images                    # Process all
     python -m backend.cli.backfill_images --ocr-only         # OCR only (fast)
+    python -m backend.cli.backfill_images --vision-only      # Vision only (images with OCR but no description)
     python -m backend.cli.backfill_images --dry-run           # Show what would be processed
     python -m backend.cli.backfill_images --reprocess         # Ignore cache, reprocess all
     python -m backend.cli.backfill_images --workers 8         # Parallel workers
@@ -49,12 +50,21 @@ async def backfill(args: argparse.Namespace) -> None:
         print("No images found in wiki/assets/")
         return
 
-    if args.reprocess:
+    if args.vision_only:
+        from backend.application.image.models import load_sidecar
+        vision_candidates = []
+        for img in all_images:
+            sidecar = load_sidecar(img)
+            if sidecar and sidecar.ocr_text and not sidecar.description:
+                vision_candidates.append(img)
+        to_process = vision_candidates
+        print(f"Found {len(all_images)} images total, {len(to_process)} need vision processing")
+    elif args.reprocess:
         to_process = all_images
+        print(f"Found {len(all_images)} images total, {len(to_process)} need processing (reprocess=True)")
     else:
         to_process = [img for img in all_images if needs_processing(img)]
-
-    print(f"Found {len(all_images)} images total, {len(to_process)} need processing")
+        print(f"Found {len(all_images)} images total, {len(to_process)} need processing")
 
     if args.dry_run:
         for img in to_process:
@@ -90,7 +100,7 @@ async def backfill(args: argparse.Namespace) -> None:
 
     print(f"Processing {len(to_process)} images (vision: {vision.provider_name})...")
 
-    result = await queue.process_images(to_process, force=args.reprocess)
+    result = await queue.process_images(to_process, force=args.reprocess, max_concurrent=args.workers)
 
     print(
         f"Done: {result['processed']} processed, "
@@ -102,9 +112,13 @@ def main():
     parser = argparse.ArgumentParser(description="Backfill image analysis for wiki images")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be processed")
     parser.add_argument("--ocr-only", action="store_true", help="Only run OCR (skip vision)")
+    parser.add_argument("--vision-only", action="store_true", help="Only run vision on images with existing OCR (skip OCR)")
     parser.add_argument("--reprocess", action="store_true", help="Reprocess all images")
     parser.add_argument("--workers", type=int, default=4, help="Number of parallel workers")
     args = parser.parse_args()
+
+    if args.ocr_only and args.vision_only:
+        parser.error("--ocr-only and --vision-only are mutually exclusive")
 
     logging.basicConfig(
         level=logging.INFO,

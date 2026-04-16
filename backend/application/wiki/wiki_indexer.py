@@ -148,6 +148,8 @@ def enrich_chunk_with_images(chunk_text: str, wiki_root: Path) -> str:
 
     def _replace_image(match: re.Match) -> str:
         image_rel_path = match.group(2)
+        if image_rel_path.startswith(("http://", "https://")):
+            return match.group(0)
         image_path = wiki_root / image_rel_path
         meta_path = image_path.parent / (image_path.name + ".meta.json")
 
