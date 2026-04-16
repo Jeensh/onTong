@@ -36,10 +36,10 @@ export default function Home() {
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false);
-  const [mobilePanel, setMobilePanel] = useState<"tree" | "content" | "ai">("content");
+  const [mobilePanel, setMobilePanel] = useState<"tree" | "content" | "ai">("tree");
 
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 768px)");
+    const mq = window.matchMedia("(max-width: 640px)");
     setIsMobile(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener("change", handler);
@@ -230,14 +230,14 @@ export default function Home() {
                 </div>
               </Panel>
 
-              <PanelResizeHandle className="w-1.5 bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors cursor-col-resize group relative after:absolute after:inset-y-0 after:-inset-x-1 after:content-['']" />
+              <PanelResizeHandle className="w-1.5 bg-border/40 hover:bg-primary/20 active:bg-primary/30 transition-colors cursor-col-resize group relative after:absolute after:inset-y-0 after:-inset-x-1 after:content-['']" />
 
               {/* Center: Workspace */}
               <Panel defaultSize={55} minSize={30}>
                 <WorkspacePanel />
               </Panel>
 
-              <PanelResizeHandle className="w-1.5 bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors cursor-col-resize group relative after:absolute after:inset-y-0 after:-inset-x-1 after:content-['']" />
+              <PanelResizeHandle className="w-1.5 bg-border/40 hover:bg-primary/20 active:bg-primary/30 transition-colors cursor-col-resize group relative after:absolute after:inset-y-0 after:-inset-x-1 after:content-['']" />
 
               {/* Right: AI Copilot (collapsible) */}
               <Panel

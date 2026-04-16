@@ -19,11 +19,11 @@ function EmptyState() {
           시작하기
         </h2>
         <p className="text-sm text-muted-foreground mb-6">
-          좌측 트리에서 파일을 선택하거나 검색으로 시작하세요
+          문서를 검색하거나 트리에서 선택하세요
         </p>
         <button
           onClick={toggle}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/20 transition-all group"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/20 transition-colors group"
         >
           <Search className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
           <span className="text-sm font-medium text-foreground">문서 검색</span>

@@ -30,8 +30,8 @@ function Btn({ onClick, active, children, title }: BtnProps) {
   return (
     <button
       onClick={onClick}
-      className={`p-1.5 rounded hover:bg-white/20 transition-colors ${
-        active ? "bg-white/25 text-white" : "text-white/80"
+      className={`p-1.5 rounded hover:bg-foreground/15 transition-colors ${
+        active ? "bg-foreground/20 text-popover-foreground" : "text-popover-foreground/80"
       }`}
       title={title}
     >
@@ -41,14 +41,14 @@ function Btn({ onClick, active, children, title }: BtnProps) {
 }
 
 function Sep() {
-  return <div className="w-px h-4 bg-white/20 mx-0.5" />;
+  return <div className="w-px h-4 bg-foreground/15 mx-0.5" />;
 }
 
 export function BubbleToolbar({ editor }: BubbleToolbarProps) {
   return (
     <BubbleMenu
       editor={editor}
-      className="flex items-center gap-0.5 px-1.5 py-1 rounded-lg bg-zinc-800 shadow-xl border border-zinc-700"
+      className="flex items-center gap-0.5 px-1.5 py-1 rounded-lg bg-popover shadow-xl border border-border"
     >
       <Btn
         onClick={() => editor.chain().focus().toggleBold().run()}

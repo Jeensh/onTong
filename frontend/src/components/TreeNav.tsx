@@ -1914,7 +1914,16 @@ export function TreeNav() {
 
   // ── Render ──────────────────────────────────────────────────────
 
-  if (loading) return <div className="p-3 text-sm text-muted-foreground">불러오는 중...</div>;
+  if (loading) return (
+    <div className="p-3 space-y-2 animate-pulse">
+      {[1, 0.7, 0.85, 0.6, 0.75, 0.5].map((w, i) => (
+        <div key={i} className="flex items-center gap-2" style={{ paddingLeft: i > 2 ? 16 : 0 }}>
+          <div className="h-3.5 w-3.5 rounded bg-muted shrink-0" />
+          <div className="h-3 rounded bg-muted" style={{ width: `${w * 100}%` }} />
+        </div>
+      ))}
+    </div>
+  );
   if (error) return <div className="p-3 text-sm text-destructive">트리 로드 실패: {error}</div>;
 
   const sectionBtnClass = (s: SidebarSection) =>
@@ -1955,16 +1964,16 @@ export function TreeNav() {
           {section === "files" && (
             <div className="flex items-center gap-0.5">
               <button onClick={() => { setCreatingIn("__root__"); setCreatingType("file"); }}
-                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground" title="새 문서">
-                <FilePlus className="h-3.5 w-3.5" />
+                className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground" title="새 문서">
+                <FilePlus className="h-4 w-4" />
               </button>
               <button onClick={() => { setCreatingIn("__root__"); setCreatingType("folder"); }}
-                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground" title="새 폴더">
-                <FolderPlus className="h-3.5 w-3.5" />
+                className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground" title="새 폴더">
+                <FolderPlus className="h-4 w-4" />
               </button>
               <button onClick={fetchTreeData}
-                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground" title="새로고침">
-                <RefreshCw className="h-3.5 w-3.5" />
+                className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground" title="새로고침">
+                <RefreshCw className="h-4 w-4" />
               </button>
             </div>
           )}

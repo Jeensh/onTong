@@ -190,6 +190,11 @@ export function DiffView({ oldContent, newContent, filePath, onAction }: DiffVie
               (적용: +{acceptedAdd} -{acceptedDel})
             </span>
           )}
+          {hunks.length > 1 && (
+            <span className="text-xs text-muted-foreground/70">
+              · 체크박스로 변경 단위 선택 가능
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {/* Toggle all */}

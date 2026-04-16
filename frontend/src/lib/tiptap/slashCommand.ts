@@ -10,50 +10,50 @@ export interface SlashCommandItem {
 
 export const SLASH_COMMANDS: SlashCommandItem[] = [
   {
-    title: "Heading 1",
-    description: "큰 제목",
+    title: "제목 1",
+    description: "Heading 1",
     command: ({ editor, range }) => {
       editor?.chain().focus().deleteRange(range).setHeading({ level: 1 }).run();
     },
   },
   {
-    title: "Heading 2",
-    description: "중간 제목",
+    title: "제목 2",
+    description: "Heading 2",
     command: ({ editor, range }) => {
       editor?.chain().focus().deleteRange(range).setHeading({ level: 2 }).run();
     },
   },
   {
-    title: "Heading 3",
-    description: "작은 제목",
+    title: "제목 3",
+    description: "Heading 3",
     command: ({ editor, range }) => {
       editor?.chain().focus().deleteRange(range).setHeading({ level: 3 }).run();
     },
   },
   {
-    title: "Bullet List",
-    description: "글머리 기호 목록",
+    title: "글머리 기호",
+    description: "Bullet List",
     command: ({ editor, range }) => {
       editor?.chain().focus().deleteRange(range).toggleBulletList().run();
     },
   },
   {
-    title: "Ordered List",
-    description: "번호 매기기 목록",
+    title: "번호 목록",
+    description: "Ordered List",
     command: ({ editor, range }) => {
       editor?.chain().focus().deleteRange(range).toggleOrderedList().run();
     },
   },
   {
-    title: "Task List",
-    description: "체크리스트",
+    title: "체크리스트",
+    description: "Task List",
     command: ({ editor, range }) => {
       editor?.chain().focus().deleteRange(range).toggleTaskList().run();
     },
   },
   {
-    title: "Table",
-    description: "3x3 테이블 삽입",
+    title: "테이블",
+    description: "3x3 Table",
     command: ({ editor, range }) => {
       editor
         ?.chain()
@@ -64,22 +64,22 @@ export const SLASH_COMMANDS: SlashCommandItem[] = [
     },
   },
   {
-    title: "Code Block",
-    description: "코드 블록",
+    title: "코드 블록",
+    description: "Code Block",
     command: ({ editor, range }) => {
       editor?.chain().focus().deleteRange(range).toggleCodeBlock().run();
     },
   },
   {
-    title: "Blockquote",
-    description: "인용 블록",
+    title: "인용",
+    description: "Blockquote",
     command: ({ editor, range }) => {
       editor?.chain().focus().deleteRange(range).toggleBlockquote().run();
     },
   },
   {
-    title: "Horizontal Rule",
-    description: "구분선",
+    title: "구분선",
+    description: "Horizontal Rule",
     command: ({ editor, range }) => {
       editor?.chain().focus().deleteRange(range).setHorizontalRule().run();
     },

@@ -51,6 +51,7 @@
 }
 
 :root {
+  color-scheme: light dark;
   --background: oklch(0.995 0.002 240);
   --foreground: oklch(0.18 0.02 260);
   --card: oklch(1 0 0);
@@ -129,6 +130,15 @@
   html {
     @apply font-sans;
   }
+  /* Global keyboard focus indicator for all interactive elements */
+  button:focus-visible,
+  a:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+    border-radius: var(--radius-sm);
+  }
 }
 
 /* Tiptap table styles */
@@ -190,8 +200,8 @@
 /* WikiLink inline node */
 .wiki-link {
   display: inline;
-  color: oklch(0.55 0.2 250);
-  background-color: oklch(0.55 0.2 250 / 8%);
+  color: var(--primary);
+  background-color: color-mix(in oklch, var(--primary) 10%, transparent);
   border-radius: 3px;
   padding: 1px 4px;
   cursor: pointer;
@@ -201,16 +211,5 @@
 }
 
 .wiki-link:hover {
-  background-color: oklch(0.55 0.2 250 / 18%);
-  color: oklch(0.45 0.25 250);
-}
-
-.dark .wiki-link {
-  color: oklch(0.7 0.15 250);
-  background-color: oklch(0.7 0.15 250 / 12%);
-}
-
-.dark .wiki-link:hover {
-  background-color: oklch(0.7 0.15 250 / 25%);
-  color: oklch(0.8 0.12 250);
+  background-color: color-mix(in oklch, var(--primary) 20%, transparent);
 }

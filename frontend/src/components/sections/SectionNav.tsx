@@ -34,7 +34,7 @@ export function SectionNav() {
             key={section.id}
             onClick={() => setActiveSection(section.id)}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-all",
+              "flex items-center gap-1.5 px-3 py-2 text-sm rounded-md transition-colors",
               activeSection === section.id
                 ? "bg-primary/10 text-primary font-medium"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted",

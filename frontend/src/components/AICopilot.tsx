@@ -118,11 +118,31 @@ interface AICopilotProps {
   isPopout?: boolean;
 }
 
+const SESSIONS_STORAGE_KEY = "ontong:chat-sessions";
+const ACTIVE_SESSION_KEY = "ontong:active-session";
+
+function loadSessions(): ChatSession[] {
+  if (typeof window === "undefined") return [createSession()];
+  try {
+    const saved = localStorage.getItem(SESSIONS_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved) as ChatSession[];
+      if (parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return [createSession()];
+}
+
+function loadActiveSessionId(sessions: ChatSession[]): string {
+  if (typeof window === "undefined") return sessions[0].id;
+  const saved = localStorage.getItem(ACTIVE_SESSION_KEY);
+  if (saved && sessions.some((s) => s.id === saved)) return saved;
+  return sessions[0].id;
+}
+
 export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {}) {
-  const [sessions, setSessions] = useState<ChatSession[]>(() => [
-    createSession(),
-  ]);
-  const [activeSessionId, setActiveSessionId] = useState(sessions[0].id);
+  const [sessions, setSessions] = useState<ChatSession[]>(loadSessions);
+  const [activeSessionId, setActiveSessionId] = useState(() => loadActiveSessionId(loadSessions()));
   const [showSessionList, setShowSessionList] = useState(false);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -153,6 +173,24 @@ export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {
 
   const activeSession = sessions.find((s) => s.id === activeSessionId)!;
   const messages = activeSession.messages;
+
+  // Persist sessions to localStorage (debounced)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      try {
+        // Strip streaming state before saving
+        const cleaned = sessions.map((s) => ({
+          ...s,
+          messages: s.messages.map((m) => ({ ...m, isStreaming: false })),
+        }));
+        localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(cleaned));
+        localStorage.setItem(ACTIVE_SESSION_KEY, activeSessionId);
+      } catch {}
+    }, 500);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [sessions, activeSessionId]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -809,7 +847,7 @@ export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {
                 <button
                   key={q}
                   onClick={() => { setInput(q); }}
-                  className="text-xs text-left px-3 py-2 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/20 transition-all text-muted-foreground hover:text-foreground"
+                  className="text-xs text-left px-3 py-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/20 transition-colors text-muted-foreground hover:text-foreground"
                 >
                   &quot;{q}&quot;
                 </button>
@@ -818,7 +856,7 @@ export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {
           </div>
         )}
 
-        {messages.map((msg) => (
+        {messages.map((msg, idx) => (
           <div key={msg.id}>
             {msg.role === "user" ? (
               <UserBubble content={msg.content} />
@@ -828,6 +866,14 @@ export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {
                 onSourceClick={openTab}
                 onApproval={handleApproval}
                 onClarificationSelect={handleClarificationSelect}
+                onRetry={msg.error ? () => {
+                  const prevUser = messages.slice(0, idx).findLast((m) => m.role === "user");
+                  if (prevUser) {
+                    setInput(prevUser.content);
+                    // Remove the errored assistant message
+                    updateMessages((msgs) => msgs.filter((m) => m.id !== msg.id));
+                  }
+                } : undefined}
               />
             )}
           </div>
@@ -1023,10 +1069,15 @@ export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {
           </button>
           <textarea
             ref={inputRef}
-            className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring min-h-[40px] max-h-[120px]"
+            className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring min-h-[40px] max-h-[120px] overflow-y-auto"
             placeholder="질문을 입력하세요..."
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              const ta = e.target;
+              ta.style.height = "auto";
+              ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+            }}
             onKeyDown={handleKeyDown}
             rows={1}
           />
@@ -1082,7 +1133,7 @@ function formatTime(ts: number): string {
 function UserBubble({ content }: { content: string }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[85%] rounded-lg bg-primary px-3 py-2 text-primary-foreground text-sm whitespace-pre-wrap">
+      <div className="max-w-[75%] rounded-lg bg-primary px-3 py-2 text-primary-foreground text-sm whitespace-pre-wrap">
         {content}
       </div>
     </div>
@@ -1094,12 +1145,15 @@ function AssistantBubble({
   onSourceClick,
   onApproval,
   onClarificationSelect,
+  onRetry,
 }: {
   msg: ChatMessage;
   onSourceClick: (path: string) => void;
   onApproval: (actionId: string, approved: boolean, actionType?: string, path?: string) => void;
   onClarificationSelect: (option: string, requestId: string) => void;
+  onRetry?: () => void;
 }) {
+  const [copied, setCopied] = useState(false);
   const openCompareTab = useWorkspaceStore((s) => s.openCompareTab);
   const resolvedConflicts = useWorkspaceStore((s) => s.resolvedConflicts);
   const hasThinkingSteps = msg.thinkingSteps && msg.thinkingSteps.length > 0;
@@ -1118,7 +1172,7 @@ function AssistantBubble({
       )}
 
       {/* Content */}
-      <div className="max-w-[95%] rounded-lg bg-muted/50 px-3 py-2 text-sm">
+      <div className="max-w-[95%] rounded-lg bg-muted/50 px-3 py-2 text-sm group/bubble">
         {isThinking && !msg.content && (
           <span className="inline-block w-1.5 h-4 bg-foreground/60 animate-pulse ml-0.5 align-text-bottom" />
         )}
@@ -1131,8 +1185,31 @@ function AssistantBubble({
           <span className="inline-block w-1.5 h-4 bg-foreground/60 animate-pulse ml-0.5 align-text-bottom" />
         )}
         {msg.error && (
-          <div className="mt-2 text-destructive text-xs">
-            {msg.error}
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-destructive text-xs">{msg.error}</span>
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                className="text-xs text-primary hover:underline font-medium"
+              >
+                다시 시도
+              </button>
+            )}
+          </div>
+        )}
+        {/* Copy button */}
+        {!msg.isStreaming && msg.content && (
+          <div className="flex justify-end mt-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(msg.content);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+              className="text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors"
+            >
+              {copied ? "복사됨" : "복사"}
+            </button>
           </div>
         )}
       </div>
@@ -1246,100 +1323,9 @@ function AssistantBubble({
 
       {/* Sources */}
       {msg.sources && msg.sources.length > 0 && (
-        <div className="flex flex-wrap gap-1 px-1">
-          {msg.sources.map((s) => (
-            <span key={s.doc} className="inline-flex items-center gap-0.5">
-            <button
-              onClick={() => onSourceClick(s.doc)}
-              className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs transition-colors ${
-                s.status === "deprecated"
-                  ? "border-red-300 text-red-500 line-through hover:bg-red-50 dark:border-red-700 dark:hover:bg-red-950/30"
-                  : s.status === "approved"
-                  ? "border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-950/30"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              }`}
-              title={[
-                `관련도: ${Math.round(s.relevance * 100)}%`,
-                s.confidence_score != null && s.confidence_score >= 0 && `신뢰도: ${s.confidence_score} (${s.confidence_tier === "high" ? "높음 — 신뢰할 수 있는 문서" : s.confidence_tier === "medium" ? "보통 — 검증 권장" : "낮음 — 최신 정보가 아닐 수 있음"})`,
-                s.updated_by && `작성자: ${s.updated_by}`,
-                s.updated && `수정일: ${s.updated}`,
-                s.status && `상태: ${s.status}`,
-                s.superseded_by && `새 버전: ${s.superseded_by}`,
-              ].filter(Boolean).join("\n")}
-            >
-              {s.status === "approved" && <CircleCheck className="h-3 w-3 text-green-600" />}
-              {s.status === "deprecated" && <X className="h-3 w-3 text-red-500" />}
-              {(!s.status || (s.status !== "approved" && s.status !== "deprecated")) && <FileText className="h-3 w-3" />}
-              <span>{s.doc.split("/").pop()}</span>
-              {s.status === "deprecated" && <span className="rounded bg-red-100 px-1 text-[10px] font-medium text-red-600 dark:bg-red-900/40 dark:text-red-400">폐기됨</span>}
-              {s.status === "deprecated" && s.superseded_by && (
-                <span
-                  className="cursor-pointer text-[10px] text-blue-500 underline hover:text-blue-700"
-                  onClick={(e) => { e.stopPropagation(); onSourceClick(s.superseded_by!); }}
-                  title={`새 버전: ${s.superseded_by}`}
-                >→ 새 버전</span>
-              )}
-              {s.updated && (
-                <span className="text-[10px] opacity-60">{s.updated.slice(5, 10)}</span>
-              )}
-              {s.confidence_score != null && s.confidence_score >= 0 && (
-                <span
-                  className={`inline-block h-2 w-2 rounded-full ${
-                    s.confidence_tier === "high"
-                      ? "bg-green-500"
-                      : s.confidence_tier === "medium"
-                      ? "bg-yellow-500"
-                      : "bg-gray-400"
-                  }`}
-                  title={
-                    s.confidence_tier === "high"
-                      ? `신뢰도 ${s.confidence_score}`
-                      : s.confidence_tier === "medium"
-                      ? `신뢰도 ${s.confidence_score} — 검증 권장`
-                      : `신뢰도 ${s.confidence_score} — 오래된 문서`
-                  }
-                />
-              )}
-            </button>
-            {/* Source feedback thumbs */}
-            <span className="inline-flex items-center gap-0.5 ml-0.5">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const base = typeof window !== "undefined" && window.location.hostname === "localhost" ? "http://localhost:8001" : "";
-                  fetch(`${base}/api/wiki/feedback/${encodeURIComponent(s.doc)}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "thumbs_up" }),
-                  }).catch(() => {});
-                }}
-                className="p-0.5 rounded hover:bg-green-100 dark:hover:bg-green-900/30 text-muted-foreground hover:text-green-600 transition-colors"
-                title="이 소스가 도움이 되었습니다"
-              >
-                <ThumbsUp className="h-3 w-3" />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const base = typeof window !== "undefined" && window.location.hostname === "localhost" ? "http://localhost:8001" : "";
-                  fetch(`${base}/api/wiki/feedback/${encodeURIComponent(s.doc)}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "thumbs_down" }),
-                  }).catch(() => {});
-                }}
-                className="p-0.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-muted-foreground hover:text-red-600 transition-colors"
-                title="이 소스가 부정확합니다"
-              >
-                <ThumbsDown className="h-3 w-3" />
-              </button>
-            </span>
-            </span>
-          ))}
-        </div>
+        <SourceChips sources={msg.sources} onSourceClick={onSourceClick} />
       )}
 
-      {/* Approval Request — sent to workspace */}
       {msg.approval && !msg.approvalResolved && msg.approval.sentToWorkspace && (
         <div className="rounded-lg border border-dashed border-primary/50 bg-primary/5 p-2">
           <div className="flex items-center gap-2 text-xs text-primary">
@@ -1383,12 +1369,117 @@ function AssistantBubble({
       {msg.approvalResolved && (
         <div className={`text-xs px-2 py-1 rounded ${
           msg.approvalResolved === "approved"
-            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-            : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+            : "bg-destructive/10 text-destructive"
         }`}>
           {msg.approvalResolved === "approved" ? "승인됨" : "거절됨"}
           {msg.approval && ` — ${msg.approval.path}`}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Source Chips (collapsible) ───────────────────────────────────────
+
+function SourceChips({ sources, onSourceClick }: { sources: SourceItem[]; onSourceClick: (doc: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const COLLAPSE_THRESHOLD = 3;
+  const visibleSources = expanded || sources.length <= COLLAPSE_THRESHOLD ? sources : sources.slice(0, 2);
+  const hiddenCount = sources.length - 2;
+
+  return (
+    <div className="flex flex-wrap gap-1 px-1">
+      {visibleSources.map((s) => (
+        <span key={s.doc} className="inline-flex items-center gap-0.5">
+          <button
+            onClick={() => onSourceClick(s.doc)}
+            className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs transition-colors ${
+              s.status === "deprecated"
+                ? "border-destructive/30 text-destructive line-through hover:bg-destructive/5"
+                : s.status === "approved"
+                ? "border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/5 dark:text-emerald-400"
+                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            }`}
+            title={[
+              `관련도: ${Math.round(s.relevance * 100)}%`,
+              s.confidence_score != null && s.confidence_score >= 0 && `신뢰도: ${s.confidence_score} (${s.confidence_tier === "high" ? "높음" : s.confidence_tier === "medium" ? "보통" : "낮음"})`,
+              s.updated_by && `작성자: ${s.updated_by}`,
+              s.updated && `수정일: ${s.updated}`,
+              s.status && `상태: ${s.status}`,
+              s.superseded_by && `새 버전: ${s.superseded_by}`,
+            ].filter(Boolean).join("\n")}
+          >
+            {s.status === "approved" && <CircleCheck className="h-3 w-3" />}
+            {s.status === "deprecated" && <X className="h-3 w-3" />}
+            {(!s.status || (s.status !== "approved" && s.status !== "deprecated")) && <FileText className="h-3 w-3" />}
+            <span>{s.doc.split("/").pop()}</span>
+            {s.status === "deprecated" && s.superseded_by && (
+              <span
+                className="cursor-pointer text-[10px] text-primary underline"
+                onClick={(e) => { e.stopPropagation(); onSourceClick(s.superseded_by!); }}
+              >→ 새 버전</span>
+            )}
+            {s.confidence_score != null && s.confidence_score >= 0 && (
+              <span
+                className={`inline-block h-2 w-2 rounded-full ${
+                  s.confidence_tier === "high" ? "bg-emerald-500"
+                    : s.confidence_tier === "medium" ? "bg-amber-500"
+                    : "bg-muted-foreground/40"
+                }`}
+                title={`신뢰도 ${s.confidence_score}`}
+              />
+            )}
+          </button>
+          <span className="inline-flex items-center gap-0.5 ml-0.5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const base = typeof window !== "undefined" && window.location.hostname === "localhost" ? "http://localhost:8001" : "";
+                fetch(`${base}/api/wiki/feedback/${encodeURIComponent(s.doc)}`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "thumbs_up" }),
+                }).catch(() => {});
+              }}
+              className="p-0.5 rounded hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-600 transition-colors"
+              title="이 소스가 도움이 되었습니다"
+            >
+              <ThumbsUp className="h-3 w-3" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const base = typeof window !== "undefined" && window.location.hostname === "localhost" ? "http://localhost:8001" : "";
+                fetch(`${base}/api/wiki/feedback/${encodeURIComponent(s.doc)}`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "thumbs_down" }),
+                }).catch(() => {});
+              }}
+              className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+              title="이 소스가 부정확합니다"
+            >
+              <ThumbsDown className="h-3 w-3" />
+            </button>
+          </span>
+        </span>
+      ))}
+      {!expanded && sources.length > COLLAPSE_THRESHOLD && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="inline-flex items-center gap-0.5 rounded-md border px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent transition-colors"
+        >
+          +{hiddenCount}개 더
+        </button>
+      )}
+      {expanded && sources.length > COLLAPSE_THRESHOLD && (
+        <button
+          onClick={() => setExpanded(false)}
+          className="inline-flex items-center gap-0.5 rounded-md px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          접기
+        </button>
       )}
     </div>
   );
@@ -1424,8 +1515,12 @@ function ThinkingStepsDisplay({
     prevCollapsed.current = initialCollapsed;
   }, [initialCollapsed]);
 
-  const completedCount = steps.filter((s) => s.status === "done" || s.status === "info").length;
-  const totalCount = steps.length;
+  const completedSteps = steps.filter((s) => s.status === "done" || s.status === "info");
+  const completedCount = completedSteps.length;
+  const lastStep = completedSteps[completedSteps.length - 1];
+  const collapsedLabel = lastStep
+    ? `${completedCount}단계 · ${lastStep.label}`
+    : `${completedCount}단계 완료`;
 
   // Collapsed view — clickable summary
   if (isCollapsed) {
@@ -1436,7 +1531,7 @@ function ThinkingStepsDisplay({
       >
         <ChevronRight className="h-3 w-3" />
         <Zap className="h-3 w-3 text-primary/70" />
-        <span>탐색 과정 ({completedCount}단계 완료)</span>
+        <span>{collapsedLabel}</span>
       </button>
     );
   }

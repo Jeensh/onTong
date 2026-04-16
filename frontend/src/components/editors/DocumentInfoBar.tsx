@@ -118,22 +118,22 @@ export function DocumentInfoBar({
   const data = confidenceData;
 
   const statusColors: Record<string, string> = {
-    approved: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400",
-    deprecated: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400",
-    draft: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+    approved: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    deprecated: "bg-destructive/10 text-destructive",
+    draft: "bg-muted text-muted-foreground",
   };
 
   const tierColor = data
     ? data.tier === "high"
-      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
       : data.tier === "medium"
-      ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-      : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+      ? "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+      : "bg-muted text-muted-foreground"
     : "";
 
   const dotColor = data
-    ? data.tier === "high" ? "bg-green-500" : data.tier === "medium" ? "bg-yellow-500" : "bg-gray-400"
-    : "bg-gray-300";
+    ? data.tier === "high" ? "bg-emerald-500" : data.tier === "medium" ? "bg-amber-500" : "bg-muted-foreground/50"
+    : "bg-muted-foreground/30";
 
   return (
     <div data-info-bar className="flex items-center gap-1.5 px-3 py-1 border-b text-xs min-h-[32px] bg-background">
@@ -151,12 +151,15 @@ export function DocumentInfoBar({
         </span>
       )}
 
-      {/* Tags preview (first 2) */}
+      {/* Tags count (detail in drawer) */}
       {metadata.tags.length > 0 && (
-        <span className="text-muted-foreground/60 truncate max-w-[120px]">
-          {metadata.tags.slice(0, 2).join(", ")}
-          {metadata.tags.length > 2 && ` +${metadata.tags.length - 2}`}
-        </span>
+        <button
+          onClick={() => onOpenDrawerTab("metadata")}
+          className="text-muted-foreground/60 hover:text-muted-foreground transition-colors shrink-0"
+          title={metadata.tags.join(", ")}
+        >
+          {metadata.tags.length}태그
+        </button>
       )}
 
       {/* Confidence pill */}
@@ -187,9 +190,9 @@ export function DocumentInfoBar({
                           {label} <span className="text-muted-foreground">({weight}%)</span>
                         </span>
                         <span className={`font-mono font-medium ${
-                          val >= 70 ? "text-green-600 dark:text-green-400"
-                            : val >= 40 ? "text-yellow-600 dark:text-yellow-400"
-                            : "text-gray-500"
+                          val >= 70 ? "text-emerald-600 dark:text-emerald-400"
+                            : val >= 40 ? "text-amber-600 dark:text-amber-400"
+                            : "text-muted-foreground"
                         }`}>
                           {Math.round(val)}
                         </span>
@@ -198,7 +201,7 @@ export function DocumentInfoBar({
                         <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
                           <div
                             className={`h-full rounded-full ${
-                              val >= 70 ? "bg-green-500" : val >= 40 ? "bg-yellow-500" : "bg-gray-400"
+                              val >= 70 ? "bg-emerald-500" : val >= 40 ? "bg-amber-500" : "bg-muted-foreground/40"
                             }`}
                             style={{ width: `${Math.min(val, 100)}%` }}
                           />
@@ -255,7 +258,7 @@ export function DocumentInfoBar({
       <button
         disabled={feedbackLoading}
         onClick={() => submitFeedback("verified")}
-        className="p-1 rounded text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors disabled:opacity-50 shrink-0"
+        className="p-1 rounded text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors disabled:opacity-50 shrink-0"
         title="확인했음"
       >
         <CheckCircle2 className="h-3.5 w-3.5" />
@@ -263,20 +266,13 @@ export function DocumentInfoBar({
       <button
         disabled={feedbackLoading}
         onClick={() => submitFeedback("needs_update")}
-        className="p-1 rounded text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors disabled:opacity-50 shrink-0"
+        className="p-1 rounded text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-50 shrink-0"
         title="수정 필요"
       >
         <AlertCircle className="h-3.5 w-3.5" />
       </button>
 
-      {/* Feedback count (compact) */}
-      {feedbackData && (feedbackData.verified_count > 0 || feedbackData.needs_update_count > 0) && (
-        <span className="text-[10px] text-muted-foreground shrink-0">
-          {feedbackData.verified_count > 0 && `${feedbackData.verified_count}`}
-          {feedbackData.verified_count > 0 && feedbackData.needs_update_count > 0 && "/"}
-          {feedbackData.needs_update_count > 0 && `${feedbackData.needs_update_count}`}
-        </span>
-      )}
+      {/* Feedback count (detail in drawer) */}
 
       {/* Expand/collapse drawer */}
       <button
