@@ -840,6 +840,23 @@ Step 1-C 백엔드(1C-5)부터 시작해줘
 
 > Phase 0 잔여 (온톨로지, shared/ 추출, wiki/ 이동, Neo4j, job queue 등) 및 Phase 1~3은 모델링/시뮬레이션 팀 관할.
 
+### Phase 1a — Engine-First Architecture (2026-04-16)
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| E1a-1 | Simulation Data Models (ParametricSimResult 외 4 모델) | [x] | `backend/modeling/simulation/sim_models.py` |
+| E1a-2 | Term Resolver (Korean alias 30개 + fuzzy + LLM) | [x] | `backend/modeling/query/term_resolver.py` |
+| E1a-3 | Simulation Registry (9 SCM entities × calc functions) | [x] | `backend/modeling/simulation/sim_registry.py` |
+| E1a-4 | Simulation Engine (param clamp + calc + BFS impact) | [x] | `backend/modeling/simulation/sim_engine.py` |
+| E1a-5 | Engine API (/engine/query, /simulate, /params, /status) | [x] | `backend/modeling/api/engine_api.py` |
+| E1a-6 | Seed Enhancement (sim_entities count) | [x] | `backend/modeling/api/seed_api.py` |
+| E1a-7 | Frontend API Client (4 functions + 6 types) | [x] | `frontend/src/lib/api/modeling.ts` |
+| E1a-8 | AnalysisConsole (자연어 입력 → 영향 분석 UI) | [x] | `frontend/.../modeling/AnalysisConsole.tsx` |
+| E1a-9 | SimulationPanel (파라미터 슬라이더 + before/after) | [x] | `frontend/.../modeling/SimulationPanel.tsx` |
+| E1a-10 | Sidebar Restructure (MAIN/SETTINGS nav, 기본탭=analysis) | [x] | `frontend/.../ModelingSection.tsx` |
+
+> 28 tests, TS clean, UI+API 검증 완료. 다음: Phase 1b (실제 BFS 의존성), Phase 2 (코드 편집 샌드박스).
+
 ---
 
 ## 🧠 에이전트 고도화 (agent_bible 분석 기반, v3)

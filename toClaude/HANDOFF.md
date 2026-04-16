@@ -4,11 +4,39 @@
 > 사용자가 "이어서 하자"라고 하면: 이 문서 → `CHANGES.md`의 `[ ]` → `TODO.md` 순으로 확인.
 > 이 문서는 `~/.claude/`의 메모리/플랜이 따라오지 않는 환경(다른 컴퓨터로 디렉토리 복사 등)을 위한 백업.
 
-마지막 업데이트: 2026-04-14
+마지막 업데이트: 2026-04-16
 
 ---
 
 ## 1. 다음 세션 첫 작업
+
+### Section 2 Modeling Engine Phase 1a 완료 (2026-04-16)
+
+**브랜치**: `main` — 11 commits, 28 tests, TS clean, UI + API 검증 완료.
+
+Engine-First Architecture로 Section 2 리디자인:
+- **분석 콘솔**: 한국어 자연어 입력 → 코드 엔티티 resolve → 영향 프로세스 분석
+- **시뮬레이션 패널**: 파라미터 슬라이더 → before/after 비교 (9개 SCM 데모 엔티티)
+- **Term Resolution Chain**: Korean alias(30개) → fuzzy match(0.55) → LLM fallback
+- **사이드바 구조 변경**: "분석 콘솔" 기본 탭, "설정" 구분선으로 기존 탭 분리
+
+**백엔드 신규 파일:**
+- `backend/modeling/simulation/sim_models.py` — ParametricSimResult 외 4 모델
+- `backend/modeling/query/term_resolver.py` — Korean alias + fuzzy + LLM
+- `backend/modeling/simulation/sim_registry.py` — 9 엔티티 × calc functions
+- `backend/modeling/simulation/sim_engine.py` — 시뮬레이션 + BFS 영향 추적
+- `backend/modeling/api/engine_api.py` — /engine/query, /simulate, /params, /status
+
+**프론트엔드 신규/변경:**
+- `frontend/src/components/sections/modeling/AnalysisConsole.tsx` (NEW)
+- `frontend/src/components/sections/modeling/SimulationPanel.tsx` (NEW)
+- `frontend/src/components/sections/ModelingSection.tsx` (restructured)
+- `frontend/src/lib/api/modeling.ts` (extended)
+
+**설계 문서**: `~/.gstack/projects/Jeensh-onTong/donghae-main-design-20260415-213837.md`
+**구현 플랜**: `docs/superpowers/plans/2026-04-15-modeling-engine-phase1a.md`
+
+**다음 후보**: Phase 1b (실제 Neo4j BFS 의존성 그래프 기반 affected_processes), Phase 2 (코드 편집 샌드박스)
 
 ### ACL Domain Scoping 완료 (2026-04-14)
 

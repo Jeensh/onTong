@@ -6,6 +6,23 @@
 
 ---
 
+## 2026-04-16 (Section 2 Modeling Engine — Phase 1a)
+
+### Engine-First Architecture 리디자인 (10 tasks, 28 tests)
+- [x] **E1a-MODELS** — ParametricSimResult, SimulationParam, SimulationOutput, AffectedProcessRef
+- [x] **E1a-RESOLVER** — TermResolver (Korean alias 30개 + fuzzy 0.55 + LLM fallback)
+- [x] **E1a-REGISTRY** — SimRegistry (9 SCM entities × calc functions, static _REGISTRY pattern)
+- [x] **E1a-ENGINE** — SimulationEngine (param clamp + calculate + BFS impact tracing)
+- [x] **E1a-API** — Engine API (/engine/query, /simulate, /params/{id}, /status)
+- [x] **E1a-SEED** — Seed enhancement (sim_entities count in response)
+- [x] **E1a-CLIENT** — Frontend API client (4 functions + 6 TypeScript interfaces)
+- [x] **E1a-ANALYSIS** — AnalysisConsole.tsx (자연어 입력 + 예시 질의 + 결과 표시)
+- [x] **E1a-SIM** — SimulationPanel.tsx (엔티티 드롭다운 + 파라미터 슬라이더 + before/after)
+- [x] **E1a-SIDEBAR** — ModelingSection.tsx (MAIN_NAV/SETTINGS_NAV 분리, 기본탭=analysis)
+- [x] **E1a-FIX** — Division-by-zero guard + hardcoded condition fix (코드 리뷰 반영)
+
+---
+
 ## 2026-04-12 (Section 2 Modeling MVP — Full Implementation)
 
 ### Section 2 Modeling MVP 완료 (18 tasks, 69 tests)
