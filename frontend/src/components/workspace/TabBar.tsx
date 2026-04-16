@@ -43,7 +43,7 @@ function SortableTab({ tab, isActive }: { tab: Tab; isActive: boolean }) {
       {...listeners}
       className={`group flex items-center gap-1.5 px-3 py-1.5 text-sm cursor-pointer border-b-2 select-none shrink-0 ${
         isActive
-          ? "border-foreground bg-background text-foreground"
+          ? "border-primary bg-background text-foreground"
           : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
       }`}
       onClick={() => setActiveTab(tab.id)}

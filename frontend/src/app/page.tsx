@@ -206,7 +206,7 @@ export default function Home() {
             {treeCollapsed && (
               <button
                 onClick={() => treePanelRef.current?.expand()}
-                className="w-7 flex flex-col items-center justify-center border-r bg-muted/30 hover:bg-muted/60 transition-colors shrink-0"
+                className="w-9 flex flex-col items-center justify-center border-r bg-muted/30 hover:bg-muted/60 transition-colors shrink-0"
                 title="사이드바 열기 (⌘B)"
               >
                 <FolderTree className="h-4 w-4 text-muted-foreground" />
@@ -260,7 +260,7 @@ export default function Home() {
             {aiCollapsed && !aiPopout && (
               <button
                 onClick={() => aiPanelRef.current?.expand()}
-                className="w-7 flex flex-col items-center justify-center border-l bg-muted/30 hover:bg-muted/60 transition-colors shrink-0"
+                className="w-9 flex flex-col items-center justify-center border-l bg-muted/30 hover:bg-muted/60 transition-colors shrink-0"
                 title="AI 코파일럿 열기 (⌘J)"
               >
                 <Sparkles className="h-4 w-4 text-muted-foreground" />
@@ -271,7 +271,7 @@ export default function Home() {
             {aiPopout && aiCollapsed && (
               <button
                 onClick={handleDockBack}
-                className="w-7 flex flex-col items-center justify-center border-l bg-primary/10 hover:bg-primary/20 transition-colors shrink-0"
+                className="w-9 flex flex-col items-center justify-center border-l bg-primary/10 hover:bg-primary/20 transition-colors shrink-0"
                 title="AI 코파일럿 패널로 되돌리기 (⌘J)"
               >
                 <PanelRightClose className="h-4 w-4 text-primary" />

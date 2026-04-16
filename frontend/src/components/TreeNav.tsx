@@ -1335,81 +1335,63 @@ function SkillsSection({ onOpenTab }: { onOpenTab: (path: string) => void }) {
 // ── Settings Section ─────────────────────────────────────────────────
 
 function SettingsSection({ onOpenVirtualTab }: { onOpenVirtualTab: (tabType: import("@/types").VirtualTabType) => void }) {
+  const itemClass = "flex items-center gap-2.5 mx-2 px-2 py-2 rounded-md hover:bg-muted/60 text-left transition-colors";
   return (
     <div className="flex-1 overflow-auto text-sm">
       <div className="px-3 pt-3 pb-2">
-        <span className="text-xs font-semibold text-muted-foreground uppercase">관리</span>
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">관리</span>
       </div>
-      <button
-        onClick={() => onOpenVirtualTab("metadata-templates")}
-        className="flex items-center gap-2 px-3 py-2 w-full hover:bg-muted/50 text-left"
-      >
-        <Tags className="h-4 w-4 text-muted-foreground" />
-        <div>
-          <div className="text-xs font-medium">메타데이터 템플릿</div>
-          <div className="text-[11px] text-muted-foreground">Domain, Process, Tags 관리</div>
-        </div>
-      </button>
-      <button
-        onClick={() => onOpenVirtualTab("untagged-dashboard")}
-        className="flex items-center gap-2 px-3 py-2 w-full hover:bg-muted/50 text-left"
-      >
-        <File className="h-4 w-4 text-muted-foreground" />
-        <div>
-          <div className="text-xs font-medium">미태깅 문서</div>
-          <div className="text-[11px] text-muted-foreground">태그 없는 문서 목록 + 일괄 태깅</div>
-        </div>
-      </button>
-      <button
-        onClick={() => onOpenVirtualTab("conflict-dashboard")}
-        className="flex items-center gap-2 px-3 py-2 w-full hover:bg-muted/50 text-left"
-      >
-        <AlertTriangle className="h-4 w-4 text-amber-500" />
-        <div>
-          <div className="text-xs font-medium">관련 문서 관리</div>
-          <div className="text-[11px] text-muted-foreground">유사 문서 분류 + AI 분석 + 해결</div>
-        </div>
-      </button>
-      <button
-        onClick={() => onOpenVirtualTab("maintenance-digest")}
-        className="flex items-center gap-2 px-3 py-2 w-full hover:bg-muted/50 text-left"
-      >
-        <ClipboardList className="h-4 w-4 text-orange-500" />
-        <div>
-          <div className="text-xs font-medium">관리가 필요한 문서</div>
-          <div className="text-[11px] text-muted-foreground">오래됨 / 신뢰도 낮음 / 미해결 관련</div>
-        </div>
-      </button>
-      <button
-        onClick={() => onOpenVirtualTab("document-graph")}
-        className="flex items-center gap-2 px-3 py-2 w-full hover:bg-muted/50 text-left"
-      >
-        <Network className="h-4 w-4 text-indigo-500" />
-        <div>
-          <div className="text-xs font-medium">문서 관계 그래프</div>
-          <div className="text-[11px] text-muted-foreground">문서 간 연결 관계 시각화</div>
-        </div>
-      </button>
-      <button
-        onClick={() => onOpenVirtualTab("permission-editor")}
-        className="flex items-center gap-2 px-3 py-2 w-full hover:bg-muted/50 text-left"
-      >
-        <Shield className="h-4 w-4 text-rose-500" />
-        <div>
-          <div className="text-xs font-medium">접근 권한 관리</div>
-          <div className="text-[11px] text-muted-foreground">폴더/문서별 읽기·쓰기 제어</div>
-        </div>
-      </button>
-      <button
-        onClick={() => onOpenVirtualTab("scoring-dashboard")}
-        className="flex items-center gap-2 px-3 py-2 w-full hover:bg-muted/50 text-left"
-      >
-        <Gauge className="h-4 w-4 text-emerald-500" />
-        <div>
-          <div className="text-xs font-medium">신뢰도 설정</div>
-          <div className="text-[11px] text-muted-foreground">점수 가중치, 임계값, 공식 확인</div>
-        </div>
-      </button>
+      <div className="space-y-0.5">
+        <button onClick={() => onOpenVirtualTab("metadata-templates")} className={itemClass}>
+          <Tags className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div className="min-w-0">
+            <div className="text-xs font-medium truncate">메타데이터 템플릿</div>
+            <div className="text-[11px] text-muted-foreground truncate">Domain, Process, Tags 관리</div>
+          </div>
+        </button>
+        <button onClick={() => onOpenVirtualTab("untagged-dashboard")} className={itemClass}>
+          <File className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div className="min-w-0">
+            <div className="text-xs font-medium truncate">미태깅 문서</div>
+            <div className="text-[11px] text-muted-foreground truncate">태그 없는 문서 목록 + 일괄 태깅</div>
+          </div>
+        </button>
+        <button onClick={() => onOpenVirtualTab("conflict-dashboard")} className={itemClass}>
+          <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+          <div className="min-w-0">
+            <div className="text-xs font-medium truncate">관련 문서 관리</div>
+            <div className="text-[11px] text-muted-foreground truncate">유사 문서 분류 + AI 분석 + 해결</div>
+          </div>
+        </button>
+        <button onClick={() => onOpenVirtualTab("maintenance-digest")} className={itemClass}>
+          <ClipboardList className="h-4 w-4 text-orange-500 shrink-0" />
+          <div className="min-w-0">
+            <div className="text-xs font-medium truncate">관리가 필요한 문서</div>
+            <div className="text-[11px] text-muted-foreground truncate">오래됨 / 신뢰도 낮음 / 미해결 관련</div>
+          </div>
+        </button>
+        <button onClick={() => onOpenVirtualTab("document-graph")} className={itemClass}>
+          <Network className="h-4 w-4 text-indigo-500 shrink-0" />
+          <div className="min-w-0">
+            <div className="text-xs font-medium truncate">문서 관계 그래프</div>
+            <div className="text-[11px] text-muted-foreground truncate">문서 간 연결 관계 시각화</div>
+          </div>
+        </button>
+        <button onClick={() => onOpenVirtualTab("permission-editor")} className={itemClass}>
+          <Shield className="h-4 w-4 text-rose-500 shrink-0" />
+          <div className="min-w-0">
+            <div className="text-xs font-medium truncate">접근 권한 관리</div>
+            <div className="text-[11px] text-muted-foreground truncate">폴더/문서별 읽기·쓰기 제어</div>
+          </div>
+        </button>
+        <button onClick={() => onOpenVirtualTab("scoring-dashboard")} className={itemClass}>
+          <Gauge className="h-4 w-4 text-emerald-500 shrink-0" />
+          <div className="min-w-0">
+            <div className="text-xs font-medium truncate">신뢰도 설정</div>
+            <div className="text-[11px] text-muted-foreground truncate">점수 가중치, 임계값, 공식 확인</div>
+          </div>
+        </button>
+      </div>
     </div>
   );
 }
@@ -1936,7 +1918,7 @@ export function TreeNav() {
   if (error) return <div className="p-3 text-sm text-destructive">트리 로드 실패: {error}</div>;
 
   const sectionBtnClass = (s: SidebarSection) =>
-    `flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${section === s ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`;
+    `flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${section === s ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`;
 
   return (
     <DndContext
@@ -1947,23 +1929,23 @@ export function TreeNav() {
     >
       <div className="flex flex-col h-full">
         {/* Header with section tabs */}
-        <div className="flex items-center px-3 py-2 border-b shrink-0">
-          <div className="flex items-center gap-1 flex-1">
+        <div className="@container flex items-center px-2 py-2 border-b shrink-0 min-w-0">
+          <div className="flex items-center gap-0.5 flex-1 min-w-0">
             <button onClick={() => setSection("files")} className={sectionBtnClass("files")} title="파일 트리">
               <FolderTree className="h-3.5 w-3.5 shrink-0" />
-              <span>파일</span>
+              <span className="hidden @min-[180px]:inline truncate">파일</span>
             </button>
             <button onClick={() => setSection("tags")} className={sectionBtnClass("tags")} title="태그 브라우저">
               <Tags className="h-3.5 w-3.5 shrink-0" />
-              <span>태그</span>
+              <span className="hidden @min-[180px]:inline truncate">태그</span>
             </button>
-            <button onClick={() => setSection("skills")} className={sectionBtnClass("skills")} title="스킬 — AI 응답을 커스터마이징하는 템플릿">
+            <button onClick={() => setSection("skills")} className={sectionBtnClass("skills")} title="스킬">
               <Zap className="h-3.5 w-3.5 shrink-0" />
-              <span>스킬</span>
+              <span className="hidden @min-[180px]:inline truncate">스킬</span>
             </button>
             <button onClick={() => setSection("settings")} className={sectionBtnClass("settings")} title="관리">
               <Settings className="h-3.5 w-3.5 shrink-0" />
-              <span>관리</span>
+              <span className="hidden @min-[180px]:inline truncate">관리</span>
             </button>
           </div>
           <button onClick={() => openSearch(true)}
