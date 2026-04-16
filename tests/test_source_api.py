@@ -232,3 +232,55 @@ class TestFileContentEndpoint:
             "/api/modeling/source/file/scm-demo?path=src/NoSuchFile.java"
         )
         assert resp.status_code == 404
+
+
+class TestEntityLookupEndpoint:
+    def test_entity_lookup_returns_file_path(self, client):
+        """Entity lookup returns file path and line range from Neo4j."""
+        from backend.modeling.api import source_api
+        mock_neo4j = MagicMock()
+        mock_neo4j.query.return_value = [
+            {
+                "qualified_name": "com.ontong.scm.inventory.SafetyStockCalculator",
+                "file_path": "src/main/java/com/ontong/scm/inventory/SafetyStockCalculator.java",
+                "line_start": 5,
+                "line_end": 37,
+            }
+        ]
+        original = source_api._neo4j_client
+        source_api._neo4j_client = mock_neo4j
+        try:
+            res = client.get(
+                "/api/modeling/source/entity/scm-demo/com.ontong.scm.inventory.SafetyStockCalculator"
+            )
+            assert res.status_code == 200
+            data = res.json()
+            assert data["file_path"] == "src/main/java/com/ontong/scm/inventory/SafetyStockCalculator.java"
+            assert data["line_start"] == 5
+            assert data["line_end"] == 37
+        finally:
+            source_api._neo4j_client = original
+
+    def test_entity_lookup_not_found(self, client):
+        """Entity not found returns 404."""
+        from backend.modeling.api import source_api
+        mock_neo4j = MagicMock()
+        mock_neo4j.query.return_value = []
+        original = source_api._neo4j_client
+        source_api._neo4j_client = mock_neo4j
+        try:
+            res = client.get("/api/modeling/source/entity/scm-demo/com.does.not.Exist")
+            assert res.status_code == 404
+        finally:
+            source_api._neo4j_client = original
+
+    def test_entity_lookup_no_neo4j_returns_503(self, client):
+        """Entity lookup without Neo4j returns 503."""
+        from backend.modeling.api import source_api
+        original = source_api._neo4j_client
+        source_api._neo4j_client = None
+        try:
+            res = client.get("/api/modeling/source/entity/scm-demo/com.any.Entity")
+            assert res.status_code == 503
+        finally:
+            source_api._neo4j_client = original

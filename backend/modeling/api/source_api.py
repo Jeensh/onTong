@@ -194,3 +194,32 @@ async def get_file_content(repo_id: str, path: str = Query(...)):
         "content": content,
         "entities": entities,
     }
+
+
+@router.get("/entity/{repo_id}/{qualified_name:path}")
+async def get_entity_location(repo_id: str, qualified_name: str):
+    """Look up the file path and line range for a code entity."""
+    if _neo4j_client is None:
+        raise HTTPException(status_code=503, detail="Neo4j not available")
+
+    results = _neo4j_client.query(
+        """
+        MATCH (e:CodeEntity {repo_id: $repo_id, qualified_name: $qn})
+        RETURN e.qualified_name as qualified_name,
+               e.file_path as file_path,
+               e.line_start as line_start,
+               e.line_end as line_end
+        """,
+        {"repo_id": repo_id, "qn": qualified_name},
+    )
+
+    if not results:
+        raise HTTPException(status_code=404, detail=f"Entity '{qualified_name}' not found")
+
+    row = results[0]
+    return {
+        "qualified_name": row["qualified_name"],
+        "file_path": row["file_path"],
+        "line_start": row["line_start"],
+        "line_end": row["line_end"],
+    }
