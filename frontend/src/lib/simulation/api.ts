@@ -2,11 +2,8 @@
 
 import type { ScenarioType, Order, OntologyGraphData, SlabState, GraphState, CustomAgent } from "./types";
 
-// Detect if running locally to bypass Next.js SSE buffering
-const API_BASE =
-  typeof window !== "undefined" && window.location.hostname === "localhost"
-    ? "http://localhost:8002"
-    : "";
+// Next.js rewrite를 통해 /api/* → backend:8001로 프록시
+const API_BASE = "";
 
 // ── Built-in Agent SSE ────────────────────────────────────────────────
 
