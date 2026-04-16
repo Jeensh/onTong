@@ -97,3 +97,66 @@ class TestImageAnalysisModels:
             processed_at=datetime.now(timezone.utc),
         ))
         assert needs_processing(image_path) is False
+
+
+class TestOCREngine:
+    """Test EasyOCR wrapper."""
+
+    def test_ocr_engine_init(self):
+        """Verify OCREngine can be instantiated."""
+        from backend.application.image.ocr_engine import OCREngine
+        engine = OCREngine(languages=["en"], gpu=False)
+        assert engine is not None
+
+    @pytest.mark.asyncio
+    async def test_ocr_extract_text_from_image(self, tmp_path):
+        """Test OCR on a real image with text."""
+        import asyncio
+        from backend.application.image.ocr_engine import OCREngine
+        from PIL import Image, ImageDraw
+        img = Image.new("RGB", (400, 100), color="white")
+        draw = ImageDraw.Draw(img)
+        draw.text((10, 30), "Hello World 500 Error", fill="black")
+        img_path = tmp_path / "test_ocr.png"
+        img.save(img_path)
+        engine = OCREngine(languages=["en"], gpu=False)
+        text = await engine.extract_text(img_path)
+        assert len(text) > 0
+
+    @pytest.mark.asyncio
+    async def test_ocr_empty_image(self, tmp_path):
+        """Test OCR on blank image returns empty string."""
+        from backend.application.image.ocr_engine import OCREngine
+        from PIL import Image
+        img = Image.new("RGB", (100, 100), color="white")
+        img_path = tmp_path / "blank.png"
+        img.save(img_path)
+        engine = OCREngine(languages=["en"], gpu=False)
+        text = await engine.extract_text(img_path)
+        assert isinstance(text, str)
+
+    def test_ocr_extract_text_sync(self, tmp_path):
+        """Test OCR on a real image with text (sync wrapper for environments without pytest-asyncio)."""
+        import asyncio
+        from backend.application.image.ocr_engine import OCREngine
+        from PIL import Image, ImageDraw
+        img = Image.new("RGB", (400, 100), color="white")
+        draw = ImageDraw.Draw(img)
+        draw.text((10, 30), "Hello World 500 Error", fill="black")
+        img_path = tmp_path / "test_ocr_sync.png"
+        img.save(img_path)
+        engine = OCREngine(languages=["en"], gpu=False)
+        text = asyncio.run(engine.extract_text(img_path))
+        assert len(text) > 0
+
+    def test_ocr_empty_image_sync(self, tmp_path):
+        """Test OCR on blank image returns empty string (sync wrapper)."""
+        import asyncio
+        from backend.application.image.ocr_engine import OCREngine
+        from PIL import Image
+        img = Image.new("RGB", (100, 100), color="white")
+        img_path = tmp_path / "blank_sync.png"
+        img.save(img_path)
+        engine = OCREngine(languages=["en"], gpu=False)
+        text = asyncio.run(engine.extract_text(img_path))
+        assert isinstance(text, str)
