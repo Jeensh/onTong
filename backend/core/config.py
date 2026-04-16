@@ -73,6 +73,16 @@ class Settings(BaseSettings):
     log_dir: str = ".logs"
     enable_local_monitor: bool = True
 
+    # Image Analysis
+    image_analysis_enabled: bool = True
+    image_ocr_engine: str = "easyocr"       # easyocr | tesseract
+    image_ocr_languages: str = "ko,en"       # comma-separated language codes
+    image_ocr_confidence: float = 0.3        # min confidence threshold
+    image_ocr_gpu: bool = False
+    image_vision_provider: str = "none"      # none | ollama | openai | claude
+    image_vision_model: str = "llava:13b"    # provider-specific model name
+    image_max_workers: int = 4               # parallel processing workers
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
