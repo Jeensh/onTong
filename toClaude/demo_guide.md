@@ -1,4 +1,158 @@
-# onTong 데모 가이드 (Wiki 완성 + Section 2 Modeling MVP + ACL Domain Scoping)
+# onTong 데모 가이드 (Wiki 완성 + Section 2 Modeling MVP + ACL Domain Scoping + Image Search + Image Management)
+
+---
+
+## Image Management — 위키 이미지 관리 시스템 (2026-04-17)
+
+> SHA-256 해시 중복 제거 + fabric.js 어노테이션 편집기 + 관리자 갤러리
+> **브랜치**: `main`
+
+### 사전 준비
+```bash
+cd /Users/donghae/workspace/ai/onTong
+source .venv/bin/activate && set -a && source .env && set +a
+uvicorn backend.main:app --host 0.0.0.0 --port 8001
+
+# 프론트엔드 (별도 터미널)
+cd frontend && npm run dev
+```
+
+### 1. 이미지 업로드 해시 중복 제거
+```bash
+# 같은 이미지를 두 번 업로드
+curl -s -F "file=@wiki/assets/sample.png" http://localhost:8001/api/files/upload/image
+# 첫 번째: deduplicated: false
+curl -s -F "file=@wiki/assets/sample.png" http://localhost:8001/api/files/upload/image
+# 두 번째: deduplicated: true (같은 filename 반환)
+```
+
+### 2. 이미지 뷰어 모달 (브라우저)
+1. 이미지가 포함된 문서 열기
+2. 이미지 클릭 → 풀스크린 뷰어 모달 열림
+3. 우측 패널에 파일명, 크기, 참조 수 표시
+4. "편집" 버튼 → 좌측 도구 모음 (사각형/타원/화살표/텍스트)
+5. 도형 그리기 → "새 이미지로 저장" → OCR 상속 여부 확인
+6. ESC로 닫기
+
+### 3. 이미지 복사
+1. 이미지가 포함된 문서 열기
+2. 이미지 우클릭 → "이미지 복사" 메뉴 → 클립보드에 PNG 복사
+3. 또는: 이미지 노드 선택 후 Ctrl+C → 클립보드 복사
+
+### 4. 관리자 갤러리 (브라우저)
+1. 좌측 사이드바 → 설정 탭 → "이미지 관리" 클릭
+2. 갤러리 페이지:
+   - 상단: 전체/미사용/용량 통계 배지
+   - 필터: 전체 / 사용 중 / 미사용 / 파생본
+   - 검색: 파일명으로 검색 (300ms 디바운스)
+3. 카드 클릭 → 상세 모달 (크기, 참조 문서, 파생 이미지 등)
+4. 미사용 이미지: 주황색 테두리 + 체크박스
+5. "미사용 전체 삭제" → 확인 → 삭제 완료 알림
+
+### 5. Admin API 직접 테스트
+```bash
+# 통계
+curl -s http://localhost:8001/api/files/assets/stats | python -m json.tool
+
+# 페이지네이션 목록
+curl -s "http://localhost:8001/api/files/assets?page=1&size=10" | python -m json.tool
+
+# 미사용 필터
+curl -s "http://localhost:8001/api/files/assets?filter=unused" | python -m json.tool
+
+# 단건 삭제 (참조 있으면 409)
+curl -s -X DELETE http://localhost:8001/api/files/assets/sample.png
+
+# 일괄 삭제
+curl -s -X POST http://localhost:8001/api/files/assets/bulk-delete | python -m json.tool
+```
+
+### 트러블슈팅
+- **갤러리 빈 화면**: 서버 시작 시 ImageRegistry가 assets/ 스캔 → 이미지 없으면 정상
+- **이미지 클릭 안 됨**: MarkdownEditor의 handleClickOn → image 노드 타입 확인
+- **fabric.js 로딩 지연**: dynamic import로 로드 — 첫 편집 모드 진입 시 잠시 대기 정상
+- **Admin API 403**: `require_admin` → 사용자 roles에 "admin" 필요
+
+---
+
+## Image Search — 위키 이미지 검색 가능화 (2026-04-16)
+
+> 이미지에서 OCR 텍스트 추출 + Vision LLM 맥락 설명 → 검색/RAG 파이프라인 통합.
+> **브랜치**: `main`
+
+### 사전 준비
+```bash
+# Backend (image_analysis_enabled=True by default)
+cd /Users/donghae/workspace/ai/onTong
+source .venv/bin/activate && set -a && source .env && set +a
+uvicorn backend.main:app --host 0.0.0.0 --port 8001
+
+# Frontend (별도 터미널)
+cd frontend && npm run dev
+```
+
+### 시나리오 1: Backfill CLI — 기존 이미지 일괄 분석
+```bash
+# 처리할 이미지 확인 (실제 분석 안 함)
+python -m backend.cli.backfill_images --dry-run
+
+# OCR만 먼저 (빠르게, 무료)
+python -m backend.cli.backfill_images --ocr-only --workers 4
+
+# Vision 설명 추가 (OCR 완료된 이미지만)
+python -m backend.cli.backfill_images --vision-only --workers 4
+
+# 전체 재처리 (기존 sidecar 무시)
+python -m backend.cli.backfill_images --reprocess --workers 8
+```
+**확인**: `wiki/assets/` 폴더에 `*.meta.json` sidecar 파일 생성됨
+
+### 시나리오 2: Sidecar 파일 확인
+```bash
+# 아무 이미지의 sidecar 내용 확인
+cat wiki/assets/*.meta.json | python3 -m json.tool | head -20
+```
+**확인**: `ocr_text`, `description`, `provider`, `ocr_engine`, `processed_at` 필드 존재
+
+### 시나리오 3: 문서 저장 시 자동 분석
+1. 이미지 포함 문서를 에디터에서 수정 후 저장
+2. 백엔드 로그에 `Image analysis for ...` 메시지 확인
+3. 해당 이미지의 `.meta.json`이 생성/갱신됨
+4. 이후 자동 재인덱싱 → 이미지 설명이 검색 가능
+
+### 시나리오 4: 이미지 내용으로 검색
+1. OCR/Vision 분석이 완료된 이미지 포함 문서가 있을 때
+2. onTalk 채팅에서 이미지 내용으로 검색 (예: "에러 500 스크린샷")
+3. **확인**: 해당 문서가 검색 결과에 포함됨
+4. **확인**: 에이전트가 이미지 설명을 참고해 답변
+
+### 시나리오 5: 테스트 실행
+```bash
+cd /Users/donghae/workspace/ai/onTong
+.venv/bin/python -m pytest tests/test_image_analysis.py -v
+# 30 tests passed
+```
+
+### 설정 (환경변수)
+| 변수 | 기본값 | 설명 |
+|------|--------|------|
+| `IMAGE_ANALYSIS_ENABLED` | `true` | 이미지 분석 전체 활성화 |
+| `IMAGE_OCR_ENGINE` | `easyocr` | OCR 엔진 (easyocr / tesseract) |
+| `IMAGE_OCR_LANGUAGES` | `ko,en` | OCR 대상 언어 |
+| `IMAGE_OCR_CONFIDENCE` | `0.3` | 최소 신뢰도 |
+| `IMAGE_OCR_GPU` | `false` | GPU 사용 여부 |
+| `IMAGE_VISION_PROVIDER` | `none` | Vision LLM (none / ollama / openai / claude) |
+| `IMAGE_VISION_MODEL` | `llava:13b` | Vision 모델명 |
+| `IMAGE_MAX_WORKERS` | `4` | 병렬 처리 워커 수 |
+
+### Troubleshooting
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| EasyOCR 첫 실행 느림 | 모델 다운로드 (~200MB) | 최초 1회만. 이후 캐시됨 |
+| meta.json 안 생기는 경우 | image_analysis_enabled=false | `.env`에 `IMAGE_ANALYSIS_ENABLED=true` 확인 |
+| Vision 설명이 빈 문자열 | vision_provider=none | Ollama 설치 + `IMAGE_VISION_PROVIDER=ollama` |
+| 검색에 이미지 내용 안 나옴 | 재인덱싱 필요 | `curl -X POST localhost:8001/api/wiki/reindex` |
+| Pillow 관련 에러 | 아키텍처 불일치 | `pip install --force-reinstall Pillow` |
 
 ---
 

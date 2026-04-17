@@ -867,6 +867,10 @@ Step 1-C 백엔드(1C-5)부터 시작해줘
 | E2a-4 | Canvas 코드 엔티티 패널 + 드래그 매핑 | [x] | `frontend/.../modeling/MappingCanvas.tsx` |
 | E2a-5 | Mapping Workbench 통합 (분할 패널 + 양방향 연동) | [x] | `frontend/.../modeling/MappingWorkbench.tsx` |
 | E2a-6 | Sidebar + ModelingSection 통합 | [x] | `frontend/.../ModelingSection.tsx` |
+| E2a-7 | Design Review 수정: Seed API 소스 파일 자동 복사 | [x] | `backend/modeling/api/seed_api.py` |
+| E2a-8 | Design Review 수정: React Flow fitView 노드 로딩 후 재실행 | [x] | `frontend/.../modeling/MappingCanvas.tsx` |
+
+> 14 source API tests, TS clean, design review 완료. 데모 가이드: `toClaude/demo_guide_modeling.md`
 
 ### 향후 인프라 확장 (Phase 2a 완료 후)
 
@@ -1167,3 +1171,46 @@ Step 1-C 백엔드(1C-5)부터 시작해줘
 | P2-B | 폐기 되돌리기 (POST /undeprecate + 되돌리기 버튼) | [x] | `api/conflict.py`, `ConflictDashboard.tsx` (기존 구현) |
 | P2-C | 검색 결과 deprecated 뱃지 + 새 버전 링크 | [x] | `AICopilot.tsx` (기존 구현) |
 | P2-D | 충돌 쌍 그룹핑 (GET /grouped + hot files 요약) | [x] | `conflict_service.py`, `api/conflict.py`, `ConflictDashboard.tsx` |
+
+---
+
+## Image Search (위키 이미지 검색 가능화)
+
+> 이미지(스크린샷, 대화 캡처, 에러 화면)에서 텍스트 추출 + 맥락 설명 생성 → 검색/RAG 파이프라인 통합
+> 브랜치: `main` | 11 commits | 30 tests | 설계: `docs/superpowers/specs/2026-04-16-image-search-design.md`
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| IMG-1 | Data models + sidecar I/O | [x] | `backend/application/image/models.py` |
+| IMG-2 | OCR engine (EasyOCR wrapper) | [x] | `backend/application/image/ocr_engine.py` |
+| IMG-3 | Vision provider abstraction (noop/ollama) | [x] | `backend/application/image/vision_provider.py` |
+| IMG-4 | ImageAnalyzer orchestrator + sidecar caching | [x] | `backend/application/image/analyzer.py` |
+| IMG-5 | Configuration settings (8 env vars) | [x] | `backend/core/config.py` |
+| IMG-6 | Indexer integration (enrich_chunk_with_images) | [x] | `backend/application/wiki/wiki_indexer.py` |
+| IMG-7 | Background processing queue (asyncio.Semaphore) | [x] | `backend/application/image/queue.py` |
+| IMG-8 | WikiService + main.py wiring | [x] | `wiki_service.py`, `main.py` |
+| IMG-9 | Backfill CLI (--dry-run, --ocr-only, --vision-only, --workers) | [x] | `backend/cli/backfill_images.py` |
+| IMG-10 | E2E integration tests | [x] | `tests/test_image_analysis.py` |
+| IMG-FIX | Code review fixes (URL filter, parallel workers, dedup check) | [x] | queue.py, wiki_indexer.py, backfill_images.py |
+
+---
+
+## Image Management (위키 이미지 관리 시스템)
+
+> SHA-256 해시 중복 제거 + fabric.js 어노테이션 + 관리자 갤러리
+> 브랜치: `main` | 설계: `docs/superpowers/specs/2026-04-17-image-management-design.md`
+> 플랜: `docs/superpowers/plans/2026-04-17-image-management.md`
+
+| # | Task | 상태 | 산출물 |
+|---|------|------|--------|
+| IMGM-1 | ImageRegistry core (hash index + ref counting + scan) | [x] | `backend/application/image/image_registry.py` |
+| IMGM-2 | Source field on ImageAnalysis sidecar | [x] | `backend/application/image/models.py` |
+| IMGM-3 | Upload SHA-256 hash dedup | [x] | `backend/api/files.py` |
+| IMGM-4 | Registry init + event handlers in main.py | [x] | `backend/main.py` |
+| IMGM-5 | Ref tracking on document save (diff old/new) | [x] | `backend/application/wiki/wiki_service.py` |
+| IMGM-6 | Admin API (stats, paginated list, delete, bulk-delete) | [x] | `backend/api/files.py` |
+| IMGM-7 | OCR inheritance endpoint | [x] | `backend/api/files.py` |
+| IMGM-8 | fabric.js install + ImageCopyExtension (Ctrl+C + context menu) | [x] | `pasteHandler.ts`, `MarkdownEditor.tsx` |
+| IMGM-9 | ImageViewerModal (fullscreen + annotation editor) | [x] | `ImageViewerModal.tsx` |
+| IMGM-10 | ImageManagementPage (admin gallery + pagination + bulk delete) | [x] | `ImageManagementPage.tsx` |
+| IMGM-11 | Routing + types + admin gate | [x] | `workspace.ts`, `useWorkspaceStore.ts`, `FileRouter.tsx`, `TreeNav.tsx` |

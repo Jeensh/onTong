@@ -6,6 +6,49 @@
 
 ---
 
+## 2026-04-17 (Image Management System 구현)
+
+### 위키 이미지 관리 시스템 (11 tasks, 60 tests, TS clean)
+- [x] **IMGM-1** — ImageRegistry core (hash index, ref counting, startup scan)
+- [x] **IMGM-2** — Source field on ImageAnalysis sidecar (annotation derivative tracking)
+- [x] **IMGM-3** — Upload SHA-256 hash dedup (12-char prefix filename)
+- [x] **IMGM-4** — Registry init in main.py + tree_change event handler (ref cleanup on delete)
+- [x] **IMGM-5** — Ref tracking on document save (diff old/new image refs in wiki_service.py)
+- [x] **IMGM-6** — Admin API (stats, paginated list, single delete w/ 409, bulk-delete unused)
+- [x] **IMGM-7** — OCR inheritance endpoint (copy sidecar data between images)
+- [x] **IMGM-8** — fabric.js + ImageCopyExtension (Ctrl+C + right-click context menu)
+- [x] **IMGM-9** — ImageViewerModal (fullscreen viewer + annotation editor: rect/ellipse/arrow/text)
+- [x] **IMGM-10** — ImageManagementPage (admin gallery + pagination + filter + search + bulk delete)
+- [x] **IMGM-11** — Routing + types + admin gate (VirtualTabType, store title, FileRouter, TreeNav)
+
+---
+
+## 2026-04-17 (Phase 2a Design Review 수정)
+
+### Mapping Workbench 버그 수정 (design review 발견)
+- [x] **E2a-7** — Seed API에서 소스 파일 자동 복사 (`sample-repos/scm-demo/src` → `/tmp/ontong-repos/scm-demo/src`). Source API가 빈 트리 반환하던 문제 해결 (`seed_api.py`)
+- [x] **E2a-8** — React Flow fitView 노드 로딩 후 재실행. `onInit`으로 ReactFlowInstance ref 저장, layout useEffect 후 `requestAnimationFrame(() => fitView())` 호출 (`MappingCanvas.tsx`)
+- [x] **DEMO** — `toClaude/demo_guide_modeling.md` 전면 재작성 (Part A: Engine Phase 1a + Part B: Mapping Workbench Phase 2a 통합)
+
+---
+
+## 2026-04-16 (Image Search — 위키 이미지 검색 가능화)
+
+### 이미지 분석 파이프라인 구현 (10 tasks + review fixes, 30 tests)
+- [x] **IMG-MODELS** — ImageAnalysis dataclass + sidecar .meta.json I/O (save/load/needs_processing)
+- [x] **IMG-OCR** — OCREngine (EasyOCR wrapper, lazy init, asyncio.to_thread)
+- [x] **IMG-VISION** — VisionProvider protocol + NoopVisionProvider + OllamaVisionProvider (base64 + Korean prompt)
+- [x] **IMG-ANALYZER** — ImageAnalyzer orchestrator (OCR→Vision→sidecar caching, force reprocess)
+- [x] **IMG-CONFIG** — 8 settings (image_analysis_enabled, ocr_engine/languages/confidence/gpu, vision_provider/model, max_workers)
+- [x] **IMG-INDEXER** — enrich_chunk_with_images() + IMAGE_REF_RE → [이미지: description] 치환, external URL filter
+- [x] **IMG-QUEUE** — ImageProcessingQueue (asyncio.Semaphore + gather 병렬 처리, max_concurrent)
+- [x] **IMG-WIRE** — WikiService._bg_image_process() + main.py lifespan 초기화
+- [x] **IMG-CLI** — backfill_images.py (--dry-run, --ocr-only, --vision-only, --reprocess, --workers N)
+- [x] **IMG-E2E** — TestEndToEndImageSearch (2 tests: enriched chunks + image-only document searchable)
+- [x] **IMG-FIX** — Code review 4건 수정 (URL filter, parallel workers, vision-only flag, dedup needs_processing)
+
+---
+
 ## 2026-04-16 (Section 2 Modeling Engine — Phase 1a)
 
 ### Engine-First Architecture 리디자인 (10 tasks, 28 tests)

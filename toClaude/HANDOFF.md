@@ -4,27 +4,80 @@
 > 사용자가 "이어서 하자"라고 하면: 이 문서 → `CHANGES.md`의 `[ ]` → `TODO.md` 순으로 확인.
 > 이 문서는 `~/.claude/`의 메모리/플랜이 따라오지 않는 환경(다른 컴퓨터로 디렉토리 복사 등)을 위한 백업.
 
-마지막 업데이트: 2026-04-16
+마지막 업데이트: 2026-04-17 (Image Management 구현 완료)
 
 ---
 
 ## 1. 다음 세션 첫 작업
 
-### Phase 2a: Source Viewer + Mapping Workbench 완료 (2026-04-16)
+### Image Management 브라우저 데모 테스트 (예정)
 
-**브랜치**: `main` — 10 commits, 14 source API tests, TS clean.
+사용자가 데모 테스트 시나리오를 요청할 예정. `toClaude/demo_guide.md`의 "Image Management" 섹션 참고.
+서버 기동 후 브라우저에서 다음을 검증:
+1. 이미지 클릭 → 뷰어 모달 (풀스크린 + 정보 패널)
+2. 어노테이션 편집 (사각형/타원/화살표/텍스트) → 새 이미지로 저장
+3. 이미지 우클릭 → "이미지 복사" → 클립보드 동작
+4. 설정 → "이미지 관리" → 갤러리 페이지 (페이지네이션, 필터, 검색, 일괄삭제)
+5. 해시 dedup: 같은 이미지 두 번 업로드 → `deduplicated: true`
+
+### Image Management System 구현 완료 (2026-04-17)
+
+**브랜치**: `main` — 11 tasks, 28+32 tests (registry + analysis), TS clean.
+
+위키 이미지 관리 시스템 (3 subsystem):
+- **SHA-256 해시 중복 제거**: 업로드 시 콘텐츠 해시로 중복 방지, 12자 prefix 파일명
+- **ImageRegistry**: 인메모리 hash→filename 인덱스, ref counting, 시작 시 assets/ 스캔
+- **어노테이션 편집기**: fabric.js 캔버스 (사각형/타원/화살표/텍스트), OCR 상속
+- **관리자 갤러리**: 페이지네이션, 필터(전체/사용중/미사용/파생본), 검색, 일괄삭제
+- **이미지 복사**: Ctrl+C + 우클릭 컨텍스트 메뉴 → 클립보드 복사
+- **이벤트 기반 ref tracking**: 문서 저장 시 diff, 삭제 시 정리
+
+**백엔드 신규**: `backend/application/image/image_registry.py`
+**백엔드 변경**: `files.py` (dedup+admin API), `main.py` (registry init), `wiki_service.py` (ref tracking), `models.py` (source field)
+**프론트엔드 신규**: `ImageViewerModal.tsx`, `ImageManagementPage.tsx`
+**프론트엔드 변경**: `pasteHandler.ts` (ImageCopyExtension), `MarkdownEditor.tsx` (click-to-view), `workspace.ts`/`useWorkspaceStore.ts`/`FileRouter.tsx`/`TreeNav.tsx` (routing)
+**설계 문서**: `docs/superpowers/specs/2026-04-17-image-management-design.md`
+**구현 플랜**: `docs/superpowers/plans/2026-04-17-image-management.md`
+
+**다음 후보**: 브라우저 UI 검증 (이미지 클릭→뷰어, 어노테이션, 갤러리 페이지)
+
+### Image Search 구현 완료 (2026-04-17)
+
+**브랜치**: `main` — 11 commits, 30 tests, 코드 리뷰 + 4건 수정 완료.
+
+위키 이미지 검색 가능화 파이프라인:
+- **OCR Engine**: EasyOCR (한국어+영어, lazy init, asyncio.to_thread)
+- **Vision Provider**: 프로토콜 기반 (noop/ollama/openai), 기본값 none (OCR only)
+- **Sidecar .meta.json**: 이미지별 분석 결과 캐시, mtime 비교로 재처리 판단
+- **Indexer Integration**: `enrich_chunk_with_images()` → `![](assets/...)` → `[이미지: 설명]` 치환
+- **Background Processing**: 문서 저장 시 asyncio.create_task로 비동기 분석 + 재인덱싱
+- **Backfill CLI**: `python -m backend.cli.backfill_images` (--dry-run/--ocr-only/--vision-only/--reprocess/--workers N)
+- **병렬 처리**: asyncio.Semaphore + gather (max_concurrent)
+
+**신규 파일**: `backend/application/image/` (models, ocr_engine, vision_provider, analyzer, queue), `backend/cli/backfill_images.py`, `tests/test_image_analysis.py`
+**변경 파일**: `config.py` (8 settings), `wiki_indexer.py` (enrichment), `wiki_service.py` (bg processing), `main.py` (pipeline init)
+**설계 문서**: `docs/superpowers/specs/2026-04-16-image-search-design.md`
+**구현 플랜**: `docs/superpowers/plans/2026-04-16-image-search-plan.md`
+
+**다음 후보**: 실제 이미지로 backfill 테스트, Ollama Vision 연동 테스트, 브라우저 UI 검증
+
+### Phase 2a: Source Viewer + Mapping Workbench 완료 (2026-04-16, design review 수정 2026-04-17)
+
+**브랜치**: `main` — 14 source API tests, TS clean, design review 완료.
 
 코드-도메인 매핑 워크벤치 구현:
 - **Source API**: 파일 트리 + 파일 내용 + 엔티티 위치 조회 (path traversal/symlink 방어)
 - **SourceViewer**: 파일 트리 + Monaco read-only 에디터 + 엔티티 gutter marker
-- **MappingCanvas**: React Flow 도메인 온톨로지 그래프 + 엔티티 패널 + 드래그-드롭 매핑
+- **MappingCanvas**: React Flow 도메인 온톨로지 그래프 + 엔티티 패널 + 드래그-드롭 매핑 + fitView 자동 적용
 - **MappingWorkbench**: 55/45 분할 패널 + 캔버스↔뷰어 양방향 연동
 - **ModelingSection**: "매핑 워크벤치" 사이드바 탭 추가
+- **Seed API 수정**: 소스 파일 자동 복사 (데모 시 수동 복사 불필요)
 
 **설계 문서**: `docs/superpowers/specs/2026-04-16-source-viewer-mapping-workbench-design.md`
 **구현 플랜**: `docs/superpowers/plans/2026-04-16-source-viewer-mapping-workbench.md`
+**데모 가이드**: `toClaude/demo_guide_modeling.md` (Part A: Engine, Part B: Workbench)
 
-**다음 후보**: 브라우저 UI 검증, Docker Sandbox (독립 기능), Phase 1b (실제 Neo4j BFS)
+**다음 후보**: Phase 1b (실제 Neo4j BFS 의존성 그래프), Docker Sandbox (독립 기능)
 
 ### Section 2 Modeling Engine Phase 1a 완료 (2026-04-16)
 
