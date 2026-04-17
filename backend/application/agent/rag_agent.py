@@ -67,7 +67,7 @@ def _load_ontong_md() -> str:
     except FileNotFoundError:
         logger.warning("ontong.md not found at %s, using fallback", _ONTONG_MD_PATH)
         return (
-            "당신은 On-Tong, 사내 Wiki 지식 관리 시스템의 AI 어시스턴트입니다.\n"
+            "당신은 onTalk, 사내 Wiki 지식 관리 시스템의 AI 어시스턴트입니다.\n"
             "검색된 문서를 기반으로 간결하고 정확하게 답변하세요.\n"
             "문서에 없는 내용은 추측하지 마세요."
         )
