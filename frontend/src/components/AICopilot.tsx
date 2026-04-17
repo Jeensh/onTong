@@ -121,32 +121,30 @@ interface AICopilotProps {
 const SESSIONS_STORAGE_KEY = "ontong:chat-sessions";
 const ACTIVE_SESSION_KEY = "ontong:active-session";
 
-function loadSessions(): ChatSession[] {
-  if (typeof window === "undefined") return [createSession()];
+function loadSessionsFromStorage(): { sessions: ChatSession[]; activeId: string } | null {
   try {
     const saved = localStorage.getItem(SESSIONS_STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved) as ChatSession[];
-      if (parsed.length > 0) return parsed;
+      if (parsed.length > 0) {
+        const savedActive = localStorage.getItem(ACTIVE_SESSION_KEY);
+        const activeId = savedActive && parsed.some((s) => s.id === savedActive)
+          ? savedActive
+          : parsed[0].id;
+        return { sessions: parsed, activeId };
+      }
     }
   } catch {}
-  return [createSession()];
-}
-
-function loadActiveSessionId(sessions: ChatSession[]): string {
-  if (typeof window === "undefined") return sessions[0].id;
-  const saved = localStorage.getItem(ACTIVE_SESSION_KEY);
-  if (saved && sessions.some((s) => s.id === saved)) return saved;
-  return sessions[0].id;
+  return null;
 }
 
 export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {}) {
-  const [initialState] = useState(() => {
-    const s = loadSessions();
-    return { sessions: s, activeId: loadActiveSessionId(s) };
-  });
-  const [sessions, setSessions] = useState<ChatSession[]>(initialState.sessions);
-  const [activeSessionId, setActiveSessionId] = useState(initialState.activeId);
+  // Always start with a fresh session for SSR/hydration consistency.
+  // localStorage state is loaded after mount in useEffect below.
+  const [defaultSession] = useState(() => createSession());
+  const [sessions, setSessions] = useState<ChatSession[]>([defaultSession]);
+  const [activeSessionId, setActiveSessionId] = useState(defaultSession.id);
+  const [hydrated, setHydrated] = useState(false);
   const [showSessionList, setShowSessionList] = useState(false);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -157,13 +155,7 @@ export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {
   const [showSkillPicker, setShowSkillPicker] = useState(false);
   const [skillList, setSkillList] = useState<SkillMeta[]>([]);
   const [skillSuggestion, setSkillSuggestion] = useState<SkillMeta | null>(null);
-  const [dismissedSkills, setDismissedSkills] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set<string>();
-    try {
-      const saved = localStorage.getItem("ontong:dismissed-skills");
-      return saved ? new Set(JSON.parse(saved) as string[]) : new Set<string>();
-    } catch { return new Set<string>(); }
-  });
+  const [dismissedSkills, setDismissedSkills] = useState<Set<string>>(new Set());
   const [skillSearch, setSkillSearch] = useState("");
   const abortRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -175,12 +167,27 @@ export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {
   const setAgentDiff = useWorkspaceStore((s) => s.setAgentDiff);
   const setAgentWrite = useWorkspaceStore((s) => s.setAgentWrite);
 
+  // Hydrate from localStorage after mount (prevents SSR mismatch)
+  useEffect(() => {
+    const stored = loadSessionsFromStorage();
+    if (stored) {
+      setSessions(stored.sessions);
+      setActiveSessionId(stored.activeId);
+    }
+    try {
+      const savedDismissed = localStorage.getItem("ontong:dismissed-skills");
+      if (savedDismissed) setDismissedSkills(new Set(JSON.parse(savedDismissed) as string[]));
+    } catch {}
+    setHydrated(true);
+  }, []);
+
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? sessions[0];
   const messages = activeSession.messages;
 
   // Persist sessions to localStorage (debounced)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
+    if (!hydrated) return; // Don't save default session before localStorage is loaded
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       try {
@@ -194,7 +201,7 @@ export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {
       } catch {}
     }, 500);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [sessions, activeSessionId]);
+  }, [sessions, activeSessionId, hydrated]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -793,7 +800,7 @@ export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {
       <div className="flex items-center gap-2 px-4 py-2.5 border-b">
         <Sparkles className="h-4 w-4 text-primary" />
         <span className="text-sm font-semibold flex-1 truncate">
-          {activeSession.title === "새 대화" ? "On-Tong Agent" : activeSession.title}
+          {activeSession.title === "새 대화" ? "onTalk" : activeSession.title}
         </span>
         <div className="flex items-center gap-1">
           <button
