@@ -56,3 +56,10 @@ wiki/.next/
 # uv lock
 uv.lock
 .gstack-audit/
+
+# Playwright / test artifacts
+frontend/test-results/
+frontend/playwright-report/
+
+# Design review artifacts
+.design-audit/
