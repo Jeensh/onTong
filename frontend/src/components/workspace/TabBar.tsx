@@ -85,7 +85,7 @@ export function TabBar() {
   if (tabs.length === 0) return null;
 
   return (
-    <div className="flex items-center border-b bg-muted/30 overflow-x-auto">
+    <div className="flex items-center border-b bg-muted/30 overflow-x-auto scrollbar-none">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

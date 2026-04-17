@@ -11,9 +11,9 @@ const SECTIONS: {
   icon: React.ReactNode;
   status: "active" | "scaffolding";
 }[] = [
-  { id: "wiki", label: "Wiki", icon: <BookOpen className="w-4 h-4" />, status: "active" },
-  { id: "modeling", label: "Modeling", icon: <Cpu className="w-4 h-4" />, status: "active" },
-  { id: "simulation", label: "Simulation", icon: <BarChart3 className="w-4 h-4" />, status: "scaffolding" },
+  { id: "wiki", label: "Wiki", icon: <BookOpen className="w-3.5 h-3.5" />, status: "active" },
+  { id: "modeling", label: "Modeling", icon: <Cpu className="w-3.5 h-3.5" />, status: "active" },
+  { id: "simulation", label: "Simulation", icon: <BarChart3 className="w-3.5 h-3.5" />, status: "scaffolding" },
 ];
 
 export function SectionNav() {
@@ -21,30 +21,30 @@ export function SectionNav() {
   const setActiveSection = useWorkspaceStore((s) => s.setActiveSection);
 
   return (
-    <nav className="flex items-center h-11 px-4 border-b bg-background gap-2">
-      <div className="flex items-center gap-2 mr-4">
-        <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
-          <span className="text-xs font-bold text-primary-foreground">on</span>
-        </div>
-        <span className="text-sm font-bold tracking-tight text-foreground">onTong</span>
-      </div>
-      <div className="flex gap-1">
+    <nav className="flex items-center h-10 px-3 border-b bg-background">
+      {/* Brand */}
+      <span className="text-sm font-semibold tracking-tight text-foreground mr-5 select-none">
+        <span className="text-primary">on</span>Tong
+      </span>
+
+      {/* Section tabs */}
+      <div className="flex items-center gap-0.5">
         {SECTIONS.map((section) => (
           <button
             key={section.id}
             onClick={() => setActiveSection(section.id)}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-2 text-sm rounded-md transition-colors",
+              "flex items-center gap-1.5 px-2.5 py-1 text-[13px] rounded-md transition-colors",
               activeSection === section.id
-                ? "bg-primary/10 text-primary font-medium"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                ? "text-foreground font-medium bg-muted"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
             )}
           >
             {section.icon}
             {section.label}
             {section.status === "scaffolding" && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 leading-none font-medium">
-                준비중
+              <span className="text-[9px] px-1 py-px rounded bg-muted-foreground/10 text-muted-foreground leading-none">
+                soon
               </span>
             )}
           </button>
