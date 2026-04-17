@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from backend.core.config import settings
 
-from backend.core.auth import get_current_user
+from backend.core.auth import User, get_current_user
+from backend.core.auth.permission import require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +28,19 @@ ASSETS_DIR = WIKI_DIR / "assets"
 ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
+
+# ── Image Registry injection ────────────────────────────────────────
+_image_registry = None
+
+
+def set_image_registry(registry) -> None:
+    """Called from main.py to inject the ImageRegistry singleton."""
+    global _image_registry
+    _image_registry = registry
+
+
+def get_image_registry():
+    return _image_registry
 
 
 # ── Unused image cleanup ────────────────────────────────────────────
@@ -66,14 +84,14 @@ def _find_unused_images() -> list[dict]:
 
 
 @router.get("/assets/unused", tags=["assets"])
-async def list_unused_images():
+async def list_unused_images(user: User = Depends(require_admin)):
     """List image files in assets/ that are not referenced by any markdown file."""
     unused = _find_unused_images()
     return {"unused": unused, "count": len(unused)}
 
 
 @router.delete("/assets/unused", tags=["assets"])
-async def delete_unused_images():
+async def delete_unused_images(user: User = Depends(require_admin)):
     """Delete all image files in assets/ that are not referenced by any markdown file."""
     unused = _find_unused_images()
     deleted = []
@@ -88,11 +106,162 @@ async def delete_unused_images():
     return {"deleted": deleted, "count": len(deleted)}
 
 
+# ── Admin Image Management ──────────────────────────────────────────
+
+@router.get("/assets/stats", tags=["assets"])
+async def get_asset_stats(user: User = Depends(require_admin)):
+    """Get image asset statistics (admin only)."""
+    if not _image_registry:
+        raise HTTPException(status_code=503, detail="Image registry not initialized")
+    return _image_registry.stats()
+
+
+@router.get("/assets", tags=["assets"])
+async def list_assets(
+    page: int = 1,
+    size: int = 50,
+    filter: str = "all",
+    search: str = "",
+    user: User = Depends(require_admin),
+):
+    """List image assets with pagination, filtering, search (admin only)."""
+    if not _image_registry:
+        raise HTTPException(status_code=503, detail="Image registry not initialized")
+    if size > 100:
+        size = 100
+
+    result = _image_registry.list_entries(page=page, size=size, filter=filter, search=search)
+
+    # Enrich items with derivatives + OCR info
+    items = []
+    for item_dict in result["items"]:
+        item_dict["derivatives"] = _image_registry.get_derivatives_of(item_dict["filename"])
+        item_dict["has_ocr"] = _has_ocr(item_dict["filename"])
+        items.append(item_dict)
+
+    return {
+        "items": items,
+        "total": result["total"],
+        "page": result["page"],
+        "pages": result["pages"],
+    }
+
+
+def _has_ocr(filename: str) -> bool:
+    """Check if an image has OCR text in its sidecar."""
+    sidecar = ASSETS_DIR / f"{filename}.meta.json"
+    if not sidecar.exists():
+        return False
+    try:
+        data = json.loads(sidecar.read_text(encoding="utf-8"))
+        return bool(data.get("ocr_text") or data.get("description"))
+    except Exception:
+        return False
+
+
+@router.delete("/assets/{filename}", tags=["assets"])
+async def delete_asset(filename: str, user: User = Depends(require_admin)):
+    """Delete a single image asset. Returns 409 if still referenced by documents."""
+    if not _image_registry:
+        raise HTTPException(status_code=503, detail="Image registry not initialized")
+
+    entry = _image_registry.get_by_filename(filename)
+    if not entry:
+        raise HTTPException(status_code=404, detail=f"Image not found: {filename}")
+    if entry.ref_count > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Image still referenced by {entry.ref_count} document(s): {sorted(entry.referenced_by)}",
+        )
+
+    image_path = ASSETS_DIR / filename
+    if image_path.exists():
+        image_path.unlink()
+    sidecar_path = ASSETS_DIR / f"{filename}.meta.json"
+    if sidecar_path.exists():
+        sidecar_path.unlink()
+
+    freed = entry.size_bytes
+    _image_registry.remove(filename)
+    logger.info(f"Deleted image asset: {filename} ({freed} bytes)")
+    return {"deleted": filename, "freed_bytes": freed}
+
+
+@router.post("/assets/bulk-delete", tags=["assets"])
+async def bulk_delete_assets(user: User = Depends(require_admin)):
+    """Delete ALL unreferenced (ref_count==0) images. Returns count + freed space."""
+    if not _image_registry:
+        raise HTTPException(status_code=503, detail="Image registry not initialized")
+
+    unused = _image_registry.get_unused_filenames()
+    deleted_count = 0
+    freed_bytes = 0
+
+    for filename in unused:
+        entry = _image_registry.get_by_filename(filename)
+        if not entry:
+            continue
+
+        image_path = ASSETS_DIR / filename
+        if image_path.exists():
+            image_path.unlink()
+        sidecar_path = ASSETS_DIR / f"{filename}.meta.json"
+        if sidecar_path.exists():
+            sidecar_path.unlink()
+
+        freed_bytes += entry.size_bytes
+        _image_registry.remove(filename)
+        deleted_count += 1
+
+    logger.info(f"Bulk deleted {deleted_count} unused images ({freed_bytes} bytes freed)")
+    return {"deleted": deleted_count, "freed_bytes": freed_bytes}
+
+
+class InheritOCRRequest(BaseModel):
+    source_filename: str
+
+
+@router.post("/assets/{filename}/inherit-ocr", tags=["assets"])
+async def inherit_ocr(filename: str, req: InheritOCRRequest):
+    """Copy OCR text + description from source image sidecar to target. Sets source field."""
+    target_path = ASSETS_DIR / filename
+    if not target_path.exists():
+        raise HTTPException(status_code=404, detail=f"Target image not found: {filename}")
+
+    source_sidecar = ASSETS_DIR / f"{req.source_filename}.meta.json"
+    if not source_sidecar.exists():
+        raise HTTPException(status_code=404, detail=f"Source sidecar not found: {req.source_filename}")
+
+    try:
+        source_data = json.loads(source_sidecar.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read source sidecar: {e}")
+
+    from backend.application.image.models import ImageAnalysis, save_sidecar
+
+    analysis = ImageAnalysis(
+        ocr_text=source_data.get("ocr_text", ""),
+        description=source_data.get("description", ""),
+        provider=source_data.get("provider", "inherited"),
+        ocr_engine=source_data.get("ocr_engine", "inherited"),
+        processed_at=datetime.now(timezone.utc),
+        source=req.source_filename,
+    )
+    save_sidecar(target_path, analysis)
+
+    if _image_registry:
+        entry = _image_registry.get_by_filename(filename)
+        if entry:
+            entry.source = req.source_filename
+
+    return {"filename": filename, "source": req.source_filename, "inherited": True}
+
+
 # ── Upload ───────────────────────────────────────────────────────────
 
 @router.post("/upload/image")
 async def upload_image(file: UploadFile):
-    """Upload an image file to wiki/assets/. Returns the relative path."""
+    """Upload an image file to wiki/assets/ with SHA-256 content-hash dedup."""
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(
             status_code=400,
@@ -103,18 +272,56 @@ async def upload_image(file: UploadFile):
     if len(data) > MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=400, detail="File too large (max 10MB)")
 
+    # Content-hash dedup
+    sha256 = hashlib.sha256(data).hexdigest()
+
+    if _image_registry:
+        existing = _image_registry.get_by_hash(sha256)
+        if existing:
+            logger.info(f"Dedup hit: {file.filename} → existing {existing.filename}")
+            return {
+                "path": f"assets/{existing.filename}",
+                "filename": existing.filename,
+                "deduplicated": True,
+            }
+
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Generate unique filename to avoid collisions
     ext = Path(file.filename or "image.png").suffix or ".png"
-    filename = f"{uuid.uuid4().hex[:12]}{ext}"
+    filename = f"{sha256[:12]}{ext}"
     dest = ASSETS_DIR / filename
+
+    # Handle rare hash-prefix collision
+    if dest.exists():
+        existing_sha = hashlib.sha256(dest.read_bytes()).hexdigest()
+        if existing_sha == sha256:
+            return {
+                "path": f"assets/{filename}",
+                "filename": filename,
+                "deduplicated": True,
+            }
+        filename = f"{sha256}{ext}"
+        dest = ASSETS_DIR / filename
 
     dest.write_bytes(data)
 
-    # Return path relative to wiki dir
+    # Register in image registry
+    if _image_registry:
+        from backend.application.image.image_registry import ImageEntry
+        _image_registry.register(ImageEntry(
+            filename=filename,
+            sha256=sha256,
+            size_bytes=len(data),
+            width=0,
+            height=0,
+            ref_count=0,
+            referenced_by=set(),
+            source=None,
+            created_at=datetime.now(timezone.utc),
+        ))
+
     rel_path = f"assets/{filename}"
-    return {"path": rel_path, "filename": filename}
+    return {"path": rel_path, "filename": filename, "deduplicated": False}
 
 
 # ── PPTX slide data ─────────────────────────────────────────────────

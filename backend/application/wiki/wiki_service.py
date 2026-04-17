@@ -167,6 +167,8 @@ class WikiService:
         # Background image analysis — process new images for search enrichment
         if self._image_queue:
             asyncio.create_task(self._bg_image_process(wiki_file))
+        # Image ref tracking — update registry ref counts on save
+        self._update_image_refs(path, wiki_file.content)
         event_bus.publish("tree_change", {"action": "update", "path": path})
         logger.info(f"Saved: {path} (indexing queued)")
         return wiki_file
@@ -187,6 +189,34 @@ class WikiService:
         except Exception:
             pass
         return content
+
+    def _update_image_refs(self, doc_path: str, content: str) -> None:
+        """Diff image refs in new content vs registry, update ref counts."""
+        from backend.api.files import get_image_registry
+
+        registry = get_image_registry()
+        if not registry:
+            return
+
+        image_ref_re = re.compile(r"!\[[^\]]*\]\((assets/[^)]+)\)")
+        new_refs: set[str] = set()
+        for match in image_ref_re.finditer(content):
+            asset_path = match.group(1)
+            filename = asset_path.split("/")[-1]
+            new_refs.add(filename)
+
+        old_refs = registry.get_refs_for_doc(doc_path)
+
+        added = new_refs - old_refs
+        removed = old_refs - new_refs
+
+        for img in added:
+            registry.increment_ref(img, doc_path)
+        for img in removed:
+            registry.decrement_ref(img, doc_path)
+
+        if added or removed:
+            logger.debug(f"Image refs updated for {doc_path}: +{len(added)} -{len(removed)}")
 
     def _validate_lineage(self, path: str, content: str) -> list:
         """Run lineage validation on content before saving. Returns list of LineageWarning."""

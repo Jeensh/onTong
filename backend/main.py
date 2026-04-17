@@ -162,6 +162,7 @@ async def lifespan(app: FastAPI):
             provider=settings.image_vision_provider,
             model=settings.image_vision_model,
             ollama_url=settings.ollama_host,
+            api_key=settings.anthropic_api_key,
         )
         _img_analyzer = ImageAnalyzer(ocr=_ocr, vision=_vision)
         _img_queue = ImageProcessingQueue(_img_analyzer)
@@ -170,6 +171,13 @@ async def lifespan(app: FastAPI):
             f"Image analysis: OCR={settings.image_ocr_engine}, "
             f"Vision={settings.image_vision_provider}/{settings.image_vision_model}"
         )
+
+    # Image Registry — in-memory hash index + ref counting
+    from backend.application.image.image_registry import ImageRegistry
+    from backend.api.files import set_image_registry
+    _image_registry = ImageRegistry()
+    _image_registry.scan(Path(settings.wiki_dir))
+    set_image_registry(_image_registry)
 
     # Build digest service
     from backend.application.trust.digest import DocumentDigestService
@@ -193,6 +201,18 @@ async def lifespan(app: FastAPI):
         digest_svc.invalidate_cache()
 
     event_bus.on("tree_change", _on_tree_change)
+
+    # Image ref count cleanup on document deletion
+    def _on_tree_change_image_refs(data: dict) -> None:
+        action = data.get("action")
+        path = data.get("path", "")
+        if not path.endswith(".md"):
+            return
+        if action == "remove":
+            _image_registry.remove_all_refs_for_doc(path)
+            logger.debug(f"Image refs cleared for deleted doc: {path}")
+
+    event_bus.on("tree_change", _on_tree_change_image_refs)
 
     # Recompute access_scope in ChromaDB when ACL changes
     async def _on_acl_changed(data: dict):
