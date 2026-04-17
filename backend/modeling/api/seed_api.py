@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -103,10 +104,16 @@ async def seed_scm_demo():
     from backend.modeling.mapping.yaml_store import save_mapping_yaml
     save_mapping_yaml(mf_path, mf)
 
-    # 4. Sync mappings to Neo4j
+    # 4. Copy source files so Source API can serve them
+    repos_dest = Path("/tmp/ontong-repos") / SAMPLE_REPO_ID / "src"
+    sample_src = sample_dir / "src"
+    if sample_src.is_dir() and not repos_dest.is_dir():
+        shutil.copytree(sample_src, repos_dest)
+
+    # 5. Sync mappings to Neo4j
     _mapping_svc.sync_to_neo4j(mf)
 
-    # 5. Register simulation parameters (sim_registry is pre-loaded with demo data)
+    # 6. Register simulation parameters (sim_registry is pre-loaded with demo data)
     from backend.modeling.simulation.sim_registry import SimRegistry
     sim_entity_ids = SimRegistry.all_entity_ids()
     sim_count = len([eid for eid in sim_entity_ids if any(m.code == eid for m in mf.mappings)])
