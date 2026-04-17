@@ -85,7 +85,11 @@ async def chat(request: ChatRequest, user: User = Depends(get_current_user)):
             augmented_query = None
             topic_shift = False
 
-            if is_followup and rag_agent and hasattr(rag_agent, '_augment_query'):
+            # Skip LLM augmentation + classification for clarification responses —
+            # the message is a folder selection (e.g. "인프라"), not a real query.
+            if request.clarification_response_id:
+                intent = await main_router.classify(request.message, has_attached_files=bool(request.attached_files))
+            elif is_followup and rag_agent and hasattr(rag_agent, '_augment_query'):
                 intent, augment_result = await asyncio.gather(
                     main_router.classify(request.message, has_attached_files=bool(request.attached_files)),
                     rag_agent._augment_query(request.message, history),
@@ -143,6 +147,11 @@ async def chat(request: ChatRequest, user: User = Depends(get_current_user)):
                         attached_context += f"\n\n--- 첨부 파일: {fp} ---\n{wiki_file.content}\n"
                         logger.info(f"Attached file loaded: {fp}")
 
+            # Topic shift → clear accumulated path preferences to avoid cross-topic contamination
+            if topic_shift and session.path_preferences:
+                logger.info(f"Topic shift detected — clearing path_preferences: {session.path_preferences}")
+                session.path_preferences.clear()
+
             # L3: Handle path disambiguation responses
             path_preference = None
             if request.clarification_response_id:
@@ -154,6 +163,13 @@ async def chat(request: ChatRequest, user: User = Depends(get_current_user)):
                     if selected not in session.path_preferences:
                         session.path_preferences.append(selected)
                     logger.info(f"Path preference set: {selected} (session total: {session.path_preferences})")
+                    # Recover the original query from history — the user's message
+                    # before the clarification was just a folder selection, not the
+                    # real search intent.
+                    user_msgs = [m for m in history if m.get("role") == "user"]
+                    if user_msgs:
+                        augmented_query = user_msgs[-1].get("content", "").strip() or augmented_query
+                        logger.info(f"Path disambiguation: restored original query '{augmented_query}'")
 
             # Build AgentContext for skill-based agents
             ctx = AgentContext(
@@ -170,6 +186,7 @@ async def chat(request: ChatRequest, user: User = Depends(get_current_user)):
                 meta_index=_meta_index,
                 intent_action=intent.action,
                 username=user.name,
+                user=user,
                 path_preference=path_preference,
                 path_preferences=list(session.path_preferences),
             )

@@ -525,6 +525,13 @@ class RAGAgent:
         # 1. Hybrid search via wiki_search skill (with ReAct loop)
         yield self._thinking("vector_search", "start", "관련 문서 검색 중")
 
+        # Topic shift → clear path preferences so old folder scope doesn't contaminate new search
+        if topic_shift and ctx:
+            if ctx.path_preference or ctx.path_preferences:
+                logger.info(f"Topic shift — clearing path prefs: pref={ctx.path_preference}, prefs={ctx.path_preferences}")
+                ctx.path_preference = None
+                ctx.path_preferences = []
+
         if ctx:
             # ReAct loop: search → evaluate → re-search if insufficient
             tried_queries: list[str] = []
@@ -653,11 +660,12 @@ class RAGAgent:
                     documents, metadatas, distances = [], [], []
 
             # ACL filter
-            if documents and user_roles:
+            acl_user = ctx.user if ctx else None
+            if documents and acl_user:
                 acl_filtered = [
                     (doc, meta, dist)
                     for doc, meta, dist in zip(documents, metadatas, distances)
-                    if acl_store.check_permission(meta.get("path", ""), user_roles, "read")
+                    if acl_store.check_permission(meta.get("path", ""), acl_user, "read")
                 ]
                 if acl_filtered:
                     documents, metadatas, distances = map(list, zip(*acl_filtered))
@@ -1063,10 +1071,12 @@ class RAGAgent:
         system_prompt = "\n\n".join(prompt_parts)
 
         # 3. Build messages and call LLM
+        # Use augmented query for follow-up context (e.g. "그거 더 설명해줘" → includes what "그거" refers to)
+        user_message = (ctx.augmented_query if ctx.augmented_query else None) or request.message
         messages = [{"role": "system", "content": system_prompt}]
         for msg in build_history_window(ctx.history):
             messages.append({"role": msg["role"], "content": msg["content"]})
-        messages.append({"role": "user", "content": request.message})
+        messages.append({"role": "user", "content": user_message})
 
         yield self._thinking("answer_gen", "start", "답변 생성 중")
 
@@ -1106,7 +1116,8 @@ class RAGAgent:
         *, ctx: AgentContext | None = None,
     ) -> AsyncGenerator[str, None]:
         """Handle wiki edit intent: delegate to wiki_edit skill."""
-        query = request.message
+        # Prefer augmented query for follow-up edits (e.g. "그 문서 수정해줘" → includes context)
+        query = (ctx.augmented_query if ctx and ctx.augmented_query else None) or request.message
 
         if ctx:
             # Use wiki_edit skill

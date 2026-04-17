@@ -35,7 +35,6 @@ class WikiSearchSkill:
         user_scope: list[str] | None = None,
     ) -> SkillResult:
         chroma = ctx.chroma
-        roles = user_roles or getattr(ctx, "user_roles", ["admin"])
 
         # Auto-extract metadata filter from query
         base_filter = metadata_filter or extract_metadata_filter(query)
@@ -120,11 +119,12 @@ class WikiSearchSkill:
                 documents, metadatas, distances = [], [], []
 
         # ACL filter
-        if documents and roles:
+        user = getattr(ctx, "user", None)
+        if documents and user:
             acl_filtered = [
                 (doc, meta, dist)
                 for doc, meta, dist in zip(documents, metadatas, distances)
-                if acl_store.check_permission(meta.get("path", meta.get("file_path", "")), roles, "read")
+                if acl_store.check_permission(meta.get("path", meta.get("file_path", "")), user, "read")
             ]
             if acl_filtered:
                 documents, metadatas, distances = map(list, zip(*acl_filtered))

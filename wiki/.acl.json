@@ -1,0 +1,133 @@
+{
+  "인프라/": {
+    "owner": "donghae",
+    "read": [
+      "all"
+    ],
+    "write": [
+      "@donghae",
+      "admin"
+    ],
+    "manage": [
+      "@donghae"
+    ],
+    "inherited": false
+  },
+  "ERP/": {
+    "owner": "admin",
+    "read": [
+      "all"
+    ],
+    "write": [
+      "all"
+    ],
+    "manage": [
+      "admin"
+    ],
+    "inherited": false
+  },
+  "MES/": {
+    "owner": "admin",
+    "read": [
+      "all"
+    ],
+    "write": [
+      "all"
+    ],
+    "manage": [
+      "admin"
+    ],
+    "inherited": false
+  },
+  "SCM/": {
+    "owner": "admin",
+    "read": [
+      "all"
+    ],
+    "write": [
+      "all"
+    ],
+    "manage": [
+      "admin"
+    ],
+    "inherited": false
+  },
+  "test_linage/": {
+    "owner": "admin",
+    "read": [
+      "all"
+    ],
+    "write": [
+      "all"
+    ],
+    "manage": [
+      "admin"
+    ],
+    "inherited": false
+  },
+  "기획/": {
+    "owner": "admin",
+    "read": [
+      "all"
+    ],
+    "write": [
+      "all"
+    ],
+    "manage": [
+      "admin"
+    ],
+    "inherited": false
+  },
+  "인사/": {
+    "owner": "admin",
+    "read": [
+      "all"
+    ],
+    "write": [
+      "all"
+    ],
+    "manage": [
+      "admin"
+    ],
+    "inherited": false
+  },
+  "재무/": {
+    "owner": "admin",
+    "read": [
+      "all"
+    ],
+    "write": [
+      "all"
+    ],
+    "manage": [
+      "admin"
+    ],
+    "inherited": false
+  },
+  "_skills/": {
+    "owner": "admin",
+    "read": [
+      "all"
+    ],
+    "write": [
+      "all"
+    ],
+    "manage": [
+      "admin"
+    ],
+    "inherited": false
+  },
+  "_personas/": {
+    "owner": "admin",
+    "read": [
+      "all"
+    ],
+    "write": [
+      "all"
+    ],
+    "manage": [
+      "admin"
+    ],
+    "inherited": false
+  }
+}

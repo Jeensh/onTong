@@ -41,6 +41,7 @@ class AgentContext:
     conflict_store: Any = None    # ConflictStore | None — for registering detected conflicts
     intent_action: str = "question"  # current intent action for allowed-tools filtering
     username: str = ""               # authenticated user name (for per-user persona)
+    user: Any = None                     # User | None — full authenticated user object (for ACL checks)
     meta_index: Any = None               # MetadataIndex | None — for status lookups
     # L3 Path-Aware RAG: path preferences from disambiguation
     path_preference: str | None = None       # current query's path preference
