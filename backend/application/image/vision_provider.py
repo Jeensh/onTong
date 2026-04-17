@@ -80,12 +80,72 @@ class OllamaVisionProvider:
             return ""
 
 
+class ClaudeVisionProvider:
+    """Anthropic Claude-based vision provider for image description."""
+
+    def __init__(self, model: str = "claude-haiku-4-5-20251001", api_key: str = ""):
+        self._model = model
+        self._api_key = api_key
+
+    @property
+    def provider_name(self) -> str:
+        return f"claude/{self._model}"
+
+    async def describe(self, image_path: Path, ocr_text: str) -> str:
+        """Send image to Claude Vision API and return description."""
+        import anthropic
+
+        prompt = VISION_PROMPT.format(ocr_text=ocr_text if ocr_text else "(OCR 텍스트 없음)")
+
+        try:
+            image_bytes = image_path.read_bytes()
+            b64 = base64.b64encode(image_bytes).decode("ascii")
+
+            suffix = image_path.suffix.lower()
+            media_type_map = {
+                ".png": "image/png",
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".gif": "image/gif",
+                ".webp": "image/webp",
+            }
+            media_type = media_type_map.get(suffix, "image/png")
+
+            client = anthropic.AsyncAnthropic(api_key=self._api_key or None)
+            response = await client.messages.create(
+                model=self._model,
+                max_tokens=1024,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": media_type,
+                                "data": b64,
+                            },
+                        },
+                        {"type": "text", "text": prompt},
+                    ],
+                }],
+            )
+            return response.content[0].text
+        except Exception as e:
+            logger.warning(f"Claude vision failed for {image_path.name}: {e}")
+            return ""
+
+
 def create_vision_provider(
     provider: str = "none",
     model: str = "llava:13b",
     ollama_url: str = "http://localhost:11434",
+    api_key: str = "",
 ) -> VisionProvider:
     """Factory function to create a VisionProvider by name."""
     if provider == "ollama":
         return OllamaVisionProvider(model=model, ollama_url=ollama_url)
+    if provider == "claude":
+        claude_model = model if model.startswith("claude") else "claude-haiku-4-5-20251001"
+        return ClaudeVisionProvider(model=claude_model, api_key=api_key)
     return NoopVisionProvider()

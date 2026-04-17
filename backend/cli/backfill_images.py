@@ -93,6 +93,7 @@ async def backfill(args: argparse.Namespace) -> None:
             provider=settings.image_vision_provider,
             model=settings.image_vision_model,
             ollama_url=settings.ollama_host,
+            api_key=settings.anthropic_api_key,
         )
 
     analyzer = ImageAnalyzer(ocr=ocr, vision=vision)
