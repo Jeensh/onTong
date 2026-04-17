@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "ocr_text": "SCM System\nOrder Management\nOrder ID\nPrcdluct\nStatus\nDue Date\nOFD2026-1847\nSemiconductor ChipAI\nDELAYED\n2026-04-20\nOFD 2026-1848\nFBEard\nType-C\n2.500\nOI TPACK\n2026-04 18\nOFD 2026-1849\nEittery Mcdule EI-7\n1200\nCFITICAL\n2026-0416\nOFD 2026-1850\nDisplay Panel 15.6\n800\nOI TPACK\n2026-04-22\nOFD 2026-1851\nMemory DDF5 1GGB\n10,O00\nDELAYED\n2026-04-19\nSummary;\nactive orders\nDELAYED\nCFITICAL\nCritical OPD-2026-1849 Battery Madule due TOMOFPOW",
+  "description": "",
+  "provider": "none",
+  "ocr_engine": "easyocr",
+  "processed_at": "2026-04-16T19:03:35.551617+00:00"
+}

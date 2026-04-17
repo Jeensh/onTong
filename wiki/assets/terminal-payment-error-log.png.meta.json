@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "ocr_text": "2026-0415 1430.12847 EFPOR[rayment-api] PaymentService 142\natce Fayment Paymentcontroller checkoutiPaymentcontroller java87i\n2026-0415 1430.13.102 EFPOR[rayment-api] PaymentService 142\n2026-0415 1430.15.203 WARI [payment-api] CircuitBreaker OPEN\nPaymentendpaintcircuit breaker opened alter\nhailures\n2026-0415 1438.44001 INFO [payment-api] [eplaymentv3\n2 started\n2026-0415 1439.01.337 IIFO [payment-api] Health check Fassed\n2026-0415 1439.02.100 INFO [payment-api] CircuitBreaker CLOSED",
+  "description": "",
+  "provider": "none",
+  "ocr_engine": "easyocr",
+  "processed_at": "2026-04-16T19:03:14.933321+00:00"
+}
