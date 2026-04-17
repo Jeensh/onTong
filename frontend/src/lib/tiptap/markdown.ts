@@ -26,6 +26,18 @@ turndown.addRule("table", {
   filter: "table",
   replacement(_content, node) {
     const element = node as HTMLElement;
+
+    // If any cell has a custom column width (from Tiptap table resizing),
+    // output the table as raw HTML so colwidth attributes survive the roundtrip.
+    // Markdown supports inline HTML blocks; marked will pass them through on load.
+    const hasColwidths =
+      element.querySelector("td[colwidth], th[colwidth], col[style]") !== null;
+
+    if (hasColwidths) {
+      return "\n\n" + element.outerHTML + "\n\n";
+    }
+
+    // No custom widths — use readable markdown pipe format
     const rows = element.querySelectorAll("tr");
     const lines: string[] = [];
 
@@ -69,6 +81,22 @@ turndown.addRule("taskListItem", {
   },
 });
 
+// Wiki image: strip /api/files/ prefix so stored markdown uses relative paths
+turndown.addRule("wikiImage", {
+  filter: "img",
+  replacement(_content, node) {
+    const el = node as HTMLElement;
+    let src = el.getAttribute("src") || "";
+    const alt = el.getAttribute("alt") || "";
+    const title = el.getAttribute("title");
+    if (src.startsWith("/api/files/")) {
+      src = src.slice("/api/files/".length);
+    }
+    const titlePart = title ? ` "${title}"` : "";
+    return `![${alt}](${src}${titlePart})`;
+  },
+});
+
 // WikiLink support: <span data-wiki-link="name">[[name]]</span> → [[name]]
 turndown.addRule("wikiLink", {
   filter(node) {
@@ -83,8 +111,16 @@ turndown.addRule("wikiLink", {
   },
 });
 
+// Zero-width space used to preserve empty paragraphs through markdown roundtrip.
+// Turndown strips empty <p></p> during DOM preprocessing (before any rule fires),
+// so we inject ZWSP into them before Turndown processes the HTML.
+const ZWSP = "\u200B";
+
 export function htmlToMarkdown(html: string): string {
-  return turndown.turndown(html);
+  const preserved = html
+    .replace(/<p><br\s*\/?><\/p>/g, `<p>${ZWSP}</p>`)
+    .replace(/<p><\/p>/g, `<p>${ZWSP}</p>`);
+  return turndown.turndown(preserved);
 }
 
 // Custom marked extension: parse [[wiki-link]] into <span data-wiki-link>
@@ -115,6 +151,24 @@ marked.use({
   ],
 });
 
+// Prefix relative image paths with /api/files/ so the browser can fetch wiki assets
+marked.use({
+  renderer: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    image({ href, title, text }: any) {
+      if (href && !href.startsWith("http://") && !href.startsWith("https://") && !href.startsWith("/")) {
+        href = `/api/files/${href}`;
+      }
+      const alt = text ? ` alt="${text}"` : "";
+      const titleAttr = title ? ` title="${title}"` : "";
+      return `<img src="${href}"${alt}${titleAttr}>`;
+    },
+  },
+});
+
 export function markdownToHtml(md: string): string {
-  return marked.parse(md, { async: false }) as string;
+  const html = marked.parse(md, { async: false }) as string;
+  // Strip ZWSP that was injected by htmlToMarkdown to preserve empty paragraphs.
+  // Tiptap handles empty <p></p> natively — no invisible chars needed in the editor.
+  return html.replace(/\u200B/g, "");
 }
