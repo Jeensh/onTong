@@ -45,6 +45,37 @@ class TestImageAnalysisModels:
         assert analysis.description == "a greeting"
         assert analysis.provider == "noop"
 
+    def test_image_analysis_source_field(self):
+        from backend.application.image.models import ImageAnalysis
+
+        analysis = ImageAnalysis(
+            ocr_text="text",
+            description="desc",
+            provider="none",
+            ocr_engine="tesseract",
+            processed_at=datetime(2026, 4, 17, 10, 0, 0, tzinfo=timezone.utc),
+            source="original.png",
+        )
+        d = analysis.to_dict()
+        assert d["source"] == "original.png"
+
+        loaded = ImageAnalysis.from_dict(d)
+        assert loaded.source == "original.png"
+
+    def test_image_analysis_source_default_empty(self):
+        from backend.application.image.models import ImageAnalysis
+
+        analysis = ImageAnalysis(
+            ocr_text="text",
+            description="desc",
+            provider="none",
+            ocr_engine="tesseract",
+            processed_at=datetime(2026, 4, 17, 10, 0, 0, tzinfo=timezone.utc),
+        )
+        assert analysis.source == ""
+        d = analysis.to_dict()
+        assert d["source"] == ""
+
     def test_sidecar_save_and_load(self, tmp_path):
         from backend.application.image.models import ImageAnalysis, save_sidecar, load_sidecar
 

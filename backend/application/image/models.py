@@ -20,6 +20,7 @@ class ImageAnalysis:
     provider: str
     ocr_engine: str
     processed_at: datetime
+    source: str = ""  # parent image filename if annotation derivative
 
     def to_dict(self) -> dict:
         return {
@@ -29,16 +30,23 @@ class ImageAnalysis:
             "provider": self.provider,
             "ocr_engine": self.ocr_engine,
             "processed_at": self.processed_at.isoformat(),
+            "source": self.source,
         }
 
     @classmethod
     def from_dict(cls, d: dict) -> ImageAnalysis:
+        version = d.get("version", 1)
+        if version != SIDECAR_VERSION:
+            raise ValueError(
+                f"Unsupported sidecar version {version}, expected {SIDECAR_VERSION}"
+            )
         return cls(
             ocr_text=d.get("ocr_text", ""),
             description=d.get("description", ""),
             provider=d.get("provider", ""),
             ocr_engine=d.get("ocr_engine", ""),
             processed_at=datetime.fromisoformat(d["processed_at"]),
+            source=d.get("source", ""),
         )
 
 
@@ -73,9 +81,22 @@ def load_sidecar(image_path: Path) -> ImageAnalysis | None:
 def needs_processing(image_path: Path) -> bool:
     """Check if an image needs (re-)processing.
 
-    Returns True if no sidecar exists or image is newer than sidecar.
+    Returns True if:
+    - No sidecar exists
+    - Image is newer than sidecar
+    - Sidecar exists but both ocr_text and description are empty
+      (so re-processing can try with a newly configured provider)
     """
     meta_path = _meta_path_for(image_path)
     if not meta_path.exists():
         return True
-    return image_path.stat().st_mtime > meta_path.stat().st_mtime
+    if image_path.stat().st_mtime > meta_path.stat().st_mtime:
+        return True
+    # Reprocess if sidecar has no useful content (e.g. OCR failed, vision was disabled)
+    try:
+        data = json.loads(meta_path.read_text(encoding="utf-8"))
+        if not data.get("ocr_text") and not data.get("description"):
+            return True
+    except Exception:
+        return True
+    return False
