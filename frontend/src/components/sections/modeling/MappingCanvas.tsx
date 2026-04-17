@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -10,6 +10,7 @@ import {
   useEdgesState,
   type Node,
   type Edge,
+  type ReactFlowInstance,
   Panel,
   Handle,
   Position,
@@ -198,6 +199,7 @@ export function MappingCanvas({
   const [codeEntities, setCodeEntities] = useState<CodeEntity[]>([]);
   const [entityFilter, setEntityFilter] = useState("");
   const [loading, setLoading] = useState(false);
+  const rfInstance = useRef<ReactFlowInstance<Node<DomainNodeData>, Edge> | null>(null);
 
   // Load data
   useEffect(() => {
@@ -259,6 +261,11 @@ export function MappingCanvas({
     const laid = layoutGraph(graphNodes, graphEdges);
     setNodes(laid.nodes);
     setEdges(laid.edges);
+
+    // Re-fit view after nodes are laid out
+    requestAnimationFrame(() => {
+      rfInstance.current?.fitView({ padding: 0.2 });
+    });
   }, [domainNodes, mappings, highlightDomainNode, setNodes, setEdges]);
 
   // Handle node click
@@ -329,6 +336,7 @@ export function MappingCanvas({
           onEdgesChange={onEdgesChange}
           onNodeClick={handleNodeClick}
           nodeTypes={nodeTypes}
+          onInit={(instance) => { rfInstance.current = instance; }}
           fitView
           fitViewOptions={{ padding: 0.2 }}
           proOptions={{ hideAttribution: true }}
