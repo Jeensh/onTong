@@ -12,7 +12,7 @@
 
 ### Image Management 브라우저 데모 테스트 (예정)
 
-사용자가 데모 테스트 시나리오를 요청할 예정. `toClaude/demo_guide.md`의 "Image Management" 섹션 참고.
+사용자가 데모 테스트 시나리오를 요청할 예정. `toClaude/modeling/demo_guide.md`의 "Image Management" 섹션 참고.
 서버 기동 후 브라우저에서 다음을 검증:
 1. 이미지 클릭 → 뷰어 모달 (풀스크린 + 정보 패널)
 2. 어노테이션 편집 (사각형/타원/화살표/텍스트) → 새 이미지로 저장
@@ -75,7 +75,7 @@
 
 **설계 문서**: `docs/superpowers/specs/2026-04-16-source-viewer-mapping-workbench-design.md`
 **구현 플랜**: `docs/superpowers/plans/2026-04-16-source-viewer-mapping-workbench.md`
-**데모 가이드**: `toClaude/demo_guide_modeling.md` (Part A: Engine, Part B: Workbench)
+**데모 가이드**: `toClaude/modeling/demo_guide_modeling.md` (Part A: Engine, Part B: Workbench)
 
 **다음 후보**: Phase 1b (실제 Neo4j BFS 의존성 그래프), Docker Sandbox (독립 기능)
 
@@ -132,6 +132,18 @@ Engine-First Architecture로 Section 2 리디자인:
 **Part 2 완료** (2026-04-15): 2A~2C 기존 구현 확인, 2D 충돌 쌍 그룹핑 신규 구현.
 
 **다음 후보 작업**: 사용자 논의 필요 (Part 2+3 모두 완료, ACL 기능 전체 구현 완료)
+
+---
+
+## 2. 이전 완료 작업
+
+2026-04-13 이전 완료 작업 상세:
+- `toClaude/modeling/CHANGES.md` — 타임스탬프순 변경 로그
+- `toClaude/modeling/archive/` — 스텝별 요약 (Modeling MVP, Self-Healing, Trust System, Part 1/2/3, Path-Aware RAG, Smart Friction 등)
+
+---
+
+<!-- LEGACY_SECTION_REMOVED_2026_04_17 -->
 
 ### Section 2 Modeling MVP 완료 (2026-04-12)
 

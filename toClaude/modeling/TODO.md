@@ -226,7 +226,7 @@
 ## Phase 2-A: RAG 성능 고도화
 
 > 문서 대량 증가 시 응답 속도 + 검색 품질 유지를 위한 최적화.
-> 상세 설계: `toClaude/plan/master_plan.md` → Phase 2-A 섹션 참조.
+> 상세 설계: `toClaude/_shared/plan/master_plan.md` → Phase 2-A 섹션 참조.
 
 ### Step P2A-1: LLM 호출 병렬화 + 제거
 
@@ -288,7 +288,7 @@
 ## Phase 2-B: 문서 충돌 감지 & 해소
 
 > 같은 주제 문서가 여러 개일 때 사용자가 올바른 판단을 할 수 있도록 가이드.
-> 상세 설계: `toClaude/plan/master_plan.md` → Phase 2-B 섹션 참조.
+> 상세 설계: `toClaude/_shared/plan/master_plan.md` → Phase 2-B 섹션 참조.
 
 ### Step P2B-1: RAG 답변 충돌 감지 프롬프트
 
@@ -870,7 +870,7 @@ Step 1-C 백엔드(1C-5)부터 시작해줘
 | E2a-7 | Design Review 수정: Seed API 소스 파일 자동 복사 | [x] | `backend/modeling/api/seed_api.py` |
 | E2a-8 | Design Review 수정: React Flow fitView 노드 로딩 후 재실행 | [x] | `frontend/.../modeling/MappingCanvas.tsx` |
 
-> 14 source API tests, TS clean, design review 완료. 데모 가이드: `toClaude/demo_guide_modeling.md`
+> 14 source API tests, TS clean, design review 완료. 데모 가이드: `toClaude/modeling/demo_guide_modeling.md`
 
 ### 향후 인프라 확장 (Phase 2a 완료 후)
 
@@ -885,7 +885,7 @@ Step 1-C 백엔드(1C-5)부터 시작해줘
 
 ## 🧠 에이전트 고도화 (agent_bible 분석 기반, v3)
 
-> 기반 문서: `toClaude/agent_bible_analysis/99_adoption_plan.md` (v3 — 전문가 리뷰 반영)
+> 기반 문서: `toClaude/_shared/agent_bible_analysis/99_adoption_plan.md` (v3 — 전문가 리뷰 반영)
 > 제1 목표: 에이전트 이해력/답변 품질 최대화
 
 ### Phase 1: 이해력 혁신 (VOC 직접 해결)

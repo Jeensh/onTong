@@ -989,11 +989,11 @@ curl -s http://localhost:8001/api/files/assets/unused | python3 -m json.tool | h
 ## Pre-Demo 자동 검증 스크립트
 
 > 위 체크리스트의 핵심 항목을 한 번에 실행하는 스크립트.
-> 변경 후 `bash toClaude/verify.sh`로 실행.
+> 변경 후 `bash toClaude/_shared/verify.sh`로 실행.
 
 ```bash
 #!/bin/bash
-# toClaude/verify.sh — Pre-Demo Quick Verification
+# toClaude/_shared/verify.sh — Pre-Demo Quick Verification
 set -e
 cd "$(dirname "$0")/.."
 

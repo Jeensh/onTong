@@ -1075,7 +1075,7 @@ npm run dev
 | Frontend | `frontend/src/lib/auth/{name}-provider.ts` | AuthProvider 구현 |
 | Frontend | `frontend/src/components/Providers.tsx` | provider 교체 |
 
-> 상세 가이드: `toClaude/reports/auth_abstraction_guide.md`
+> 상세 가이드: `toClaude/_shared/reports/auth_abstraction_guide.md`
 
 ---
 
@@ -3017,7 +3017,7 @@ pytest tests/ -v
 ## 🏗️ 3-Section Platform v2 아키텍처 (계획 단계)
 
 > **현재 상태**: Phase 0 진행 중 (6/17 완료) — 스캐폴딩 + 개발자 C 환경 준비 완료
-> **상세 문서**: `toClaude/reports/platform_architecture_v2.md`
+> **상세 문서**: `toClaude/_shared/reports/platform_architecture_v2.md`
 
 ### 플랫폼 구조 개요
 
