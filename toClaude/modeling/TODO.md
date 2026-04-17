@@ -917,6 +917,24 @@ Step 1-C 백엔드(1C-5)부터 시작해줘
 | AG-3-2 | 스킬 권한 매핑 (READ/WRITE/EXECUTE) | Phase 2 | [x] | `skill.py`, `context.py` |
 | AG-3-3 | PreSkill/PostSkill 훅 시스템 | AG-3-2 | [x] | `skill.py` HookRegistry, `hooks.py` 내장훅, `context.py` 훅 파이프라인 |
 
+### V2-Phase 2: 비즈니스 시뮬레이션 연동 (Section 3)
+
+| # | Task | 의존 | 상태 | 산출물 |
+|---|------|------|------|--------|
+| V2-2-1 | 파라메트릭 시뮬레이션 엔진 (Monte Carlo 등) | Phase 1 | [ ] | `backend/modeling/simulation/executor.py` |
+| V2-2-2 | 비동기 job queue 연동 (시뮬레이션 실행) | V2-0-15, V2-2-1 | [ ] | `backend/modeling/simulation/job_queue.py` |
+| V2-2-3 | OutputFormat별 결과 가공 (ChartOutput, TableOutput, GanttOutput) | V2-2-1 | [ ] | `backend/modeling/simulation/formatter.py` |
+| V2-2-4 | Parametric mock 서버 (정적 JSON X, 파라미터 기반 동적 생성) | Phase 0 | [x] | `backend/simulation/mock/scenarios/slab_size_simulator.py`, `backend/simulation/tools/mock_simulator.py` |
+| V2-2-5 | SimAgent 기본 구현 (시나리오 설계 + 결과 해석) | V2-2-4 | [x] | `backend/simulation/agent/` (scenario_a/b/c, agent_builder, custom_runner) |
+| V2-2-6 | SimCopilot 프론트엔드 (채팅 + 대시보드 하이브리드) | V2-2-5 | [x] | `frontend/src/components/simulation/` (SimulationSidebar, CustomAgentHub, AgentBuilderChat, CustomAgentRunner, CustomAgentFormBuilder) |
+| V2-2-7 | ScenarioDashboard (차트/테이블/Gantt 시각화) | V2-2-3 | [ ] | `frontend/src/components/simulation/ScenarioDashboard.tsx` |
+| V2-2-8 | ParameterForm (시나리오 파라미터 입력 폼) | V2-2-4 | [ ] | `frontend/src/components/simulation/ParameterForm.tsx` |
+| V2-2-9 | 시나리오 버전 관리 + 결과 저장소 | V2-2-6 | [ ] | `backend/simulation/storage/` |
+| V2-2-10 | CompareView (시나리오 A vs B 비교) | V2-2-9 | [ ] | `frontend/src/components/simulation/CompareView.tsx` |
+| V2-2-11 | Mock → 실제 API 전환 테스트 | V2-2-1, V2-2-5 | [ ] | 통합 테스트 |
+
+### V2-Phase 3: 데이터 통합 + 운영 연동 (Section 3)
+
 ### Phase 4: Q&A ReAct 루프
 
 | # | Task | 의존 | 상태 | 산출물 |
@@ -934,6 +952,11 @@ Step 1-C 백엔드(1C-5)부터 시작해줘
 | Phase 3 | 인프라 강화 | 3 | ✅ 완료 (3/3) |
 | Phase 4 | Q&A ReAct 루프 | 3 | ✅ 완료 (3/3) |
 | | **합계** | **17/17 완료** | 전체 완료 |
+| V2-Phase 0 | 공유 인프라 구축 | 17 | 🔨 6/17 완료 |
+| V2-Phase 1 | 코드 영향 분석 MVP | 11 | ⬜ 미시작 |
+| V2-Phase 2 | 비즈니스 시뮬레이션 연동 | 11 | 🔨 3/11 완료 (V2-2-4~6) |
+| V2-Phase 3 | 데이터 통합 + 운영 연동 | 6 | ⬜ 미시작 |
+| | **V2 합계** | **45 tasks** | |
 
 ---
 

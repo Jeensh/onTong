@@ -457,6 +457,167 @@
 
 ---
 
+## 2026-04-16 (docs 정리)
+
+- [x] **Section 3 고도화 + Section 2 연결 로드맵 문서 작성**
+  - `docs/section3-roadmap.md` 신규 생성
+  - Phase A: Section 2 최소 API 4개 구현 (주문/설비/온톨로지/시뮬레이션 실행)
+  - Phase B: 섹션 3 코어 고도화 (그래프 시각화, 역계산, 멀티셋 비교, Wiki SEQ 연동)
+  - Phase C: 플랫폼 통합 (섹션 1→3 연결, 실시간 동기화, 팀 에이전트 라이브러리)
+  - Phase D: 해커톤 차별화 (Extended Thinking, MCP 서버, Graph RAG, Observability)
+  - 통합 후 아키텍처 및 데이터 플로우 다이어그램 포함
+
+- [x] **section3-developer-guide.md 업데이트**
+  - 상태 정보 현행화 (Phase 1+1.5 완료 반영)
+  - 참고 문서 경로 업데이트 (section3-* 접두어 반영)
+
+- [x] **section3-user-guide.md 업데이트**
+  - 로드맵 테이블 현행화 (Phase A/B/C/D 구조로 변경)
+
+---
+
+## 2026-04-09 (외부 접속 + 개발 가이드 보완)
+
+- [x] **SSE 스트리밍 프록시 추가** (`12cb42a`)
+  - ngrok/LAN 환경에서 SSE 이벤트 스트리밍 정상 동작하도록 프록시 설정
+  - Next.js rewrite 규칙에 SSE 엔드포인트 buffering off 적용
+
+- [x] **section3-developer-guide.md 업데이트** (`181546d`)
+  - 실제 실행 환경 기반 세팅 가이드 전면 재작성
+  - Section 10 추가: 현재 구현된 아키텍처 전체 문서화
+    - Slab 에이전트 API (SSE 이벤트 상세)
+    - Custom Agent API (CRUD + 빌더 + 실행)
+    - SimulationToolExecutor ReAct 루프 아키텍처
+    - Tool Registry 자기 기술 시스템
+    - Parallel Executor (asyncio.gather)
+    - 온톨로지 그래프 구조
+    - ActiveView 프론트엔드 뷰 라우팅
+
+- [x] **의존성 누락 수정** (`5c1e46d`)
+  - fresh install 시 빌드 실패하던 문제 해결
+  - package.json / pyproject.toml 의존성 정리
+
+---
+
+## 2026-04-07 (Phase 1.5 Custom Agent Hub 완성)
+
+- [x] **Custom Agent 시스템 전체 구현 (백엔드)**
+  - `custom_agent.py` — Custom Agent CRUD API + 채팅 빌더 + 실행 API
+  - `agent_builder_agent.py` — LLM 기반 에이전트 정의 수집 채팅 빌더
+  - `custom_agent_runner.py` — 등록된 Custom Agent 실행기
+  - `custom_agents.json` — 파일 기반 영구 저장소
+  - SSE 이벤트: `agent_ready` (정의 완성 시) + 기존 `thinking/tool_call/tool_result/content_delta/done`
+
+- [x] **Custom Agent 시스템 전체 구현 (프론트엔드)**
+  - `CustomAgentHub.tsx` — 에이전트 카드 목록 + 채팅/양식 생성 버튼
+  - `AgentBuilderChat.tsx` — AI와 대화하며 에이전트 설계 + 미리보기 카드 + 등록 버튼
+  - `CustomAgentFormBuilder.tsx` — 구조화된 폼 기반 에이전트 생성 (아이콘/색상/도구/프롬프트)
+  - `CustomAgentRunner.tsx` — 등록된 에이전트 실행 채팅 (에이전트별 독립 대화)
+  - `SimulationSidebar.tsx` — Custom Agent 섹션 통합 (헤더 클릭→허브, 채팅/양식 빌더, 에이전트 목록)
+  - `SimulationSection.tsx` — `activeView` 기반 뷰 라우팅 확장 (custom_hub/custom_chat_builder/custom_form_builder/custom_agent)
+
+- [x] **Phase 1 연동 기능 완성**
+  - Scenario A 딥링크: `done` 이벤트 + `suggested_width` → "이 주문을 Slab 설계 3D로 확인" 버튼
+  - Scenario C 딥링크: `done` 이벤트 + `recommended_split_count` → "최적 분할수 N개를 3D로 확인" 버튼
+  - Scenario B 딥링크: 영향받은 슬랩 Slab 설계 3D 연결 버튼
+  - 온톨로지 그래프 Order 노드 클릭 → 시뮬레이터 자동 이동 + 파라미터 로딩
+  - 주문 선택 드롭다운 (`GET /api/simulation/slab/orders` → SlabParamController 상단)
+
+- [x] **Tool Registry 시스템 구축**
+  - `tool_registry.py` — SimulationToolRegistry: 중앙 등록, Anthropic 스키마 조회, 실행
+  - `tool_definitions.py` — 10개 도구 Anthropic tool_use 형식 JSON 스키마 선언
+  - 시나리오별 도구 묶음: SCENARIO_A_TOOLS, SCENARIO_B_TOOLS, SCENARIO_C_TOOLS, ALL_TOOLS
+  - `GET /api/simulation/slab/tools` — Custom Agent 빌더 UI용 도구 목록
+
+- [x] **사용자 가이드 + 개발자 가이드 전면 작성**
+  - `section3-user-guide.md` — 800줄 사용자 매뉴얼 (화면 구성, 시나리오 사용법, FAQ, 연동 흐름 5가지)
+  - `section3-developer-guide.md` — Custom Agent API 상세 + 도구 추가 가이드 + 뷰 라우팅 설명 추가
+
+---
+
+## 2026-04-04 (Phase 1 시나리오 에이전트 + Slab 시뮬레이터 구축)
+
+- [x] **시나리오 A/B/C AI 에이전트 구현**
+  - `scenario_a_agent.py` — DG320 에러 진단 (주문 조회 → Edging 기준 확인 → 폭 조정 제안)
+  - `scenario_b_agent.py` — Edging 파급효과 분석 (변경 파라미터 파싱 → 전체 주문 영향 스캔)
+  - `scenario_c_agent.py` — 단중·분할수 최적화 (분할수 1~N 조합별 만족률 계산)
+  - `llm_tool_executor.py` — Anthropic tool_use 기반 ReAct 루프 실행기 (모든 에이전트 공통)
+
+- [x] **Slab 설계 도구 함수 7개 구현**
+  - `mock_simulator.py` — get_order_info, simulate_width_range, suggest_adjusted_width, find_edging_specs_for_order, simulate_width_impact, batch_simulate_width_impact, find_orders_by_rolling_line, simulate_split_combinations, get_equipment_spec
+  - `parallel_executor.py` — asyncio.gather 기반 병렬 주문 영향 분석 (시나리오 B용)
+  - `ontology_graph.py` — NetworkX 기반 Mock 온톨로지 그래프 (build_mock_graph, find_edging_specs_for_order, find_orders_by_rolling_line)
+
+- [x] **Slab Size Simulator 프론트엔드 구현**
+  - `SlabSizeSimulator.tsx` — 3-pane 레이아웃 컨테이너
+  - `SlabParamController.tsx` — 6개 파라미터 슬라이더 + 숫자 입력 + 상태 인디케이터 (🟢🟡🔴)
+  - `SlabViewer3D.tsx` — Three.js 3D Slab 렌더링 (OrbitControls, 치수 라벨, 상태별 색상 코딩)
+  - `SlabDesignViewer3D.tsx` — 고급 3D 뷰어 (분할 애니메이션, 시나리오 C 딥링크용)
+  - `SlabImpactPanel.tsx` — SEQ 2~16 단계별 통과 여부 실시간 판정 트리
+  - `SlabCompareTable.tsx` — 변경 전/후 파라미터 비교 테이블
+
+- [x] **SEQ 1~16 설계 계산 엔진 구현**
+  - `slab_size_simulator.py` — calculate_slab_design() 함수
+  - SEQ2 두께 결정, SEQ3 1차 폭범위, SEQ4 길이범위, SEQ5 단중범위, SEQ8 분할수, SEQ9 매수, SEQ12 2차 폭범위, SEQ14 Target폭, SEQ16 Target길이
+  - 설비 제약 기반 상태 판정 (ok/warning/error)
+
+- [x] **Slab 에이전트 API 구축**
+  - `slab_agent.py` — Slab 전용 API 라우터
+  - `POST /api/simulation/slab/run` — 시나리오 A/B/C 에이전트 실행 (SSE 스트리밍)
+  - `GET /api/simulation/slab/orders` — Mock 주문 목록
+  - `GET /api/simulation/slab/ontology` — 온톨로지 그래프 JSON
+  - `POST /api/simulation/slab/calculate` — Slab 설계 파라미터 계산
+  - `GET /api/simulation/slab/constraints` — 슬라이더 min/max 범위용 설비 제약
+  - `GET /api/simulation/slab/equipment` — 설비 스펙 데이터
+
+- [x] **채팅 패널 + 온톨로지 그래프 구현**
+  - `ChatPanel.tsx` — SSE 스트리밍 + 마크다운 렌더링 + 추론 과정/도구 호출 표시
+  - `OntologyGraph.tsx` — vis-network 기반 그래프 시각화 (노드 타입별 색상, 에이전트 탐색 경로 하이라이트)
+
+- [x] **프론트엔드 상태 관리 + API 클라이언트**
+  - `useSimulationStore.ts` — Zustand 전역 상태 (activeView, graphData, customAgents, orders)
+  - `useSlabSimulator.ts` — Slab 시뮬레이터 전용 훅 (파라미터 상태 + API 호출)
+  - `api.ts` — API 클라이언트 + SSE 파서 (fetchOntologyGraph, runAgent, runCustomAgent, etc.)
+  - `types.ts` — TypeScript 타입 정의 (CustomAgent, ActiveView, SLAB_TOOLS, SCENARIO_META)
+
+- [x] **Mock 데이터 생성**
+  - `mock_orders.json` — 5개 주문 (DG320 에러 1건 포함)
+  - `mock_equipment_spec.json` — 연주설비 2대 + 열연설비 2대
+  - `mock_edging_spec.json` — Edging 기준 3건 (HR-A 2구간 + HR-B 1구간)
+  - `mock_ontology.json` — 13노드 12엣지 온톨로지 그래프
+
+---
+
+## 2026-04-02 (3-Section 플랫폼 스캐폴딩)
+
+- [x] **3-Section 플랫폼 아키텍처 구현** (`00e81f2`)
+  - `backend/simulation/` 스캐폴딩 — API 라우터, mock 서버, client Protocol, agent 빈 모듈
+  - `backend/modeling/` 스캐폴딩 — API 라우터(health), 빈 모듈
+  - `backend/shared/contracts/simulation.py` — Section 2↔3 typed 계약 (Pydantic 모델)
+  - `main.py` 라우터 등록 — modeling_api, simulation_api, slab_agent_api, custom_agent_api
+  - 프론트엔드 SectionNav 상단 탭 (Wiki/Modeling/Simulation)
+  - SimulationSection 3-pane 레이아웃 + SimulationSidebar
+  - ModelingSection placeholder 카드
+  - MockModelingClient — 파라미터 기반 동적 결과 생성 (수요예측/재고최적화/리드타임분석)
+
+---
+
+## 2026-04-07 (세션 — SimCopilot 프론트엔드 통합 완료)
+
+- [x] **Custom Agent 시스템 프론트엔드 통합**
+  - `CustomAgentRunner.tsx` — 등록된 커스텀 에이전트 실행 채팅 UI (에이전트별 독립 대화)
+  - `CustomAgentFormBuilder.tsx` — 양식 기반 에이전트 생성 UI (아이콘/색상/도구/프롬프트)
+  - `SimulationSection.tsx` — 사이드바 통합 + `activeView` 기반 뷰 라우팅
+  - `SimulationSidebar.tsx` — "Custom Agent" 헤더 → `custom_hub` 뷰 링크 추가
+  - 앱 시작 시 `fetchCustomAgents()` 호출, 기존 에이전트 자동 로드
+  - `api.ts` TypeScript 타입 캐스팅 수정 (`unknown` → 구체 타입)
+
+- [x] **문서 업데이트 (`docs/`)**
+  - `section3-user-guide.md` — 사이드바 레이아웃 설명 + Custom Agent 섹션(7-1~7-6) + FAQ + 로드맵
+  - `section3-developer-guide.md` — 파일 구조 현행화 + Custom Agent API 상세 + 도구 추가 가이드 + 뷰 라우팅 설명
+
+---
+
 ## 2026-04-01 (세션 27 — Phase 0 스캐폴딩 + 개발자 C 환경 구축)
 
 - [x] **shared/contracts/ 생성** — `simulation.py` typed 계약 (DemandForecastParams, InventoryOptimizeParams, LeadTimeAnalysisParams, SimulationJob 등)
