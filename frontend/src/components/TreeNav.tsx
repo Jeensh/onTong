@@ -27,6 +27,7 @@ import {
   X,
   Gauge,
   ClipboardList,
+  Image as ImageIcon,
   Lock,
   Users,
   Share2,
@@ -1391,6 +1392,13 @@ function SettingsSection({ onOpenVirtualTab }: { onOpenVirtualTab: (tabType: imp
             <div className="text-[11px] text-muted-foreground truncate">점수 가중치, 임계값, 공식 확인</div>
           </div>
         </button>
+        <button onClick={() => onOpenVirtualTab("image-management")} className={itemClass}>
+          <ImageIcon className="h-4 w-4 text-sky-500 shrink-0" />
+          <div className="min-w-0">
+            <div className="text-xs font-medium truncate">이미지 관리</div>
+            <div className="text-[11px] text-muted-foreground truncate">업로드 중복 제거 · 미사용 정리</div>
+          </div>
+        </button>
       </div>
     </div>
   );
@@ -1938,8 +1946,8 @@ export function TreeNav() {
     >
       <div className="flex flex-col h-full">
         {/* Header with section tabs */}
-        <div className="@container flex items-center px-2 py-2 border-b shrink-0 min-w-0">
-          <div className="flex items-center gap-0.5 flex-1 min-w-0">
+        <div className="@container flex items-center px-2 py-2 border-b shrink-0 min-w-0 overflow-hidden">
+          <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-hidden">
             <button onClick={() => setSection("files")} className={sectionBtnClass("files")} title="파일 트리">
               <FolderTree className="h-3.5 w-3.5 shrink-0" />
               <span className="hidden @min-[180px]:inline truncate">파일</span>
@@ -1958,11 +1966,11 @@ export function TreeNav() {
             </button>
           </div>
           <button onClick={() => openSearch(true)}
-            className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground mr-1" title="문서 검색 (Ctrl+K)">
+            className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground mr-1 shrink-0" title="문서 검색 (Ctrl+K)">
             <Search className="h-3.5 w-3.5" />
           </button>
           {section === "files" && (
-            <div className="flex items-center gap-0.5">
+            <div className="flex items-center gap-0.5 shrink-0">
               <button onClick={() => { setCreatingIn("__root__"); setCreatingType("file"); }}
                 className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground" title="새 문서">
                 <FilePlus className="h-4 w-4" />

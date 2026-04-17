@@ -13,6 +13,7 @@ import { DiffViewer } from "@/components/editors/DiffViewer";
 import { PermissionEditor } from "@/components/admin/PermissionEditor";
 import { ScoringDashboard } from "@/components/editors/ScoringDashboard";
 import { MaintenanceDigest } from "@/components/editors/MaintenanceDigest";
+import { ImageManagementPage } from "@/components/editors/ImageManagementPage";
 
 const DocumentGraph = dynamic(
   () => import("@/components/editors/DocumentGraph").then((m) => m.DocumentGraph),
@@ -64,6 +65,8 @@ export function FileRouter({ filePath, fileType, tabId }: FileRouterProps) {
       return <ScoringDashboard />;
     case "maintenance-digest":
       return <MaintenanceDigest />;
+    case "image-management":
+      return <ImageManagementPage />;
     case "document-compare": {
       // filePath format: __compare__pathA__pathB__
       const match = filePath.match(/^__compare__(.+?)__(.+?)__$/);

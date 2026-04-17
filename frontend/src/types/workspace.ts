@@ -30,7 +30,8 @@ export type VirtualTabType =
   | "document-graph"
   | "permission-editor"
   | "scoring-dashboard"
-  | "maintenance-digest";
+  | "maintenance-digest"
+  | "image-management";
 
 export type TabType = FileType | VirtualTabType;
 

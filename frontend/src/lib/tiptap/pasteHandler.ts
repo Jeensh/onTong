@@ -3,7 +3,7 @@
  */
 
 import { Extension } from "@tiptap/core";
-import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Plugin, PluginKey, NodeSelection } from "@tiptap/pm/state";
 import { Fragment, Slice } from "@tiptap/pm/model";
 import {
   containsHtmlTable,
@@ -122,5 +122,121 @@ async function handleImageUpload(editor: any, file: File) {
     });
   } catch (err) {
     console.error("Image upload failed:", err);
+  }
+}
+
+// ── Image Copy Extension ────────────────────────────────────────────
+
+export const ImageCopyExtension = Extension.create({
+  name: "imageCopy",
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey("imageCopy"),
+        props: {
+          handleKeyDown(view, event) {
+            if ((event.ctrlKey || event.metaKey) && event.key === "c") {
+              const { selection } = view.state;
+              if (selection instanceof NodeSelection && selection.node.type.name === "image") {
+                const src = selection.node.attrs.src;
+                if (src) {
+                  copyImageToClipboard(src);
+                  event.preventDefault();
+                  return true;
+                }
+              }
+            }
+            return false;
+          },
+          handleDOMEvents: {
+            contextmenu(view, event) {
+              const pos = view.posAtCoords({ left: event.clientX, top: event.clientY });
+              if (!pos) return false;
+
+              const node = view.state.doc.nodeAt(pos.pos);
+              if (node?.type.name === "image") {
+                event.preventDefault();
+                showImageContextMenu(event.clientX, event.clientY, node.attrs.src);
+                return true;
+              }
+              return false;
+            },
+          },
+        },
+      }),
+    ];
+  },
+});
+
+async function copyImageToClipboard(src: string): Promise<void> {
+  try {
+    const res = await fetch(src);
+    const blob = await res.blob();
+    const pngBlob = blob.type === "image/png" ? blob : await convertToPng(blob);
+    await navigator.clipboard.write([
+      new ClipboardItem({ "image/png": pngBlob }),
+    ]);
+  } catch (err) {
+    console.error("Failed to copy image:", err);
+  }
+}
+
+function convertToPng(blob: Blob): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("No canvas context"));
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png");
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(blob);
+  });
+}
+
+let _menuEl: HTMLDivElement | null = null;
+
+function showImageContextMenu(x: number, y: number, src: string): void {
+  removeImageContextMenu();
+
+  _menuEl = document.createElement("div");
+  _menuEl.style.cssText = `
+    position: fixed; left: ${x}px; top: ${y}px; z-index: 9999;
+    background: white; border: 1px solid #ddd; border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15); padding: 4px 0;
+    font-size: 13px; min-width: 160px;
+  `;
+
+  const copyItem = document.createElement("div");
+  copyItem.textContent = "이미지 복사";
+  copyItem.style.cssText = "padding: 6px 12px; cursor: pointer;";
+  copyItem.onmouseenter = () => (copyItem.style.background = "#f0f0f0");
+  copyItem.onmouseleave = () => (copyItem.style.background = "transparent");
+  copyItem.onclick = () => {
+    copyImageToClipboard(src);
+    removeImageContextMenu();
+  };
+  _menuEl.appendChild(copyItem);
+
+  document.body.appendChild(_menuEl);
+
+  const dismiss = (e: MouseEvent) => {
+    if (_menuEl && !_menuEl.contains(e.target as Node)) {
+      removeImageContextMenu();
+      document.removeEventListener("mousedown", dismiss);
+    }
+  };
+  setTimeout(() => document.addEventListener("mousedown", dismiss), 0);
+}
+
+function removeImageContextMenu(): void {
+  if (_menuEl) {
+    _menuEl.remove();
+    _menuEl = null;
   }
 }

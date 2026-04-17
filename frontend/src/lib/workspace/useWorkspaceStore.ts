@@ -55,6 +55,7 @@ const VIRTUAL_TAB_TITLES: Record<VirtualTabType, string> = {
   "permission-editor": "접근 권한 관리",
   "scoring-dashboard": "신뢰도 설정",
   "maintenance-digest": "관리가 필요한 문서",
+  "image-management": "이미지 관리",
 };
 
 interface WorkspaceState {
@@ -66,6 +67,10 @@ interface WorkspaceState {
   agentWrite: AgentWrite | null;
   graphCenterPath: string | null;
   resolvedConflicts: Set<string>;
+  /** Unsaved editor content keyed by filePath — survives tab switches */
+  drafts: Record<string, string>;
+  /** Cursor + scroll position keyed by filePath — restored on tab switch */
+  viewStates: Record<string, { cursorPos: number; scrollTop: number }>;
   setActiveSection: (section: SectionId) => void;
   openTab: (filePath: string) => void;
   openVirtualTab: (tabType: VirtualTabType) => void;
@@ -82,6 +87,10 @@ interface WorkspaceState {
   setAgentWrite: (write: AgentWrite) => void;
   clearAgentWrite: () => void;
   addResolvedConflict: (pairKey: string) => void;
+  setDraft: (filePath: string, markdown: string) => void;
+  clearDraft: (filePath: string) => void;
+  setViewState: (filePath: string, state: { cursorPos: number; scrollTop: number }) => void;
+  clearViewState: (filePath: string) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -93,6 +102,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   agentWrite: null,
   graphCenterPath: null,
   resolvedConflicts: new Set<string>(),
+  drafts: {},
+  viewStates: {},
 
   setActiveSection: (section: SectionId) => {
     set({ activeSection: section });
@@ -172,9 +183,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   closeTab: (tabId: string) => {
-    const { tabs, activeTabId } = get();
+    const { tabs, activeTabId, drafts } = get();
     const idx = tabs.findIndex((t) => t.id === tabId);
     if (idx === -1) return;
+
+    // Clear draft and view state for the closed tab's file
+    const closedTab = tabs[idx];
+    const newDrafts = { ...drafts };
+    delete newDrafts[closedTab.filePath];
+    const newViewStates = { ...get().viewStates };
+    delete newViewStates[closedTab.filePath];
 
     const newTabs = tabs.filter((t) => t.id !== tabId);
 
@@ -189,7 +207,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }
     }
 
-    set({ tabs: newTabs, activeTabId: newActiveId });
+    set({ tabs: newTabs, activeTabId: newActiveId, drafts: newDrafts, viewStates: newViewStates });
   },
 
   setActiveTab: (tabId: string) => {
@@ -247,6 +265,30 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const next = new Set(state.resolvedConflicts);
       next.add(pairKey);
       return { resolvedConflicts: next };
+    });
+  },
+
+  setDraft: (filePath: string, markdown: string) => {
+    set((state) => ({ drafts: { ...state.drafts, [filePath]: markdown } }));
+  },
+
+  clearDraft: (filePath: string) => {
+    set((state) => {
+      const next = { ...state.drafts };
+      delete next[filePath];
+      return { drafts: next };
+    });
+  },
+
+  setViewState: (filePath: string, state: { cursorPos: number; scrollTop: number }) => {
+    set((s) => ({ viewStates: { ...s.viewStates, [filePath]: state } }));
+  },
+
+  clearViewState: (filePath: string) => {
+    set((s) => {
+      const next = { ...s.viewStates };
+      delete next[filePath];
+      return { viewStates: next };
     });
   },
 }));

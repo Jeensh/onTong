@@ -14,7 +14,9 @@ import { lockManager } from "@/lib/lock/lockManager";
 import { DiffView, type DiffAction } from "./DiffView";
 import { htmlToMarkdown, markdownToHtml } from "@/lib/tiptap/markdown";
 import { SlashCommandExtension } from "@/lib/tiptap/slashCommand";
-import { PasteHandlerExtension } from "@/lib/tiptap/pasteHandler";
+import { PasteHandlerExtension, ImageCopyExtension } from "@/lib/tiptap/pasteHandler";
+import { ImageViewerModal } from "@/components/editors/ImageViewerModal";
+import { MarkdownShortcuts } from "@/lib/tiptap/markdownShortcuts";
 import { WikiLinkNode } from "@/lib/tiptap/wikiLink";
 import { resolveWikiLink } from "@/lib/search/useSearchStore";
 import { BubbleToolbar } from "./BubbleToolbar";
@@ -53,6 +55,9 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
   const setDirty = useWorkspaceStore((s) => s.setDirty);
   const isDirty = useWorkspaceStore((s) => s.tabs.find((t) => t.id === tabId)?.isDirty ?? false);
   const openTab = useWorkspaceStore((s) => s.openTab);
+  const setDraft = useWorkspaceStore((s) => s.setDraft);
+  const clearDraft = useWorkspaceStore((s) => s.clearDraft);
+  const setViewState = useWorkspaceStore((s) => s.setViewState);
   const agentDiff = useWorkspaceStore((s) => s.agentDiff);
   const clearAgentDiff = useWorkspaceStore((s) => s.clearAgentDiff);
   const agentWrite = useWorkspaceStore((s) => s.agentWrite);
@@ -74,12 +79,16 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
     last_verified_at: number; last_verified_by: string;
   } | null>(null);
   const [linkedDocsCount, setLinkedDocsCount] = useState(0);
+  const [viewerImage, setViewerImage] = useState<{ src: string; filename: string } | null>(null);
   const originalContentRef = useRef("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadedRef = useRef(false);
   const prevFilePathRef = useRef(filePath);
   const openTabRef = useRef(openTab);
   openTabRef.current = openTab;
+  const isDirtyRef = useRef(isDirty);
+  isDirtyRef.current = isDirty;
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   // Ref to always call the latest handleSave
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleSaveRef = useRef<(html?: string, silent?: boolean) => Promise<void>>(null as any);
@@ -99,7 +108,11 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
       StarterKit.configure({
         codeBlock: false,
       }),
-      TableKit,
+      TableKit.configure({
+        table: {
+          resizable: true,
+        },
+      }),
       Image,
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -111,11 +124,22 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
       }),
       SlashCommandExtension,
       PasteHandlerExtension,
+      ImageCopyExtension,
+      MarkdownShortcuts,
     ],
     editorProps: {
       attributes: {
         class:
           "prose max-w-none focus:outline-none min-h-[300px] px-6 py-4",
+      },
+      handleClickOn(_view, _pos, node) {
+        if (node.type.name === "image") {
+          const src = node.attrs.src as string;
+          const filename = src.split("/").pop() || "";
+          setViewerImage({ src, filename });
+          return true;
+        }
+        return false;
       },
     },
     onUpdate: () => {
@@ -125,22 +149,53 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
     },
   });
 
-  // Load file content
+  // Save draft on unmount so content survives tab switches
+  useEffect(() => {
+    return () => {
+      if (isDirtyRef.current && editor) {
+        try {
+          setDraft(filePath, editor.getHTML());
+        } catch {}
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filePath, editor, setDraft]);
+
+  // Continuously save cursor + scroll position (debounced) so it's always fresh
+  useEffect(() => {
+    if (loading || !editor) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const save = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const cursorPos = editor.state.selection.anchor;
+        const scrollTop = scrollContainerRef.current?.scrollTop ?? 0;
+        setViewState(filePath, { cursorPos, scrollTop });
+      }, 200);
+    };
+    editor.on("selectionUpdate", save);
+    const container = scrollContainerRef.current;
+    container?.addEventListener("scroll", save, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      editor.off("selectionUpdate", save);
+      container?.removeEventListener("scroll", save);
+    };
+  }, [loading, editor, filePath, setViewState]);
+
+  // Load file content (restore draft if available)
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      // Auto-save previous file if dirty before loading new one
-      if (prevFilePathRef.current !== filePath && handleSaveRef.current) {
-        try {
-          await handleSaveRef.current(undefined, true);
-        } catch {}
-      }
       prevFilePathRef.current = filePath;
 
       setLoading(true);
       setError(null);
       try {
+        // Check for unsaved draft first
+        const draft = useWorkspaceStore.getState().drafts[filePath];
+
         const wiki = await fetchFile(filePath);
         if (cancelled) return;
 
@@ -152,16 +207,29 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
           setMetadata(wiki.metadata);
         }
 
-        // content from API already has frontmatter stripped
-        const html = markdownToHtml(wiki.content);
-        originalContentRef.current = wiki.content;
-        loadedRef.current = false;
-        editor?.commands.setContent(html);
-        // Mark as loaded after setContent so onUpdate skip works
-        requestAnimationFrame(() => {
-          loadedRef.current = true;
-        });
-        setDirty(tabId, false);
+        if (draft) {
+          // Restore unsaved draft (stored as raw HTML — no conversion needed)
+          originalContentRef.current = wiki.content;
+          loadedRef.current = false;
+          editor?.commands.setContent(draft);
+          requestAnimationFrame(() => { loadedRef.current = true; });
+          setDirty(tabId, true);
+          clearDraft(filePath);
+        } else {
+          // Normal load from server
+          const html = markdownToHtml(wiki.content);
+          originalContentRef.current = wiki.content;
+          loadedRef.current = false;
+          editor?.commands.setContent(html);
+          requestAnimationFrame(() => { loadedRef.current = true; });
+          setDirty(tabId, false);
+        }
+
+        // Queue view state restoration — executed when scroll container mounts
+        const savedView = useWorkspaceStore.getState().viewStates[filePath];
+        if (savedView) {
+          pendingViewRestore.current = savedView;
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -174,8 +242,32 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
     return () => {
       cancelled = true;
     };
-  }, [filePath, editor, tabId, setDirty]);
+  }, [filePath, editor, tabId, setDirty, clearDraft]);
 
+  // Ref callback for scroll container — restores scroll position when DOM mounts
+  const pendingViewRestore = useRef<{ cursorPos: number; scrollTop: number } | null>(null);
+  const scrollRefCallback = useCallback((el: HTMLDivElement | null) => {
+    scrollContainerRef.current = el;
+    if (!el || !pendingViewRestore.current) return;
+    const view = pendingViewRestore.current;
+    pendingViewRestore.current = null;
+    // Wait for editor content to render into the container, then restore
+    const tryRestore = (attempts: number) => {
+      if (el.scrollHeight > el.clientHeight || attempts >= 15) {
+        el.scrollTop = view.scrollTop;
+        if (editor) {
+          try {
+            const docSize = editor.state.doc.content.size;
+            const pos = Math.min(view.cursorPos, docSize > 0 ? docSize - 1 : 0);
+            editor.commands.setTextSelection(pos);
+          } catch {}
+        }
+      } else {
+        requestAnimationFrame(() => tryRestore(attempts + 1));
+      }
+    };
+    requestAnimationFrame(() => tryRestore(0));
+  }, [editor]);
 
   // Save handler
   const handleSave = useCallback(
@@ -192,6 +284,7 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
         const saved = await saveFile(filePath, fullContent);
         originalContentRef.current = md;
         setDirty(tabId, false);
+        clearDraft(filePath);
         // Update metadata from server response (timestamps, author injected by backend)
         if (saved.raw_content) {
           setMetadata(parseFrontmatter(saved.raw_content));
@@ -452,6 +545,17 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
   const handleCloseDrawer = useCallback(() => setDrawerOpen(false), []);
   const handleLinkedDocsCountChange = useCallback((total: number) => setLinkedDocsCount(total), []);
 
+  const handleImageReplace = useCallback((newSrc: string) => {
+    if (!editor || !viewerImage) return;
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === "image" && node.attrs.src === viewerImage.src) {
+        editor.chain().focus().setNodeSelection(pos).run();
+        editor.commands.updateAttributes("image", { src: newSrc });
+        return false;
+      }
+    });
+  }, [editor, viewerImage]);
+
   const handleMetadataChange = useCallback(
     (newMeta: DocumentMetadata) => {
       setMetadata(newMeta);
@@ -646,7 +750,7 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
             }}
           />
         ) : (
-          <div className="flex-1 overflow-auto relative">
+          <div ref={scrollRefCallback} className="flex-1 overflow-auto relative">
             <div className="pb-16">
               <EditorContent editor={editor} />
             </div>
@@ -683,6 +787,14 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
         <div className="absolute bottom-16 right-4 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 text-xs px-3 py-1 rounded-full shadow-sm">
           검색 반영 대기 중...
         </div>
+      )}
+      {viewerImage && (
+        <ImageViewerModal
+          src={viewerImage.src}
+          filename={viewerImage.filename}
+          onClose={() => setViewerImage(null)}
+          onReplace={handleImageReplace}
+        />
       )}
     </div>
   );
