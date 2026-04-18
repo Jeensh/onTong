@@ -810,6 +810,7 @@ class RAGAgent:
         # 5a. Conflict detection via dedicated skill
         has_conflict = False
         conflict_details = ""
+        skill_conflicting_docs: list[str] = []
         unique_sources = {m.get("file_path", "") for m in relevant_metas}
         high_relevance_sources = {
             m.get("file_path", "")
@@ -827,14 +828,21 @@ class RAGAgent:
                 if conflict_result and conflict_result.data.get("has_conflict"):
                     has_conflict = True
                     conflict_details = conflict_result.data.get("details", "")
+                    skill_conflicting_docs = conflict_result.data.get("conflicting_docs") or []
                     logger.info(f"Dedicated conflict_check detected: {conflict_details[:100]}")
             except Exception as e:
                 logger.debug(f"Dedicated conflict check skipped: {e}")
 
         if has_conflict:
-            conflicting_docs = sorted(unique_sources) if unique_sources else (
-                [s.doc for s in sources] if sources else []
-            )
+            # Prefer the skill's own conflicting_docs (actual conflict parties)
+            # over unique_sources (all retrieved files) so the UI doesn't show
+            # spurious pairs between files that merely co-occurred in results.
+            if len(skill_conflicting_docs) >= 2:
+                conflicting_docs = skill_conflicting_docs
+            elif unique_sources:
+                conflicting_docs = sorted(unique_sources)
+            else:
+                conflicting_docs = [s.doc for s in sources] if sources else []
             # Build explicit conflict pairs for comparison UI
             pairs: list[ConflictPair] = []
             if len(conflicting_docs) >= 2:
