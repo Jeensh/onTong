@@ -1242,86 +1242,107 @@ function AssistantBubble({
 
       {/* Conflict Warning Banner */}
       {msg.conflictWarning && (
-        <div className="rounded-lg border border-amber-400/50 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-2">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
-            <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+        <div className="rounded-lg border border-amber-400/60 bg-amber-50/70 dark:bg-amber-950/30 shadow-sm overflow-hidden">
+          <div className="flex items-start gap-2 px-3 pt-2.5 pb-2 border-b border-amber-200/70 dark:border-amber-800/40">
+            <svg className="h-4 w-4 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
             </svg>
-            문서 간 내용 차이 감지
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] font-semibold text-amber-900 dark:text-amber-300 leading-snug">
+                참고한 문서끼리 내용이 다릅니다
+              </div>
+              <p className="mt-0.5 text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                {msg.conflictWarning.details}
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-amber-800 dark:text-amber-300/80 leading-relaxed">
-            {msg.conflictWarning.details}
-          </p>
           {/* Pair-based comparison UI */}
           {msg.conflictWarning.conflict_pairs && msg.conflictWarning.conflict_pairs.length > 0 ? (
-            <div className="space-y-2 pt-1">
+            <ul className="divide-y divide-amber-200/60 dark:divide-amber-800/40">
               {msg.conflictWarning.conflict_pairs.map((pair, idx) => {
                 const pairKey = `${pair.file_a}__${pair.file_b}`;
                 const isResolved = resolvedConflicts.has(pairKey);
+                const simPct = Math.round(pair.similarity * 100);
+                const simChip =
+                  pair.similarity >= 0.85
+                    ? { text: "내용 거의 동일", klass: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" }
+                    : pair.similarity >= 0.7
+                    ? { text: "내용 상당 중첩", klass: "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 ring-1 ring-inset ring-amber-200 dark:ring-amber-800/50" }
+                    : { text: "주제 겹침", klass: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400" };
                 return (
-                  <div
+                  <li
                     key={idx}
-                    className={`rounded border p-2 space-y-1 ${
+                    className={`px-3 py-2.5 ${
                       isResolved
-                        ? "border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/20"
-                        : "border-amber-300 dark:border-amber-600 bg-white/50 dark:bg-amber-950/20"
+                        ? "bg-green-50/60 dark:bg-green-950/20"
+                        : "bg-white dark:bg-slate-900/40"
                     }`}
                   >
-                    <div className="flex items-center gap-1.5 text-[11px] text-amber-800 dark:text-amber-300">
-                      <FileText className="h-3 w-3 flex-shrink-0" />
-                      <button
-                        onClick={() => onSourceClick(pair.file_a)}
-                        className="font-medium hover:underline truncate max-w-[120px]"
-                        title={pair.file_a}
-                      >
-                        {pair.file_a.split("/").pop()}
-                      </button>
-                      <span className="text-amber-500">↔</span>
-                      <button
-                        onClick={() => onSourceClick(pair.file_b)}
-                        className="font-medium hover:underline truncate max-w-[120px]"
-                        title={pair.file_b}
-                      >
-                        {pair.file_b.split("/").pop()}
-                      </button>
-                      <span className="ml-auto text-[10px] text-amber-500 dark:text-amber-400/70">
-                        유사도 {Math.round(pair.similarity * 100)}%
-                      </span>
+                    <div className="flex items-start gap-2">
+                      <FileText className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-slate-400 dark:text-slate-500" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px]">
+                          <button
+                            onClick={() => onSourceClick(pair.file_a)}
+                            className="font-medium text-slate-800 dark:text-slate-200 hover:text-amber-700 dark:hover:text-amber-400 hover:underline cursor-pointer truncate max-w-[160px]"
+                            title={pair.file_a}
+                          >
+                            {pair.file_a.split("/").pop()}
+                          </button>
+                          <span className="text-slate-400 dark:text-slate-500" aria-hidden>·</span>
+                          <button
+                            onClick={() => onSourceClick(pair.file_b)}
+                            className="font-medium text-slate-800 dark:text-slate-200 hover:text-amber-700 dark:hover:text-amber-400 hover:underline cursor-pointer truncate max-w-[160px]"
+                            title={pair.file_b}
+                          >
+                            {pair.file_b.split("/").pop()}
+                          </button>
+                          <span
+                            className={`ml-auto inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${simChip.klass}`}
+                            title={`유사도 ${simPct}%`}
+                          >
+                            {simChip.text}
+                          </span>
+                        </div>
+                        {pair.summary && (
+                          <p className="mt-1 text-[12px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                            {pair.summary}
+                          </p>
+                        )}
+                        <div className="mt-2 flex items-center justify-end">
+                          {isResolved ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-green-700 dark:text-green-400 font-medium">
+                              <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                              검토함
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => openCompareTab(pair.file_a, pair.file_b)}
+                              className="inline-flex items-center gap-1 rounded-md bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors"
+                            >
+                              나란히 비교
+                              <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M8.22 5.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 010-1.06z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    {pair.summary && (
-                      <p className="text-[10px] text-amber-700/70 dark:text-amber-400/50 line-clamp-2 leading-relaxed">
-                        {pair.summary}
-                      </p>
-                    )}
-                    <div className="pt-0.5">
-                      {isResolved ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-green-600 dark:text-green-400 font-medium">
-                          <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                          해결됨
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => openCompareTab(pair.file_a, pair.file_b)}
-                          className="inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-800/40 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-700/50 transition-colors"
-                        >
-                          나란히 비교
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           ) : msg.conflictWarning.conflicting_docs.length > 0 ? (
             /* Fallback: legacy doc-link-only UI */
-            <div className="flex flex-wrap gap-1 pt-1">
+            <div className="flex flex-wrap gap-1.5 px-3 py-2.5 bg-white dark:bg-slate-900/40">
               {msg.conflictWarning.conflicting_docs.map((doc) => (
                 <button
                   key={doc}
                   onClick={() => onSourceClick(doc)}
-                  className="inline-flex items-center gap-1 rounded border border-amber-300 dark:border-amber-600 px-1.5 py-0.5 text-[11px] text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
+                  className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-0.5 text-[11px] text-slate-700 dark:text-slate-300 hover:border-amber-400 hover:text-amber-700 dark:hover:text-amber-400 transition-colors"
                 >
                   <FileText className="h-3 w-3" />
                   {doc.split("/").pop()}
