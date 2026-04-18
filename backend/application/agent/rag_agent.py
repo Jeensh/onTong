@@ -1355,7 +1355,7 @@ class RAGAgent:
             data = write_result.data
             yield self._thinking("answer_gen", "done", "문서 작성 완료")
             yield self._sse("content_delta", ContentDelta(
-                delta=f"**`{data['path']}`** 문서를 생성했습니다. 워크스페이스에서 확인하세요."
+                delta=f"**`{data['path']}`** 문서 생성안을 준비했습니다. 승인하시면 저장됩니다."
             ).model_dump_json())
 
             yield self._sse(
