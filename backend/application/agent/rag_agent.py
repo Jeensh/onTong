@@ -365,12 +365,15 @@ class RAGAgent:
                 yield event
             return
 
-        # Wiki chat is Q&A-only. Document creation ('write') is handled by
-        # explicit UI affordances (tree create, editor), not the chat endpoint.
-        # Fall through to Q&A so the answer is rendered inline (including
-        # code blocks) instead of silently creating a wiki file.
+        # Document creation ('write') delegates to the wiki_write skill,
+        # which produces content + an approval_request event (same pattern
+        # as 'edit'). Previously this silently downgraded to 'question',
+        # which caused the Q&A LLM to hallucinate fake <wiki_write> tags
+        # and claim a save that never happened.
         if action == "write":
-            action = "question"
+            async for event in self._handle_write(request, ctx=ctx):
+                yield event
+            return
 
         # Normal Q&A flow (with clarification check)
         async for event in self._handle_qa(
