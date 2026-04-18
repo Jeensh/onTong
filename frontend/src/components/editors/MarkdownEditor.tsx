@@ -187,6 +187,15 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
   useEffect(() => {
     let cancelled = false;
 
+    // If this tab is showing an AI write preview, the file doesn't exist on
+    // disk yet — skip the fetch (would 404) and let the agentWrite render
+    // branch handle display. Load happens after approval via reloadEditor.
+    if (agentWrite && agentWrite.filePath === filePath) {
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     async function load() {
       prevFilePathRef.current = filePath;
 
@@ -242,7 +251,7 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
     return () => {
       cancelled = true;
     };
-  }, [filePath, editor, tabId, setDirty, clearDraft]);
+  }, [filePath, editor, tabId, setDirty, clearDraft, agentWrite]);
 
   // Ref callback for scroll container — restores scroll position when DOM mounts
   const pendingViewRestore = useRef<{ cursorPos: number; scrollTop: number } | null>(null);
