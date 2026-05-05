@@ -941,6 +941,89 @@ async def bulk_status_change(body: BulkStatusRequest, user: User = Depends(requi
     return {"total": len(body.paths), "success": success_count, "results": results}
 
 
+def _get_snapshot_store_for_request():
+    """Resolve SnapshotStore from current profile. Returns (store, warning_or_none)."""
+    from backend.core.config import settings
+    from backend.core.backends import get_snapshot_store
+    from pathlib import Path
+
+    profile = settings.resolve_profile()
+    if profile.snapshot_backend == "sqlite":
+        sqlite_path = Path(settings.wiki_dir) / ".ontong" / "snapshots.db"
+        if not sqlite_path.exists():
+            return None, "Snapshot store not initialized yet"
+        store = get_snapshot_store(profile, sqlite_path=str(sqlite_path))
+    elif profile.snapshot_backend == "postgres":
+        store = get_snapshot_store(profile, postgres_dsn=settings.postgres_dsn)
+    else:
+        raise HTTPException(status_code=503, detail="Snapshot backend not configured")
+    return store, None
+
+
+# ── Snapshot Endpoints (declare restore FIRST to prevent route shadowing) ────
+
+@router.post("/snapshots/{path:path}/{version}/restore")
+async def restore_snapshot(path: str, version: str, user: User = Depends(require_write)):
+    """Restore a snapshot by saving its content as the current version.
+
+    Creates a new snapshot of the pre-restore state (via normal save_file flow),
+    then writes the old snapshot content as the new current content.
+    Declare BEFORE the GET /snapshots/{path}/{version} route to avoid FastAPI shadowing.
+    """
+    _validate_path(path)
+    store, warning = _get_snapshot_store_for_request()
+    if store is None:
+        raise HTTPException(status_code=404, detail=warning or "Snapshot store not available")
+
+    content = store.get_content(path, version)
+    if content is None:
+        raise HTTPException(status_code=404, detail=f"Snapshot not found: {path}@{version}")
+
+    # Save WITHOUT If-Match (force restore — caller has already chosen this version).
+    # save_file itself will snapshot the current state before overwriting.
+    await _svc().save_file(path, content, user_name=user.name)
+    return {"restored": path, "from_version": version}
+
+
+@router.get("/snapshots/{path:path}/{version}")
+async def get_snapshot(path: str, version: str, user: User = Depends(require_read)):
+    """Return the content of a specific snapshot (path + version)."""
+    _validate_path(path)
+    store, warning = _get_snapshot_store_for_request()
+    if store is None:
+        raise HTTPException(status_code=404, detail=warning or "Snapshot store not available")
+
+    content = store.get_content(path, version)
+    if content is None:
+        raise HTTPException(status_code=404, detail=f"Snapshot not found: {path}@{version}")
+    return {"path": path, "version": version, "content": content}
+
+
+@router.get("/snapshots/{path:path}")
+async def list_snapshots(path: str, limit: int = 20, user: User = Depends(require_read)):
+    """Return most-recent-first list of snapshot metadata for a path (no content)."""
+    _validate_path(path)
+    store, warning = _get_snapshot_store_for_request()
+    if store is None:
+        return {"items": [], "count": 0, "warning": warning or "Snapshot store not available"}
+
+    limit = max(1, min(100, limit))
+    items = store.list(path, limit=limit)
+    return {
+        "items": [
+            {
+                "path": s.path,
+                "version": s.version,
+                "user_name": s.user_name,
+                "created_at": s.created_at,
+                "reason": s.reason,
+            }
+            for s in items
+        ],
+        "count": len(items),
+    }
+
+
 @router.get("/profile-status")
 async def get_profile_status() -> dict:
     """Return current Profile + per-backend health."""

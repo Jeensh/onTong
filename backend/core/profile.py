@@ -20,6 +20,7 @@ VALID_BACKENDS = {
     "fulltext": {"bm25_inmem", "pg_fts", "elasticsearch"},
     "ref_index": {"sqlite", "postgres"},
     "version_store": {"sqlite", "postgres"},
+    "snapshot": {"sqlite", "postgres"},
 }
 
 
@@ -32,8 +33,9 @@ class Profile:
     kv_backend: str
     task_queue_backend: str
     fulltext_backend: str
-    ref_index_backend: str = "sqlite"  # default: sqlite (dev-safe)
+    ref_index_backend: str = "sqlite"      # default: sqlite (dev-safe)
     version_store_backend: str = "sqlite"  # OCC version store (Phase 2)
+    snapshot_backend: str = "sqlite"       # Snapshot store (Phase 2 Tasks 2-4/2-5)
 
 
 _DEFAULTS: dict[str, dict[str, str]] = {
@@ -46,6 +48,7 @@ _DEFAULTS: dict[str, dict[str, str]] = {
         "fulltext": "bm25_inmem",
         "ref_index": "sqlite",
         "version_store": "sqlite",
+        "snapshot": "sqlite",
     },
     "team": {
         "lock": "redis",
@@ -56,6 +59,7 @@ _DEFAULTS: dict[str, dict[str, str]] = {
         "fulltext": "bm25_inmem",
         "ref_index": "postgres",
         "version_store": "postgres",
+        "snapshot": "postgres",
     },
     "enterprise": {
         "lock": "redis",
@@ -66,6 +70,7 @@ _DEFAULTS: dict[str, dict[str, str]] = {
         "fulltext": "elasticsearch",
         "ref_index": "postgres",
         "version_store": "postgres",
+        "snapshot": "postgres",
     },
 }
 
@@ -78,6 +83,7 @@ _OVERRIDE_KEYS = {
     "fulltext": "ONTONG_FULLTEXT_BACKEND",
     "ref_index": "ONTONG_REF_INDEX_BACKEND",
     "version_store": "ONTONG_VERSION_STORE_BACKEND",
+    "snapshot": "ONTONG_SNAPSHOT_BACKEND",
 }
 
 
@@ -114,4 +120,5 @@ def resolve_profile(profile: str, overrides: dict[str, str]) -> Profile:
         fulltext_backend=chosen["fulltext"],
         ref_index_backend=chosen["ref_index"],
         version_store_backend=chosen["version_store"],
+        snapshot_backend=chosen["snapshot"],
     )

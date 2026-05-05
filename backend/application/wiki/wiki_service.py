@@ -112,6 +112,24 @@ class WikiService:
         return await self.storage.read(path)
 
     async def save_file(self, path: str, content: str, user_name: str = "", expected_version: str | None = None) -> WikiFile:
+        # Phase 2 Task 2-5: snapshot the OLD content before overwriting
+        try:
+            old = await self.storage.read(path)
+            if old is not None:
+                snap_store = self._get_snapshot_lazy()
+                if snap_store is not None:
+                    occ = self._get_occ_lazy()
+                    old_version = (occ.current(path) if occ else "") or ""
+                    snap_store.append(
+                        path=path,
+                        content=old.raw_content,
+                        version=old_version,
+                        user_name=old.metadata.updated_by or "",
+                        reason="save",
+                    )
+        except Exception as e:
+            logger.warning(f"Pre-save snapshot failed for {path}: {e}")
+
         # OCC: check version before write (Phase 2 Task 2-3)
         try:
             occ = self._get_occ_lazy()
@@ -609,6 +627,25 @@ class WikiService:
                 self._occ_cache = None
         return self._occ_cache
 
+    def _get_snapshot_lazy(self):
+        """Resolve SnapshotStore once, cache on instance (Phase 2 Tasks 2-4/2-5)."""
+        if not hasattr(self, "_snapshot_cache"):
+            try:
+                from backend.core.config import settings
+                from backend.core.backends import get_snapshot_store
+                profile = settings.resolve_profile()
+                if profile.snapshot_backend == "sqlite":
+                    from pathlib import Path
+                    sqlite_path = Path(settings.wiki_dir) / ".ontong" / "snapshots.db"
+                    sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+                    self._snapshot_cache = get_snapshot_store(profile, sqlite_path=str(sqlite_path))
+                else:
+                    self._snapshot_cache = get_snapshot_store(profile, postgres_dsn=settings.postgres_dsn)
+            except Exception as e:
+                logger.warning(f"Snapshot store init failed: {e}")
+                self._snapshot_cache = None
+        return self._snapshot_cache
+
     def _auto_inject_error_codes(self, content: str) -> str:
         """If error_codes field is empty/missing in frontmatter, auto-extract from body."""
         lines = content.split("\n")
@@ -653,6 +690,23 @@ class WikiService:
     async def delete_file(self, path: str) -> bool:
         # Clean up lineage links in counterpart documents before deletion
         await self._cleanup_lineage_on_delete(path)
+        # Phase 2 Task 2-5: snapshot the content before permanent deletion
+        try:
+            old = await self.storage.read(path)
+            if old is not None:
+                snap_store = self._get_snapshot_lazy()
+                if snap_store is not None:
+                    occ = self._get_occ_lazy()
+                    old_version = (occ.current(path) if occ else "") or ""
+                    snap_store.append(
+                        path=path,
+                        content=old.raw_content,
+                        version=old_version,
+                        user_name=old.metadata.updated_by or "",
+                        reason="pre_delete",
+                    )
+        except Exception as e:
+            logger.warning(f"Pre-delete snapshot failed for {path}: {e}")
         deleted = await self.storage.delete(path)
         if deleted:
             await self.indexer.remove_file(path)
