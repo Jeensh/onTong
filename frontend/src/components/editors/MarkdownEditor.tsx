@@ -11,6 +11,12 @@ import { Placeholder } from "@tiptap/extension-placeholder";
 import { useWorkspaceStore } from "@/lib/workspace/useWorkspaceStore";
 import { fetchFile, saveFile, acquireLock, releaseLock } from "@/lib/api/wiki";
 import { lockManager } from "@/lib/lock/lockManager";
+import { saveWithOCC, fetchETag } from "@/lib/wiki/saveWithOCC";
+import type { ConflictPayload } from "@/lib/wiki/saveWithOCC";
+import {
+  ConflictResolutionModal,
+  type ConflictAction,
+} from "@/components/sections/wiki/ConflictResolutionModal";
 import { DiffView, type DiffAction } from "./DiffView";
 import { htmlToMarkdown, markdownToHtml } from "@/lib/tiptap/markdown";
 import { SlashCommandExtension } from "@/lib/tiptap/slashCommand";
@@ -80,6 +86,9 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
   } | null>(null);
   const [linkedDocsCount, setLinkedDocsCount] = useState(0);
   const [viewerImage, setViewerImage] = useState<{ src: string; filename: string } | null>(null);
+  // OCC: track the ETag of the last-fetched version and any active conflict
+  const [baseVersion, setBaseVersion] = useState<string | null>(null);
+  const [conflict, setConflict] = useState<ConflictPayload | null>(null);
   const originalContentRef = useRef("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadedRef = useRef(false);
@@ -205,8 +214,14 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
         // Check for unsaved draft first
         const draft = useWorkspaceStore.getState().drafts[filePath];
 
-        const wiki = await fetchFile(filePath);
+        const [wiki, etag] = await Promise.all([
+          fetchFile(filePath),
+          fetchETag(filePath),
+        ]);
         if (cancelled) return;
+
+        // Capture ETag for OCC saves
+        if (etag) setBaseVersion(etag);
 
         // Parse metadata from raw_content if available, else from response metadata
         if (wiki.raw_content) {
@@ -290,16 +305,27 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
       savingRef.current = true;
       setSaving(true);
       try {
-        const saved = await saveFile(filePath, fullContent);
+        const result = await saveWithOCC({ path: filePath, content: fullContent, baseVersion });
+        // 409 conflict — show modal and abort the rest of the save flow
+        if ("conflict" in result && result.conflict) {
+          setConflict(result);
+          return;
+        }
+        // Success path — update ETag for next save
+        if (result.newVersion) setBaseVersion(result.newVersion);
+
+        // Refresh metadata from server (timestamps, author injected by backend)
+        const saved = await fetchFile(filePath).catch(() => null);
+        if (saved) {
+          if (saved.raw_content) {
+            setMetadata(parseFrontmatter(saved.raw_content));
+          } else if (saved.metadata) {
+            setMetadata(saved.metadata);
+          }
+        }
         originalContentRef.current = md;
         setDirty(tabId, false);
         clearDraft(filePath);
-        // Update metadata from server response (timestamps, author injected by backend)
-        if (saved.raw_content) {
-          setMetadata(parseFrontmatter(saved.raw_content));
-        } else if (saved.metadata) {
-          setMetadata(saved.metadata);
-        }
         if (!silent) toast.success("저장 완료");
         // Track indexing status (non-blocking)
         setIndexPending(true);
@@ -328,9 +354,76 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
         setSaving(false);
       }
     },
-    [editor, filePath, tabId, setDirty, metadata]
+    [editor, filePath, tabId, setDirty, metadata, baseVersion]
   );
   handleSaveRef.current = handleSave;
+
+  // Handle user action from the conflict resolution modal
+  const handleConflictAction = useCallback(
+    async (action: ConflictAction) => {
+      if (!conflict) return;
+      if (action.type === "cancel") {
+        setConflict(null);
+        return;
+      }
+      if (action.type === "reload") {
+        // Discard local changes — load server's content into the editor
+        const html = (await import("@/lib/tiptap/markdown")).markdownToHtml(
+          conflict.server_content
+        );
+        originalContentRef.current = conflict.server_content;
+        loadedRef.current = false;
+        editor?.commands.setContent(html);
+        requestAnimationFrame(() => { loadedRef.current = true; });
+        setBaseVersion(conflict.server_version);
+        setDirty(tabId, false);
+        clearDraft(filePath);
+        setConflict(null);
+        return;
+      }
+      if (action.type === "overwrite") {
+        // Force-save local content using server_version as the new If-Match base
+        // (avoids infinite conflict loop vs the truly stale base_version)
+        if (!editor) return;
+        const rawContent = editor.getHTML();
+        const { htmlToMarkdown: h2m, markdownToHtml: m2h } = await import(
+          "@/lib/tiptap/markdown"
+        );
+        const { mergeFrontmatterAndBody: mf } = await import(
+          "@/lib/markdown/frontmatterSync"
+        );
+        const md = h2m(rawContent);
+        const fullContent = mf(metadata, md);
+        const result = await saveWithOCC({
+          path: conflict.path,
+          content: fullContent,
+          baseVersion: conflict.server_version, // use server's current version, not stale base
+        });
+        if ("conflict" in result && result.conflict) {
+          // Yet another concurrent edit — update the modal with fresh conflict info
+          setConflict(result);
+          return;
+        }
+        if (result.newVersion) setBaseVersion(result.newVersion);
+        const saved = await fetchFile(filePath).catch(() => null);
+        if (saved) {
+          const { parseFrontmatter: pf } = await import("@/lib/markdown/frontmatterSync");
+          if (saved.raw_content) setMetadata(pf(saved.raw_content));
+          else if (saved.metadata) setMetadata(saved.metadata);
+        }
+        const serverHtml = m2h(md);
+        originalContentRef.current = md;
+        loadedRef.current = false;
+        editor.commands.setContent(serverHtml);
+        requestAnimationFrame(() => { loadedRef.current = true; });
+        setDirty(tabId, false);
+        clearDraft(filePath);
+        setConflict(null);
+        toast.success("덮어쓰기 완료");
+      }
+    },
+    [conflict, editor, filePath, tabId, metadata, setDirty, clearDraft]
+  );
 
   // Ctrl+S
   useEffect(() => {
@@ -803,6 +896,13 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
           filename={viewerImage.filename}
           onClose={() => setViewerImage(null)}
           onReplace={handleImageReplace}
+        />
+      )}
+      {conflict && (
+        <ConflictResolutionModal
+          conflict={conflict}
+          myContent={editor ? htmlToMarkdown(editor.getHTML()) : ""}
+          onAction={handleConflictAction}
         />
       )}
     </div>
