@@ -62,6 +62,20 @@ class Settings(BaseSettings):
     # Redis (optional — falls back to in-memory if not configured)
     redis_url: str = ""  # e.g. redis://localhost:6379/0
 
+    # ── Profile / Backend selection (Phase 0) ─────────────────────────
+    ontong_profile: str = "dev"  # dev | team | enterprise
+
+    # Per-component overrides (empty = use profile default)
+    ontong_lock_backend: str = ""
+    ontong_event_bus_backend: str = ""
+    ontong_metadata_index_backend: str = ""
+    ontong_kv_backend: str = ""
+    ontong_task_queue_backend: str = ""
+    ontong_fulltext_backend: str = ""
+
+    # Postgres (team / enterprise)
+    postgres_dsn: str = ""  # e.g. postgresql+asyncpg://user:pass@localhost:5432/ontong
+
     # Ollama
     ollama_num_parallel: int = 4  # Max parallel LLM requests (Ollama)
     llm_semaphore_limit: int = 8  # Max concurrent LLM calls across all agents
@@ -82,6 +96,24 @@ class Settings(BaseSettings):
     image_vision_provider: str = "none"      # none | ollama | openai | claude
     image_vision_model: str = "llava:13b"    # provider-specific model name
     image_max_workers: int = 4               # parallel processing workers
+
+    def resolve_profile(self):
+        """Return resolved Profile (calls backend.core.profile.resolve_profile)."""
+        from backend.core.profile import resolve_profile as _resolve
+
+        overrides: dict[str, str] = {}
+        for env_key, attr in [
+            ("ONTONG_LOCK_BACKEND", "ontong_lock_backend"),
+            ("ONTONG_EVENT_BUS_BACKEND", "ontong_event_bus_backend"),
+            ("ONTONG_METADATA_INDEX_BACKEND", "ontong_metadata_index_backend"),
+            ("ONTONG_KV_BACKEND", "ontong_kv_backend"),
+            ("ONTONG_TASK_QUEUE_BACKEND", "ontong_task_queue_backend"),
+            ("ONTONG_FULLTEXT_BACKEND", "ontong_fulltext_backend"),
+        ]:
+            val = getattr(self, attr)
+            if val:
+                overrides[env_key] = val
+        return _resolve(self.ontong_profile, overrides)
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
