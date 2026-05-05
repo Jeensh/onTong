@@ -854,3 +854,55 @@ async def bulk_status_change(body: BulkStatusRequest, user: User = Depends(requi
 
     success_count = sum(1 for r in results if r["ok"])
     return {"total": len(body.paths), "success": success_count, "results": results}
+
+
+@router.get("/profile-status")
+async def get_profile_status() -> dict:
+    """Return current Profile + per-backend health."""
+    from backend.core.config import settings
+
+    profile = settings.resolve_profile()
+    backends: dict = {
+        "lock": {"name": profile.lock_backend, "healthy": True},
+        "event_bus": {"name": profile.event_bus_backend, "healthy": True},
+        "metadata_index": {"name": profile.metadata_index_backend, "healthy": True},
+        "kv": {"name": profile.kv_backend, "healthy": True},
+        "task_queue": {"name": profile.task_queue_backend, "healthy": True},
+        "fulltext": {"name": profile.fulltext_backend, "healthy": True},
+    }
+
+    # Ping Redis if any backend uses it
+    needs_redis = any(
+        getattr(profile, f"{k}_backend") in {"redis", "redis_pubsub", "redis_hash"}
+        for k in ["lock", "event_bus", "metadata_index", "kv"]
+    )
+    if needs_redis and settings.redis_url:
+        try:
+            import redis
+            r = redis.from_url(settings.redis_url, socket_timeout=1)
+            r.ping()
+        except Exception as e:
+            for name in ["lock", "event_bus", "metadata_index", "kv"]:
+                if backends[name]["name"] in {"redis", "redis_pubsub", "redis_hash"}:
+                    backends[name]["healthy"] = False
+                    backends[name]["error"] = str(e)
+
+    # Ping Postgres if profile uses it
+    if settings.postgres_dsn:
+        try:
+            from sqlalchemy import text
+            from backend.infrastructure.db.engine import get_engine
+            engine = get_engine()
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+        except Exception as e:
+            backends["postgres"] = {"healthy": False, "error": str(e)}
+        else:
+            backends["postgres"] = {"healthy": True}
+
+    return {
+        "profile": profile.name,
+        "backends": backends,
+        "redis_url_configured": bool(settings.redis_url),
+        "postgres_dsn_configured": bool(settings.postgres_dsn),
+    }
