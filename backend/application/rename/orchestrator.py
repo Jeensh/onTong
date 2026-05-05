@@ -283,9 +283,17 @@ class RenameOrchestrator:
                         await self._content.storage.write(
                             src_path, result.new_content, user_name="system:rename"
                         )
-                        # Re-extract and refresh RefIndex for this source
+                        # Re-read from storage so RefIndex offsets reflect the
+                        # post-write content. The storage adapter may inject
+                        # frontmatter timestamps (created/updated), shifting
+                        # body offsets. Without this, undo's patcher would
+                        # see stale offsets and skip the reverse patch.
+                        written = await self._content.storage.read(src_path)
                         ext = ReferenceExtractor()
-                        new_refs = ext.extract(src_path, result.new_content)
+                        new_refs = ext.extract(
+                            src_path,
+                            written.raw_content if written else result.new_content,
+                        )
                         self._ref_index.upsert_for_source(src_path, new_refs)
                     inbound_done += 1
                     if job:

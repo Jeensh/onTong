@@ -1036,15 +1036,21 @@ def _get_snapshot_store_for_request():
     return store, None
 
 
-# ── Snapshot Endpoints (declare restore FIRST to prevent route shadowing) ────
+# ── Snapshot Endpoints ───────────────────────────────────────────────────────
+# `version` is passed as a query parameter (NOT a path segment) because
+# `path:path` is greedy and steals slash-bearing paths. With `?version=...`
+# there is no ambiguity for paths like `데모2/B.md`.
 
-@router.post("/snapshots/{path:path}/{version}/restore")
-async def restore_snapshot(path: str, version: str, user: User = Depends(require_write)):
+@router.post("/snapshots/{path:path}/restore")
+async def restore_snapshot(
+    path: str,
+    version: str,                                      # query param
+    user: User = Depends(require_write),
+):
     """Restore a snapshot by saving its content as the current version.
 
-    Creates a new snapshot of the pre-restore state (via normal save_file flow),
-    then writes the old snapshot content as the new current content.
-    Declare BEFORE the GET /snapshots/{path}/{version} route to avoid FastAPI shadowing.
+    Creates a new snapshot of the pre-restore state (via the normal save_file
+    snapshot hook), then writes the chosen snapshot's content as the new save.
     """
     _validate_path(path)
     store, warning = _get_snapshot_store_for_request()
@@ -1061,27 +1067,30 @@ async def restore_snapshot(path: str, version: str, user: User = Depends(require
     return {"restored": path, "from_version": version}
 
 
-@router.get("/snapshots/{path:path}/{version}")
-async def get_snapshot(path: str, version: str, user: User = Depends(require_read)):
-    """Return the content of a specific snapshot (path + version)."""
+@router.get("/snapshots/{path:path}")
+async def list_or_get_snapshot(
+    path: str,
+    version: str | None = None,                        # query param
+    limit: int = 20,
+    user: User = Depends(require_read),
+):
+    """Snapshot list (when `version` omitted) or single snapshot content (when present).
+
+    GET /snapshots/{path}                  → list metadata
+    GET /snapshots/{path}?version=01HXYZ   → return that snapshot's content
+    """
     _validate_path(path)
     store, warning = _get_snapshot_store_for_request()
     if store is None:
+        if version is None:
+            return {"items": [], "count": 0, "warning": warning or "Snapshot store not available"}
         raise HTTPException(status_code=404, detail=warning or "Snapshot store not available")
 
-    content = store.get_content(path, version)
-    if content is None:
-        raise HTTPException(status_code=404, detail=f"Snapshot not found: {path}@{version}")
-    return {"path": path, "version": version, "content": content}
-
-
-@router.get("/snapshots/{path:path}")
-async def list_snapshots(path: str, limit: int = 20, user: User = Depends(require_read)):
-    """Return most-recent-first list of snapshot metadata for a path (no content)."""
-    _validate_path(path)
-    store, warning = _get_snapshot_store_for_request()
-    if store is None:
-        return {"items": [], "count": 0, "warning": warning or "Snapshot store not available"}
+    if version is not None:
+        content = store.get_content(path, version)
+        if content is None:
+            raise HTTPException(status_code=404, detail=f"Snapshot not found: {path}@{version}")
+        return {"path": path, "version": version, "content": content}
 
     limit = max(1, min(100, limit))
     items = store.list(path, limit=limit)

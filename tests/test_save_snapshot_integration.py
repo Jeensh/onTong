@@ -78,7 +78,7 @@ def test_get_snapshot_content_returns_old_body(app_with_wiki):
     r = client.get("/api/wiki/snapshots/a.md")
     snap_meta = r.json()["items"][0]
     version = snap_meta["version"]
-    r2 = client.get(f"/api/wiki/snapshots/a.md/{version}")
+    r2 = client.get(f"/api/wiki/snapshots/a.md?version={version}")
     assert r2.status_code == 200
     assert "v1 body" in r2.json()["content"]
 
@@ -94,7 +94,7 @@ def test_restore_snapshot_brings_back_old_content(app_with_wiki):
     client = TestClient(app)
     snap_list = client.get("/api/wiki/snapshots/a.md").json()
     target_version = snap_list["items"][0]["version"]
-    r = client.post(f"/api/wiki/snapshots/a.md/{target_version}/restore")
+    r = client.post(f"/api/wiki/snapshots/a.md/restore?version={target_version}")
     assert r.status_code == 200
 
     # File on disk now contains v1 body again
