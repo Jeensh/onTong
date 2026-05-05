@@ -57,6 +57,11 @@ tree-sitter-java = "^0.23"
 # Cache / Locking
 redis = "^5.0"
 
+# Database (Phase 0: rename/concurrency)
+sqlalchemy = "^2.0"
+asyncpg = "^0.29"
+alembic = "^1.13"
+
 # Utilities
 httpx = "^0.25.0"
 aiofiles = "^23.0"
@@ -78,6 +83,7 @@ ruff = "^0.1.0"
 mypy = "^1.0"
 httpx = "^0.25.0"
 fakeredis = "^2.20"
+pytest-postgresql = "^6.0"
 
 [tool.black]
 line-length = 100
