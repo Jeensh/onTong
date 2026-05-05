@@ -51,20 +51,31 @@ class RedisEventBus:
         await self._redis.aclose()
 
     async def _listen(self) -> None:
-        try:
-            async for msg in self._pubsub.listen():
-                if msg.get("type") != "message":
-                    continue
-                try:
-                    payload = json.loads(msg["data"])
-                except (json.JSONDecodeError, KeyError):
-                    continue
-                event = Event(type=payload["type"], data=payload["data"])
-                self._fanout_to_local(event)
-        except asyncio.CancelledError:
-            raise
-        except Exception as e:
-            logger.error(f"Redis pubsub listener crashed: {e}")
+        """Read messages from Redis pubsub and fan out to local subscribers.
+
+        On transient errors (connection drop, etc.) the loop logs and retries
+        with exponential backoff up to 30s. CancelledError propagates so stop()
+        can shut down cleanly.
+        """
+        backoff = 1.0
+        while True:
+            try:
+                async for msg in self._pubsub.listen():
+                    if msg.get("type") != "message":
+                        continue
+                    try:
+                        payload = json.loads(msg["data"])
+                    except (json.JSONDecodeError, KeyError):
+                        continue
+                    event = Event(type=payload["type"], data=payload["data"])
+                    self._fanout_to_local(event)
+                    backoff = 1.0  # reset after a successful message
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.error("Redis pubsub listener error (retry in %.1fs): %s", backoff, e)
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 30.0)
 
     def _fanout_to_local(self, event: Event) -> None:
         dead: list[asyncio.Queue] = []
@@ -100,7 +111,13 @@ class RedisEventBus:
             loop = asyncio.get_running_loop()
             loop.create_task(self._redis.publish(CHANNEL, payload))
         except RuntimeError:
-            asyncio.run(self._redis.publish(CHANNEL, payload))
+            # No running event loop (e.g. publish called from sync context outside FastAPI).
+            # Cannot use asyncio.run here — it would deadlock if a parent loop ever resumes.
+            # Local callbacks already ran above; remote fan-out is dropped with a warning.
+            logger.warning(
+                "RedisEventBus.publish called outside an event loop; remote fan-out skipped (event_type=%s)",
+                event_type,
+            )
 
     async def subscribe(self) -> AsyncGenerator[Event, None]:
         q: asyncio.Queue[Event] = asyncio.Queue(maxsize=256)

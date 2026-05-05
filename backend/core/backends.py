@@ -8,6 +8,9 @@ from backend.core.profile import Profile
 
 if TYPE_CHECKING:
     from backend.infrastructure.locks.base import LockBackend
+    from backend.infrastructure.events.event_bus_inproc import InProcessEventBus
+    from backend.infrastructure.events.event_bus_redis import RedisEventBus
+    EventBusLike = "InProcessEventBus | RedisEventBus"
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +18,18 @@ _singletons: dict[str, Any] = {}
 
 
 def _reset_for_test() -> None:
-    """Clear cached backends — test-only helper."""
+    """Clear cached backends — test-only helper.
+
+    Also resets the event_bus proxy's _impl so subsequent attribute access
+    re-resolves through this factory.
+    """
     _singletons.clear()
+    try:
+        from backend.infrastructure.events.event_bus import event_bus
+        event_bus._impl = None
+    except Exception:
+        # Module not loaded yet — nothing to reset
+        pass
 
 
 def get_lock_backend(profile: Profile, *, redis_url: str = "") -> "LockBackend":
@@ -47,7 +60,7 @@ def get_lock_backend(profile: Profile, *, redis_url: str = "") -> "LockBackend":
     return backend
 
 
-def get_event_bus(profile: Profile, *, redis_url: str = ""):
+def get_event_bus(profile: Profile, *, redis_url: str = "") -> "EventBusLike":
     """Return an EventBus matching the profile."""
     cached = _singletons.get("event_bus")
     if cached is not None:
