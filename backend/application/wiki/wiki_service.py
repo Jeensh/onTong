@@ -21,25 +21,30 @@ logger = logging.getLogger(__name__)
 # ── Indexing status tracking ──────────────────────────────────────────
 
 class IndexStatus:
-    """Track indexing status for files (in-memory, non-blocking)."""
+    """Track indexing status for files. Backed by KVStore (multi-worker safe)."""
+
+    NAMESPACE = "pending"
 
     def __init__(self) -> None:
-        self._pending: dict[str, float] = {}  # path → queued_at timestamp
+        from backend.core.config import settings
+        from backend.core.backends import get_kv_store
+        profile = settings.resolve_profile()
+        self._kv = get_kv_store(profile, namespace=self.NAMESPACE, redis_url=settings.redis_url)
 
     def mark_pending(self, path: str) -> None:
-        self._pending[path] = time.time()
+        self._kv.set(path, str(time.time()))
 
     def mark_done(self, path: str) -> None:
-        self._pending.pop(path, None)
+        self._kv.delete(path)
 
     def is_pending(self, path: str) -> bool:
-        return path in self._pending
+        return self._kv.get(path) is not None
 
     def get_pending(self) -> dict[str, float]:
-        return dict(self._pending)
+        return {k: float(self._kv.get(k) or "0") for k in self._kv.keys(prefix="")}
 
     def pending_count(self) -> int:
-        return len(self._pending)
+        return len(self._kv.keys(prefix=""))
 
 
 index_status = IndexStatus()

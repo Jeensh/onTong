@@ -86,3 +86,34 @@ def get_event_bus(profile: Profile, *, redis_url: str = "") -> "EventBusLike":
     _singletons["event_bus"] = (profile.event_bus_backend, bus)
     logger.info(f"EventBus backend initialized: {profile.event_bus_backend}")
     return bus
+
+
+def get_kv_store(profile: Profile, namespace: str, *, redis_url: str = ""):
+    """Return a KVStore for the given namespace (e.g. 'hash', 'pending').
+
+    Each namespace gets its own singleton.
+    """
+    cache_key = f"kv:{namespace}"
+    cached = _singletons.get(cache_key)
+    if cached is not None:
+        cached_name, cached_obj = cached
+        if cached_name != profile.kv_backend:
+            raise RuntimeError(
+                f"Profile changed mid-process: cached kv backend for {namespace!r} is {cached_name!r}, "
+                f"requested {profile.kv_backend!r}. Call _reset_for_test() between switches."
+            )
+        return cached_obj
+
+    if profile.kv_backend == "memory":
+        from backend.infrastructure.kv.memory import MemoryKVStore
+        store = MemoryKVStore()
+    elif profile.kv_backend == "redis":
+        from backend.infrastructure.kv.redis import RedisKVStore
+        if not redis_url:
+            raise RuntimeError("redis_url required for Redis KV store")
+        store = RedisKVStore(redis_url, namespace=namespace)
+    else:
+        raise ValueError(f"unknown kv backend: {profile.kv_backend}")
+
+    _singletons[cache_key] = (profile.kv_backend, store)
+    return store
