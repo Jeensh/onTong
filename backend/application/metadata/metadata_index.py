@@ -20,7 +20,6 @@ Rebuilt fully on reindex; updated incrementally on file save/delete.
 
 from __future__ import annotations
 
-import json
 import logging
 import threading
 from pathlib import Path
@@ -33,9 +32,12 @@ class MetadataIndex:
     """Thread-safe materialized metadata index."""
 
     def __init__(self, wiki_dir: str) -> None:
-        self._path = Path(wiki_dir) / ".ontong" / "metadata_index.json"
+        from backend.core.config import settings
+        from backend.core.backends import get_metadata_index_backend
+        profile = settings.resolve_profile()
+        legacy_path = Path(wiki_dir) / ".ontong" / "metadata_index.json"
+        self._backend = get_metadata_index_backend(profile, legacy_path=legacy_path, redis_url=settings.redis_url)
         self._lock = threading.Lock()
-        self._data: dict[str, Any] | None = None
 
     # ── Public read API ──────────────────────────────────────────────
 
@@ -477,21 +479,7 @@ class MetadataIndex:
                     del d["related_index"][rel]
 
     def _load(self) -> dict:
-        if self._data is not None:
-            return self._data
-        if self._path.exists():
-            try:
-                self._data = json.loads(self._path.read_text(encoding="utf-8"))
-                return self._data
-            except Exception:
-                pass
-        self._data = {"domains": {}, "domain_processes": {}, "tags": {}, "untagged": [], "files": {}, "domain_files": {}, "process_files": {}, "tag_files": {}, "status_files": {}, "supersedes_index": {}, "related_index": {}}
-        return self._data
+        return self._backend.load()
 
     def _save(self, d: dict) -> None:
-        self._data = d
-        try:
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            self._path.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
-        except Exception as e:
-            logger.error(f"Failed to save metadata index: {e}")
+        self._backend.save(d)

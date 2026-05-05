@@ -117,3 +117,33 @@ def get_kv_store(profile: Profile, namespace: str, *, redis_url: str = ""):
 
     _singletons[cache_key] = (profile.kv_backend, store)
     return store
+
+
+def get_metadata_index_backend(profile: Profile, *, legacy_path=None, redis_url: str = ""):
+    """Return a MetadataBackend matching the profile."""
+    cached = _singletons.get("metadata_index")
+    if cached is not None:
+        cached_name, cached_obj = cached
+        if cached_name != profile.metadata_index_backend:
+            raise RuntimeError(
+                f"Profile changed mid-process: cached metadata_index backend is {cached_name!r}, "
+                f"requested {profile.metadata_index_backend!r}. Call _reset_for_test() between switches."
+            )
+        return cached_obj
+
+    if profile.metadata_index_backend == "json_file":
+        from backend.application.metadata.backends.json_file import JsonFileBackend
+        if legacy_path is None:
+            raise RuntimeError("legacy_path required for json_file backend")
+        backend = JsonFileBackend(legacy_path)
+    elif profile.metadata_index_backend == "redis_hash":
+        from backend.application.metadata.backends.redis_hash import RedisHashBackend
+        if not redis_url:
+            raise RuntimeError("redis_url required for redis_hash backend")
+        backend = RedisHashBackend(redis_url)
+    else:
+        raise ValueError(f"unknown metadata_index backend: {profile.metadata_index_backend}")
+
+    _singletons["metadata_index"] = (profile.metadata_index_backend, backend)
+    logger.info(f"MetadataIndex backend initialized: {profile.metadata_index_backend}")
+    return backend
