@@ -166,6 +166,13 @@ class WikiService:
             logger.warning(f"Failed to compute access_scope for {path}: {e}")
             access_scope = None
 
+        # Extract + persist references (Phase 1 Task 1-3)
+        try:
+            self._update_ref_index(wiki_file)
+        except Exception as e:
+            logger.warning(f"RefIndex update failed for {wiki_file.path}: {e}")
+            # Non-fatal — save proceeds
+
         # Background indexing — save returns immediately
         index_status.mark_pending(path)
         asyncio.create_task(self._bg_index(wiki_file, access_scope=access_scope))
@@ -516,6 +523,46 @@ class WikiService:
         await self.storage.write(path, new_content, user_name="")
         logger.info(f"Auto-related: {path} → {related_paths}")
 
+    def _update_ref_index(self, wiki_file: WikiFile) -> None:
+        """Extract references from saved file and upsert into RefIndex.
+
+        Skips system paths (_skills/, _personas/, .ontong/) and binary files.
+        """
+        # Skip system / binary
+        if wiki_file.path.startswith(("_skills/", "_personas/", ".ontong/")):
+            return
+        if wiki_file.content.startswith("[Binary file:"):
+            return
+
+        ref_index = self._get_ref_index_lazy()
+        if ref_index is None:
+            return  # not configured (e.g. test setup without DB)
+
+        from backend.application.refindex.extractor import ReferenceExtractor
+        extractor = ReferenceExtractor()
+        refs = extractor.extract(wiki_file.path, wiki_file.raw_content)
+        ref_index.upsert_for_source(wiki_file.path, refs)
+
+    def _get_ref_index_lazy(self):
+        """Resolve RefIndex once, cache on instance."""
+        if not hasattr(self, "_ref_index_cache"):
+            try:
+                from backend.core.config import settings
+                from backend.core.backends import get_ref_index
+                profile = settings.resolve_profile()
+                # SQLite: store in <wiki_dir>/.ontong/refs.db. Postgres: settings.postgres_dsn.
+                if profile.ref_index_backend == "sqlite":
+                    from pathlib import Path
+                    sqlite_path = Path(settings.wiki_dir) / ".ontong" / "refs.db"
+                    sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+                    self._ref_index_cache = get_ref_index(profile, sqlite_path=str(sqlite_path))
+                else:
+                    self._ref_index_cache = get_ref_index(profile, postgres_dsn=settings.postgres_dsn)
+            except Exception as e:
+                logger.warning(f"RefIndex initialization failed: {e}")
+                self._ref_index_cache = None
+        return self._ref_index_cache
+
     def _auto_inject_error_codes(self, content: str) -> str:
         """If error_codes field is empty/missing in frontmatter, auto-extract from body."""
         lines = content.split("\n")
@@ -567,6 +614,13 @@ class WikiService:
                 self._conflict_svc.remove_file(path)
             if self._meta_index:
                 self._meta_index.on_file_deleted(path)
+            # Remove references for deleted source (Phase 1 Task 1-3)
+            try:
+                ref_index = self._get_ref_index_lazy()
+                if ref_index:
+                    ref_index.remove_for_source(path)
+            except Exception as e:
+                logger.warning(f"RefIndex remove failed for {path}: {e}")
             event_bus.publish("tree_change", {"action": "remove", "path": path})
             logger.info(f"Deleted and removed from index: {path}")
         return deleted
@@ -646,6 +700,16 @@ class WikiService:
                     )
             # Update references in other documents that point to old_path
             await self._update_references(old_path, new_path)
+            # Update RefIndex: source path changed (Phase 1 Task 1-3)
+            try:
+                ref_index = self._get_ref_index_lazy()
+                if ref_index:
+                    ref_index.rename_source(old_path, new_path)
+                    # Note: rename_target is the responsibility of Phase 3's RenameOrchestrator,
+                    # which also patches inbound document bodies. For Phase 1, just track the
+                    # new source identity so outbound refs from the renamed doc remain queryable.
+            except Exception as e:
+                logger.warning(f"RefIndex rename_source failed: {old_path} → {new_path}: {e}")
             event_bus.publish("tree_change", {"action": "move", "old_path": old_path, "new_path": new_path})
             logger.info(f"Moved file: {old_path} → {new_path}")
         return moved
@@ -693,16 +757,15 @@ class WikiService:
         return sorted(self._meta_index.get_related_reverse(path))
 
     async def move_folder(self, old_path: str, new_path: str) -> bool:
-        # Collect old file paths before move for conflict cleanup
+        # Collect old file paths before move — needed for conflict cleanup AND RefIndex rename
         old_files: list[str] = []
-        if self._conflict_svc:
-            try:
-                tree = await self.storage.list_subtree(old_path)
-                for node in tree:
-                    if not node.is_dir:
-                        old_files.append(node.path)
-            except Exception:
-                pass
+        try:
+            tree = await self.storage.list_subtree(old_path)
+            for node in tree:
+                if not node.is_dir:
+                    old_files.append(node.path)
+        except Exception:
+            pass
 
         moved = await self.storage.move(old_path, new_path)
         if moved:
@@ -710,6 +773,19 @@ class WikiService:
             if self._conflict_svc:
                 for fp in old_files:
                     self._conflict_svc.remove_file(fp)
+            # Update RefIndex: rename source paths for all moved children (Phase 1 Task 1-3)
+            try:
+                ref_index = self._get_ref_index_lazy()
+                if ref_index:
+                    # Get distinct source_paths under old_path prefix, rename each
+                    # Note: this is best-effort and does NOT patch inbound bodies.
+                    # Phase 4 will use Phase 3's RenameOrchestrator for full inbound updates.
+                    if old_files:  # collected before move (existing variable in this method)
+                        for old_subpath in old_files:
+                            new_subpath = old_subpath.replace(old_path, new_path, 1)
+                            ref_index.rename_source(old_subpath, new_subpath)
+            except Exception as e:
+                logger.warning(f"RefIndex folder-rename failed: {old_path} → {new_path}: {e}")
             asyncio.create_task(self._bg_reindex_all())
             event_bus.publish("tree_change", {"action": "move", "old_path": old_path, "new_path": new_path})
             logger.info(f"Moved folder: {old_path} → {new_path}")

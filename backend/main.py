@@ -315,6 +315,22 @@ async def lifespan(app: FastAPI):
     await event_bus.start()
     logger.info("EventBus started")
 
+    # Phase 1: initialize RefIndex (creates SQLite file or pings Postgres)
+    try:
+        from backend.core.config import settings as _cfg
+        from backend.core.backends import get_ref_index
+        _profile = _cfg.resolve_profile()
+        if _profile.ref_index_backend == "sqlite":
+            from pathlib import Path as _Path
+            _sqlite_path = _Path(_cfg.wiki_dir) / ".ontong" / "refs.db"
+            _sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+            get_ref_index(_profile, sqlite_path=str(_sqlite_path))
+        elif _cfg.postgres_dsn:
+            get_ref_index(_profile, postgres_dsn=_cfg.postgres_dsn)
+        logger.info(f"RefIndex initialized: {_profile.ref_index_backend}")
+    except Exception as e:
+        logger.warning(f"RefIndex init failed (will retry per-request): {e}")
+
     import asyncio
     asyncio.create_task(_bg_initial_index())
     logger.info("Background indexing started (app available immediately)")
