@@ -265,3 +265,33 @@ def get_snapshot_store(profile: Profile, *, sqlite_path: str | None = None, post
     _singletons["snapshot"] = (profile.snapshot_backend, store)
     logger.info(f"SnapshotStore initialized: {profile.snapshot_backend}")
     return store
+
+
+def get_audit_store(profile: Profile, *, sqlite_path: str | None = None, postgres_dsn: str = ""):
+    """Return an AuditStore matching the profile (Phase 3 — rename audit/jobs)."""
+    cached = _singletons.get("audit_store")
+    if cached is not None:
+        cached_name, cached_obj = cached
+        if cached_name != profile.audit_store_backend:
+            raise RuntimeError(
+                f"Profile changed mid-process: cached audit_store backend is {cached_name!r}, "
+                f"requested {profile.audit_store_backend!r}. Call _reset_for_test() between switches."
+            )
+        return cached_obj
+
+    if profile.audit_store_backend == "sqlite":
+        from backend.application.rename.sqlite_audit import SqliteAuditStore
+        if sqlite_path is None:
+            raise RuntimeError("sqlite_path required for sqlite audit_store backend")
+        store = SqliteAuditStore(sqlite_path)
+    elif profile.audit_store_backend == "postgres":
+        from backend.application.rename.postgres_audit import PostgresAuditStore
+        if not postgres_dsn:
+            raise RuntimeError("postgres_dsn required for postgres audit_store backend")
+        store = PostgresAuditStore(postgres_dsn)
+    else:
+        raise ValueError(f"unknown audit_store backend: {profile.audit_store_backend!r}")
+
+    _singletons["audit_store"] = (profile.audit_store_backend, store)
+    logger.info(f"AuditStore initialized: {profile.audit_store_backend}")
+    return store

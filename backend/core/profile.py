@@ -21,6 +21,7 @@ VALID_BACKENDS = {
     "ref_index": {"sqlite", "postgres"},
     "version_store": {"sqlite", "postgres"},
     "snapshot": {"sqlite", "postgres"},
+    "audit_store": {"sqlite", "postgres"},
 }
 
 
@@ -36,6 +37,7 @@ class Profile:
     ref_index_backend: str = "sqlite"      # default: sqlite (dev-safe)
     version_store_backend: str = "sqlite"  # OCC version store (Phase 2)
     snapshot_backend: str = "sqlite"       # Snapshot store (Phase 2 Tasks 2-4/2-5)
+    audit_store_backend: str = "sqlite"    # Rename audit store (Phase 3)
 
 
 _DEFAULTS: dict[str, dict[str, str]] = {
@@ -49,6 +51,7 @@ _DEFAULTS: dict[str, dict[str, str]] = {
         "ref_index": "sqlite",
         "version_store": "sqlite",
         "snapshot": "sqlite",
+        "audit_store": "sqlite",
     },
     "team": {
         "lock": "redis",
@@ -60,6 +63,7 @@ _DEFAULTS: dict[str, dict[str, str]] = {
         "ref_index": "postgres",
         "version_store": "postgres",
         "snapshot": "postgres",
+        "audit_store": "postgres",
     },
     "enterprise": {
         "lock": "redis",
@@ -71,6 +75,7 @@ _DEFAULTS: dict[str, dict[str, str]] = {
         "ref_index": "postgres",
         "version_store": "postgres",
         "snapshot": "postgres",
+        "audit_store": "postgres",
     },
 }
 
@@ -84,6 +89,7 @@ _OVERRIDE_KEYS = {
     "ref_index": "ONTONG_REF_INDEX_BACKEND",
     "version_store": "ONTONG_VERSION_STORE_BACKEND",
     "snapshot": "ONTONG_SNAPSHOT_BACKEND",
+    "audit_store": "ONTONG_AUDIT_STORE_BACKEND",
 }
 
 
@@ -121,4 +127,5 @@ def resolve_profile(profile: str, overrides: dict[str, str]) -> Profile:
         ref_index_backend=chosen["ref_index"],
         version_store_backend=chosen["version_store"],
         snapshot_backend=chosen["snapshot"],
+        audit_store_backend=chosen["audit_store"],
     )

@@ -346,6 +346,21 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"VersionStore init failed (will retry per-request): {e}")
 
+    # Phase 3: initialize AuditStore (rename audit/jobs)
+    try:
+        from backend.core.backends import get_audit_store
+        _as_profile = _cfg.resolve_profile()
+        if _as_profile.audit_store_backend == "sqlite":
+            from pathlib import Path as _ASPath
+            _as_sqlite_path = _ASPath(_cfg.wiki_dir) / ".ontong" / "audit.db"
+            _as_sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+            get_audit_store(_as_profile, sqlite_path=str(_as_sqlite_path))
+        elif _cfg.postgres_dsn:
+            get_audit_store(_as_profile, postgres_dsn=_cfg.postgres_dsn)
+        logger.info(f"AuditStore initialized: {_as_profile.audit_store_backend}")
+    except Exception as e:
+        logger.warning(f"AuditStore init failed (will retry per-request): {e}")
+
     import asyncio
     asyncio.create_task(_bg_initial_index())
     logger.info("Background indexing started (app available immediately)")
