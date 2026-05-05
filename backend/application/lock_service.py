@@ -6,15 +6,17 @@ See backend.infrastructure.locks for concrete implementations.
 from __future__ import annotations
 
 import logging
-from backend.infrastructure.locks.lock_protocol import LockInfo, LockBackend, DEFAULT_TTL
+from backend.infrastructure.locks.base import LockInfo, LockBackend, DEFAULT_TTL
 
 logger = logging.getLogger(__name__)
+
+__all__ = ["LockService", "LockInfo", "LockBackend", "DEFAULT_TTL", "get_lock_service"]
 
 
 class LockService:
     """Lock service facade — delegates to backend selected by Profile."""
 
-    def __init__(self, backend=None) -> None:
+    def __init__(self, backend: LockBackend | None = None) -> None:
         if backend is None:
             from backend.core.config import settings
             from backend.core.backends import get_lock_backend
@@ -22,13 +24,13 @@ class LockService:
             backend = get_lock_backend(profile, redis_url=settings.redis_url)
         self._backend = backend
 
-    def acquire(self, path: str, user: str, ttl: int = DEFAULT_TTL):
+    def acquire(self, path: str, user: str, ttl: int = DEFAULT_TTL) -> LockInfo | None:
         return self._backend.acquire(path, user, ttl)
 
     def release(self, path: str, user: str) -> bool:
         return self._backend.release(path, user)
 
-    def status(self, path: str):
+    def status(self, path: str) -> LockInfo | None:
         return self._backend.status(path)
 
     def refresh(self, path: str, user: str) -> bool:

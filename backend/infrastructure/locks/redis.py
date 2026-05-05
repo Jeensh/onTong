@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from .lock_protocol import LockBackend, LockInfo, DEFAULT_TTL
+from .base import LockBackend, LockInfo, DEFAULT_TTL
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,7 @@ class RedisLockBackend(LockBackend):
 
         existing_raw = self._redis.get(key)
         if not existing_raw:
+            # Race: key expired between SET NX and GET — retry
             if self._redis.set(key, lock_data, nx=True, ex=ttl):
                 self._redis.sadd(f"{self.USER_INDEX_PREFIX}{user}", path)
                 return LockInfo(path=path, user=user, acquired_at=now, ttl=ttl)

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from .lock_protocol import LockBackend, LockInfo, DEFAULT_TTL
+from .base import LockBackend, LockInfo, DEFAULT_TTL
 
 logger = logging.getLogger(__name__)
 
