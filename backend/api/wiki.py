@@ -906,3 +906,57 @@ async def get_profile_status() -> dict:
         "redis_url_configured": bool(settings.redis_url),
         "postgres_dsn_configured": bool(settings.postgres_dsn),
     }
+
+
+@router.get("/broken-refs")
+async def get_broken_refs(
+    limit: int = 100,
+    offset: int = 0,
+    kind: int | None = None,
+):
+    """Return references whose target_path doesn't exist as a known source.
+
+    A "known source" = any path that has at least one outbound ref in the
+    RefIndex. Documents with no outbound refs are not currently visible to
+    this query (Phase 1 limitation; Phase 6 may refine).
+
+    Query params:
+    - limit: max results (default 100, max 1000)
+    - offset: pagination offset
+    - kind: filter by RefKind (1-5); omit for all kinds
+
+    Returns: { items: [{source_path, target_path, kind, location}], count }
+    """
+    from backend.core.config import settings
+    from backend.core.backends import get_ref_index
+    from pathlib import Path
+
+    profile = settings.resolve_profile()
+    if profile.ref_index_backend == "sqlite":
+        sqlite_path = Path(settings.wiki_dir) / ".ontong" / "refs.db"
+        if not sqlite_path.exists():
+            return {"items": [], "count": 0, "warning": "RefIndex not built yet — run `ontong migrate refindex-build`"}
+        ref_index = get_ref_index(profile, sqlite_path=str(sqlite_path))
+    elif profile.ref_index_backend == "postgres":
+        ref_index = get_ref_index(profile, postgres_dsn=settings.postgres_dsn)
+    else:
+        raise HTTPException(status_code=503, detail="RefIndex backend not configured")
+
+    limit = max(1, min(1000, limit))
+    offset = max(0, offset)
+
+    refs = ref_index.broken(limit=limit, offset=offset, kind=kind)
+    return {
+        "items": [
+            {
+                "source_path": r.source_path,
+                "target_path": r.target_path,
+                "kind": r.kind,
+                "location": r.location,
+            }
+            for r in refs
+        ],
+        "count": len(refs),
+        "limit": limit,
+        "offset": offset,
+    }
