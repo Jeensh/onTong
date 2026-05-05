@@ -102,7 +102,7 @@ async def lifespan(app: FastAPI):
     from backend.application.metadata.tag_registry import tag_registry
     meta_index = MetadataIndex(settings.wiki_dir)
     wiki_service.set_metadata_index(meta_index)
-    if not meta_index._path.exists():
+    if meta_index.is_empty():
         _files = await wiki_service.get_all_files()
         meta_index.rebuild(extended=[
             {
@@ -311,13 +311,13 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Background indexing failed: {e}")
 
+    # Start event bus before any tasks that may publish events
+    await event_bus.start()
+    logger.info("EventBus started")
+
     import asyncio
     asyncio.create_task(_bg_initial_index())
     logger.info("Background indexing started (app available immediately)")
-
-    # Start event bus (no-op for inproc, subscribes Redis channel for redis_pubsub)
-    await event_bus.start()
-    logger.info("EventBus started")
 
     yield
 

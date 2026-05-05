@@ -478,6 +478,11 @@ class MetadataIndex:
                 if rel in d.get("related_index", {}) and not d["related_index"][rel]:
                     del d["related_index"][rel]
 
+    def is_empty(self) -> bool:
+        """True if the underlying backend has no files indexed yet."""
+        d = self._backend.load()
+        return not d.get("files")
+
     def _load(self) -> dict:
         return self._backend.load()
 

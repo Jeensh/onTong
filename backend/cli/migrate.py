@@ -19,7 +19,7 @@ def cmd_db_upgrade(args: argparse.Namespace) -> int:
 
     cfg = Config("migrations/alembic.ini")
     cfg.set_main_option("script_location", "migrations")
-    sync_dsn = settings.postgres_dsn.replace("+asyncpg", "")
+    sync_dsn = settings.postgres_dsn.replace("+asyncpg", "+psycopg")
     cfg.set_main_option("sqlalchemy.url", sync_dsn)
     print(f"Running alembic upgrade head against {sync_dsn} ...")
     command.upgrade(cfg, "head")

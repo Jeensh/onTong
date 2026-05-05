@@ -98,7 +98,10 @@ class RedisEventBus:
                     loop = asyncio.get_running_loop()
                     loop.create_task(cb(data))
                 except RuntimeError:
-                    pass
+                    logger.warning(
+                        "Async callback for %s dropped (no running event loop)",
+                        event_type,
+                    )
             else:
                 try:
                     cb(data)
