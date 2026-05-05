@@ -147,3 +147,31 @@ def get_metadata_index_backend(profile: Profile, *, legacy_path=None, redis_url:
     _singletons["metadata_index"] = (profile.metadata_index_backend, backend)
     logger.info(f"MetadataIndex backend initialized: {profile.metadata_index_backend}")
     return backend
+
+
+def get_task_queue(profile: Profile, *, redis_url: str = ""):
+    """Return a TaskQueue matching the profile."""
+    cached = _singletons.get("task_queue")
+    if cached is not None:
+        cached_name, cached_obj = cached
+        if cached_name != profile.task_queue_backend:
+            raise RuntimeError(
+                f"Profile changed mid-process: cached task_queue backend is {cached_name!r}, "
+                f"requested {profile.task_queue_backend!r}. Call _reset_for_test() between switches."
+            )
+        return cached_obj
+
+    if profile.task_queue_backend == "asyncio":
+        from backend.infrastructure.queue.asyncio_queue import AsyncioTaskQueue
+        q = AsyncioTaskQueue()
+    elif profile.task_queue_backend == "arq":
+        from backend.infrastructure.queue.arq_queue import ArqTaskQueue
+        if not redis_url:
+            raise RuntimeError("redis_url required for arq backend")
+        q = ArqTaskQueue(redis_url)
+    else:
+        raise ValueError(f"unknown task_queue backend: {profile.task_queue_backend}")
+
+    _singletons["task_queue"] = (profile.task_queue_backend, q)
+    logger.info(f"TaskQueue backend initialized: {profile.task_queue_backend}")
+    return q
