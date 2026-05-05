@@ -13,6 +13,7 @@ CONFIRM_THRESHOLD = 10        # inbound_count above which UI must confirm
 ESTIMATE_PER_INBOUND = 0.05   # seconds — rough placeholder; tuned in Phase 6 load test
 LOCK_TTL = 5
 MAX_IMPACT_PREVIEW = 100
+UNDO_WINDOW_SECONDS = 5 * 60  # 5 minutes
 
 
 class RenameOrchestrator:
@@ -87,6 +88,14 @@ class RenameOrchestrator:
             impact_items=impact_items,
         )
 
+    def _publish_progress(self, audit_id: str, event_type: str, data: dict) -> None:
+        """Publish to event_bus. Non-fatal if event_bus unavailable."""
+        try:
+            from backend.infrastructure.events.event_bus import event_bus
+            event_bus.publish(event_type, {"audit_id": audit_id, **data})
+        except Exception as e:
+            logger.warning("event_bus publish failed for %s: %s", event_type, e)
+
     async def execute(self, audit_id: str, *, force: bool = False) -> RenameResult:
         """Full rename pipeline.
 
@@ -144,6 +153,22 @@ class RenameOrchestrator:
                     error="source lock missed",
                 )
             source_acquired = True
+
+            # Collect inbound refs early to include in rename_started event
+            # (we rebuild below — this is just for the count)
+            _early_inbound = list(self._ref_index.inbound(old_path))
+            from pathlib import Path as _P_early
+            _old_stem_early = _P_early(old_path).stem
+            if _old_stem_early and _old_stem_early != old_path:
+                from backend.application.refindex.extractor import RefKind as _RK_early
+                _early_inbound += list(self._ref_index.inbound(_old_stem_early, kind=_RK_early.BODY_WIKILINK))
+            _early_unique_sources = sorted({r.source_path for r in _early_inbound})[:50]
+
+            self._publish_progress(audit_id, "rename_started", {
+                "old_path": old_path,
+                "new_path": new_path,
+                "inbound_total": len(_early_unique_sources),
+            })
 
             # Build target_remap: full path + stem (for BODY_WIKILINK kind=4)
             target_remap: dict[str, str] = {old_path: new_path}
@@ -265,11 +290,23 @@ class RenameOrchestrator:
                     inbound_done += 1
                     if job:
                         self._audit.update_job(job.id, status="done")
+                    self._publish_progress(audit_id, "rename_progress", {
+                        "done": inbound_done,
+                        "failed": inbound_failed,
+                        "total": len(unique_sources_capped),
+                        "current": src_path,
+                    })
                 except Exception as e:
                     inbound_failed += 1
                     logger.error("patch_inbound failed for %s: %s", src_path, e)
                     if job:
                         self._audit.update_job(job.id, status="failed", last_error=str(e))
+                    self._publish_progress(audit_id, "rename_progress", {
+                        "done": inbound_done,
+                        "failed": inbound_failed,
+                        "total": len(unique_sources_capped),
+                        "current": src_path,
+                    })
 
             # Chunk metadata update (OQ-4=A: includes re-embedding)
             chunk_job = next((j for j in jobs if j.kind == "update_chunk_meta"), None)
@@ -293,6 +330,10 @@ class RenameOrchestrator:
                     if chunk_job:
                         self._audit.update_job(chunk_job.id, status="failed", last_error=str(e))
 
+            self._publish_progress(audit_id, "rename_progress", {
+                "step": "chunk_meta_done",
+            })
+
             # Refresh jobs list to check final statuses
             jobs = self._audit.list_jobs(int(audit_id))
             chunk_job = next((j for j in jobs if j.kind == "update_chunk_meta"), None)
@@ -304,6 +345,12 @@ class RenameOrchestrator:
             else:
                 self._audit.update_audit_status(int(audit_id), "partial")
                 final_status = "partial"
+
+            self._publish_progress(audit_id, "rename_finished", {
+                "status": final_status,
+                "done": inbound_done,
+                "failed": inbound_failed,
+            })
 
             return RenameResult(
                 audit_id=audit_id,
@@ -333,3 +380,54 @@ class RenameOrchestrator:
                 lock_set_release_all(inbound_paths_acquired, lock_user)
             if source_acquired:
                 lock_set_release_all([old_path], lock_user)
+
+    async def undo(self, audit_id: str, actor: str) -> RenameResult:
+        """Undo a rename within the 5-minute window.
+
+        Steps:
+        1. Load audit row. Reject if op != 'rename_plan' or outside undo window.
+        2. Reverse the rename: new_path → old_path via the same orchestrator pipeline.
+        3. The reverse rename's body patcher restores inbound refs automatically.
+        4. Mark a new audit row (reverse plan's audit_id is returned via the result).
+        """
+        import time
+
+        audit_row = self._audit.get_audit(int(audit_id))
+        if audit_row is None:
+            return RenameResult(
+                audit_id=audit_id,
+                status="failed",
+                inbound_done=0,
+                inbound_failed=0,
+                inbound_total=0,
+                error="audit row not found",
+            )
+        if audit_row.op != "rename_plan" or audit_row.status not in ("success", "partial"):
+            return RenameResult(
+                audit_id=audit_id,
+                status="failed",
+                inbound_done=0,
+                inbound_failed=0,
+                inbound_total=0,
+                error=(
+                    f"audit op={audit_row.op}, status={audit_row.status} "
+                    "— undoable only for completed renames"
+                ),
+            )
+        if audit_row.finished_at and (time.time() - audit_row.finished_at > UNDO_WINDOW_SECONDS):
+            return RenameResult(
+                audit_id=audit_id,
+                status="failed",
+                inbound_done=0,
+                inbound_failed=0,
+                inbound_total=0,
+                error="undo window expired (5 min)",
+            )
+
+        old_path = audit_row.payload.get("old_path")
+        new_path = audit_row.payload.get("new_path")
+
+        # Plan + execute the reverse rename (new_path → old_path)
+        reverse_plan = await self.plan(new_path, old_path, f"system:undo({actor})")
+        result = await self.execute(reverse_plan.audit_id)
+        return result

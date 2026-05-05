@@ -276,13 +276,89 @@ async def save_file(
     return result
 
 
+@router.get("/rename-preview/{path:path}")
+async def rename_preview(path: str, to: str, user: User = Depends(require_write)):
+    """Compute the impact of a rename without executing it.
+
+    Returns RenamePlan-shaped JSON. UI shows confirm dialog if confirm_required=True.
+    """
+    _validate_path(path)
+    _validate_path(to)
+    svc = _svc()
+    orch = svc.get_rename_orchestrator()
+    if orch is None:
+        raise HTTPException(status_code=503, detail="RenameOrchestrator not available")
+    plan = await orch.plan(path, to, user.name)
+    return {
+        "audit_id": plan.audit_id,
+        "old_path": plan.old_path,
+        "new_path": plan.new_path,
+        "inbound_count": plan.inbound_count,
+        "unique_inbound_sources": plan.unique_inbound_sources,
+        "confirm_required": plan.confirm_required,
+        "estimated_seconds": plan.estimated_seconds,
+        "impact_items": [
+            {"source_path": it.source_path, "ref_count": it.ref_count}
+            for it in plan.impact_items
+        ],
+    }
+
+
 @router.patch("/file/{path:path}")
 async def move_file(path: str, body: MoveRequest, user: User = Depends(require_write)):
-    """Rename or move a wiki file."""
-    result = await _svc().move_file(path, body.new_path)
-    if result is None:
-        raise HTTPException(status_code=404, detail=f"File not found: {path}")
-    return {"old_path": path, "new_path": body.new_path}
+    """Rename or move a wiki file. Routes through RenameOrchestrator (Phase 3).
+
+    Old behavior (svc.move_file with naive raw.replace) is replaced.
+    """
+    _validate_path(path)
+    _validate_path(body.new_path)
+    svc = _svc()
+    orch = svc.get_rename_orchestrator()
+    if orch is None:
+        # Fallback for environments where orchestrator can't initialize
+        result = await svc.move_file(path, body.new_path)
+        if not result:
+            raise HTTPException(status_code=404, detail=f"File not found: {path}")
+        return {"old_path": path, "new_path": body.new_path, "warning": "fallback_legacy_path"}
+
+    plan = await orch.plan(path, body.new_path, user.name)
+    result = await orch.execute(plan.audit_id)
+    if result.status == "failed":
+        raise HTTPException(status_code=409, detail={
+            "error": result.error,
+            "audit_id": result.audit_id,
+        })
+    return {
+        "old_path": path,
+        "new_path": body.new_path,
+        "audit_id": result.audit_id,
+        "status": result.status,
+        "inbound_done": result.inbound_done,
+        "inbound_failed": result.inbound_failed,
+        "inbound_total": result.inbound_total,
+    }
+
+
+@router.post("/audit/{audit_id}/undo")
+async def undo_rename(audit_id: str, user: User = Depends(require_write)):
+    """Undo a rename if within the 5-minute window."""
+    svc = _svc()
+    orch = svc.get_rename_orchestrator()
+    if orch is None:
+        raise HTTPException(status_code=503, detail="RenameOrchestrator not available")
+    result = await orch.undo(audit_id, user.name)
+    if result.status == "failed":
+        raise HTTPException(status_code=400, detail={
+            "error": result.error,
+            "audit_id": audit_id,
+        })
+    return {
+        "undone_audit_id": audit_id,
+        "new_audit_id": result.audit_id,
+        "status": result.status,
+        "inbound_done": result.inbound_done,
+        "inbound_total": result.inbound_total,
+    }
 
 
 @router.delete("/file/{path:path}")

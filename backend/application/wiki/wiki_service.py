@@ -586,6 +586,62 @@ class WikiService:
         refs = extractor.extract(wiki_file.path, wiki_file.raw_content)
         ref_index.upsert_for_source(wiki_file.path, refs)
 
+    def get_rename_orchestrator(self):
+        """Resolve a singleton RenameOrchestrator. Lazy + cached on the service instance."""
+        if hasattr(self, "_rename_orch"):
+            return self._rename_orch
+        try:
+            from pathlib import Path
+            from backend.core.config import settings
+            from backend.core.backends import (
+                get_ref_index, get_audit_store, get_snapshot_store, get_version_store,
+            )
+            from backend.application.rename.orchestrator import RenameOrchestrator
+            from backend.application.rename.chunk_meta import ChunkMetaUpdater
+            from backend.application.occ.manager import OCCManager
+
+            profile = settings.resolve_profile()
+
+            wiki_dir = Path(settings.wiki_dir)
+            if profile.ref_index_backend == "sqlite":
+                ref_index = get_ref_index(profile, sqlite_path=str(wiki_dir / ".ontong" / "refs.db"))
+            else:
+                ref_index = get_ref_index(profile, postgres_dsn=settings.postgres_dsn)
+
+            if profile.audit_store_backend == "sqlite":
+                audit = get_audit_store(profile, sqlite_path=str(wiki_dir / ".ontong" / "audit.db"))
+            else:
+                audit = get_audit_store(profile, postgres_dsn=settings.postgres_dsn)
+
+            if profile.snapshot_backend == "sqlite":
+                snap = get_snapshot_store(profile, sqlite_path=str(wiki_dir / ".ontong" / "snapshots.db"))
+            else:
+                snap = get_snapshot_store(profile, postgres_dsn=settings.postgres_dsn)
+
+            if profile.version_store_backend == "sqlite":
+                vstore = get_version_store(profile, sqlite_path=str(wiki_dir / ".ontong" / "versions.db"))
+            else:
+                vstore = get_version_store(profile, postgres_dsn=settings.postgres_dsn)
+            occ = OCCManager(vstore)
+
+            chunk_updater = None
+            if self._chroma is not None and self.indexer is not None:
+                chunk_updater = ChunkMetaUpdater(self._chroma, self.indexer)
+
+            self._rename_orch = RenameOrchestrator(
+                ref_index=ref_index,
+                audit_store=audit,
+                content_store=self,         # WikiService has self.storage
+                occ_manager=occ,
+                snapshot_store=snap,
+                chunk_updater=chunk_updater,
+            )
+            return self._rename_orch
+        except Exception as e:
+            logger.error("Failed to construct RenameOrchestrator: %s", e)
+            self._rename_orch = None
+            return None
+
     def _get_ref_index_lazy(self):
         """Resolve RefIndex once, cache on instance."""
         if not hasattr(self, "_ref_index_cache"):
