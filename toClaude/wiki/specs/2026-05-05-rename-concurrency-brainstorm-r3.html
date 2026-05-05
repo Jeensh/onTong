@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>위키 Rename + 동시성 — 라운드 3 (Design Review)</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --bg-card: #1e293b;
+    --bg-input: #0b1220;
+    --bg-soft: #172033;
+    --border: #334155;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --accent: #60a5fa;
+    --accent-hover: #93c5fd;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --ok: #34d399;
+    --rec: #a78bfa;
+    --code-bg: #0b1220;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-input: #f1f5f9;
+      --bg-soft: #f8fafc;
+      --border: #cbd5e1;
+      --text: #0f172a;
+      --text-dim: #475569;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --warn: #d97706;
+      --danger: #dc2626;
+      --ok: #059669;
+      --rec: #7c3aed;
+      --code-bg: #f1f5f9;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif; line-height:1.6; }
+  .wrap { max-width:1000px; margin:0 auto; padding:32px 24px 140px; }
+  header { margin-bottom:24px; }
+  h1 { font-size:28px; margin:0 0 6px; letter-spacing:-0.01em; }
+  .subtitle { color:var(--text-dim); font-size:14px; }
+
+  .recap { background:var(--bg-soft); border-left:4px solid var(--ok); border-radius:0 10px 10px 0; padding:16px 20px; margin-bottom:20px; }
+  .recap h3 { margin:0 0 8px; font-size:15px; color:var(--ok); }
+  .recap p { margin:6px 0; font-size:13px; color:var(--text-dim); }
+  .recap a { color:var(--accent); }
+
+  .question { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:20px 22px; margin-bottom:18px; }
+  .q-id { display:inline-block; padding:3px 10px; background:rgba(96,165,250,.15); color:var(--accent); border-radius:6px; font-size:12px; font-weight:700; margin-bottom:8px; }
+  .q-title { font-size:17px; font-weight:600; margin:0 0 6px; }
+  .q-help { color:var(--text-dim); font-size:13px; margin-bottom:14px; }
+
+  .opt-card { display:block; padding:12px 14px; margin:8px 0; border:1px solid var(--border); border-radius:10px; cursor:pointer; transition:all .12s; background:var(--bg-soft); }
+  .opt-card:hover { border-color:var(--accent); }
+  .opt-card.recommended { border-color:var(--rec); border-width:2px; box-shadow:0 0 0 3px rgba(167,139,250,.1); }
+  .opt-card input { margin-right:10px; vertical-align:middle; }
+  .opt-card .opt-head { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+  .opt-card .opt-name { font-weight:600; font-size:14px; }
+  .opt-card .opt-desc { color:var(--text-dim); font-size:13px; line-height:1.5; margin-left:24px; }
+
+  .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+  .badge.rec { background:rgba(167,139,250,.18); color:var(--rec); }
+  .badge.warn { background:rgba(251,191,36,.15); color:var(--warn); }
+
+  textarea, input[type="text"] { width:100%; padding:10px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:inherit; font-size:14px; resize:vertical; }
+  textarea:focus, input[type="text"]:focus { outline:none; border-color:var(--accent); }
+  textarea { min-height:80px; }
+
+  code { font-family:"JetBrains Mono","Fira Code",monospace; font-size:12px; background:var(--code-bg); border-radius:4px; padding:2px 6px; }
+
+  .actions { position:sticky; bottom:0; background:var(--bg); padding:16px 0 0; margin-top:24px; border-top:1px solid var(--border); display:flex; gap:10px; }
+  button { padding:12px 24px; border-radius:8px; border:none; font-weight:600; font-size:15px; cursor:pointer; transition:all .1s; font-family:inherit; }
+  .btn-primary { background:var(--accent); color:#fff; }
+  .btn-primary:hover { background:var(--accent-hover); }
+  .btn-secondary { background:var(--bg-card); color:var(--text); border:1px solid var(--border); }
+  .btn-secondary:hover { background:var(--bg-input); }
+  .btn-success { background:var(--ok); color:#fff; }
+
+  #output-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:100; align-items:center; justify-content:center; padding:20px; }
+  #output-modal.active { display:flex; }
+  .modal-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; width:100%; max-width:800px; max-height:85vh; display:flex; flex-direction:column; overflow:hidden; }
+  .modal-head { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+  .modal-head h3 { margin:0; font-size:18px; }
+  .modal-body { padding:0; flex:1; overflow:auto; }
+  #output-text { width:100%; height:100%; min-height:400px; padding:16px 20px; background:var(--code-bg); border:none; color:var(--text); font-family:"JetBrains Mono","Fira Code",monospace; font-size:13px; line-height:1.5; resize:none; }
+  #output-text:focus { outline:none; }
+  .modal-foot { padding:12px 20px; border-top:1px solid var(--border); display:flex; gap:10px; justify-content:flex-end; }
+  .toast { position:fixed; top:20px; right:20px; padding:12px 20px; background:var(--ok); color:#fff; border-radius:8px; opacity:0; transition:opacity .2s; z-index:200; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>라운드 3 — Design Review + Open Questions</h1>
+    <div class="subtitle">2026-05-05 · OQ-1~7 결정 + 다음 단계 + 커밋 권한. 추천(<span style="color:var(--rec);">보라색</span>) 미리 선택됨.</div>
+  </header>
+
+  <div class="recap">
+    <h3>📄 Design Doc 작성 완료</h3>
+    <p><b>경로</b>: <code>toClaude/wiki/specs/2026-05-05-rename-concurrency-design.md</code> (904 줄)</p>
+    <p><b>구조</b>: 1.개요 → 2.핵심결정 → 3.아키텍처 (Path/Content 분리) → 4.데이터모델 → 5.핵심흐름 → 6.인터페이스 → 7.Profile 추상화 → 8.에러/복구 → 9.보안/ACL → 10.마이그레이션 → 11.테스트 → 12.운영 → 13.Phase 분해 → 14.OQ → 부록 A.가설매핑</p>
+    <p><b>사용자 통찰 반영</b>: ① 경로/내용 분리 → §3.1 두 서비스 + 별도 락/큐. ② 소/대 추상화 → §7 Profile 매트릭스 9 컴포넌트 모두 protocol 뒤로.</p>
+    <p>아래 답변 후 design doc 자체에 대한 수정 사항이 있으면 Q-EDIT 텍스트에 적어주세요.</p>
+  </div>
+
+  <form id="form">
+
+    <!-- ───── OQ-1 ───── -->
+    <div class="question">
+      <span class="q-id">OQ-1 · 인바운드 패치 권한 정책</span>
+      <h3 class="q-title">A 가 X 를 rename 할 때 X 를 인용하는 inbound 문서들을 시스템이 자동 패치한다. 이때 권한은?</h3>
+      <p class="q-help">A 가 inbound 문서 자체에 write 권한이 없을 수 있음. 정책 결정 필요.</p>
+      <label class="opt-card recommended"><input type="radio" name="oq1" value="system" checked> <div class="opt-head"><span class="opt-name">A. 시스템 권한 — 무조건 패치</span><span class="badge rec">추천</span></div><div class="opt-desc">참조 갱신은 자동화 작업이므로 ACL 우회. 모든 변경은 audit 에 <code>actor=system+A</code> 로 기록.</div></label>
+      <label class="opt-card"><input type="radio" name="oq1" value="user"> <div class="opt-head"><span class="opt-name">B. 사용자 권한 — 권한 없으면 건너뜀</span></div><div class="opt-desc">A 가 inbound 에 write 권한 없으면 그 inbound 는 stale 로 남김 + 사용자에게 "N개 못 갱신" 알림.</div></label>
+      <label class="opt-card"><input type="radio" name="oq1" value="hybrid"> <div class="opt-head"><span class="opt-name">C. Hybrid — 자동 시도, 권한 없으면 시스템으로 fallback</span></div><div class="opt-desc">사용자 권한으로 우선 시도, 실패 시 시스템 fallback + audit 명시. 가장 보수적.</div></label>
+    </div>
+
+    <!-- ───── OQ-2 ───── -->
+    <div class="question">
+      <span class="q-id">OQ-2 · 스냅샷 보존</span>
+      <h3 class="q-title">스냅샷 보존 정책</h3>
+      <p class="q-help">100K × 평균 20KB × N = 디스크. N=20 가정 시 약 40GB.</p>
+      <label class="opt-card recommended"><input type="radio" name="oq2" value="n20" checked> <div class="opt-head"><span class="opt-name">A. 파일별 N=20 (시간 무제한)</span><span class="badge rec">추천</span></div><div class="opt-desc">슬라이딩 윈도우만. 시간 기준 prune 없음. 정책 단순.</div></label>
+      <label class="opt-card"><input type="radio" name="oq2" value="n20_30d"> <div class="opt-head"><span class="opt-name">B. N=20 + 30일 후 prune</span></div><div class="opt-desc">개수 + 시간 둘 다. 디스크 압박 줄임.</div></label>
+      <label class="opt-card"><input type="radio" name="oq2" value="n50_90d"> <div class="opt-head"><span class="opt-name">C. N=50 + 90일 후 prune</span></div><div class="opt-desc">더 긴 히스토리. 약 100GB 예상.</div></label>
+      <label class="opt-card"><input type="radio" name="oq2" value="unlimited"> <div class="opt-head"><span class="opt-name">D. 무제한 보존</span></div><div class="opt-desc">git-style 전체 히스토리. 디스크 비용 감수.</div></label>
+    </div>
+
+    <!-- ───── OQ-3 ───── -->
+    <div class="question">
+      <span class="q-id">OQ-3 · Elasticsearch 도입 시점</span>
+      <h3 class="q-title">ES 를 언제 도입?</h3>
+      <p class="q-help">사용자가 보조1 에서 ES 도입 가능 체크. 도입 타이밍 + 한국어 nori 검증 시점.</p>
+      <label class="opt-card"><input type="radio" name="oq3" value="phase1"> <div class="opt-head"><span class="opt-name">A. Phase 1 부터</span></div><div class="opt-desc">BM25 의존도 처음부터 제거. 운영 검증 위험 ↑.</div></label>
+      <label class="opt-card"><input type="radio" name="oq3" value="phase3"> <div class="opt-head"><span class="opt-name">B. Phase 3 끝, BM25 한계 보이면</span></div><div class="opt-desc">필요할 때 도입. 회귀 가능성 있음.</div></label>
+      <label class="opt-card recommended"><input type="radio" name="oq3" value="phase6" checked> <div class="opt-head"><span class="opt-name">C. Phase 6 (스케일 검증) 이후</span><span class="badge rec">추천</span></div><div class="opt-desc">기존 BM25 + Postgres FTS 우선. 부하 검증 후 enterprise 에만 ES. 도입 위험 최소.</div></label>
+      <label class="opt-card"><input type="radio" name="oq3" value="never"> <div class="opt-head"><span class="opt-name">D. 도입 안 함 (Postgres FTS 로 충분)</span></div><div class="opt-desc">ES 인프라 부담 회피. 한국어 형태소는 PG mecab/kkma extension 으로.</div></label>
+    </div>
+
+    <!-- ───── OQ-4 ───── -->
+    <div class="question">
+      <span class="q-id">OQ-4 · ChromaDB chunk 본문 안 path 처리</span>
+      <h3 class="q-title">L5 — chunk 본문에 박힌 path prefix (<code>[분류: ...] [문서: ...]</code>) 를 rename 시 어떻게?</h3>
+      <p class="q-help">현재 <code>_build_path_prefix</code> 가 chunk 본문에 path 를 prepend (RAG 정확도 향상 목적). rename 시 이걸 어떻게 다룰지 비용 큰 결정.</p>
+      <label class="opt-card"><input type="radio" name="oq4" value="rewrite"> <div class="opt-head"><span class="opt-name">A. 텍스트 패치 + 임베딩 재생성</span></div><div class="opt-desc">chunk 본문 자체를 신규 path 로 갱신 → 임베딩 재계산 (cost ↑). 가장 정확.</div></label>
+      <label class="opt-card recommended"><input type="radio" name="oq4" value="meta_only" checked> <div class="opt-head"><span class="opt-name">B. metadata 만 갱신, 본문 path 는 다음 reindex 까지 stale</span><span class="badge rec">추천</span></div><div class="opt-desc">검색 결과의 file_path 는 정확. 임베딩 안 바뀌어도 의미적 매칭은 거의 동일 (path 영향 작음). 사용자가 큰 영향 못 느낌.</div></label>
+      <label class="opt-card"><input type="radio" name="oq4" value="remove_prefix"> <div class="opt-head"><span class="opt-name">C. <code>_build_path_prefix</code> 제거 (chunk 에 path 미포함)</span></div><div class="opt-desc">근본 회피. RAG recall 영향 사전 측정 필요. ONTONG_PATH_EMBED_ENABLED 환경변수 이미 존재.</div></label>
+      <label class="opt-card"><input type="radio" name="oq4" value="defer"> <div class="opt-head"><span class="opt-name">D. 결정 보류, Phase 6 부하 검증에서 측정 후 결정</span></div><div class="opt-desc">B 로 일단 진행, 측정 후 A 또는 C 로 전환.</div></label>
+    </div>
+
+    <!-- ───── OQ-5 ───── -->
+    <div class="question">
+      <span class="q-id">OQ-5 · Bulk 동시 작업 제한</span>
+      <h3 class="q-title">drag-and-drop 다중 선택 + 폴더 rename 등 bulk 작업의 동시 사용자 한도</h3>
+      <label class="opt-card"><input type="radio" name="oq5" value="unlimited"> <div class="opt-head"><span class="opt-name">A. 무제한 (Arq rate limit 의존)</span></div></label>
+      <label class="opt-card recommended"><input type="radio" name="oq5" value="per_user_1" checked> <div class="opt-head"><span class="opt-name">B. 사용자당 1 bulk 작업</span><span class="badge rec">추천</span></div><div class="opt-desc">한 사람이 동시에 여러 폴더 옮기는 것 차단. UX 단순.</div></label>
+      <label class="opt-card"><input type="radio" name="oq5" value="global_n"> <div class="opt-head"><span class="opt-name">C. 전체 동시 N=10 bulk</span></div><div class="opt-desc">서버 부하 보호.</div></label>
+      <label class="opt-card"><input type="radio" name="oq5" value="hybrid"> <div class="opt-head"><span class="opt-name">D. UI 사용자당 1 + 백엔드 전체 N=20</span></div></label>
+    </div>
+
+    <!-- ───── OQ-6 ───── -->
+    <div class="question">
+      <span class="q-id">OQ-6 · 멀티호스트 ContentStore 매체</span>
+      <h3 class="q-title">멀티 호스트 / enterprise profile 에서 마크다운 파일 자체를 어디에 저장?</h3>
+      <p class="q-help">현재는 LocalFS. 멀티 호스트 시 atomic <code>rename()</code> 보장 필요.</p>
+      <label class="opt-card recommended"><input type="radio" name="oq6" value="nfs" checked> <div class="opt-head"><span class="opt-name">A. NFS 공유 마운트</span><span class="badge rec">추천</span></div><div class="opt-desc">POSIX rename atomic 보장 (NFSv4). 운영 단순. 단일 NFS 가 SPOF.</div></label>
+      <label class="opt-card"><input type="radio" name="oq6" value="s3"> <div class="opt-head"><span class="opt-name">B. S3-호환 객체 스토리지</span></div><div class="opt-desc">atomic rename 미보장 → Two-Phase commit (PUT new → DELETE old) 추가 코드 필요. 확장성 ↑.</div></label>
+      <label class="opt-card"><input type="radio" name="oq6" value="single_master"> <div class="opt-head"><span class="opt-name">C. 단일 master + read replica</span></div><div class="opt-desc">write 만 master, read 는 워커 로컬 복제. 일관성 lag.</div></label>
+      <label class="opt-card"><input type="radio" name="oq6" value="defer"> <div class="opt-head"><span class="opt-name">D. 단일 호스트 유지, Phase 6 이후 평가</span></div><div class="opt-desc">team profile 까지는 단일 호스트, enterprise 이행 시점에 결정.</div></label>
+    </div>
+
+    <!-- ───── OQ-7 ───── -->
+    <div class="question">
+      <span class="q-id">OQ-7 · Profile 토글 hot-reload</span>
+      <h3 class="q-title">Profile / 백엔드 토글이 재시작 필요? 아니면 hot-reload?</h3>
+      <label class="opt-card recommended"><input type="radio" name="oq7" value="restart" checked> <div class="opt-head"><span class="opt-name">A. 재시작 필요 (단순)</span><span class="badge rec">추천</span></div><div class="opt-desc">환경변수 변경 → systemctl restart. 단순 + 안전. 운영 거버넌스에 적합.</div></label>
+      <label class="opt-card"><input type="radio" name="oq7" value="hot"> <div class="opt-head"><span class="opt-name">B. 전체 hot-reload</span></div><div class="opt-desc">SIGHUP 으로 백엔드 재구성. 진행 중 작업 마이그레이션 코드 필요.</div></label>
+      <label class="opt-card"><input type="radio" name="oq7" value="partial"> <div class="opt-head"><span class="opt-name">C. 일부만 hot-reload (lock backend 등)</span></div><div class="opt-desc">stateless 백엔드는 hot, stateful (RefIndex/Snapshot) 은 재시작.</div></label>
+    </div>
+
+    <!-- ───── 디자인 수정 요청 ───── -->
+    <div class="question">
+      <span class="q-id">Q-EDIT · Design Doc 수정 요청</span>
+      <h3 class="q-title">design doc 자체에 대한 수정 / 보완 / 삭제 사항</h3>
+      <p class="q-help">없으면 비워두세요. 섹션 번호 + 의견 형식 권장 (예: "§5.2 의 청크 batch 50 → 100 으로", "§13 Phase 4 에 권한 검증 추가").</p>
+      <textarea name="edits" placeholder="예: §3.1 의 락 도메인 분리 다이어그램에 sequence 추가, §11.3 SLA 의 inbound 1K ≤ 30s 는 너무 빠르다 ≤ 60s 로...."></textarea>
+    </div>
+
+    <!-- ───── 다음 단계 ───── -->
+    <div class="question">
+      <span class="q-id">Q-NEXT · 다음 단계</span>
+      <h3 class="q-title">design doc 검토 후 어떻게 진행?</h3>
+      <label class="opt-card recommended"><input type="radio" name="next" value="phase0_plan" checked> <div class="opt-head"><span class="opt-name">A. 승인 → Phase 0 구현 플랜 작성</span><span class="badge rec">추천</span></div><div class="opt-desc"><code>writing-plans</code> 스킬로 P0 작업 0-1~0-9 를 TODO.md 분해 + 테스트 명세 + 검증 기준 + 산출물.</div></label>
+      <label class="opt-card"><input type="radio" name="next" value="revise"> <div class="opt-head"><span class="opt-name">B. 위 Q-EDIT 반영 후 다시 review</span></div><div class="opt-desc">design doc 수정 → 라운드 4 review HTML.</div></label>
+      <label class="opt-card"><input type="radio" name="next" value="round4"> <div class="opt-head"><span class="opt-name">C. 라운드 4 추가 질문 — 특정 영역 깊이</span></div><div class="opt-desc">예: 3-way diff UI 와이어프레임 / Postgres 스키마 인덱스 튜닝 / Arq 워커 토폴로지 등.</div></label>
+      <label class="opt-card"><input type="radio" name="next" value="pause"> <div class="opt-head"><span class="opt-name">D. 잠시 보류 (커밋만 하고 다른 일 우선)</span></div></label>
+    </div>
+
+    <!-- ───── 커밋 ───── -->
+    <div class="question">
+      <span class="q-id">Q-COMMIT · Git 커밋</span>
+      <h3 class="q-title">spec 파일 + HTML 3 개 (r1, r2, r3) 를 커밋해도 될까?</h3>
+      <p class="q-help">위키 섹션 격리 규칙상 <code>toClaude/wiki/specs/*</code> 만 staging. 다른 섹션 / WIP 는 건드리지 않음.</p>
+      <label class="opt-card recommended"><input type="radio" name="commit" value="now" checked> <div class="opt-head"><span class="opt-name">A. 지금 커밋 OK (위키 섹션 파일만)</span><span class="badge rec">추천</span></div><div class="opt-desc"><code>git add toClaude/wiki/specs/2026-05-05-*</code> + <code>toClaude/wiki/CHANGES.md</code> + <code>TODO.md</code> 갱신.</div></label>
+      <label class="opt-card"><input type="radio" name="commit" value="user"> <div class="opt-head"><span class="opt-name">B. 사용자가 직접 커밋</span></div></label>
+      <label class="opt-card"><input type="radio" name="commit" value="defer"> <div class="opt-head"><span class="opt-name">C. 추후 다른 작업과 함께 커밋</span></div></label>
+    </div>
+
+    <!-- ───── 추가 의견 ───── -->
+    <div class="question">
+      <span class="q-id">Q-NOTE · 추가 의견 / 제약</span>
+      <textarea name="extra" placeholder="라운드 1·2·3 통틀어 추가로 알려주고 싶은 것"></textarea>
+    </div>
+
+  </form>
+
+  <div class="actions">
+    <button type="button" class="btn-primary" onclick="generate()">답변 생성 → 복사</button>
+    <button type="button" class="btn-secondary" onclick="document.getElementById('form').reset()">초기화</button>
+  </div>
+</div>
+
+<div id="output-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>아래 텍스트를 복사해 Claude 에 붙여넣기</h3>
+      <button class="btn-secondary" onclick="closeModal()" style="padding:6px 12px; font-size:13px;">닫기</button>
+    </div>
+    <div class="modal-body">
+      <textarea id="output-text" readonly></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-success" onclick="copyOut()">📋 클립보드에 복사</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">복사됨</div>
+
+<script>
+const OQ1 = {
+  system: "A. 시스템 권한 — 무조건 패치",
+  user: "B. 사용자 권한 — 권한 없으면 건너뜀",
+  hybrid: "C. Hybrid — 사용자 우선 + 시스템 fallback",
+};
+const OQ2 = {
+  n20: "A. 파일별 N=20 (시간 무제한)",
+  n20_30d: "B. N=20 + 30일 prune",
+  n50_90d: "C. N=50 + 90일 prune",
+  unlimited: "D. 무제한",
+};
+const OQ3 = {
+  phase1: "A. Phase 1 부터",
+  phase3: "B. Phase 3 후 BM25 한계 보이면",
+  phase6: "C. Phase 6 이후 (enterprise 만)",
+  never: "D. 도입 안 함 (PG FTS 로 충분)",
+};
+const OQ4 = {
+  rewrite: "A. 텍스트 패치 + 임베딩 재생성",
+  meta_only: "B. metadata 만, 본문 path 는 reindex 까지 stale",
+  remove_prefix: "C. _build_path_prefix 제거",
+  defer: "D. Phase 6 부하 검증에서 결정",
+};
+const OQ5 = {
+  unlimited: "A. 무제한",
+  per_user_1: "B. 사용자당 1 bulk",
+  global_n: "C. 전체 N=10",
+  hybrid: "D. UI 1 + 백엔드 N=20",
+};
+const OQ6 = {
+  nfs: "A. NFS 공유",
+  s3: "B. S3-호환 + 2-phase commit",
+  single_master: "C. 단일 master + read replica",
+  defer: "D. 단일 호스트, P6 후 평가",
+};
+const OQ7 = {
+  restart: "A. 재시작 필요",
+  hot: "B. 전체 hot-reload",
+  partial: "C. 일부만 hot-reload",
+};
+const NEXT = {
+  phase0_plan: "A. Phase 0 구현 플랜 작성 (writing-plans)",
+  revise: "B. Q-EDIT 반영 후 다시 review",
+  round4: "C. 라운드 4 추가 질문",
+  pause: "D. 보류 / 커밋만",
+};
+const COMMIT = {
+  now: "A. 지금 커밋 OK",
+  user: "B. 사용자가 직접 커밋",
+  defer: "C. 추후 함께 커밋",
+};
+
+function getR(n) { const e = document.querySelector(`input[name="${n}"]:checked`); return e ? e.value : ""; }
+function getT(n) { const e = document.querySelector(`[name="${n}"]`); return e ? e.value.trim() : ""; }
+function L(m, v) { return m[v] || v || "(미선택)"; }
+
+function generate() {
+  const md = `# 위키 Rename + 동시성 — 라운드 3 답변
+
+## OQ-1 · 인바운드 패치 권한
+${L(OQ1, getR("oq1"))}
+
+## OQ-2 · 스냅샷 보존
+${L(OQ2, getR("oq2"))}
+
+## OQ-3 · ES 도입 시점
+${L(OQ3, getR("oq3"))}
+
+## OQ-4 · L5 chunk 본문 path
+${L(OQ4, getR("oq4"))}
+
+## OQ-5 · Bulk 동시 한도
+${L(OQ5, getR("oq5"))}
+
+## OQ-6 · 멀티호스트 ContentStore
+${L(OQ6, getR("oq6"))}
+
+## OQ-7 · Profile 토글 reload
+${L(OQ7, getR("oq7"))}
+
+## Q-EDIT · Design Doc 수정 요청
+${getT("edits") || "(없음)"}
+
+## Q-NEXT · 다음 단계
+${L(NEXT, getR("next"))}
+
+## Q-COMMIT · Git 커밋
+${L(COMMIT, getR("commit"))}
+
+## Q-NOTE · 추가 의견
+${getT("extra") || "(없음)"}
+
+---
+다음 단계 진행해줘.
+`;
+  document.getElementById("output-text").value = md;
+  document.getElementById("output-modal").classList.add("active");
+}
+function closeModal() { document.getElementById("output-modal").classList.remove("active"); }
+async function copyOut() {
+  const ta = document.getElementById("output-text");
+  ta.select();
+  try { await navigator.clipboard.writeText(ta.value); }
+  catch (e) { document.execCommand("copy"); }
+  const t = document.getElementById("toast");
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1500);
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+</script>
+</body>
+</html>

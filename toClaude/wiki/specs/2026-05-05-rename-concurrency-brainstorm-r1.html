@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>위키 Rename + 동시성 — 라운드 1 브레인스토밍</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --bg-card: #1e293b;
+    --bg-input: #0b1220;
+    --border: #334155;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --accent: #60a5fa;
+    --accent-hover: #93c5fd;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --ok: #34d399;
+    --code-bg: #0b1220;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-input: #f1f5f9;
+      --border: #cbd5e1;
+      --text: #0f172a;
+      --text-dim: #475569;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --warn: #d97706;
+      --danger: #dc2626;
+      --ok: #059669;
+      --code-bg: #f1f5f9;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 24px 120px; }
+  header { margin-bottom: 32px; }
+  h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .subtitle { color: var(--text-dim); font-size: 14px; }
+  details {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  details > summary {
+    cursor: pointer;
+    padding: 16px 20px;
+    font-weight: 600;
+    font-size: 16px;
+    list-style: none;
+    user-select: none;
+    background: linear-gradient(to right, transparent, transparent);
+    transition: background 0.15s;
+  }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::before {
+    content: "▶";
+    display: inline-block;
+    margin-right: 10px;
+    transition: transform 0.15s;
+    color: var(--accent);
+    font-size: 12px;
+  }
+  details[open] > summary::before { transform: rotate(90deg); }
+  details > summary:hover { background: rgba(96, 165, 250, 0.05); }
+  details > .body { padding: 0 20px 20px; }
+  details > .body > *:first-child { margin-top: 0; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .badge.ok { background: rgba(52, 211, 153, 0.15); color: var(--ok); }
+  .badge.warn { background: rgba(251, 191, 36, 0.15); color: var(--warn); }
+  .badge.danger { background: rgba(248, 113, 113, 0.15); color: var(--danger); }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text-dim); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  code, pre {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 13px;
+    background: var(--code-bg);
+    border-radius: 4px;
+  }
+  code { padding: 2px 6px; }
+  pre { padding: 12px 14px; overflow-x: auto; border: 1px solid var(--border); }
+
+  .h-list { list-style: none; padding: 0; margin: 0; }
+  .h-list li {
+    padding: 12px 14px;
+    border-left: 3px solid var(--border);
+    margin-bottom: 8px;
+    background: var(--bg-input);
+    border-radius: 0 8px 8px 0;
+  }
+  .h-list li.crit { border-left-color: var(--danger); }
+  .h-list li.warn { border-left-color: var(--warn); }
+  .h-list .h-id { font-weight: 700; color: var(--accent); margin-right: 6px; }
+  .h-list .h-title { font-weight: 600; }
+  .h-list .h-desc { color: var(--text-dim); font-size: 14px; margin-top: 4px; }
+
+  /* Form */
+  .question {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+    margin-bottom: 18px;
+  }
+  .q-id {
+    display: inline-block;
+    padding: 3px 10px;
+    background: rgba(96, 165, 250, 0.15);
+    color: var(--accent);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .q-title { font-size: 17px; font-weight: 600; margin: 0 0 6px; }
+  .q-help { color: var(--text-dim); font-size: 13px; margin-bottom: 14px; }
+
+  .opt { display: block; margin: 6px 0; cursor: pointer; padding: 8px 10px; border-radius: 6px; transition: background 0.1s; }
+  .opt:hover { background: var(--bg-input); }
+  .opt input { margin-right: 10px; vertical-align: middle; transform: translateY(-1px); }
+  .opt-label { font-weight: 500; }
+  .opt-sub { color: var(--text-dim); font-size: 13px; margin-left: 26px; margin-top: 2px; }
+
+  textarea, input[type="text"] {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    resize: vertical;
+  }
+  textarea:focus, input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  textarea { min-height: 70px; }
+
+  .priority-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; padding: 6px 8px; border-radius: 6px; }
+  .priority-row:hover { background: var(--bg-input); }
+  .priority-row label { flex: 1; }
+  .priority-row select { background: var(--bg-input); border: 1px solid var(--border); color: var(--text); padding: 4px 8px; border-radius: 4px; font-size: 13px; }
+
+  .actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg);
+    padding: 16px 0 0;
+    margin-top: 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 10px;
+  }
+  button {
+    padding: 12px 24px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-secondary {
+    background: var(--bg-card);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--bg-input); }
+  .btn-success { background: var(--ok); color: white; }
+
+  #output-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  #output-modal.active { display: flex; }
+  .modal-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 800px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .modal-head { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .modal-head h3 { margin: 0; font-size: 18px; }
+  .modal-body { padding: 0; flex: 1; overflow: auto; }
+  #output-text {
+    width: 100%;
+    height: 100%;
+    min-height: 400px;
+    padding: 16px 20px;
+    background: var(--code-bg);
+    border: none;
+    color: var(--text);
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    resize: none;
+  }
+  #output-text:focus { outline: none; }
+  .modal-foot { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+  .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; background: var(--ok); color: white; border-radius: 8px; opacity: 0; transition: opacity 0.2s; z-index: 200; }
+  .toast.show { opacity: 1; }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 8px 0 16px; font-size: 12px; color: var(--text-dim); }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .legend .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot.crit { background: var(--danger); }
+  .dot.warn { background: var(--warn); }
+  .dot.norm { background: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>위키 Rename / 경로 변경 + 동시성 — 라운드 1</h1>
+    <div class="subtitle">2026-05-05 · 사용자 결정 필요. 답변 후 <b>"답변 생성"</b> → 복사 → Claude 에 붙여넣기.</div>
+  </header>
+
+  <details open>
+    <summary>1. 현황 분석 (코드에서 확인한 사실)</summary>
+    <div class="body">
+      <p><strong>참조 그래프는 4 개 레이어가 동시에 존재</strong>. 현재 rename / move 가 각각을 어떻게 처리하는지 정리.</p>
+
+      <table>
+        <thead><tr><th>레이어</th><th>위치</th><th>rename 시</th><th>move 시</th><th>folder move 시</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>L1.</b> Frontmatter <code>supersedes</code> / <code>superseded_by</code> / <code>related[]</code></td>
+            <td>YAML 헤더</td>
+            <td><span class="badge warn">부분</span> <code>raw.replace(old, new)</code></td>
+            <td><span class="badge warn">부분</span> 동일</td>
+            <td><span class="badge danger">없음</span></td>
+          </tr>
+          <tr>
+            <td><b>L2.</b> Body wikilink <code>[[stem]]</code></td>
+            <td>본문</td>
+            <td><span class="badge danger">없음</span> stem 변경 → 깨짐</td>
+            <td><span class="badge ok">우연히 OK</span> stem 으로 resolve</td>
+            <td><span class="badge ok">우연히 OK</span></td>
+          </tr>
+          <tr>
+            <td><b>L3.</b> Body markdown link <code>[t](path.md)</code></td>
+            <td>본문</td>
+            <td><span class="badge danger">없음</span> 추출 자체 안 함</td>
+            <td><span class="badge danger">없음</span></td>
+            <td><span class="badge danger">없음</span></td>
+          </tr>
+          <tr>
+            <td><b>L4.</b> Image ref <code>![alt](assets/x.png)</code></td>
+            <td>본문</td>
+            <td colspan="3">ImageRegistry 가 filename 기반으로 ref count 만 추적 (path 무관)</td>
+          </tr>
+          <tr>
+            <td><b>L5.</b> ChromaDB chunk metadata <code>file_path</code></td>
+            <td>벡터 DB</td>
+            <td colspan="3">신규 path 로 BG 재인덱스되지만, <b>다른 문서의 chunk 본문</b>에 박힌 old path 는 그대로</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p><strong>핵심 코드 위치</strong>:</p>
+      <ul>
+        <li><code>backend/application/wiki/wiki_service.py:627-685</code> — <code>move_file</code> + <code>_update_references</code> (naive <code>raw.replace</code>)</li>
+        <li><code>backend/application/wiki/wiki_service.py:697-718</code> — <code>move_folder</code> (<b>인바운드 참조 업데이트 0 줄</b>, 전체 재인덱싱만)</li>
+        <li><code>backend/application/wiki/wiki_search.py:31-55</code> — wikilink 는 stem 기반 backlink 만 빌드 (재작성 로직 없음)</li>
+        <li><code>backend/application/lock_service.py</code> — TTL 락 서비스. <b>편집 보호용</b>이고, rename/move 는 락 안 걸음</li>
+        <li><code>backend/api/wiki.py:222-228</code> — <code>PATCH /file/{path}</code> 핸들러. ACL <code>require_write</code> 만 체크, 락 검사 없음</li>
+        <li><code>backend/application/metadata/metadata_index.py:36-37</code> — <code>threading.Lock</code> + 인메모리 캐시 <code>_data</code> → 멀티 워커 시 stale</li>
+        <li><code>backend/infrastructure/events/event_bus.py</code> — SSE 단일 프로세스 broadcast (워커 간 fan-out 없음)</li>
+      </ul>
+
+      <p><strong>배포 가정</strong>: HANDOFF.md 기준으로 현재는 단일 uvicorn (포트 8001, --reload off). 100K+ 문서 가정은 메모리에 명시.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>2. 발견된 문제 가설 (16 건)</summary>
+    <div class="body">
+      <div class="legend">
+        <span><span class="dot crit"></span>치명: 데이터/링크 손실, 보안</span>
+        <span><span class="dot warn"></span>중요: 사용자 체감 버그, 성능</span>
+        <span><span class="dot norm"></span>일반: UX, 운영성</span>
+      </div>
+
+      <ul class="h-list">
+        <li class="crit">
+          <span class="h-id">H1</span><span class="h-title">Body wikilink 부패 (rename)</span>
+          <div class="h-desc">파일명 (stem) 이 바뀌면 모든 문서의 <code>[[old-stem]]</code> 가 깨진 링크가 됨. 현재 코드는 본문을 건드리지 않음.</div>
+        </li>
+        <li class="crit">
+          <span class="h-id">H2</span><span class="h-title">Body markdown link 부패 (rename + move)</span>
+          <div class="h-desc"><code>[보기](docs/foo.md)</code> 형식은 <b>추출조차 안 됨</b>. rename/move 둘 다 → 404.</div>
+        </li>
+        <li class="warn">
+          <span class="h-id">H3</span><span class="h-title">Wikilink stem 충돌</span>
+          <div class="h-desc">stem-only resolve 라 서로 다른 폴더의 동일 stem 이 있으면 backlink 가 잘못된 문서를 가리킬 수 있음.</div>
+        </li>
+        <li class="crit">
+          <span class="h-id">H4</span><span class="h-title">Folder move = inbound 참조 0 업데이트</span>
+          <div class="h-desc"><code>move_folder</code>는 <code>_update_references</code> 호출 없음. 폴더 이름 바꾸면 <b>모든 inbound 참조가 깨짐</b>. 전체 reindex 도 본문 링크는 안 고침.</div>
+        </li>
+        <li class="warn">
+          <span class="h-id">H5</span><span class="h-title">Naive string replace 오작동</span>
+          <div class="h-desc"><code>raw.replace("a/b.md", "c/d.md")</code> 가 frontmatter 외 본문/주석/예제 코드 블록까지 건드림. 또 <code>"a/b.md"</code>가 <code>"a/b.md.backup"</code>의 부분 문자열이면 의도치 않은 매칭.</div>
+        </li>
+        <li class="crit">
+          <span class="h-id">H6</span><span class="h-title">Race A — rename + 동시 편집</span>
+          <div class="h-desc">User A: <code>PUT /file/old</code> (저장), User B: <code>PATCH /file/old → new</code> (rename). 결과: 저장이 old 에 떨어진 뒤 rename 이 빈 파일을 옮길 수도, 또는 저장이 새 파일을 덮어쓸 수도 있음.</div>
+        </li>
+        <li class="crit">
+          <span class="h-id">H7</span><span class="h-title">Race B — 동일 target 충돌</span>
+          <div class="h-desc">A: <code>X→Y</code>, B: <code>Z→Y</code> 동시. <code>Path.rename()</code> 자체는 atomic 이지만 앱 레이어에 <b>uniqueness 사전 체크가 없음</b> → 마지막 승자가 덮어씀.</div>
+        </li>
+        <li class="crit">
+          <span class="h-id">H8</span><span class="h-title">Race C — 인덱싱 중 rename</span>
+          <div class="h-desc">Save → BG <code>_bg_index(old_path)</code> 시작 → 사용자가 rename. BG 작업이 old_path 로 chunk upsert 후, rename 핸들러가 old 를 지움 → ghost chunk 잔존 또는 부분 인덱스.</div>
+        </li>
+        <li class="warn">
+          <span class="h-id">H9</span><span class="h-title">Race D — inbound 업데이트 비원자성</span>
+          <div class="h-desc">filesystem rename 성공 후 <code>_update_references</code> 진행 중 크래시 / 타임아웃 → 일부 inbound 만 업데이트, 일부는 stale. 재시도 큐 / 로그 없음.</div>
+        </li>
+        <li class="warn">
+          <span class="h-id">H10</span><span class="h-title">멀티 워커 캐시 드리프트</span>
+          <div class="h-desc">gunicorn workers ≥ 2 가정 시 <code>BM25 in-memory</code>, <code>MetadataIndex._data</code>, <code>FileHashStore</code>, <code>IndexStatus._pending</code> 모두 워커별 사본. SSE 도 워커 간 fan-out 안 됨 → 일부 사용자만 신규 트리.</div>
+        </li>
+        <li>
+          <span class="h-id">H11</span><span class="h-title">감사 / 복원 흔적 없음</span>
+          <div class="h-desc">누가 언제 어떤 문서를 어디로 옮겼는지 기록이 없어 잘못된 rename 후 추적/복원이 어려움.</div>
+        </li>
+        <li>
+          <span class="h-id">H12</span><span class="h-title">Dry-run / undo 부재</span>
+          <div class="h-desc">rename 직전 영향도 (몇 개 inbound, 어떤 사용자 락) 미리보기 / 직후 undo 가 없음.</div>
+        </li>
+        <li class="warn">
+          <span class="h-id">H13</span><span class="h-title">Hot doc 성능</span>
+          <div class="h-desc">100K 코퍼스에서 인기 문서가 1만 inbound 가지면 sequential write × 1만 = 분 단위. 그 동안 다른 작업 블록 / 락 만료 / 재시도 폭주.</div>
+        </li>
+        <li class="crit">
+          <span class="h-id">H14</span><span class="h-title">ACL 변경창 누출</span>
+          <div class="h-desc">private 폴더 → public 폴더로 move 시 chunk metadata 의 <code>access_read</code> 가 reindex 완료 전까지 stale. 이 사이 검색에 노출.</div>
+        </li>
+        <li class="warn">
+          <span class="h-id">H15</span><span class="h-title">락은 있지만 rename 이 무시</span>
+          <div class="h-desc">B 가 편집 락 보유 중인 문서를 A 가 rename 가능. 편집자 입장에서 갑자기 파일이 사라짐.</div>
+        </li>
+        <li>
+          <span class="h-id">H16</span><span class="h-title">레이트 제한 / 쓰로틀 없음</span>
+          <div class="h-desc">짧은 시간에 rename 폭증 → 인덱싱 / SSE / 재참조 쓰기 쓰나미. 데모 중 누가 실수로 폴더 5번 이동하면 분 단위 멈춤 가능.</div>
+        </li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>3. 결정 필요 — 답변 폼</summary>
+    <div class="body">
+      <p style="color: var(--text-dim); font-size: 14px;">하나라도 빈 답이 있으면 그 부분은 "추가 조사 / 다음 라운드"로 표기됨.</p>
+
+      <form id="form">
+
+        <div class="question">
+          <span class="q-id">Q1 · 동기화 스코프</span>
+          <h3 class="q-title">어떤 참조까지 자동으로 따라가게 할까?</h3>
+          <p class="q-help">선택한 항목만 rename/move 시 함께 업데이트됩니다. (복수 선택)</p>
+          <label class="opt"><input type="checkbox" name="scope" value="frontmatter" checked> <span class="opt-label">L1. Frontmatter (supersedes / superseded_by / related[])</span><div class="opt-sub">현재 부분 지원 — 정확성/원자성 강화</div></label>
+          <label class="opt"><input type="checkbox" name="scope" value="wikilink" checked> <span class="opt-label">L2. Body wikilink <code>[[path]]</code></span><div class="opt-sub">stem 충돌 해소 + path 기반 정규화 검토</div></label>
+          <label class="opt"><input type="checkbox" name="scope" value="markdown_link"> <span class="opt-label">L3. Body markdown link <code>[t](path.md)</code></span><div class="opt-sub">현재 추출조차 안 함 — 신규 추출기 + 업데이트 필요</div></label>
+          <label class="opt"><input type="checkbox" name="scope" value="image_ref"> <span class="opt-label">L4. Image ref <code>![](assets/...)</code></span><div class="opt-sub">assets 자체가 옮겨질 일이 거의 없으면 제외 가능</div></label>
+          <label class="opt"><input type="checkbox" name="scope" value="chroma"> <span class="opt-label">L5. ChromaDB chunk 본문에 박힌 path</span><div class="opt-sub">정확성 매우 어려움 — reindex 로 우회 vs 직접 갱신</div></label>
+        </div>
+
+        <div class="question">
+          <span class="q-id">Q2 · 연산 종류</span>
+          <h3 class="q-title">어떤 변경 연산을 1차 범위로 잡을까?</h3>
+          <label class="opt"><input type="checkbox" name="ops" value="file_rename" checked> 파일 이름 변경 (같은 폴더)</label>
+          <label class="opt"><input type="checkbox" name="ops" value="file_move" checked> 파일 이동 (다른 폴더)</label>
+          <label class="opt"><input type="checkbox" name="ops" value="folder_rename" checked> 폴더 이름 변경</label>
+          <label class="opt"><input type="checkbox" name="ops" value="folder_move" checked> 폴더 이동 (서브트리 통째로)</label>
+          <label class="opt"><input type="checkbox" name="ops" value="bulk"> 다수 파일 일괄 이동 (드래그 앤 드롭 다중 선택)</label>
+        </div>
+
+        <div class="question">
+          <span class="q-id">Q3 · 식별 모델</span>
+          <h3 class="q-title">참조를 무엇으로 식별할까? (장기 방향)</h3>
+          <p class="q-help">모든 후속 설계가 이 답에 의존.</p>
+          <label class="opt"><input type="radio" name="id_model" value="path_based" checked> <span class="opt-label">A. 경로 기반 유지</span><div class="opt-sub">rename 시 모든 참조를 정확히 업데이트. 기존 코드와 호환. 본문 변경 빈도 ↑.</div></label>
+          <label class="opt"><input type="radio" name="id_model" value="uuid_based"> <span class="opt-label">B. 안정 ID (UUID/slug) 도입</span><div class="opt-sub">참조는 ID 로 저장, path 는 표시용. rename 거의 무비용. <b>큰 마이그레이션</b>, 사람이 손으로 쓰기 불편.</div></label>
+          <label class="opt"><input type="radio" name="id_model" value="hybrid"> <span class="opt-label">C. 하이브리드 — 양쪽 동시 지원</span><div class="opt-sub">신규 참조는 ID 우선, 기존 path 참조도 호환 + 점진적 마이그레이션 도구. 복잡도 ↑.</div></label>
+          <label class="opt"><input type="radio" name="id_model" value="undecided"> 아직 결정 미루고 path 기반 보강만 진행</label>
+        </div>
+
+        <div class="question">
+          <span class="q-id">Q4 · 동시성 보호 강도</span>
+          <h3 class="q-title">rename 과 다른 작업 사이 race 를 어떻게 막을까?</h3>
+          <label class="opt"><input type="radio" name="locking" value="best_effort"> <span class="opt-label">A. Best-effort + 재시도 큐</span><div class="opt-sub">eventual consistency, 단순. 짧은 불일치 창 허용 + 백그라운드 재시도.</div></label>
+          <label class="opt"><input type="radio" name="locking" value="pessimistic" checked> <span class="opt-label">B. Pessimistic — rename 시 자기 자신 + inbound 문서 짧은 락</span><div class="opt-sub">정합성 강함. inbound 가 많으면 락 fan-out 비용. 고정 TTL 으로 데드락 회피.</div></label>
+          <label class="opt"><input type="radio" name="locking" value="optimistic"> <span class="opt-label">C. Optimistic — ETag/version 기반 conflict 감지</span><div class="opt-sub">충돌 시 사용자 또는 시스템에 보고 후 재시도. 락 없음.</div></label>
+          <label class="opt"><input type="radio" name="locking" value="serialize"> <span class="opt-label">D. 글로벌 rename 직렬화 (큐)</span><div class="opt-sub">간단하지만 느림. 데모 환경엔 충분할 수 있음.</div></label>
+        </div>
+
+        <div class="question">
+          <span class="q-id">Q5 · 트랜잭션 단위</span>
+          <h3 class="q-title">rename 도중 부분 실패하면?</h3>
+          <label class="opt"><input type="radio" name="tx" value="rollback"> <span class="opt-label">A. 즉시 rollback (원래 위치로 복원)</span><div class="opt-sub">정합성 최우선. 복원 자체가 또 실패할 수 있어 구현 복잡.</div></label>
+          <label class="opt"><input type="radio" name="tx" value="forward_with_queue" checked> <span class="opt-label">B. 진행 + 실패 항목 재시도 큐 + 사용자 알림</span><div class="opt-sub">"파일은 옮겨졌지만 N개 참조는 30초 후 갱신 예정" 식. 운영 친화.</div></label>
+          <label class="opt"><input type="radio" name="tx" value="two_phase"> <span class="opt-label">C. Two-phase — dry-run으로 영향도 확인 후 사용자가 확정</span><div class="opt-sub">"이 rename 은 N개 문서를 수정합니다 [확정] [취소]". 영향 큰 hot doc 에 안전.</div></label>
+        </div>
+
+        <div class="question">
+          <span class="q-id">Q6 · 배포 모델</span>
+          <h3 class="q-title">설계가 가정해야 할 워커/배포 형태?</h3>
+          <p class="q-help">100K 가정 + 멀티 사용자 = Redis 기반 공유 상태가 거의 필수.</p>
+          <label class="opt"><input type="radio" name="deploy" value="single"> <span class="opt-label">A. 단일 uvicorn (현재)</span><div class="opt-sub">in-memory 상태 OK. SSE 단일 프로세스. 동시 사용자 ≤ 수십.</div></label>
+          <label class="opt"><input type="radio" name="deploy" value="multi_worker" checked> <span class="opt-label">B. gunicorn 멀티 워커 (단일 호스트)</span><div class="opt-sub">Redis 락 + Redis pub/sub for SSE + shared metadata index 필요.</div></label>
+          <label class="opt"><input type="radio" name="deploy" value="distributed"> <span class="opt-label">C. 멀티 호스트 / k8s</span><div class="opt-sub">Redis + 외부 message bus + ChromaDB 외부화. 위 B 의 상위 호환.</div></label>
+        </div>
+
+        <div class="question">
+          <span class="q-id">Q7 · 영향도 미리보기 UX</span>
+          <h3 class="q-title">사용자가 rename 트리거할 때 어떤 안내가 필요?</h3>
+          <label class="opt"><input type="checkbox" name="ux" value="impact_count" checked> 영향받는 inbound 참조 개수 미리 표시</label>
+          <label class="opt"><input type="checkbox" name="ux" value="impact_list"> 영향받는 문서 목록 (상위 N개) 미리보기</label>
+          <label class="opt"><input type="checkbox" name="ux" value="confirm_threshold"> N개 초과면 확인 대화상자 (예: 10개 이상)</label>
+          <label class="opt"><input type="checkbox" name="ux" value="progress" checked> 진행률 / 인덱싱 상태 라이브 표시</label>
+          <label class="opt"><input type="checkbox" name="ux" value="undo"> 직전 rename undo 버튼 (5분 윈도우)</label>
+          <label class="opt"><input type="checkbox" name="ux" value="lock_warn" checked> 다른 사용자가 편집 중이면 경고 / 차단</label>
+        </div>
+
+        <div class="question">
+          <span class="q-id">Q8 · 기존 깨진 링크 정리</span>
+          <h3 class="q-title">현재 코퍼스에 이미 stale link 가 있을 가능성이 높음. 어떻게?</h3>
+          <label class="opt"><input type="radio" name="cleanup" value="report_only" checked> A. 검사 도구만 추가 — "broken link 리스트" 리포트, 사용자가 수동 처리</label>
+          <label class="opt"><input type="radio" name="cleanup" value="auto_fix_safe"> B. 안전한 케이스만 자동 수정 (stem 으로 유일하게 매칭되는 경우)</label>
+          <label class="opt"><input type="radio" name="cleanup" value="migrate"> C. 전체 일회성 마이그레이션 스크립트 (현행 정합성 강제 정렬)</label>
+          <label class="opt"><input type="radio" name="cleanup" value="skip"> D. 신규 기능만, 기존 데이터는 손대지 않음</label>
+        </div>
+
+        <div class="question">
+          <span class="q-id">Q9 · 시급도 우선순위</span>
+          <h3 class="q-title">H1~H16 중 가장 먼저 해결해야 할 3 건은?</h3>
+          <p class="q-help">상단 "발견된 문제 가설" 섹션 참고. 직접 본 적 있는 시나리오 위주로 골라도 OK.</p>
+          <input type="text" name="top_h" placeholder="예: H4, H6, H1">
+        </div>
+
+        <div class="question">
+          <span class="q-id">Q10 · 추가 컨텍스트 / 다른 의견</span>
+          <h3 class="q-title">위에 안 잡힌 시나리오, 제약, 의견</h3>
+          <textarea name="extra" placeholder="예: '실제로 데모 중에 폴더 이름 바꾸자 검색이 깨졌었음', '이번 반기에는 마이그레이션 도구는 시간 없음', '동시 사용자는 최대 20명 가정' ..."></textarea>
+        </div>
+
+        <div class="question">
+          <span class="q-id">Q11 · 다음 라운드 깊이</span>
+          <h3 class="q-title">다음 라운드에서 어디까지 다룰까?</h3>
+          <label class="opt"><input type="radio" name="next_round" value="approach" checked> A. 2~3개 접근안 (alternative) 비교 + 추천 1 개</label>
+          <label class="opt"><input type="radio" name="next_round" value="design"> B. 바로 design doc 초안 (architecture + components + data flow)</label>
+          <label class="opt"><input type="radio" name="next_round" value="impl_plan"> C. 즉시 구현 플랜 (phase 별 작업 목록 + 테스트)</label>
+        </div>
+      </form>
+
+      <div class="actions">
+        <button type="button" class="btn-primary" onclick="generate()">답변 생성 → 복사</button>
+        <button type="button" class="btn-secondary" onclick="document.getElementById('form').reset()">초기화</button>
+      </div>
+    </div>
+  </details>
+</div>
+
+<div id="output-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>아래 텍스트를 복사해 Claude 에 붙여넣기</h3>
+      <button class="btn-secondary" onclick="closeModal()" style="padding: 6px 12px; font-size: 13px;">닫기</button>
+    </div>
+    <div class="modal-body">
+      <textarea id="output-text" readonly></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-success" onclick="copyOut()">📋 클립보드에 복사</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">복사됨</div>
+
+<script>
+const SCOPE_LABEL = {
+  frontmatter: "L1 Frontmatter (supersedes/superseded_by/related)",
+  wikilink: "L2 Body wikilink [[path]]",
+  markdown_link: "L3 Body markdown link [text](path.md)",
+  image_ref: "L4 Image ref ![](assets/...)",
+  chroma: "L5 ChromaDB chunk 본문 path",
+};
+const OPS_LABEL = {
+  file_rename: "파일 이름 변경",
+  file_move: "파일 이동",
+  folder_rename: "폴더 이름 변경",
+  folder_move: "폴더 이동",
+  bulk: "다수 파일 일괄",
+};
+const ID_MODEL_LABEL = {
+  path_based: "A. 경로 기반 유지",
+  uuid_based: "B. 안정 ID (UUID) 도입",
+  hybrid: "C. 하이브리드",
+  undecided: "결정 보류 (path 기반 보강)",
+};
+const LOCK_LABEL = {
+  best_effort: "A. Best-effort + 재시도 큐",
+  pessimistic: "B. Pessimistic — inbound 락",
+  optimistic: "C. Optimistic — ETag/version",
+  serialize: "D. 글로벌 직렬화",
+};
+const TX_LABEL = {
+  rollback: "A. 즉시 rollback",
+  forward_with_queue: "B. 진행 + 재시도 큐 + 알림",
+  two_phase: "C. Two-phase (dry-run + 확정)",
+};
+const DEPLOY_LABEL = {
+  single: "A. 단일 uvicorn",
+  multi_worker: "B. gunicorn 멀티 워커",
+  distributed: "C. 멀티 호스트",
+};
+const UX_LABEL = {
+  impact_count: "영향 inbound 개수 표시",
+  impact_list: "영향 문서 목록 미리보기",
+  confirm_threshold: "임계값 초과 시 확인 대화상자",
+  progress: "진행률 라이브 표시",
+  undo: "undo 버튼",
+  lock_warn: "편집 중이면 경고/차단",
+};
+const CLEANUP_LABEL = {
+  report_only: "A. 리포트만",
+  auto_fix_safe: "B. 안전한 케이스 자동 수정",
+  migrate: "C. 일회성 마이그레이션",
+  skip: "D. 신규 기능만",
+};
+const NEXT_LABEL = {
+  approach: "A. 2-3 접근안 비교 + 추천",
+  design: "B. design doc 초안",
+  impl_plan: "C. 즉시 구현 플랜",
+};
+
+function getChecked(name) {
+  return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(el => el.value);
+}
+function getRadio(name) {
+  const el = document.querySelector(`input[name="${name}"]:checked`);
+  return el ? el.value : "";
+}
+function getText(name) {
+  const el = document.querySelector(`[name="${name}"]`);
+  return el ? el.value.trim() : "";
+}
+
+function lookup(map, val) { return map[val] || val || "(미선택)"; }
+function lookupList(map, vals) {
+  if (!vals.length) return "(미선택)";
+  return vals.map(v => `- ${lookup(map, v)}`).join("\n");
+}
+
+function generate() {
+  const scope = getChecked("scope");
+  const ops = getChecked("ops");
+  const idModel = getRadio("id_model");
+  const locking = getRadio("locking");
+  const tx = getRadio("tx");
+  const deploy = getRadio("deploy");
+  const ux = getChecked("ux");
+  const cleanup = getRadio("cleanup");
+  const topH = getText("top_h");
+  const extra = getText("extra");
+  const nextRound = getRadio("next_round");
+
+  const md = `# 위키 Rename + 동시성 — 라운드 1 답변
+
+## Q1. 동기화 스코프
+${lookupList(SCOPE_LABEL, scope)}
+
+## Q2. 연산 종류
+${lookupList(OPS_LABEL, ops)}
+
+## Q3. 식별 모델
+${lookup(ID_MODEL_LABEL, idModel)}
+
+## Q4. 동시성 보호
+${lookup(LOCK_LABEL, locking)}
+
+## Q5. 트랜잭션 단위
+${lookup(TX_LABEL, tx)}
+
+## Q6. 배포 모델
+${lookup(DEPLOY_LABEL, deploy)}
+
+## Q7. UX
+${lookupList(UX_LABEL, ux)}
+
+## Q8. 기존 깨진 링크 정리
+${lookup(CLEANUP_LABEL, cleanup)}
+
+## Q9. 시급도 TOP 3 (H 번호)
+${topH || "(미답)"}
+
+## Q10. 추가 컨텍스트
+${extra || "(없음)"}
+
+## Q11. 다음 라운드 깊이
+${lookup(NEXT_LABEL, nextRound)}
+
+---
+다음 라운드 진행해줘.
+`;
+
+  document.getElementById("output-text").value = md;
+  document.getElementById("output-modal").classList.add("active");
+}
+
+function closeModal() {
+  document.getElementById("output-modal").classList.remove("active");
+}
+
+async function copyOut() {
+  const ta = document.getElementById("output-text");
+  ta.select();
+  try {
+    await navigator.clipboard.writeText(ta.value);
+  } catch (e) {
+    document.execCommand("copy");
+  }
+  const t = document.getElementById("toast");
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1500);
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeModal();
+});
+</script>
+</body>
+</html>

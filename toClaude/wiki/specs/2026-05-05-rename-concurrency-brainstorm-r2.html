@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>위키 Rename + 동시성 — 라운드 2 (접근안 비교)</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --bg-card: #1e293b;
+    --bg-input: #0b1220;
+    --bg-soft: #172033;
+    --border: #334155;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --accent: #60a5fa;
+    --accent-hover: #93c5fd;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --ok: #34d399;
+    --rec: #a78bfa;
+    --code-bg: #0b1220;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-input: #f1f5f9;
+      --bg-soft: #f8fafc;
+      --border: #cbd5e1;
+      --text: #0f172a;
+      --text-dim: #475569;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --warn: #d97706;
+      --danger: #dc2626;
+      --ok: #059669;
+      --rec: #7c3aed;
+      --code-bg: #f1f5f9;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif; line-height:1.6; }
+  .wrap { max-width:1000px; margin:0 auto; padding:32px 24px 140px; }
+  header { margin-bottom:24px; }
+  h1 { font-size:28px; margin:0 0 6px; letter-spacing:-0.01em; }
+  .subtitle { color:var(--text-dim); font-size:14px; }
+
+  details { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; margin-bottom:16px; overflow:hidden; }
+  details > summary { cursor:pointer; padding:16px 20px; font-weight:600; font-size:16px; list-style:none; user-select:none; transition:background .15s; }
+  details > summary::-webkit-details-marker { display:none; }
+  details > summary::before { content:"▶"; display:inline-block; margin-right:10px; transition:transform .15s; color:var(--accent); font-size:12px; }
+  details[open] > summary::before { transform:rotate(90deg); }
+  details > summary:hover { background:rgba(96,165,250,.05); }
+  details > .body { padding:0 20px 20px; }
+  details > .body > *:first-child { margin-top:0; }
+
+  .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; margin-left:6px; vertical-align:middle; }
+  .badge.ok { background:rgba(52,211,153,.15); color:var(--ok); }
+  .badge.warn { background:rgba(251,191,36,.15); color:var(--warn); }
+  .badge.danger { background:rgba(248,113,113,.15); color:var(--danger); }
+  .badge.rec { background:rgba(167,139,250,.18); color:var(--rec); }
+  .badge.lock { background:rgba(96,165,250,.15); color:var(--accent); }
+
+  table { width:100%; border-collapse:collapse; margin:12px 0; font-size:14px; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { color:var(--text-dim); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.05em; }
+
+  code, pre { font-family:"JetBrains Mono","Fira Code",monospace; font-size:13px; background:var(--code-bg); border-radius:4px; }
+  code { padding:2px 6px; }
+  pre { padding:12px 14px; overflow-x:auto; border:1px solid var(--border); }
+
+  .question { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:20px 22px; margin-bottom:18px; }
+  .q-id { display:inline-block; padding:3px 10px; background:rgba(96,165,250,.15); color:var(--accent); border-radius:6px; font-size:12px; font-weight:700; margin-bottom:8px; }
+  .q-title { font-size:17px; font-weight:600; margin:0 0 6px; }
+  .q-help { color:var(--text-dim); font-size:13px; margin-bottom:14px; }
+
+  .opt-card { display:block; padding:14px 16px; margin:10px 0; border:1px solid var(--border); border-radius:10px; cursor:pointer; transition:all .12s; background:var(--bg-soft); }
+  .opt-card:hover { border-color:var(--accent); }
+  .opt-card.recommended { border-color:var(--rec); border-width:2px; box-shadow:0 0 0 3px rgba(167,139,250,.1); }
+  .opt-card input { margin-right:10px; vertical-align:middle; }
+  .opt-card .opt-head { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .opt-card .opt-name { font-weight:600; font-size:15px; }
+  .opt-card .opt-desc { color:var(--text-dim); font-size:13px; line-height:1.55; margin-left:24px; }
+  .opt-card .opt-trade { display:flex; gap:14px; margin-top:8px; margin-left:24px; font-size:12px; flex-wrap:wrap; }
+  .opt-card .opt-trade span { padding:2px 8px; border-radius:4px; }
+  .opt-card .opt-trade .pro { background:rgba(52,211,153,.12); color:var(--ok); }
+  .opt-card .opt-trade .con { background:rgba(248,113,113,.12); color:var(--danger); }
+  .opt-card .opt-trade .neu { background:rgba(148,163,184,.15); color:var(--text-dim); }
+
+  textarea, input[type="text"] { width:100%; padding:10px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:inherit; font-size:14px; resize:vertical; }
+  textarea:focus, input[type="text"]:focus { outline:none; border-color:var(--accent); }
+  textarea { min-height:80px; }
+
+  .impl-banner { background:linear-gradient(135deg, rgba(167,139,250,.08), rgba(96,165,250,.08)); border:1px solid var(--rec); border-radius:12px; padding:18px 22px; margin-bottom:20px; }
+  .impl-banner h3 { margin:0 0 10px; font-size:17px; color:var(--rec); }
+  .impl-banner ul { margin:8px 0; padding-left:22px; }
+  .impl-banner li { margin:4px 0; font-size:14px; }
+  .impl-banner .key { color:var(--accent); font-weight:600; }
+
+  .recap { background:var(--bg-soft); border-left:4px solid var(--ok); border-radius:0 10px 10px 0; padding:16px 20px; margin-bottom:20px; }
+  .recap h3 { margin:0 0 8px; font-size:15px; color:var(--ok); }
+  .recap dl { margin:0; display:grid; grid-template-columns:120px 1fr; gap:6px 12px; font-size:13px; }
+  .recap dt { color:var(--text-dim); }
+  .recap dd { margin:0; }
+
+  .phase { background:var(--bg-soft); border:1px solid var(--border); border-radius:10px; padding:12px 16px; margin-bottom:10px; }
+  .phase-head { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .phase-id { font-weight:700; color:var(--accent); font-family:"JetBrains Mono",monospace; }
+  .phase-title { font-weight:600; }
+  .phase-deps { font-size:12px; color:var(--text-dim); }
+  .phase-tasks { margin:6px 0 0 0; padding-left:24px; font-size:13px; color:var(--text-dim); }
+  .phase-tasks li { margin:2px 0; }
+
+  .actions { position:sticky; bottom:0; background:var(--bg); padding:16px 0 0; margin-top:24px; border-top:1px solid var(--border); display:flex; gap:10px; }
+  button { padding:12px 24px; border-radius:8px; border:none; font-weight:600; font-size:15px; cursor:pointer; transition:all .1s; font-family:inherit; }
+  .btn-primary { background:var(--accent); color:#fff; }
+  .btn-primary:hover { background:var(--accent-hover); }
+  .btn-secondary { background:var(--bg-card); color:var(--text); border:1px solid var(--border); }
+  .btn-secondary:hover { background:var(--bg-input); }
+  .btn-success { background:var(--ok); color:#fff; }
+
+  #output-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:100; align-items:center; justify-content:center; padding:20px; }
+  #output-modal.active { display:flex; }
+  .modal-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; width:100%; max-width:800px; max-height:85vh; display:flex; flex-direction:column; overflow:hidden; }
+  .modal-head { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+  .modal-head h3 { margin:0; font-size:18px; }
+  .modal-body { padding:0; flex:1; overflow:auto; }
+  #output-text { width:100%; height:100%; min-height:400px; padding:16px 20px; background:var(--code-bg); border:none; color:var(--text); font-family:"JetBrains Mono","Fira Code",monospace; font-size:13px; line-height:1.5; resize:none; }
+  #output-text:focus { outline:none; }
+  .modal-foot { padding:12px 20px; border-top:1px solid var(--border); display:flex; gap:10px; justify-content:flex-end; }
+  .toast { position:fixed; top:20px; right:20px; padding:12px 20px; background:var(--ok); color:#fff; border-radius:8px; opacity:0; transition:opacity .2s; z-index:200; }
+  .toast.show { opacity:1; }
+
+  .agree-row { display:flex; gap:14px; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); }
+  .agree-row:last-child { border-bottom:none; }
+  .agree-row .label { flex:1; font-size:14px; }
+  .agree-row .controls { display:flex; gap:6px; }
+  .agree-row .controls label { padding:4px 10px; border:1px solid var(--border); border-radius:6px; cursor:pointer; font-size:12px; }
+  .agree-row .controls input { display:none; }
+  .agree-row .controls input:checked + span { background:var(--accent); color:#fff; padding:4px 10px; border-radius:5px; margin:-4px -10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>라운드 2 — 접근안 비교 + 작업 순서</h1>
+    <div class="subtitle">2026-05-05 · 5 개 핵심 결정 + Phase 의존성 그래프 동의. 추천(<span style="color:var(--rec);">보라색 카드</span>)이 미리 선택됨.</div>
+  </header>
+
+  <div class="recap">
+    <h3>📌 라운드 1 에서 확정된 것</h3>
+    <dl>
+      <dt>스코프</dt><dd>L1 frontmatter + L2 wikilink + L3 markdown link + L5 chroma chunk path</dd>
+      <dt>연산</dt><dd>file rename/move + folder rename/move + bulk</dd>
+      <dt>식별 모델</dt><dd>경로 기반 유지 (UUID 도입 X)</dd>
+      <dt>락</dt><dd>Pessimistic (rename 시 inbound 락)</dd>
+      <dt>TX</dt><dd>진행 + 재시도 큐 + 알림</dd>
+      <dt>배포</dt><dd>멀티 호스트</dd>
+      <dt>UX</dt><dd>영향 미리보기 + 임계값 confirm + 진행률 + 편집 락 경고</dd>
+      <dt>Cleanup</dt><dd>broken-link 리포트만</dd>
+      <dt>추가</dt><dd><b>수만 동시사용자</b>, 저장 시 load↔save 버전 충돌 처리, 최근 N 개 스냅샷</dd>
+      <dt>Q9</dt><dd>"전부 다 — 충돌 안 나게 작업 순서 잡기" → Phase 그래프 결정 D 에서 처리</dd>
+    </dl>
+  </div>
+
+  <div class="impl-banner">
+    <h3>⚡ 함의 — 위 답변 조합이 강제하는 것</h3>
+    <p style="margin:0 0 10px; font-size:14px;">"수만 동시사용자 × 멀티 호스트 × 100K 문서 × pessimistic 락" 의 조합은 사실상 v2 인프라 재배치를 요구합니다. 현재 코드의 다음 부분이 외부화되어야 정합성 유지 가능:</p>
+    <ul>
+      <li><span class="key">락</span> — <code>InMemoryLockBackend</code> 폐기, Redis 락만 사용 (이미 RedisLockBackend 존재 → 활성화)</li>
+      <li><span class="key">SSE 이벤트 fan-out</span> — <code>event_bus</code> 단일 프로세스 → Redis Pub/Sub 으로 호스트 간 broadcast</li>
+      <li><span class="key">MetadataIndex</span> — <code>.ontong/metadata_index.json</code> 파일 캐시 → Redis hash + invalidation</li>
+      <li><span class="key">FileHashStore / IndexStatus</span> — Redis 또는 외부 KV</li>
+      <li><span class="key">BM25</span> — in-memory → 외부 검색엔진 (Elasticsearch / Meilisearch / OpenSearch) 또는 Postgres FTS</li>
+      <li><span class="key">파일 저장소</span> — POSIX rename 은 단일 호스트만 atomic. 멀티 호스트면 공유 FS (NFS) 또는 객체 스토리지 (S3 + 메타데이터 DB) 로 이동</li>
+      <li><span class="key">백그라운드 작업</span> — <code>asyncio.create_task</code> → 외부 큐 (Arq/Celery/Dramatiq)</li>
+      <li><span class="key">스냅샷</span> — 신규 컴포넌트, 객체 스토리지나 Postgres LOB</li>
+    </ul>
+    <p style="margin:10px 0 0; font-size:13px; color:var(--text-dim);">Phase 0 (인프라 재배치) 가 다른 모든 작업의 선행 조건이 됩니다. 결정 D 의 phase 그래프에 반영함.</p>
+  </div>
+
+  <form id="form">
+
+    <!-- ───── 결정 1: 참조 패치 정확도 ───── -->
+    <div class="question">
+      <span class="q-id">결정 1 · 참조 패치 정확도</span>
+      <h3 class="q-title">rename 시 본문/메타의 참조를 어떻게 정확히 찾고 바꿀까?</h3>
+      <p class="q-help">현재의 <code>raw.replace(old, new)</code> 는 부분 매칭 / 코드블록 / 우연 매칭 위험. 정확도 모델을 골라야 모든 후속 단계가 안전.</p>
+
+      <label class="opt-card">
+        <input type="radio" name="d1" value="ast_inline">
+        <div class="opt-head"><span class="opt-name">A. AST/파서 기반 인플레이스 패치</span></div>
+        <div class="opt-desc">매 rename 마다 inbound 문서를 열어 frontmatter 는 YAML 파싱, body 는 markdown AST (markdown-it / mistune) 로 파싱 → 링크 노드만 정확히 교체. 인덱스 별도 구축 안 함.</div>
+        <div class="opt-trade">
+          <span class="pro">✓ 추가 인덱스 없음</span>
+          <span class="pro">✓ 정확도 높음</span>
+          <span class="con">✗ 인기 문서 시 N 회 파싱·재직렬화 비용</span>
+          <span class="con">✗ inbound 후보 찾기는 여전히 풀스캔</span>
+        </div>
+      </label>
+
+      <label class="opt-card recommended">
+        <input type="radio" name="d1" value="ref_index" checked>
+        <div class="opt-head"><span class="opt-name">B. ReferenceIndex 도입 (정/역방향)</span><span class="badge rec">추천</span></div>
+        <div class="opt-desc">저장 시점에 본문/frontmatter 참조를 추출해 <code>ReferenceIndex</code> (Redis hash + Postgres) 에 정/역방향 인덱스 적재. rename 시 역방향 조회로 inbound 문서 <b>리스트 + 정확한 character offset</b> 을 받아 한 번의 텍스트 패치. 풀스캔 불필요.</div>
+        <div class="opt-trade">
+          <span class="pro">✓ rename 시 O(inbound) 정확</span>
+          <span class="pro">✓ broken-link 리포트도 같은 인덱스 재사용</span>
+          <span class="pro">✓ 영향도 미리보기 즉시</span>
+          <span class="con">✗ 신규 컴포넌트 (스토어 + 마이그레이션)</span>
+          <span class="neu">≈ 저장 핫패스에 추출기 추가 (~5ms)</span>
+        </div>
+      </label>
+
+      <label class="opt-card">
+        <input type="radio" name="d1" value="lazy_alias">
+        <div class="opt-head"><span class="opt-name">C. Lazy Alias Resolution</span></div>
+        <div class="opt-desc">rename 시 본문 안 건드림. 별도 <code>alias_map[old_path] = new_path</code> 저장. 읽기/검색 시점에 alias 적용해 해석. 본문은 영원히 old path 로 남음.</div>
+        <div class="opt-trade">
+          <span class="pro">✓ rename O(1) 거의 무비용</span>
+          <span class="con">✗ 검색 인덱스/벡터 본문에 박힌 path 영구 stale</span>
+          <span class="con">✗ ML/AI 답변에서 옛 경로 그대로 인용</span>
+          <span class="con">✗ alias map 끝없이 증식</span>
+        </div>
+      </label>
+    </div>
+
+    <!-- ───── 결정 2: 분산 락 모델 ───── -->
+    <div class="question">
+      <span class="q-id">결정 2 · 분산 락 모델</span>
+      <h3 class="q-title">수만 동시사용자에서 rename 의 락 fan-out 을 어떻게 안전하면서 빠르게?</h3>
+      <p class="q-help">pessimistic 락이지만, 인기 문서 1 개에 inbound 1 만이면 1 만 락을 쥐는 건 비현실. 어떻게 작은 단위로 쪼갤까?</p>
+
+      <label class="opt-card">
+        <input type="radio" name="d2" value="global_serial">
+        <div class="opt-head"><span class="opt-name">A. 전역 rename 직렬화</span></div>
+        <div class="opt-desc">"한 번에 하나의 rename" 글로벌 mutex (Redis SET NX). 인바운드는 락 없이 변경. 변경 중 편집은 ETag 충돌로 잡음.</div>
+        <div class="opt-trade">
+          <span class="pro">✓ 가장 단순</span>
+          <span class="pro">✓ 데드락 불가</span>
+          <span class="con">✗ 처리율 1 op/sec 수준 — 수만 사용자 환경에서 병목</span>
+        </div>
+      </label>
+
+      <label class="opt-card recommended">
+        <input type="radio" name="d2" value="batched_two_phase" checked>
+        <div class="opt-head"><span class="opt-name">B. Two-Phase: source 락 + inbound 배치 락</span><span class="badge rec">추천</span></div>
+        <div class="opt-desc">
+          <b>Phase 1 — Plan</b>: source 문서에 단독 rename 락 획득. ReferenceIndex 로 inbound 목록 확보. inbound 가 임계값 N (예: 50) 이하면 즉시 모두 짧은 락 (수초) 획득 후 일괄 패치.<br>
+          <b>Phase 2 — Async</b>: N 초과면 청크 단위 (예: 50 개씩) 로 락 획득→패치→해제 반복하며 진행률 SSE. 청크 사이에 다른 작업이 끼어들 수 있도록 양보.<br>
+          락 획득은 항상 path 알파벳 정렬 순서 → 데드락 회피.
+        </div>
+        <div class="opt-trade">
+          <span class="pro">✓ 작은 rename 즉시 완료</span>
+          <span class="pro">✓ 인기 문서 progressive 진행</span>
+          <span class="pro">✓ 데드락 회피 (정렬 순)</span>
+          <span class="neu">≈ 청크 사이 일부 사용자에게 짧은 시간 stale 보임</span>
+        </div>
+      </label>
+
+      <label class="opt-card">
+        <input type="radio" name="d2" value="optimistic_etag">
+        <div class="opt-head"><span class="opt-name">C. Optimistic + ETag 감지</span></div>
+        <div class="opt-desc">락 안 잡고 진행. 각 inbound 패치 시 ETag 비교, 충돌 시 재시도. source 본인만 락.</div>
+        <div class="opt-trade">
+          <span class="pro">✓ 락 비용 0</span>
+          <span class="pro">✓ 단순 구현</span>
+          <span class="con">✗ 인기 문서 라이브 편집 시 재시도 지옥</span>
+          <span class="con">✗ "어떤 사용자가 편집 중이면 차단" UX 요구와 충돌</span>
+        </div>
+      </label>
+    </div>
+
+    <!-- ───── 결정 3: 저장 시 충돌 + 스냅샷 ───── -->
+    <div class="question">
+      <span class="q-id">결정 3 · 저장 시 충돌 + 스냅샷</span>
+      <h3 class="q-title">load 한 버전과 저장 직전 버전이 다르면 어떻게? 스냅샷 형태는?</h3>
+      <p class="q-help">라운드 1 추가 요구. 자동 저장이 없으니 사용자가 "저장" 누를 때까지 임의로 길어질 수 있음.</p>
+
+      <label class="opt-card">
+        <input type="radio" name="d3" value="last_write_wins">
+        <div class="opt-head"><span class="opt-name">A. Last-Write-Wins + 스냅샷 윈도우</span></div>
+        <div class="opt-desc">저장은 무조건 성공. 매 저장마다 직전 버전을 스냅샷 (예: 최근 20 개 슬라이딩) 으로 보존. 충돌 인지 책임은 사용자.</div>
+        <div class="opt-trade">
+          <span class="pro">✓ 가장 단순</span>
+          <span class="pro">✓ 저장 항상 성공</span>
+          <span class="con">✗ 두 사람 동시 편집 시 한 명 작업 사일런트로 묻힘</span>
+          <span class="con">✗ "다른 사람이 저장했다" 인지 시점이 늦음</span>
+        </div>
+      </label>
+
+      <label class="opt-card recommended">
+        <input type="radio" name="d3" value="occ_3way" checked>
+        <div class="opt-head"><span class="opt-name">B. Optimistic Concurrency Control + 3-way diff UX</span><span class="badge rec">추천</span></div>
+        <div class="opt-desc">
+          load 시 서버가 <code>version</code> (ULID 또는 monotonic counter) 부여 → 클라이언트 보유. save 시 <code>If-Match: &lt;version&gt;</code> 헤더.<br>
+          서버 측 현재 version 과 일치 → 저장 + 새 버전 발행 + 스냅샷.<br>
+          불일치 → 409 Conflict + <code>{server_version, server_content, base_version}</code> 반환 → UI 가 3-way diff (base / server / mine) 띄우고 사용자가 머지.<br>
+          스냅샷: <b>매 저장마다 1 개</b>, 사용자별 보존 N=20, 전체 보존 N=10 (혼합), Postgres LOB 또는 S3.
+        </div>
+        <div class="opt-trade">
+          <span class="pro">✓ 데이터 손실 0</span>
+          <span class="pro">✓ 사용자 인지 명확</span>
+          <span class="pro">✓ rename 도 동일 OCC 메커니즘 재사용</span>
+          <span class="neu">≈ 3-way diff UI 신규 필요</span>
+          <span class="neu">≈ 스냅샷 스토리지 비용 (100K × 평균 20KB × 20 = 40GB 규모)</span>
+        </div>
+      </label>
+
+      <label class="opt-card">
+        <input type="radio" name="d3" value="crdt">
+        <div class="opt-head"><span class="opt-name">C. CRDT 실시간 협업 (Yjs/Automerge)</span></div>
+        <div class="opt-desc">Google Docs 식 실시간 동시 편집. 충돌 자동 머지.</div>
+        <div class="opt-trade">
+          <span class="pro">✓ "동시 편집" 자체를 우아하게 해결</span>
+          <span class="con">✗ 마크다운 + frontmatter 모델과 임피던스 큼</span>
+          <span class="con">✗ 신규 클라/서버 인프라 (WebSocket relay) 큰 투자</span>
+          <span class="con">✗ "저장 버튼" UX 와 안 맞음 (자동 저장 모델)</span>
+        </div>
+      </label>
+    </div>
+
+    <!-- ───── 결정 4: 인프라 스택 ───── -->
+    <div class="question">
+      <span class="q-id">결정 4 · 인프라 스택</span>
+      <h3 class="q-title">멀티 호스트 / 수만 사용자를 위한 스택 — 어디까지 도입?</h3>
+      <p class="q-help">기존 Redis 옵션 코드는 이미 있음. 추가 도입 항목을 묶어서 결정.</p>
+
+      <label class="opt-card recommended">
+        <input type="radio" name="d4" value="lean_redis_arq" checked>
+        <div class="opt-head"><span class="opt-name">A. Lean — Redis + Arq + Postgres</span><span class="badge rec">추천</span></div>
+        <div class="opt-desc">
+          <b>Redis</b>: 락, Pub/Sub (SSE fan-out), MetadataIndex/FileHashStore/IndexStatus 캐시.<br>
+          <b>Arq</b>: asyncio 친화 작업 큐 (Redis broker). rename inbound 패치, BG 인덱싱, 스냅샷 저장.<br>
+          <b>Postgres</b>: ReferenceIndex (정/역방향), 스냅샷 메타데이터, 감사 로그, OCC version.<br>
+          <b>객체 스토리지 (옵션)</b>: 스냅샷 본문 (Postgres LOB 으로 시작 가능).<br>
+          BM25 는 일단 Postgres FTS 또는 기존 in-memory 유지 + 추후 외부화.
+        </div>
+        <div class="opt-trade">
+          <span class="pro">✓ 신규 컴포넌트 최소</span>
+          <span class="pro">✓ 기존 Redis 코드 활용</span>
+          <span class="pro">✓ Postgres 1 개로 메타/스냅샷/audit 통합</span>
+          <span class="neu">≈ Postgres 신규 도입은 운영 부담 (없으면)</span>
+        </div>
+      </label>
+
+      <label class="opt-card">
+        <input type="radio" name="d4" value="full_distributed">
+        <div class="opt-head"><span class="opt-name">B. Full — Redis + NATS + Elasticsearch + S3 + Postgres</span></div>
+        <div class="opt-desc">SSE fan-out 은 NATS, 검색은 Elasticsearch, 스냅샷은 S3, 메타는 Postgres. 처리율 ↑↑.</div>
+        <div class="opt-trade">
+          <span class="pro">✓ 진짜 수만 사용자 처리량</span>
+          <span class="con">✗ 신규 의존성 4-5 개 동시</span>
+          <span class="con">✗ 운영/배포 복잡도 큼</span>
+        </div>
+      </label>
+
+      <label class="opt-card">
+        <input type="radio" name="d4" value="redis_only">
+        <div class="opt-head"><span class="opt-name">C. Redis-only — 메타도 Redis 에</span></div>
+        <div class="opt-desc">Postgres 도입 회피. ReferenceIndex/스냅샷도 Redis 에. 단점: 영속성/쿼리력 ↓, 스냅샷 디스크 사용 비효율.</div>
+        <div class="opt-trade">
+          <span class="pro">✓ 의존성 최소</span>
+          <span class="con">✗ Redis 영속성 한계 (RDB/AOF) 만으로 audit/스냅샷은 무리</span>
+          <span class="con">✗ 복잡 쿼리 (예: "내가 인용한 모든 문서") 어렵</span>
+        </div>
+      </label>
+    </div>
+
+    <!-- ───── 결정 5: Phase 의존성 그래프 동의 ───── -->
+    <div class="question">
+      <span class="q-id">결정 5 · 작업 순서 (Phase 의존성)</span>
+      <h3 class="q-title">"전부 다 충돌 안 나게" — 추천 순서. 동의 / 수정 표시.</h3>
+      <p class="q-help">화살표(→) = 의존. <span class="badge lock">병렬</span> = 같은 단계 내 병렬 가능. 각 phase 끝에 데모 가능 산출물.</p>
+
+      <div class="phase">
+        <div class="phase-head"><span class="phase-id">Phase 0</span> <span class="phase-title">인프라 재배치</span> <span class="phase-deps">선행 0</span></div>
+        <ul class="phase-tasks">
+          <li>Redis 락/Pub-Sub 활성화 + InMemoryLockBackend 폐기 경로</li>
+          <li>EventBus → Redis Pub/Sub adapter (워커 간 SSE fan-out)</li>
+          <li>MetadataIndex/FileHashStore/IndexStatus → Redis hash 백엔드</li>
+          <li>Arq 워커 도입 + Postgres 스키마 (refs, snapshots, versions, audit)</li>
+        </ul>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head"><span class="phase-id">Phase 1</span> <span class="phase-title">정확한 참조 추출 + ReferenceIndex</span> <span class="phase-deps">선행 P0</span></div>
+        <ul class="phase-tasks">
+          <li>ReferenceExtractor — frontmatter YAML + body markdown AST → {target_path, kind, offset}</li>
+          <li>Postgres <code>references</code> 테이블 + 정/역방향 쿼리 API</li>
+          <li>저장 핫패스에 추출기 wiring + 마이그레이션 (전체 코퍼스 1 회 추출)</li>
+          <li>Broken-link 리포트 (Q8 답) — 같은 인덱스 재활용</li>
+        </ul>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head"><span class="phase-id">Phase 2</span> <span class="phase-title">OCC + 스냅샷</span> <span class="phase-deps">선행 P0 (P1 과 병렬 가능)</span> <span class="badge lock">병렬</span></div>
+        <ul class="phase-tasks">
+          <li>WikiFile 에 <code>version</code> 필드 + load 응답에 ETag 헤더</li>
+          <li><code>If-Match</code> 검사 → 409 + 3-way diff 페이로드</li>
+          <li>스냅샷 스토어 (Postgres LOB 시작) + 슬라이딩 N=20</li>
+          <li>프론트 3-way diff UI</li>
+        </ul>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head"><span class="phase-id">Phase 3</span> <span class="phase-title">단일 파일 rename/move (정합성 핵심)</span> <span class="phase-deps">선행 P1 + P2</span></div>
+        <ul class="phase-tasks">
+          <li>새 <code>RenameOrchestrator</code> — Plan / Execute / Reconcile 3 단계</li>
+          <li>source 락 + collision check + Phase-2-Phase 인바운드 배치 락</li>
+          <li>본문 정확 패치 (P1 ReferenceIndex 사용) + frontmatter 갱신</li>
+          <li>ChromaDB 본문 path 갱신 (L5) — 영향 chunk 재인덱싱</li>
+          <li>SSE 진행률 + 영향도 미리보기 API</li>
+          <li>실패 항목 → Arq 재시도 큐 + audit 로그</li>
+        </ul>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head"><span class="phase-id">Phase 4</span> <span class="phase-title">폴더 / bulk</span> <span class="phase-deps">선행 P3</span></div>
+        <ul class="phase-tasks">
+          <li>서브트리 enumeration → P3 의 단일 rename 을 N 회 큐잉</li>
+          <li>전체 작업 = parent 그룹 단위 정렬, 청크 50</li>
+          <li>아토믹 dryrun: "이 폴더 이동 시 X 개 inbound 영향, 추정 Y 초"</li>
+        </ul>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head"><span class="phase-id">Phase 5</span> <span class="phase-title">UX 마감</span> <span class="phase-deps">선행 P3 (P4 와 일부 병렬)</span> <span class="badge lock">병렬</span></div>
+        <ul class="phase-tasks">
+          <li>영향도 미리보기 다이얼로그 + 임계값 confirm</li>
+          <li>편집 중 rename 경고/차단 (lock_service 통합)</li>
+          <li>진행률 토스트 + undo 버튼 (5 분 윈도우, 스냅샷 활용)</li>
+          <li>Broken-link 리포트 페이지</li>
+        </ul>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head"><span class="phase-id">Phase 6</span> <span class="phase-title">스케일 검증</span> <span class="phase-deps">선행 P3~P5</span></div>
+        <ul class="phase-tasks">
+          <li>100K 시드 + 동시 50 사용자 시뮬레이션 부하 테스트</li>
+          <li>성능 회귀 가드 (rename SLA: inbound 100 까지 ≤ 2s, 1000 까지 ≤ 30s)</li>
+          <li>ACL 누출 윈도우 측정 (H14)</li>
+        </ul>
+      </div>
+
+      <div style="margin-top:18px; padding:14px 16px; background:var(--bg-soft); border-radius:8px;">
+        <div style="font-weight:600; margin-bottom:10px;">위 Phase 0~6 추천 순서에 동의?</div>
+        <label class="opt-card recommended" style="margin:0;">
+          <input type="radio" name="d5" value="agree" checked>
+          <div class="opt-head"><span class="opt-name">A. 동의 — 이 순서대로 진행</span><span class="badge rec">추천</span></div>
+        </label>
+        <label class="opt-card">
+          <input type="radio" name="d5" value="agree_with_changes">
+          <div class="opt-head"><span class="opt-name">B. 일부 수정 (아래 텍스트로 지시)</span></div>
+        </label>
+        <label class="opt-card">
+          <input type="radio" name="d5" value="reorder">
+          <div class="opt-head"><span class="opt-name">C. 다른 순서로 (아래 텍스트로 지시)</span></div>
+        </label>
+        <textarea name="phase_notes" placeholder="(선택) Phase 순서 / 범위 / 제외할 것 / 추가할 것" style="margin-top:10px;"></textarea>
+      </div>
+    </div>
+
+    <!-- ───── 보조 ───── -->
+    <div class="question">
+      <span class="q-id">보조 1 · 인프라 도입 가능성</span>
+      <h3 class="q-title">실 운영 환경에 도입 가능한 것 체크</h3>
+      <label class="opt-card" style="margin:6px 0;"><input type="checkbox" name="infra" value="redis" checked> <div class="opt-head"><span class="opt-name">Redis</span></div></label>
+      <label class="opt-card" style="margin:6px 0;"><input type="checkbox" name="infra" value="postgres"> <div class="opt-head"><span class="opt-name">PostgreSQL</span></div></label>
+      <label class="opt-card" style="margin:6px 0;"><input type="checkbox" name="infra" value="object_storage"> <div class="opt-head"><span class="opt-name">S3 호환 객체 스토리지</span></div></label>
+      <label class="opt-card" style="margin:6px 0;"><input type="checkbox" name="infra" value="elasticsearch"> <div class="opt-head"><span class="opt-name">Elasticsearch / OpenSearch</span></div></label>
+      <label class="opt-card" style="margin:6px 0;"><input type="checkbox" name="infra" value="message_bus"> <div class="opt-head"><span class="opt-name">NATS / Kafka</span></div></label>
+    </div>
+
+    <div class="question">
+      <span class="q-id">보조 2 · 임계값 / 정책</span>
+      <h3 class="q-title">숫자 정책 — 추천값. 그대로 사용 OK 면 비워두기.</h3>
+      <table>
+        <tr><td>스냅샷 보존 개수</td><td><input type="text" name="snap_keep" placeholder="20"></td></tr>
+        <tr><td>rename inbound confirm 임계값</td><td><input type="text" name="confirm_threshold" placeholder="10"></td></tr>
+        <tr><td>락 TTL (초)</td><td><input type="text" name="lock_ttl" placeholder="5"></td></tr>
+        <tr><td>청크 batch 크기 (Phase 2)</td><td><input type="text" name="batch_size" placeholder="50"></td></tr>
+        <tr><td>undo 윈도우 (분)</td><td><input type="text" name="undo_window" placeholder="5"></td></tr>
+      </table>
+    </div>
+
+    <div class="question">
+      <span class="q-id">보조 3 · 추가 의견 / 제약</span>
+      <textarea name="extra" placeholder="라운드 2 에 안 잡힌 시나리오, 운영 제약, 우려, 폐기 결정..."></textarea>
+    </div>
+
+    <div class="question">
+      <span class="q-id">보조 4 · 다음 라운드</span>
+      <label class="opt-card" style="margin:6px 0;"><input type="radio" name="next" value="design_doc" checked> <div class="opt-head"><span class="opt-name">A. 위 결정으로 design doc (spec) 초안 작성 → 검토</span><span class="badge rec">추천</span></div></label>
+      <label class="opt-card" style="margin:6px 0;"><input type="radio" name="next" value="phase_plan"> <div class="opt-head"><span class="opt-name">B. Phase 0 부터 구현 플랜 (TODO 분해)</span></div></label>
+      <label class="opt-card" style="margin:6px 0;"><input type="radio" name="next" value="more_questions"> <div class="opt-head"><span class="opt-name">C. 라운드 3 추가 질문 (특정 영역 깊이)</span></div></label>
+    </div>
+
+  </form>
+
+  <div class="actions">
+    <button type="button" class="btn-primary" onclick="generate()">답변 생성 → 복사</button>
+    <button type="button" class="btn-secondary" onclick="document.getElementById('form').reset()">초기화</button>
+  </div>
+</div>
+
+<div id="output-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>아래 텍스트를 복사해 Claude 에 붙여넣기</h3>
+      <button class="btn-secondary" onclick="closeModal()" style="padding:6px 12px; font-size:13px;">닫기</button>
+    </div>
+    <div class="modal-body">
+      <textarea id="output-text" readonly></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-success" onclick="copyOut()">📋 클립보드에 복사</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">복사됨</div>
+
+<script>
+const D1 = {
+  ast_inline: "A. AST/파서 기반 인플레이스 패치",
+  ref_index: "B. ReferenceIndex (정/역방향) — 추천",
+  lazy_alias: "C. Lazy Alias Resolution",
+};
+const D2 = {
+  global_serial: "A. 전역 직렬화",
+  batched_two_phase: "B. Two-Phase + 배치 락 — 추천",
+  optimistic_etag: "C. Optimistic + ETag",
+};
+const D3 = {
+  last_write_wins: "A. Last-Write-Wins + 스냅샷",
+  occ_3way: "B. OCC + 3-way diff — 추천",
+  crdt: "C. CRDT 실시간",
+};
+const D4 = {
+  lean_redis_arq: "A. Lean — Redis + Arq + Postgres — 추천",
+  full_distributed: "B. Full — Redis+NATS+ES+S3+PG",
+  redis_only: "C. Redis-only",
+};
+const D5 = {
+  agree: "A. Phase 0~6 추천 순서 동의",
+  agree_with_changes: "B. 일부 수정 (notes 참고)",
+  reorder: "C. 다른 순서 (notes 참고)",
+};
+const NEXT = {
+  design_doc: "A. design doc 초안",
+  phase_plan: "B. Phase 0 부터 구현 플랜",
+  more_questions: "C. 라운드 3 추가 질문",
+};
+
+function getR(name) { const e = document.querySelector(`input[name="${name}"]:checked`); return e ? e.value : ""; }
+function getC(name) { return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(e => e.value); }
+function getT(name) { const e = document.querySelector(`[name="${name}"]`); return e ? e.value.trim() : ""; }
+function lookup(map, v) { return map[v] || v || "(미선택)"; }
+
+function generate() {
+  const d1 = getR("d1"), d2 = getR("d2"), d3 = getR("d3"), d4 = getR("d4"), d5 = getR("d5");
+  const phaseNotes = getT("phase_notes");
+  const infra = getC("infra");
+  const snapKeep = getT("snap_keep") || "20 (기본)";
+  const confirm = getT("confirm_threshold") || "10 (기본)";
+  const lockTtl = getT("lock_ttl") || "5 (기본)";
+  const batch = getT("batch_size") || "50 (기본)";
+  const undo = getT("undo_window") || "5 (기본)";
+  const extra = getT("extra");
+  const next = getR("next");
+
+  const md = `# 위키 Rename + 동시성 — 라운드 2 답변
+
+## 결정 1 · 참조 패치 정확도
+${lookup(D1, d1)}
+
+## 결정 2 · 분산 락 모델
+${lookup(D2, d2)}
+
+## 결정 3 · 저장 시 충돌 + 스냅샷
+${lookup(D3, d3)}
+
+## 결정 4 · 인프라 스택
+${lookup(D4, d4)}
+
+## 결정 5 · Phase 의존성 동의
+${lookup(D5, d5)}
+${phaseNotes ? "\n**Phase notes:** " + phaseNotes : ""}
+
+## 보조 1 · 인프라 도입 가능
+${infra.length ? infra.map(i => "- " + i).join("\n") : "(없음)"}
+
+## 보조 2 · 정책 임계값
+- 스냅샷 보존: ${snapKeep}
+- rename confirm 임계: ${confirm}
+- 락 TTL: ${lockTtl}
+- 배치 청크 크기: ${batch}
+- undo 윈도우(분): ${undo}
+
+## 보조 3 · 추가 의견
+${extra || "(없음)"}
+
+## 보조 4 · 다음 라운드
+${lookup(NEXT, next)}
+
+---
+다음 라운드 진행해줘.
+`;
+
+  document.getElementById("output-text").value = md;
+  document.getElementById("output-modal").classList.add("active");
+}
+function closeModal() { document.getElementById("output-modal").classList.remove("active"); }
+async function copyOut() {
+  const ta = document.getElementById("output-text");
+  ta.select();
+  try { await navigator.clipboard.writeText(ta.value); }
+  catch (e) { document.execCommand("copy"); }
+  const t = document.getElementById("toast");
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1500);
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+</script>
+</body>
+</html>
