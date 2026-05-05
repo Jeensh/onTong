@@ -190,23 +190,80 @@ async def search_path(q: str = "", limit: int = 20):
 
 
 @router.get("/file/{path:path}", response_model=WikiFile)
-async def get_file(path: str, user: User = Depends(require_read)):
-    """Read a wiki file by path."""
+async def get_file(path: str, response: Response, user: User = Depends(require_read)):
+    """Read a wiki file by path. Sets ETag header for OCC."""
     _validate_path(path)
     wiki_file = await _svc().get_file(path)
     if wiki_file is None:
         raise HTTPException(status_code=404, detail=f"File not found: {path}")
+
+    # OCC: set ETag = current version (lazy-generate from mtime if missing)
+    try:
+        from backend.core.config import settings
+        from backend.core.backends import get_version_store
+        profile = settings.resolve_profile()
+        if profile.version_store_backend == "sqlite":
+            from pathlib import Path
+            sqlite_path = Path(settings.wiki_dir) / ".ontong" / "versions.db"
+            sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+            store = get_version_store(profile, sqlite_path=str(sqlite_path))
+        else:
+            store = get_version_store(profile, postgres_dsn=settings.postgres_dsn)
+        from backend.application.occ.manager import OCCManager
+        occ = OCCManager(store)
+        mtime = 0.0
+        if wiki_file.metadata.updated:
+            try:
+                dt = datetime.fromisoformat(wiki_file.metadata.updated.replace("Z", "+00:00"))
+                mtime = dt.timestamp()
+            except Exception:
+                pass
+        version = occ.lazy_version_for(path, mtime_fallback=mtime)
+        response.headers["ETag"] = f'"{version}"'
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"OCC ETag failed for {path}: {e}")
+
     return wiki_file
 
 
 @router.put("/file/{path:path}", response_model=WikiFile)
-async def save_file(path: str, body: SaveRequest, user: User = Depends(require_write)):
-    """Create or update a wiki file (with synchronous re-indexing)."""
+async def save_file(
+    path: str,
+    body: SaveRequest,
+    request: Request,
+    user: User = Depends(require_write),
+):
+    """Create or update a wiki file. Returns 409 if If-Match version does not match."""
     _validate_path(path)
+
+    # OCC: check If-Match header
+    if_match = request.headers.get("if-match", "").strip().strip('"')
+    expected_version = if_match or None
+
     try:
-        result = await _svc().save_file(path, body.content, user_name=user.name)
+        result = await _svc().save_file(
+            path, body.content, user_name=user.name,
+            expected_version=expected_version,
+        )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        from backend.application.occ.manager import VersionConflict
+        if isinstance(e, VersionConflict):
+            payload = e.payload
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "conflict": True,
+                    "path": payload.path,
+                    "base_version": payload.base_version,
+                    "server_version": payload.server_version,
+                    "server_content": payload.server_content,
+                    "server_updated_by": payload.server_updated_by,
+                },
+            )
+        raise
 
     # Invalidate persona cache when a user edits their ontong.local.md
     if "_personas/@" in path and path.endswith("ontong.local.md"):

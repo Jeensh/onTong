@@ -111,7 +111,24 @@ class WikiService:
     async def get_file(self, path: str) -> WikiFile | None:
         return await self.storage.read(path)
 
-    async def save_file(self, path: str, content: str, user_name: str = "") -> WikiFile:
+    async def save_file(self, path: str, content: str, user_name: str = "", expected_version: str | None = None) -> WikiFile:
+        # OCC: check version before write (Phase 2 Task 2-3)
+        try:
+            occ = self._get_occ_lazy()
+            if occ is not None:
+                old_file = await self.storage.read(path)
+                server_content = old_file.raw_content if old_file else ""
+                server_updated_by = (old_file.metadata.updated_by if old_file else "")
+                occ.check_or_raise(path, expected_version,
+                                   server_content=server_content,
+                                   server_updated_by=server_updated_by)
+        except Exception as e:
+            from backend.application.occ.manager import VersionConflict
+            if isinstance(e, VersionConflict):
+                raise  # propagate to API layer
+            # Other OCC errors — non-fatal, log and proceed
+            logger.warning(f"OCC pre-check failed for {path}: {e}")
+
         # Auto-downgrade: if existing doc is approved and body changed → set to draft
         content = await self._auto_downgrade_approved(path, content)
 
@@ -128,6 +145,14 @@ class WikiService:
                 logger.warning(f"Lineage warning for {path}: [{w.code}] {w.message}")
 
         wiki_file = await self.storage.write(path, content, user_name=user_name)
+
+        # OCC: advance version after successful write (Phase 2 Task 2-3)
+        try:
+            occ = self._get_occ_lazy()
+            if occ is not None:
+                occ.advance(path, updated_by=user_name)
+        except Exception as e:
+            logger.warning(f"OCC advance failed for {path}: {e}")
 
         # Soft validation: warn if domain/process not in templates
         self._validate_metadata_soft(wiki_file)
@@ -563,6 +588,27 @@ class WikiService:
                 self._ref_index_cache = None
         return self._ref_index_cache
 
+    def _get_occ_lazy(self):
+        """Resolve OCCManager once, cache on instance (Phase 2 Task 2-3)."""
+        if not hasattr(self, "_occ_cache"):
+            try:
+                from backend.core.config import settings
+                from backend.core.backends import get_version_store
+                from backend.application.occ.manager import OCCManager
+                profile = settings.resolve_profile()
+                if profile.version_store_backend == "sqlite":
+                    from pathlib import Path
+                    sqlite_path = Path(settings.wiki_dir) / ".ontong" / "versions.db"
+                    sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+                    store = get_version_store(profile, sqlite_path=str(sqlite_path))
+                else:
+                    store = get_version_store(profile, postgres_dsn=settings.postgres_dsn)
+                self._occ_cache = OCCManager(store)
+            except Exception as e:
+                logger.warning(f"OCC initialization failed: {e}")
+                self._occ_cache = None
+        return self._occ_cache
+
     def _auto_inject_error_codes(self, content: str) -> str:
         """If error_codes field is empty/missing in frontmatter, auto-extract from body."""
         lines = content.split("\n")
@@ -621,6 +667,13 @@ class WikiService:
                     ref_index.remove_for_source(path)
             except Exception as e:
                 logger.warning(f"RefIndex remove failed for {path}: {e}")
+            # OCC: remove version row for deleted file (Phase 2 Task 2-3)
+            try:
+                occ = self._get_occ_lazy()
+                if occ:
+                    occ._store.delete(path)
+            except Exception as e:
+                logger.warning(f"OCC delete failed for {path}: {e}")
             event_bus.publish("tree_change", {"action": "remove", "path": path})
             logger.info(f"Deleted and removed from index: {path}")
         return deleted
@@ -710,6 +763,13 @@ class WikiService:
                     # new source identity so outbound refs from the renamed doc remain queryable.
             except Exception as e:
                 logger.warning(f"RefIndex rename_source failed: {old_path} → {new_path}: {e}")
+            # OCC: rename version row (Phase 2 Task 2-3)
+            try:
+                occ = self._get_occ_lazy()
+                if occ:
+                    occ._store.rename(old_path, new_path)
+            except Exception as e:
+                logger.warning(f"OCC rename failed: {old_path} → {new_path}: {e}")
             event_bus.publish("tree_change", {"action": "move", "old_path": old_path, "new_path": new_path})
             logger.info(f"Moved file: {old_path} → {new_path}")
         return moved
@@ -819,6 +879,18 @@ class WikiService:
                             ref_index.rename_source(old_subpath, new_subpath)
             except Exception as e:
                 logger.warning(f"RefIndex folder-rename failed: {old_path} → {new_path}: {e}")
+            # OCC: rename version rows for all moved children (Phase 2 Task 2-3)
+            try:
+                occ = self._get_occ_lazy()
+                if occ and old_files:
+                    for old_subpath in old_files:
+                        new_subpath = old_subpath.replace(old_path, new_path, 1)
+                        try:
+                            occ._store.rename(old_subpath, new_subpath)
+                        except Exception as sub_e:
+                            logger.warning(f"OCC folder-rename subpath failed: {old_subpath}: {sub_e}")
+            except Exception as e:
+                logger.warning(f"OCC folder-rename failed: {old_path} → {new_path}: {e}")
             asyncio.create_task(self._bg_reindex_all())
             event_bus.publish("tree_change", {"action": "move", "old_path": old_path, "new_path": new_path})
             logger.info(f"Moved folder: {old_path} → {new_path}")

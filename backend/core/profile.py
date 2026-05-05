@@ -19,6 +19,7 @@ VALID_BACKENDS = {
     "task_queue": {"asyncio", "arq"},
     "fulltext": {"bm25_inmem", "pg_fts", "elasticsearch"},
     "ref_index": {"sqlite", "postgres"},
+    "version_store": {"sqlite", "postgres"},
 }
 
 
@@ -32,6 +33,7 @@ class Profile:
     task_queue_backend: str
     fulltext_backend: str
     ref_index_backend: str = "sqlite"  # default: sqlite (dev-safe)
+    version_store_backend: str = "sqlite"  # OCC version store (Phase 2)
 
 
 _DEFAULTS: dict[str, dict[str, str]] = {
@@ -43,6 +45,7 @@ _DEFAULTS: dict[str, dict[str, str]] = {
         "task_queue": "asyncio",
         "fulltext": "bm25_inmem",
         "ref_index": "sqlite",
+        "version_store": "sqlite",
     },
     "team": {
         "lock": "redis",
@@ -52,6 +55,7 @@ _DEFAULTS: dict[str, dict[str, str]] = {
         "task_queue": "arq",
         "fulltext": "bm25_inmem",
         "ref_index": "postgres",
+        "version_store": "postgres",
     },
     "enterprise": {
         "lock": "redis",
@@ -61,6 +65,7 @@ _DEFAULTS: dict[str, dict[str, str]] = {
         "task_queue": "arq",
         "fulltext": "elasticsearch",
         "ref_index": "postgres",
+        "version_store": "postgres",
     },
 }
 
@@ -72,6 +77,7 @@ _OVERRIDE_KEYS = {
     "task_queue": "ONTONG_TASK_QUEUE_BACKEND",
     "fulltext": "ONTONG_FULLTEXT_BACKEND",
     "ref_index": "ONTONG_REF_INDEX_BACKEND",
+    "version_store": "ONTONG_VERSION_STORE_BACKEND",
 }
 
 
@@ -107,4 +113,5 @@ def resolve_profile(profile: str, overrides: dict[str, str]) -> Profile:
         task_queue_backend=chosen["task_queue"],
         fulltext_backend=chosen["fulltext"],
         ref_index_backend=chosen["ref_index"],
+        version_store_backend=chosen["version_store"],
     )

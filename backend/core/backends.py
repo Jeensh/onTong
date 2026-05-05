@@ -205,3 +205,33 @@ def get_ref_index(profile: Profile, *, sqlite_path: str | None = None, postgres_
     _singletons["ref_index"] = (profile.ref_index_backend, index)
     logger.info(f"RefIndex backend initialized: {profile.ref_index_backend}")
     return index
+
+
+def get_version_store(profile: Profile, *, sqlite_path: str | None = None, postgres_dsn: str = ""):
+    """Return a VersionStore matching the profile (OCC — Phase 2)."""
+    cached = _singletons.get("version_store")
+    if cached is not None:
+        cached_name, cached_obj = cached
+        if cached_name != profile.version_store_backend:
+            raise RuntimeError(
+                f"Profile changed mid-process: cached version_store backend is {cached_name!r}, "
+                f"requested {profile.version_store_backend!r}. Call _reset_for_test() between switches."
+            )
+        return cached_obj
+
+    if profile.version_store_backend == "sqlite":
+        from backend.application.occ.sqlite_store import SqliteVersionStore
+        if sqlite_path is None:
+            raise RuntimeError("sqlite_path required for sqlite version store")
+        store = SqliteVersionStore(sqlite_path)
+    elif profile.version_store_backend == "postgres":
+        from backend.application.occ.postgres_store import PostgresVersionStore
+        if not postgres_dsn:
+            raise RuntimeError("postgres_dsn required for postgres version store")
+        store = PostgresVersionStore(postgres_dsn)
+    else:
+        raise ValueError(f"unknown version_store backend: {profile.version_store_backend!r}")
+
+    _singletons["version_store"] = (profile.version_store_backend, store)
+    logger.info(f"VersionStore initialized: {profile.version_store_backend}")
+    return store

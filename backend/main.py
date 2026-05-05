@@ -331,6 +331,21 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"RefIndex init failed (will retry per-request): {e}")
 
+    # Phase 2: initialize VersionStore (OCC — creates SQLite file or pings Postgres)
+    try:
+        from backend.core.backends import get_version_store
+        _vs_profile = _cfg.resolve_profile()
+        if _vs_profile.version_store_backend == "sqlite":
+            from pathlib import Path as _VSPath
+            _vs_sqlite_path = _VSPath(_cfg.wiki_dir) / ".ontong" / "versions.db"
+            _vs_sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+            get_version_store(_vs_profile, sqlite_path=str(_vs_sqlite_path))
+        elif _cfg.postgres_dsn:
+            get_version_store(_vs_profile, postgres_dsn=_cfg.postgres_dsn)
+        logger.info(f"VersionStore initialized: {_vs_profile.version_store_backend}")
+    except Exception as e:
+        logger.warning(f"VersionStore init failed (will retry per-request): {e}")
+
     import asyncio
     asyncio.create_task(_bg_initial_index())
     logger.info("Background indexing started (app available immediately)")
