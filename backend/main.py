@@ -315,8 +315,14 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(_bg_initial_index())
     logger.info("Background indexing started (app available immediately)")
 
+    # Start event bus (no-op for inproc, subscribes Redis channel for redis_pubsub)
+    await event_bus.start()
+    logger.info("EventBus started")
+
     yield
 
+    await event_bus.stop()
+    logger.info("EventBus stopped")
     await auth_provider.on_shutdown()
     logger.info("onTong Backend shutting down...")
 
