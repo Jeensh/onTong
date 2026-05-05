@@ -229,17 +229,45 @@ async def move_file(path: str, body: MoveRequest, user: User = Depends(require_w
 
 
 @router.delete("/file/{path:path}")
-async def delete_file(path: str, force: bool = False, user: User = Depends(require_write)):
-    """Delete a wiki file. If referenced by other docs and force=False, returns 409."""
+async def delete_file(path: str, user: User = Depends(require_write)):
+    """Delete a wiki file. G7 policy: blocks if ANY inbound reference exists.
+
+    Inbound = frontmatter (supersedes/superseded_by/related) + body wikilink + body markdown link.
+    NO force parameter — graph integrity is non-negotiable. Caller must clean up
+    references first (rename / remove links / delete the dependent docs).
+    """
     _validate_path(path)
     svc = _svc()
-    if not force:
-        refs = svc.get_referencing_files(path)
-        if refs:
-            raise HTTPException(
-                status_code=409,
-                detail={"message": f"File is referenced by {len(refs)} document(s)", "referenced_by": refs},
-            )
+
+    # G7: check ALL inbound kinds via RefIndex
+    inbound = svc.get_inbound_references(path)
+    if inbound:
+        from collections import defaultdict
+        by_kind: dict[int, list[dict]] = defaultdict(list)
+        for r in inbound:
+            by_kind[r.kind].append({
+                "source_path": r.source_path,
+                "kind": r.kind,
+                "location": r.location,
+            })
+        # Build a sorted unique source-path list for the friendly message
+        unique_sources = sorted({r.source_path for r in inbound})
+
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "blocked": True,
+                "policy": "G7",
+                "message": (
+                    f"이 문서를 {len(unique_sources)} 개 문서가 인용 중입니다. "
+                    f"먼저 인용을 정리하거나 해당 문서들을 함께 삭제하세요."
+                ),
+                "inbound_count": len(inbound),
+                "unique_sources": unique_sources,
+                "by_kind": {str(k): v for k, v in by_kind.items()},
+            },
+        )
+
     deleted = await svc.delete_file(path)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"File not found: {path}")

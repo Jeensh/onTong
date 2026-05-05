@@ -756,6 +756,39 @@ class WikiService:
             return []
         return sorted(self._meta_index.get_related_reverse(path))
 
+    def get_inbound_references(self, path: str) -> list:
+        """Return Reference objects whose target_path == path.
+
+        Uses the RefIndex (Phase 1 Task 1-2) so it covers ALL kinds:
+        FM_SUPERSEDES, FM_SUPERSEDED_BY, FM_RELATED, BODY_WIKILINK, BODY_MD_LINK.
+
+        For BODY_WIKILINK refs, target_path is the stem (not the full path).
+        We resolve the stem to the actual path via filename matching
+        (consistent with WikiSearchService.build_backlink_map). If multiple
+        files share the same stem, all are returned (over-collect — better
+        to block than silently miss).
+        """
+        ref_index = self._get_ref_index_lazy()
+        if ref_index is None:
+            return []
+
+        # Direct path-based inbound (covers FM_*, BODY_MD_LINK)
+        direct = ref_index.inbound(path)
+
+        # Stem-based inbound for BODY_WIKILINK
+        from pathlib import Path as _Path
+        stem = _Path(path).stem
+        if stem and stem != path:
+            from backend.application.refindex.extractor import RefKind
+            stem_inbound = ref_index.inbound(stem, kind=RefKind.BODY_WIKILINK)
+            # Filter: only count wikilinks whose stem actually resolves to THIS path,
+            # not some other file with the same stem in a different folder.
+            # For Phase 1: include all stem matches (over-collect). Phase 3 will
+            # disambiguate via stem-to-path map.
+            direct = list(direct) + list(stem_inbound)
+
+        return direct
+
     async def move_folder(self, old_path: str, new_path: str) -> bool:
         # Collect old file paths before move — needed for conflict cleanup AND RefIndex rename
         old_files: list[str] = []
