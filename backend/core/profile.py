@@ -18,6 +18,7 @@ VALID_BACKENDS = {
     "kv": {"memory", "redis"},
     "task_queue": {"asyncio", "arq"},
     "fulltext": {"bm25_inmem", "pg_fts", "elasticsearch"},
+    "ref_index": {"sqlite", "postgres"},
 }
 
 
@@ -30,6 +31,7 @@ class Profile:
     kv_backend: str
     task_queue_backend: str
     fulltext_backend: str
+    ref_index_backend: str = "sqlite"  # default: sqlite (dev-safe)
 
 
 _DEFAULTS: dict[str, dict[str, str]] = {
@@ -40,6 +42,7 @@ _DEFAULTS: dict[str, dict[str, str]] = {
         "kv": "memory",
         "task_queue": "asyncio",
         "fulltext": "bm25_inmem",
+        "ref_index": "sqlite",
     },
     "team": {
         "lock": "redis",
@@ -48,6 +51,7 @@ _DEFAULTS: dict[str, dict[str, str]] = {
         "kv": "redis",
         "task_queue": "arq",
         "fulltext": "bm25_inmem",
+        "ref_index": "postgres",
     },
     "enterprise": {
         "lock": "redis",
@@ -56,6 +60,7 @@ _DEFAULTS: dict[str, dict[str, str]] = {
         "kv": "redis",
         "task_queue": "arq",
         "fulltext": "elasticsearch",
+        "ref_index": "postgres",
     },
 }
 
@@ -66,6 +71,7 @@ _OVERRIDE_KEYS = {
     "kv": "ONTONG_KV_BACKEND",
     "task_queue": "ONTONG_TASK_QUEUE_BACKEND",
     "fulltext": "ONTONG_FULLTEXT_BACKEND",
+    "ref_index": "ONTONG_REF_INDEX_BACKEND",
 }
 
 
@@ -100,4 +106,5 @@ def resolve_profile(profile: str, overrides: dict[str, str]) -> Profile:
         kv_backend=chosen["kv"],
         task_queue_backend=chosen["task_queue"],
         fulltext_backend=chosen["fulltext"],
+        ref_index_backend=chosen["ref_index"],
     )

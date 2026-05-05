@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     ontong_kv_backend: str = ""
     ontong_task_queue_backend: str = ""
     ontong_fulltext_backend: str = ""
+    ontong_ref_index_backend: str = ""
 
     # Postgres (team / enterprise)
     postgres_dsn: str = ""  # e.g. postgresql+asyncpg://user:pass@localhost:5432/ontong
@@ -109,6 +110,7 @@ class Settings(BaseSettings):
             ("ONTONG_KV_BACKEND", "ontong_kv_backend"),
             ("ONTONG_TASK_QUEUE_BACKEND", "ontong_task_queue_backend"),
             ("ONTONG_FULLTEXT_BACKEND", "ontong_fulltext_backend"),
+            ("ONTONG_REF_INDEX_BACKEND", "ontong_ref_index_backend"),
         ]:
             val = getattr(self, attr)
             if val:

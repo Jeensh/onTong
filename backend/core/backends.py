@@ -175,3 +175,33 @@ def get_task_queue(profile: Profile, *, redis_url: str = ""):
     _singletons["task_queue"] = (profile.task_queue_backend, q)
     logger.info(f"TaskQueue backend initialized: {profile.task_queue_backend}")
     return q
+
+
+def get_ref_index(profile: Profile, *, sqlite_path: str | None = None, postgres_dsn: str = ""):
+    """Return a RefIndex matching the profile."""
+    cached = _singletons.get("ref_index")
+    if cached is not None:
+        cached_name, cached_obj = cached
+        if cached_name != profile.ref_index_backend:
+            raise RuntimeError(
+                f"Profile changed mid-process: cached ref_index backend is {cached_name!r}, "
+                f"requested {profile.ref_index_backend!r}. Call _reset_for_test() between switches."
+            )
+        return cached_obj
+
+    if profile.ref_index_backend == "sqlite":
+        from backend.application.refindex.sqlite_backend import SqliteRefIndex
+        if sqlite_path is None:
+            raise RuntimeError("sqlite_path required for sqlite ref_index backend")
+        index = SqliteRefIndex(sqlite_path)
+    elif profile.ref_index_backend == "postgres":
+        from backend.application.refindex.postgres_backend import PostgresRefIndex
+        if not postgres_dsn:
+            raise RuntimeError("postgres_dsn required for postgres ref_index backend")
+        index = PostgresRefIndex(postgres_dsn)
+    else:
+        raise ValueError(f"unknown ref_index backend: {profile.ref_index_backend}")
+
+    _singletons["ref_index"] = (profile.ref_index_backend, index)
+    logger.info(f"RefIndex backend initialized: {profile.ref_index_backend}")
+    return index
