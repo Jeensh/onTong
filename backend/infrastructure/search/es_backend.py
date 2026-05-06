@@ -80,14 +80,34 @@ class ESSearchBackend(FullTextSearch):
             self._es.indices.put_alias(index=initial_name, name=INDEX_ALIAS)
             logger.info(f"Created index {initial_name} aliased to {INDEX_ALIAS}")
 
-    def add_documents(self, docs: list) -> int:
-        """Bulk index via elasticsearch helpers."""
+    def create_fresh_index(self) -> str:
+        """Create a new timestamped index with the same mapping. Returns the new index name.
+
+        Used by cmd_fulltext_export to build a shadow index before alias-swap.
+        """
+        import time
+        new_name = f"{INDEX_PREFIX}{int(time.time())}"
+        mapping = NORI_ANALYZER_MAPPING if self._use_nori else STANDARD_MAPPING
+        try:
+            self._es.indices.create(index=new_name, body=mapping)
+        except Exception:
+            self._es.indices.create(index=new_name, body=STANDARD_MAPPING)
+        logger.info(f"Created fresh index {new_name}")
+        return new_name
+
+    def add_documents(self, docs: list, *, target_index: str | None = None) -> int:
+        """Bulk index via elasticsearch helpers.
+
+        By default, writes to the live alias (INDEX_ALIAS).
+        Pass target_index to write to a specific timestamped index for alias-swap migration.
+        """
         from elasticsearch.helpers import bulk
+        index_to_use = target_index or INDEX_ALIAS
         actions = []
         for d in docs:
             # d is BM25Document or dict-like; extract fields
             actions.append({
-                "_index": INDEX_ALIAS,
+                "_index": index_to_use,
                 "_id": getattr(d, "id", None) or d.get("id"),
                 "_source": {
                     "file_path": getattr(d, "file_path", None) or d.get("file_path"),

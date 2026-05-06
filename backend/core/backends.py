@@ -314,10 +314,9 @@ def get_fulltext_search(profile: Profile, *, es_url: str = ""):
         return cached_obj
 
     if profile.fulltext_backend == "bm25_inmem":
-        # Reuse the existing global BM25 index. We wrap it minimally so it
-        # exposes the FullTextSearch protocol surface.
-        from backend.infrastructure.search.bm25 import bm25_index
-        backend_obj = bm25_index  # the class already has add_documents, remove_by_file, search, etc.
+        # Return a protocol-conforming adapter wrapping the global BM25 index.
+        from backend.infrastructure.search.bm25_adapter import BM25SearchAdapter
+        backend_obj = BM25SearchAdapter()
     elif profile.fulltext_backend == "elasticsearch":
         from backend.infrastructure.search.es_backend import ESSearchBackend
         if not es_url:

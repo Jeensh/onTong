@@ -119,3 +119,72 @@ def test_factory_dev_profile_returns_bm25(monkeypatch):
     assert hasattr(result, "add_documents")
     assert hasattr(result, "search")
     _reset_for_test()
+
+
+def test_cmd_fulltext_export_uses_alias_swap(monkeypatch, tmp_path):
+    """cmd_fulltext_export builds a fresh index, populates it, then swaps alias."""
+    fake_es = MagicMock()
+    fake_es.indices.exists_alias.return_value = True  # skip _ensure_index create
+    fake_es.indices.create.return_value = {"acknowledged": True}
+    fake_es.indices.get_alias.return_value = {"old-index": {}}
+    fake_es.indices.put_alias.return_value = {"acknowledged": True}
+    fake_es.indices.update_aliases.return_value = {"acknowledged": True}
+
+    monkeypatch.setattr(
+        "backend.infrastructure.search.es_backend._build_client",
+        lambda url: fake_es,
+    )
+    monkeypatch.setattr(
+        "elasticsearch.helpers.bulk",
+        lambda es, actions, **kw: (len(actions), []),
+    )
+
+    monkeypatch.setenv("ONTONG_PROFILE", "dev")
+    import importlib, backend.core.config
+    importlib.reload(backend.core.config)
+
+    import backend.core.config as cfg
+    cfg.settings.wiki_dir = str(tmp_path)
+    (tmp_path / "doc.md").write_text("# Hello\nbody text\n")
+
+    from unittest.mock import patch
+    with patch("backend.application.wiki.wiki_indexer.WikiIndexer.chunk", return_value=[]):
+        import argparse
+        from backend.cli.migrate import cmd_fulltext_export
+        ns = argparse.Namespace(from_="bm25", to="es", es_url="http://fake:9200")
+        result = cmd_fulltext_export(ns)
+
+    assert result == 0
+    # Alias swap must have been called (both remove + add in actions)
+    fake_es.indices.update_aliases.assert_called()
+    call_args = fake_es.indices.update_aliases.call_args
+    actions = call_args.kwargs.get("body", {}).get("actions", [])
+    types = [list(a.keys())[0] for a in actions]
+    assert "add" in types
+
+
+def test_factory_bm25_returns_adapter_conforming_to_protocol(monkeypatch):
+    """get_fulltext_search(dev) returns a FullTextSearch-conforming BM25SearchAdapter."""
+    monkeypatch.setenv("ONTONG_PROFILE", "dev")
+    import importlib, backend.core.config
+    importlib.reload(backend.core.config)
+    from backend.core.backends import _reset_for_test, get_fulltext_search
+    _reset_for_test()
+    from backend.core.config import settings
+    profile = settings.resolve_profile()
+
+    backend_inst = get_fulltext_search(profile)
+
+    # Must be a proper FullTextSearch subclass (isinstance passes ABC check)
+    from backend.infrastructure.search.fulltext_protocol import FullTextSearch
+    assert isinstance(backend_inst, FullTextSearch)
+
+    # add_documents returns int
+    n = backend_inst.add_documents([])
+    assert isinstance(n, int)
+
+    # search returns list (of SearchHit or empty)
+    hits = backend_inst.search("nonexistent_query_xyzzy_123", limit=5)
+    assert isinstance(hits, list)
+
+    _reset_for_test()

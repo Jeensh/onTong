@@ -135,16 +135,16 @@ def cmd_fulltext_export(args: argparse.Namespace) -> int:
     if to_backend == "es":
         es_url = getattr(args, "es_url", "") or "http://localhost:9200"
         try:
-            from backend.infrastructure.search.es_backend import ESSearchBackend, INDEX_PREFIX
-            import time
+            from backend.infrastructure.search.es_backend import ESSearchBackend
         except ImportError as e:
             print(f"ERROR: elasticsearch dep missing: {e}")
             print("  pip install elasticsearch")
             return 2
 
-        # Build a fresh index with timestamp suffix
+        # Build a fresh shadow index, populate it, then atomically swap alias
         es = ESSearchBackend(es_url)
-        new_index_name = f"{INDEX_PREFIX}{int(time.time())}"
+        new_index_name = es.create_fresh_index()
+        print(f"Building fresh index {new_index_name} ...")
 
         # Walk wiki dir, chunk via existing WikiIndexer.chunk method
         from backend.application.wiki.wiki_indexer import WikiIndexer
@@ -194,7 +194,8 @@ def cmd_fulltext_export(args: argparse.Namespace) -> int:
                     }
                     for c in chunks
                 ]
-                added = es.add_documents(docs)
+                # Write to shadow index, NOT the live alias
+                added = es.add_documents(docs, target_index=new_index_name)
                 total_chunks += added
                 if (i + 1) % 100 == 0:
                     print(f"  ... {i+1}/{len(all_paths)} files, {total_chunks} chunks")
@@ -202,7 +203,9 @@ def cmd_fulltext_export(args: argparse.Namespace) -> int:
                 print(f"  WARN {rel}: {e}")
 
         print(f"Indexed {total_chunks} chunks across {len(all_paths)} files")
-        print(f"Alias {INDEX_PREFIX}* swapped to current index")
+        print(f"Swapping alias to {new_index_name} ...")
+        es.alias_swap(new_index_name)
+        print("Done.")
         return 0
 
     elif to_backend == "bm25":

@@ -1,7 +1,8 @@
 "use client";
 
 export interface ConflictBlock {
-  startLine: number;          // line number in the merged output
+  id: string;              // unique sentinel baked into marker text
+  startLine: number;       // line number in the merged output
   baseLines: string[];
   mineLines: string[];
   serverLines: string[];
@@ -13,6 +14,12 @@ export interface ThreeWayMergeResult {
   merged: string;             // text with conflict markers if any
   conflicts: ConflictBlock[];
   hasConflicts: boolean;
+}
+
+let _nextBlockId = 0;
+function _makeBlockId(): string {
+  _nextBlockId += 1;
+  return `b${_nextBlockId}`;
 }
 
 export function threeWayMerge(base: string, mine: string, server: string): ThreeWayMergeResult {
@@ -77,19 +84,21 @@ export function threeWayMerge(base: string, mine: string, server: string): Three
 
     // True conflict: collect runs of conflicting lines on both sides until
     // we resync. Naive: take one line from each side, emit conflict block, advance.
+    const blockId = _makeBlockId();
     const startLine = output.length;
     const block: ConflictBlock = {
+      id: blockId,
       startLine,
       baseLines: baseLine !== null ? [baseLine] : [],
       mineLines: mineLine !== null ? [mineLine] : [],
       serverLines: serverLine !== null ? [serverLine] : [],
       resolution: null,
     };
-    output.push("<<<<<<< MINE");
+    output.push(`<<<<<<< MINE [${blockId}]`);
     if (mineLine !== null) output.push(mineLine);
     output.push("=======");
     if (serverLine !== null) output.push(serverLine);
-    output.push(">>>>>>> SERVER");
+    output.push(`>>>>>>> SERVER [${blockId}]`);
     conflicts.push(block);
 
     if (baseLine !== null) i++;
@@ -105,9 +114,60 @@ export function threeWayMerge(base: string, mine: string, server: string): Three
 }
 
 /**
- * Apply a single block resolution to merged text by replacing the conflict markers.
- * Uses blockIndex to locate the Nth conflict block in the merged string.
+ * Apply a single block resolution to merged text by looking up the block by its
+ * sentinel ID embedded in the marker. This is safe even after other blocks have
+ * been resolved (i.e., their markers removed), because each marker carries a unique ID.
  * Returns updated merged string.
+ */
+export function applyResolutionById(
+  merged: string,
+  blockId: string,
+  resolution: "ours" | "theirs" | "both",
+): string {
+  const lines = merged.split("\n");
+  const startMarker = `<<<<<<< MINE [${blockId}]`;
+  const endMarker = `>>>>>>> SERVER [${blockId}]`;
+  let startIdx = -1;
+  let midIdx = -1;
+  let endIdx = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i] === startMarker) {
+      startIdx = i;
+    } else if (startIdx !== -1 && lines[i] === "=======" && midIdx === -1) {
+      midIdx = i;
+    } else if (midIdx !== -1 && lines[i] === endMarker) {
+      endIdx = i;
+      break;
+    }
+  }
+
+  if (startIdx === -1 || midIdx === -1 || endIdx === -1) return merged;
+
+  let replacement: string[];
+  if (resolution === "ours") {
+    replacement = lines.slice(startIdx + 1, midIdx);
+  } else if (resolution === "theirs") {
+    replacement = lines.slice(midIdx + 1, endIdx);
+  } else {
+    // both
+    replacement = [
+      ...lines.slice(startIdx + 1, midIdx),
+      ...lines.slice(midIdx + 1, endIdx),
+    ];
+  }
+
+  return [
+    ...lines.slice(0, startIdx),
+    ...replacement,
+    ...lines.slice(endIdx + 1),
+  ].join("\n");
+}
+
+/**
+ * @deprecated Use applyResolutionById instead.
+ * Kept for backwards compatibility — finds block by position index.
+ * BREAKS after the first block is resolved (markers shift).
  */
 export function applyResolutionByIndex(
   merged: string,
@@ -121,14 +181,15 @@ export function applyResolutionByIndex(
   let endIdx = -1;
 
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i] === "<<<<<<< MINE") {
+    // Match any <<<<<<< MINE [*] marker
+    if (lines[i].startsWith("<<<<<<< MINE [")) {
       currentBlock++;
       if (currentBlock === blockIndex) {
         startIdx = i;
       }
     } else if (lines[i] === "=======" && startIdx !== -1 && midIdx === -1 && currentBlock === blockIndex) {
       midIdx = i;
-    } else if (lines[i] === ">>>>>>> SERVER" && midIdx !== -1 && currentBlock === blockIndex) {
+    } else if (lines[i].startsWith(">>>>>>> SERVER [") && midIdx !== -1 && currentBlock === blockIndex) {
       endIdx = i;
       break;
     }

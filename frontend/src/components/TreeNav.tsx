@@ -371,6 +371,8 @@ function DraggableTreeItem({
             onContextMenu={(e) => onContextMenu(e, node)}
             onClick={(e) => {
               if (onNodeClick && (e.shiftKey || e.metaKey || e.ctrlKey)) {
+                // Bulk selection is files-only; skip directories
+                if (node.is_dir) return;
                 onNodeClick(node, e);
                 return;
               }
@@ -1770,12 +1772,12 @@ export function TreeNav() {
 
     // Bulk drag: dragged node is part of a multi-selection (>1 files only, no dirs)
     if (selectedPaths.has(draggedNode.path) && selectedPaths.size > 1) {
-      // Only move files (not dirs) in bulk to keep things simple
+      // Filter out any directories that may have slipped into the selection
       const filePaths = [...selectedPaths].filter((p) => {
-        // exclude dirs by checking tree (we only have flat paths here, so use path heuristic or skip)
-        // We trust the caller to only select files; dirs fall through to single-move path
-        return true;
+        const node = findTreeNode(tree, p);
+        return node && !node.is_dir;
       });
+      if (filePaths.length === 0) return;
       const pairs = filePaths
         .filter((p) => !p.startsWith(targetFolderPath + "/") && p !== targetFolderPath)
         .map((oldPath) => {
@@ -1813,7 +1815,7 @@ export function TreeNav() {
     } catch (err) {
       toast.error(`이동 실패: ${(err as Error).message}`);
     }
-  }, [tabs, updateTabPath, selectedPaths]);
+  }, [tabs, updateTabPath, selectedPaths, tree]);
 
   // ── Bulk Move ────────────────────────────────────────────────────
 

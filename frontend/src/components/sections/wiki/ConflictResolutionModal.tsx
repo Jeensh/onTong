@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ConflictPayload } from "@/lib/wiki/saveWithOCC";
-import { threeWayMerge, applyResolutionByIndex } from "@/lib/wiki/threeWayMerge";
+import { threeWayMerge, applyResolutionById } from "@/lib/wiki/threeWayMerge";
 
 export type ConflictAction =
   | { type: "merged"; content: string; baseVersion: string }
@@ -22,21 +22,26 @@ export function ConflictResolutionModal(props: {
   );
 
   const [merged, setMerged] = useState<string>(initialMerge.merged);
-  const conflictBlocks = useMemo(
-    () => threeWayMerge(baseContent, myContent, conflict.server_content).conflicts,
-    [baseContent, myContent, conflict.server_content]
-  );
+
+  // Reset merged state when a new conflict arrives (server_version changed)
+  useEffect(() => {
+    setMerged(initialMerge.merged);
+  }, [conflict.server_version, initialMerge.merged]);
+
+  // Derive conflict blocks from initialMerge (stable reference via useMemo)
+  const conflictBlocks = initialMerge.conflicts;
 
   const remainingConflicts = useMemo(() => {
-    return (merged.match(/^<<<<<<< MINE$/gm) ?? []).length;
+    // Count remaining unresolved markers: look for <<<<<<< MINE [*]
+    return (merged.match(/^<<<<<<< MINE \[/gm) ?? []).length;
   }, [merged]);
 
   const myLines = myContent.split("\n").length;
   const serverLines = conflict.server_content.split("\n").length;
   const baseLines = baseContent.split("\n").length;
 
-  const resolveBlock = (idx: number, action: "ours" | "theirs" | "both") => {
-    setMerged((m) => applyResolutionByIndex(m, idx, action));
+  const resolveBlock = (blockId: string, action: "ours" | "theirs" | "both") => {
+    setMerged((m) => applyResolutionById(m, blockId, action));
   };
 
   return (
@@ -77,11 +82,12 @@ export function ConflictResolutionModal(props: {
             <h3 className="text-sm font-semibold text-slate-800">머지 결과 (저장될 내용)</h3>
             {conflictBlocks.length > 0 && (
               <div className="flex gap-1">
-                {conflictBlocks.map((_, i) => (
+                {conflictBlocks.map((block, i) => (
                   <ConflictBlockButtons
-                    key={i}
+                    key={block.id}
+                    blockId={block.id}
                     index={i}
-                    onResolve={(action) => resolveBlock(i, action)}
+                    onResolve={(action) => resolveBlock(block.id, action)}
                   />
                 ))}
               </div>
@@ -132,7 +138,15 @@ function Column({ title, content, variant }: { title: string; content: string; v
   );
 }
 
-function ConflictBlockButtons({ index, onResolve }: { index: number; onResolve: (action: "ours" | "theirs" | "both") => void }) {
+function ConflictBlockButtons({
+  blockId,
+  index,
+  onResolve,
+}: {
+  blockId: string;
+  index: number;
+  onResolve: (action: "ours" | "theirs" | "both") => void;
+}) {
   return (
     <div className="flex gap-0.5 rounded border border-slate-300 bg-white">
       <span className="border-r border-slate-300 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
