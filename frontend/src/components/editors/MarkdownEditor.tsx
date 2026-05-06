@@ -86,8 +86,9 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
   } | null>(null);
   const [linkedDocsCount, setLinkedDocsCount] = useState(0);
   const [viewerImage, setViewerImage] = useState<{ src: string; filename: string } | null>(null);
-  // OCC: track the ETag of the last-fetched version and any active conflict
+  // OCC: track the ETag + raw content of the last-fetched version and any active conflict
   const [baseVersion, setBaseVersion] = useState<string | null>(null);
+  const [baseContent, setBaseContent] = useState<string>("");
   const [conflict, setConflict] = useState<ConflictPayload | null>(null);
   const originalContentRef = useRef("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -234,6 +235,8 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
         if (draft) {
           // Restore unsaved draft (stored as raw HTML — no conversion needed)
           originalContentRef.current = wiki.content;
+          // Capture base content at load time (raw markdown, before draft restored)
+          setBaseContent(wiki.raw_content ?? wiki.content ?? "");
           loadedRef.current = false;
           editor?.commands.setContent(draft);
           requestAnimationFrame(() => { loadedRef.current = true; });
@@ -243,6 +246,8 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
           // Normal load from server
           const html = markdownToHtml(wiki.content);
           originalContentRef.current = wiki.content;
+          // Capture base content at load time (raw markdown for 3-way merge)
+          setBaseContent(wiki.raw_content ?? wiki.content ?? "");
           loadedRef.current = false;
           editor?.commands.setContent(html);
           requestAnimationFrame(() => { loadedRef.current = true; });
@@ -311,8 +316,9 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
           setConflict(result);
           return;
         }
-        // Success path — update ETag for next save
+        // Success path — update ETag and base content for next save / conflict detection
         if (result.newVersion) setBaseVersion(result.newVersion);
+        setBaseContent(fullContent);
 
         // Refresh metadata from server (timestamps, author injected by backend)
         const saved = await fetchFile(filePath).catch(() => null);
@@ -358,69 +364,51 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
   );
   handleSaveRef.current = handleSave;
 
-  // Handle user action from the conflict resolution modal
+  // Handle user action from the 3-way merge conflict modal
   const handleConflictAction = useCallback(
     async (action: ConflictAction) => {
       if (!conflict) return;
       if (action.type === "cancel") {
+        // Keep local content unchanged; do NOT advance baseVersion (next save will conflict again)
         setConflict(null);
         return;
       }
-      if (action.type === "reload") {
-        // Discard local changes — load server's content into the editor
-        const html = (await import("@/lib/tiptap/markdown")).markdownToHtml(
-          conflict.server_content
-        );
-        originalContentRef.current = conflict.server_content;
-        loadedRef.current = false;
-        editor?.commands.setContent(html);
-        requestAnimationFrame(() => { loadedRef.current = true; });
-        setBaseVersion(conflict.server_version);
-        setDirty(tabId, false);
-        clearDraft(filePath);
-        setConflict(null);
+      // type === "merged": save the user-resolved merge result
+      const { htmlToMarkdown: h2m, markdownToHtml: m2h } = await import(
+        "@/lib/tiptap/markdown"
+      );
+      const { mergeFrontmatterAndBody: mf, parseFrontmatter: pf } = await import(
+        "@/lib/markdown/frontmatterSync"
+      );
+      // action.content is already raw markdown from the merge textarea
+      const fullContent = mf(metadata, action.content);
+      const result = await saveWithOCC({
+        path: conflict.path,
+        content: fullContent,
+        baseVersion: action.baseVersion, // = conflict.server_version at conflict time
+      });
+      if ("conflict" in result && result.conflict) {
+        // Yet another concurrent save while the user was resolving — refresh modal
+        setConflict(result);
         return;
       }
-      if (action.type === "overwrite") {
-        // Force-save local content using server_version as the new If-Match base
-        // (avoids infinite conflict loop vs the truly stale base_version)
-        if (!editor) return;
-        const rawContent = editor.getHTML();
-        const { htmlToMarkdown: h2m, markdownToHtml: m2h } = await import(
-          "@/lib/tiptap/markdown"
-        );
-        const { mergeFrontmatterAndBody: mf } = await import(
-          "@/lib/markdown/frontmatterSync"
-        );
-        const md = h2m(rawContent);
-        const fullContent = mf(metadata, md);
-        const result = await saveWithOCC({
-          path: conflict.path,
-          content: fullContent,
-          baseVersion: conflict.server_version, // use server's current version, not stale base
-        });
-        if ("conflict" in result && result.conflict) {
-          // Yet another concurrent edit — update the modal with fresh conflict info
-          setConflict(result);
-          return;
-        }
-        if (result.newVersion) setBaseVersion(result.newVersion);
-        const saved = await fetchFile(filePath).catch(() => null);
-        if (saved) {
-          const { parseFrontmatter: pf } = await import("@/lib/markdown/frontmatterSync");
-          if (saved.raw_content) setMetadata(pf(saved.raw_content));
-          else if (saved.metadata) setMetadata(saved.metadata);
-        }
-        const serverHtml = m2h(md);
-        originalContentRef.current = md;
-        loadedRef.current = false;
-        editor.commands.setContent(serverHtml);
-        requestAnimationFrame(() => { loadedRef.current = true; });
-        setDirty(tabId, false);
-        clearDraft(filePath);
-        setConflict(null);
-        toast.success("덮어쓰기 완료");
+      // Success — update editor, version, and base content
+      if (result.newVersion) setBaseVersion(result.newVersion);
+      setBaseContent(fullContent);
+      const saved = await fetchFile(filePath).catch(() => null);
+      if (saved) {
+        if (saved.raw_content) setMetadata(pf(saved.raw_content));
+        else if (saved.metadata) setMetadata(saved.metadata);
       }
+      const mergedHtml = m2h(action.content);
+      originalContentRef.current = action.content;
+      loadedRef.current = false;
+      editor?.commands.setContent(mergedHtml);
+      requestAnimationFrame(() => { loadedRef.current = true; });
+      setDirty(tabId, false);
+      clearDraft(filePath);
+      setConflict(null);
+      toast.success("머지 저장 완료");
     },
     [conflict, editor, filePath, tabId, metadata, setDirty, clearDraft]
   );
@@ -901,6 +889,7 @@ export function MarkdownEditor({ filePath, tabId }: MarkdownEditorProps) {
       {conflict && (
         <ConflictResolutionModal
           conflict={conflict}
+          baseContent={baseContent}
           myContent={editor ? htmlToMarkdown(editor.getHTML()) : ""}
           onAction={handleConflictAction}
         />
