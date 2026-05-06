@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>onTong Workbench — V7 Lens + Path-trace + L5 + Cross-domain</title>
+<link rel="stylesheet" href="_shared.css" />
+<style>
+  /* V7 = V6 + 팔란티어 비교 후 보강
+     - Backward 강화: side-by-side diff + risk score + cascade + rollback
+     - Graph: Lens 시스템 / Path-trace / L5 (anchor micro) / Cross-domain / Filter / Search
+  */
+  .app-shell {
+    display: grid;
+    grid-template-rows: 36px 32px 1fr 24px;
+    grid-template-columns: 280px minmax(420px, 1fr) var(--right-w, 380px);
+    grid-template-areas: "top top top" "tabs tabs tabs" "left main right" "status status status";
+    height: 100vh;
+  }
+  .app-shell.graph-mode {
+    grid-template-columns: 220px 1fr;
+    grid-template-areas: "top top" "tabs tabs" "gfilter graph" "status status";
+  }
+  .app-shell.graph-mode .left, .app-shell.graph-mode .main, .app-shell.graph-mode .right { display: none; }
+  .app-shell.graph-mode .graph { display: flex; }
+  .app-shell.graph-mode .gfilter { display: flex; }
+
+  .topbar { grid-area: top; }
+  .tabbar { grid-area: tabs; background: var(--panel-2); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 8px; gap: 1px; }
+  .left  { grid-area: left;  background: var(--panel-2); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .main  { grid-area: main;  background: var(--bg); overflow: hidden; display: flex; flex-direction: column; }
+  .right { grid-area: right; background: var(--panel-2); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+  .gfilter { grid-area: gfilter; background: var(--panel-2); border-right: 1px solid var(--border); display: none; flex-direction: column; overflow-y: auto; padding: 12px 14px; }
+  .graph { grid-area: graph; background: var(--bg); display: none; flex-direction: column; overflow: hidden; position: relative; }
+  .statusbar { grid-area: status; }
+
+  .tab { display: flex; align-items: center; gap: 6px; padding: 5px 12px; height: 26px; background: var(--panel-3); border: 1px solid var(--border); border-bottom: 0; border-radius: 5px 5px 0 0; margin-bottom: -1px; font-size: 11.5px; color: var(--text-dim); cursor: pointer; max-width: 240px; }
+  .tab.active { background: var(--bg); color: var(--text); border-bottom: 1px solid var(--bg); }
+  .tab .x { color: var(--text-faint); padding: 0 2px; }
+  .tab.unsaved::after { content: '●'; color: var(--accent); font-size: 14px; margin-left: 2px; }
+
+  /* LEFT */
+  .left-tabs { display: flex; padding: 6px 6px 0; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .left-tabs button { border: 0; border-radius: 4px 4px 0 0; padding: 5px 7px; color: var(--text-faint); border-bottom: 2px solid transparent; font-size: 11px; }
+  .left-tabs button.active { color: var(--text); border-bottom-color: var(--accent); background: var(--panel-2); }
+
+  /* MAIN modebar */
+  .main-modebar { height: 32px; padding: 0 14px; background: var(--panel-2); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .main-modebar .crumb { color: var(--text-faint); font-size: 11px; flex: 1; }
+  .dir-toggle { display: flex; gap: 0; background: var(--panel-3); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; margin-right: 8px; }
+  .dir-toggle button { border: 0; padding: 3px 10px; font-size: 11px; color: var(--text-faint); border-right: 1px solid var(--border); }
+  .dir-toggle button:last-child { border-right: 0; }
+  .dir-toggle button.active.fwd { background: var(--accent); color: var(--bg); }
+  .dir-toggle button.active.bwd { background: var(--warn); color: var(--bg); }
+  .mode-toggle { display: flex; gap: 0; background: var(--panel-3); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .mode-toggle button { border: 0; padding: 3px 10px; font-size: 11px; color: var(--text-faint); border-right: 1px solid var(--border); }
+  .mode-toggle button:last-child { border-right: 0; }
+  .mode-toggle button.active { background: var(--accent); color: var(--bg); }
+
+  .main-body { flex: 1; overflow: auto; padding: 14px 20px; }
+  .main-body.bwd { background: rgba(245,158,11,0.02); }
+
+  /* Backward 강화 */
+  .impact-banner { background: rgba(245,158,11,0.08); border: 1px solid var(--warn); border-radius: 6px; padding: 12px 16px; margin-bottom: 14px; display: flex; gap: 12px; align-items: center; }
+  .impact-banner .tag { background: var(--warn); color: var(--bg); padding: 3px 8px; border-radius: 3px; font-size: 10.5px; font-weight: 700; }
+
+  .risk-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 14px 18px; margin: 12px 0;
+    display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center;
+  }
+  .risk-score {
+    width: 70px; height: 70px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: conic-gradient(var(--warn) 0% 62%, var(--panel-3) 62% 100%);
+    position: relative;
+  }
+  .risk-score::before {
+    content: ''; position: absolute; inset: 6px; background: var(--panel); border-radius: 50%;
+  }
+  .risk-score .num {
+    position: relative; z-index: 1; font-size: 18px; font-weight: 700; color: var(--warn);
+  }
+  .risk-detail { font-size: 12px; color: var(--text-dim); line-height: 1.7; }
+  .risk-detail strong { color: var(--text); }
+
+  /* branch/scenario */
+  .branch-bar {
+    display: flex; gap: 6px; margin: 10px 0; align-items: center; flex-wrap: wrap;
+  }
+  .branch-pill {
+    background: var(--panel-2); border: 1px solid var(--border-2); border-radius: 4px;
+    padding: 4px 10px; font-size: 11.5px; color: var(--text-dim);
+    cursor: pointer; display: flex; gap: 6px; align-items: center;
+  }
+  .branch-pill.active { border-color: var(--accent); color: var(--accent); }
+  .branch-pill .x { color: var(--text-faint); cursor: pointer; }
+
+  /* Side-by-side diff */
+  .diff-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0;
+  }
+  .diff-pane {
+    background: var(--panel-3); border: 1px solid var(--border); border-radius: 4px;
+    padding: 10px 14px; overflow-x: auto;
+  }
+  .diff-pane .head {
+    font-size: 11px; color: var(--text-faint); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;
+  }
+  .diff-pane.asis .head { color: var(--text-faint); }
+  .diff-pane.tobe .head { color: var(--good); }
+  .diff-pane pre {
+    font-family: "SF Mono", Menlo, monospace; font-size: 11.5px;
+    color: var(--text); line-height: 1.6;
+  }
+  .diff-line.del { background: rgba(248,113,113,0.12); padding: 0 4px; display: inline-block; width: 100%; }
+  .diff-line.add { background: rgba(52,211,153,0.12); padding: 0 4px; display: inline-block; width: 100%; }
+  .diff-line.unchanged { color: var(--text-dim); }
+
+  /* Cascade tree */
+  .cascade-tree {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px 16px; margin: 10px 0; font-size: 12.5px;
+  }
+  .cascade-row {
+    padding: 4px 8px; border-radius: 3px; display: flex; gap: 8px; align-items: center;
+  }
+  .cascade-row.depth-0 { background: rgba(245,158,11,0.1); }
+  .cascade-row.depth-1 { padding-left: 24px; }
+  .cascade-row.depth-2 { padding-left: 40px; color: var(--text-dim); }
+  .cascade-row .arrow { color: var(--text-faint); }
+  .cascade-row .label { font-family: "SF Mono", Menlo, monospace; font-size: 11.5px; }
+
+  pre.code-snip { background: var(--panel-3); border: 1px solid var(--border); padding: 10px 14px; border-radius: 4px; overflow-x: auto; font-family: "SF Mono", Menlo, monospace; font-size: 12px; color: var(--text); line-height: 1.55; }
+  pre.code-snip .hi { background: rgba(56,189,248,0.18); padding: 0 2px; }
+
+  /* RIGHT */
+  .right-resize { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; cursor: col-resize; z-index: 5; }
+  .right-resize:hover { background: var(--accent); }
+  .right-tabs { display: flex; padding: 6px 8px 0; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .right-tabs button { border: 0; border-radius: 4px 4px 0 0; padding: 5px 10px; color: var(--text-faint); border-bottom: 2px solid transparent; font-size: 11.5px; }
+  .right-tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+  .right-content { padding: 12px 14px; overflow-y: auto; flex: 1; font-size: 12px; }
+  .ctx-block { margin-bottom: 14px; }
+  .ctx-block h4 { font-size: 11px; color: var(--text-faint); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+
+  /* GRAPH 모드 — 강화 */
+  .graph-toolbar {
+    height: 40px; padding: 0 14px; display: flex; align-items: center; gap: 12px;
+    background: var(--panel-2); border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .graph-toolbar h3 { font-size: 13px; font-weight: 600; }
+  .graph-bread { display: flex; gap: 4px; align-items: center; font-size: 12px; }
+  .graph-bread .crumb { padding: 3px 8px; background: var(--panel-3); border: 1px solid var(--border); border-radius: 3px; cursor: pointer; }
+  .graph-bread .crumb.current { background: var(--accent); color: var(--bg); }
+  .graph-bread .sep { color: var(--text-faint); }
+  .graph-tools { display: flex; gap: 4px; align-items: center; margin-left: auto; }
+  .graph-tools input[type=search] { background: var(--panel-3); border: 1px solid var(--border); padding: 3px 8px; border-radius: 3px; font-size: 11px; width: 160px; }
+  .level-slider { display: flex; gap: 0; background: var(--panel-3); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .level-slider button { border: 0; border-right: 1px solid var(--border); border-radius: 0; padding: 3px 8px; font-size: 11px; }
+  .level-slider button:last-child { border-right: 0; }
+  .level-slider button.active { background: var(--accent-2); color: var(--bg); }
+
+  /* GRAPH FILTER sidebar */
+  .gfilter h4 {
+    font-size: 11px; color: var(--text-faint); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em; margin: 14px 0 6px;
+  }
+  .gfilter h4:first-child { margin-top: 0; }
+  .gfilter .filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .gfilter label.fopt {
+    display: flex; gap: 6px; align-items: center; font-size: 11.5px;
+    padding: 3px 6px; cursor: pointer; border-radius: 3px;
+  }
+  .gfilter label.fopt:hover { background: var(--panel-3); }
+  .gfilter label.fopt input { accent-color: var(--accent); }
+
+  /* Lens 시스템 */
+  .lens-bar {
+    display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  }
+  .lens-pill {
+    background: var(--panel-3); border: 1px solid var(--border); border-radius: 4px;
+    padding: 3px 8px; font-size: 10.5px; cursor: pointer; color: var(--text-faint);
+    display: flex; gap: 4px; align-items: center;
+  }
+  .lens-pill:hover { color: var(--text); }
+  .lens-pill.active {
+    background: rgba(56,189,248,0.1); border-color: var(--accent); color: var(--accent);
+  }
+  .lens-pill .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--bad), var(--warn), var(--good));
+  }
+
+  .graph-canvas {
+    flex: 1; background: radial-gradient(circle at 50% 50%, var(--panel-2), var(--bg)),
+      repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px);
+    position: relative; overflow: hidden;
+  }
+  .graph-view { display: none; position: absolute; inset: 0; }
+  .graph-view.active { display: block; }
+
+  .graph-node {
+    position: absolute; padding: 8px 14px; border-radius: 6px;
+    background: var(--panel); border: 1px solid var(--border-2);
+    font-size: 11.5px; color: var(--text); cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3); user-select: none;
+    transition: opacity 0.15s, border-color 0.15s, transform 0.1s;
+  }
+  .graph-node:hover { transform: scale(1.04); border-color: var(--accent); }
+  .graph-node.dimmed { opacity: 0.25; }
+  .graph-node.path-traced { border: 2px solid var(--accent); box-shadow: 0 0 12px rgba(56,189,248,0.5); }
+
+  .graph-node.code { border-left: 3px solid var(--code-fg); }
+  .graph-node.domain { border-left: 3px solid var(--domain-fg); }
+  .graph-node.action { border-left: 3px solid var(--action-fg); }
+  .graph-node.rule { border-left: 3px solid var(--rule-fg); }
+
+  /* Verification lens (verify_lens 활성 시) */
+  .lens-verify .graph-node[data-vl="UNMAPPED"] { background: rgba(248,113,113,0.15); border-color: var(--bad); }
+  .lens-verify .graph-node[data-vl="DRAFT"] { background: rgba(245,158,11,0.15); border-color: var(--warn); }
+  .lens-verify .graph-node[data-vl="SIGNATURE_LOCKED"] { background: rgba(245,158,11,0.06); border-color: var(--warn); }
+  .lens-verify .graph-node[data-vl="BODY_ANCHORED"] { background: rgba(56,189,248,0.1); border-color: var(--accent); }
+  .lens-verify .graph-node[data-vl="SIM_VERIFIED"] { background: rgba(52,211,153,0.15); border-color: var(--good); }
+  .lens-verify .graph-node[data-vl="PR_PROVEN"] { background: rgba(52,211,153,0.25); border-color: var(--good); }
+
+  /* Cross-domain edge */
+  .cross-domain { stroke: var(--warn) !important; stroke-width: 2.5 !important; }
+
+  /* Right-click menu */
+  .ctxmenu {
+    position: absolute; background: var(--panel); border: 1px solid var(--border-2);
+    border-radius: 6px; padding: 4px 0; min-width: 200px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 100; display: none;
+  }
+  .ctxmenu.show { display: block; }
+  .ctxmenu .item {
+    padding: 6px 12px; font-size: 12px; color: var(--text-dim); cursor: pointer;
+    display: flex; gap: 8px; align-items: center;
+  }
+  .ctxmenu .item:hover { background: var(--panel-2); color: var(--accent); }
+  .ctxmenu .sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+  .graph-legend {
+    position: absolute; bottom: 16px; left: 16px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 14px; font-size: 11px;
+  }
+  .graph-legend .row { display: flex; align-items: center; gap: 6px; margin: 0; }
+  .graph-legend .swatch { width: 10px; height: 3px; background: var(--accent-2); border-radius: 2px; }
+
+  .lvl-bar { display: inline-block; height: 5px; width: 60px; background: var(--panel-3); border-radius: 3px; overflow: hidden; }
+  .lvl-bar > span { display: block; height: 100%; background: var(--accent); }
+</style>
+</head>
+<body>
+<div class="app-shell" id="shell">
+
+<header class="topbar">
+  <span class="brand"><span class="o">on</span>Tong</span>
+  <span class="repo">slab-design-real · main</span>
+  <span class="spacer"></span>
+  <button class="cmd-k">⌘K  검색 / 명령</button>
+  <button onclick="toggleGraphMode(true)">🌐 그래프</button>
+  <button class="primary">시뮬</button>
+</header>
+
+<div class="tabbar">
+  <div class="tab"><span>📋</span><span>주문_검증</span><span class="x">×</span></div>
+  <div class="tab active unsaved"><span>🔧</span><span>C 함량 변경 영향</span><span class="x">×</span></div>
+  <div class="tab"><span>📊</span><span>대시보드</span><span class="x">×</span></div>
+</div>
+
+<!-- LEFT (Backward 모드라 좌측은 단순화) -->
+<aside class="left">
+  <div class="left-tabs">
+    <button class="active">📊 Map</button>
+    <button>Code</button>
+    <button>Domain</button>
+    <button>Action</button>
+    <button>큐</button>
+  </div>
+  <div style="padding: 10px; font-size: 11.5px; color: var(--text-dim);">
+    Backward 모드 활성 — 변경 대상 도메인 term 만 highlight.
+  </div>
+  <div style="padding: 8px;">
+    <div style="background: rgba(245,158,11,0.1); border: 1px solid var(--warn); border-radius: 4px; padding: 8px 12px;">
+      <div style="font-size: 11px; color: var(--warn); margin-bottom: 3px;">변경 중</div>
+      <div style="font-size: 12.5px; font-weight: 600;">C 함량 (atomic)</div>
+      <div style="font-size: 11px; color: var(--text-dim);">term.scm.c_pct.range</div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="main-modebar">
+    <div class="crumb">scm › <strong>C 함량 변경</strong></div>
+    <div class="dir-toggle">
+      <button class="fwd">🔍 Forward</button>
+      <button class="active bwd">🔧 Backward</button>
+    </div>
+    <div class="mode-toggle">
+      <button class="active">Detail</button>
+      <button>↕ Split</button>
+      <button onclick="toggleGraphMode(true)">🌐 Graph</button>
+    </div>
+  </div>
+
+  <div class="main-body bwd">
+    <div class="impact-banner">
+      <span class="tag">🔧 BACKWARD</span>
+      <span>
+        <strong>C 함량 max 0.25 → 0.30 변경 영향</strong> ·
+        4 branches 동시 비교 ·
+        risk 62/100
+      </span>
+    </div>
+
+    <!-- Branch / scenario 분기 (P10 rollback) -->
+    <div class="branch-bar">
+      <span style="color: var(--text-faint); font-size: 11px; margin-right: 4px;">분기:</span>
+      <span class="branch-pill active">
+        <span style="color: var(--accent);">●</span> 0.25→0.30 (current)
+      </span>
+      <span class="branch-pill">○ 0.25→0.28 (보수)</span>
+      <span class="branch-pill">○ 0.25→0.35 (적극)</span>
+      <span class="branch-pill">○ Mn 도 동시</span>
+      <button style="font-size: 11px;">+ 새 분기</button>
+      <span style="margin-left: auto; color: var(--text-faint); font-size: 11px;">⏎ 활성 분기 비교</span>
+    </div>
+
+    <!-- Risk score (P10 risk_score) -->
+    <div class="risk-card">
+      <div class="risk-score"><span class="num">62</span></div>
+      <div class="risk-detail">
+        <div><strong>위험도 62/100</strong> · medium-high</div>
+        <div>· 영향 크기: <strong>14 코드 위치 + 6 Action + 2 Rule</strong> (점수 18)</div>
+        <div>· 시뮬 통과 신뢰도: <strong>78%</strong> (점수 22)</div>
+        <div>· HARD-rule 위반 가능: <strong>1건</strong> (rule.scm.quality_grade_a, 점수 22)</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <button class="primary" style="font-size: 11px;">🌊 시뮬 실행</button>
+        <button style="font-size: 11px;">📤 draft PR</button>
+      </div>
+    </div>
+
+    <!-- Side-by-side diff (P10 diff_view) -->
+    <div style="margin: 16px 0 8px; display: flex; align-items: center; gap: 10px;">
+      <h3 style="font-size: 13px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em;">Side-by-side Diff</h3>
+      <div class="mode-toggle" style="margin-left: auto;">
+        <button class="active" style="font-size: 10.5px;">Java</button>
+        <button style="font-size: 10.5px;">Term</button>
+        <button style="font-size: 10.5px;">Rule</button>
+        <button style="font-size: 10.5px;">매뉴얼</button>
+      </div>
+    </div>
+    <div class="diff-grid">
+      <div class="diff-pane asis">
+        <div class="head">As-is (현재)</div>
+        <pre><span class="diff-line unchanged">@Override</span>
+<span class="diff-line unchanged">public ValidationResult validate() {</span>
+<span class="diff-line unchanged">  if (latest.C &lt; 0.10 ||</span>
+<span class="diff-line del">      latest.C &gt; 0.25)</span>
+<span class="diff-line unchanged">    return fail("C 함량 위반");</span>
+<span class="diff-line unchanged">  ...</span>
+<span class="diff-line unchanged">}</span></pre>
+      </div>
+      <div class="diff-pane tobe">
+        <div class="head">To-be (제안)</div>
+        <pre><span class="diff-line unchanged">@Override</span>
+<span class="diff-line unchanged">public ValidationResult validate() {</span>
+<span class="diff-line unchanged">  if (latest.C &lt; 0.10 ||</span>
+<span class="diff-line add">      latest.C &gt; 0.30)</span>
+<span class="diff-line unchanged">    return fail("C 함량 위반");</span>
+<span class="diff-line unchanged">  ...</span>
+<span class="diff-line unchanged">}</span></pre>
+      </div>
+    </div>
+
+    <!-- Cascade preview (P10 cascade_preview) -->
+    <div style="margin: 16px 0 8px;">
+      <h3 style="font-size: 13px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em;">Cascade — 직접 + 간접 영향 (depth 슬라이더)</h3>
+      <div style="display: flex; gap: 6px; align-items: center; margin-top: 6px;">
+        <span style="color: var(--text-faint); font-size: 11px;">depth:</span>
+        <input type="range" min="1" max="5" value="2" style="flex: 1;" />
+        <span style="font-size: 11.5px; color: var(--accent);">2 hops</span>
+      </div>
+    </div>
+    <div class="cascade-tree">
+      <div class="cascade-row depth-0">
+        <span class="pill domain" style="font-size: 9.5px;">term</span>
+        <span class="label">term.scm.c_pct.range[1]</span>
+        <span style="color: var(--warn); font-size: 11px; margin-left: auto;">변경 시작점</span>
+      </div>
+      <div class="cascade-row depth-1">
+        <span class="arrow">↓</span>
+        <span class="pill rule" style="font-size: 9.5px;">rule</span>
+        <span class="label">rule.scm.c_range</span>
+        <span style="color: var(--text-faint); font-size: 11px;">precondition refs</span>
+      </div>
+      <div class="cascade-row depth-1">
+        <span class="arrow">↓</span>
+        <span class="pill action" style="font-size: 9.5px;">action</span>
+        <span class="label">action.scm.주문_검증</span>
+        <span style="color: var(--text-faint); font-size: 11px;">preconditions[0]</span>
+      </div>
+      <div class="cascade-row depth-1">
+        <span class="arrow">↓</span>
+        <span class="pill action" style="font-size: 9.5px;">action</span>
+        <span class="label">action.scm.화학성분_검증</span>
+        <span style="color: var(--text-faint); font-size: 11px;">preconditions[2]</span>
+      </div>
+      <div class="cascade-row depth-2">
+        <span class="arrow">↓↓</span>
+        <span class="pill action" style="font-size: 9.5px;">action</span>
+        <span class="label">action.scm.출하_승인</span>
+        <span style="color: var(--text-faint); font-size: 11px;">depends on 화학성분_검증 (간접)</span>
+      </div>
+      <div class="cascade-row depth-2">
+        <span class="arrow">↓↓</span>
+        <span class="pill rule" style="font-size: 9.5px;">rule</span>
+        <span class="label">rule.scm.quality_grade_a</span>
+        <span style="color: var(--bad); font-size: 11px;">⚠ HARD 위반 가능</span>
+      </div>
+    </div>
+
+    <div style="margin: 14px 0; display: flex; gap: 8px;">
+      <button onclick="toggleGraphMode(true)" class="primary" style="font-size: 12px;">🌐 그래프 위에서 path 시각화 보기</button>
+      <span style="color: var(--text-faint); font-size: 11.5px; margin-left: auto;">
+        diff/risk/cascade/branch 4가지 = P10 답변 흡수
+      </span>
+    </div>
+  </div>
+</main>
+
+<!-- RIGHT -->
+<aside class="right">
+  <div class="right-resize"></div>
+  <div class="right-tabs">
+    <button class="active">📄 변경 미리보기</button>
+    <button>📖 매뉴얼</button>
+    <button>🌊 영향</button>
+  </div>
+  <div class="right-content">
+    <div class="ctx-block">
+      <h4>14 위치 자동 patch</h4>
+      <div style="font-size: 11.5px; color: var(--text-dim); line-height: 1.7;">
+        <div>RushOrder.validate:11 — 0.25→0.30</div>
+        <div>StandardOrder.validate:8 — 0.25→0.30</div>
+        <div>QualityChecker.checkChemical:23</div>
+        <div>PriceCalc.computePremium:45</div>
+        <div style="color: var(--text-faint);">+10 더보기</div>
+      </div>
+    </div>
+    <div class="ctx-block">
+      <h4>매뉴얼 자동 갱신 후보</h4>
+      <p style="color: var(--text-dim);">
+        slab-design.md §3.2 — "C 함량 0.10~0.25%" → "C 함량 0.10~0.30%"<br>
+        quality-spec.md §1.4 표 2 행 3
+      </p>
+    </div>
+  </div>
+</aside>
+
+<!-- ─────── GRAPH 모드 ─────── -->
+
+<!-- Graph filter sidebar (NEW V7) -->
+<aside class="gfilter">
+  <h4>🔍 Filter</h4>
+  <div class="filter-group">
+    <label class="fopt"><input type="checkbox" checked> domain: SCM</label>
+    <label class="fopt"><input type="checkbox" checked> domain: Quality</label>
+    <label class="fopt"><input type="checkbox"> domain: Production</label>
+    <label class="fopt"><input type="checkbox"> domain: Logistics</label>
+  </div>
+  <h4>verification min</h4>
+  <select style="width: 100%; padding: 4px 8px;">
+    <option>전체</option>
+    <option>SIGNATURE_LOCKED+</option>
+    <option>BODY_ANCHORED+</option>
+    <option>SIM_VERIFIED+</option>
+  </select>
+  <h4>kind</h4>
+  <div class="filter-group">
+    <label class="fopt"><input type="checkbox" checked> Action</label>
+    <label class="fopt"><input type="checkbox" checked> Term</label>
+    <label class="fopt"><input type="checkbox" checked> Rule</label>
+    <label class="fopt"><input type="checkbox" checked> Code</label>
+    <label class="fopt"><input type="checkbox"> Manual fragment</label>
+  </div>
+  <h4>그래프 위 옵션</h4>
+  <div class="filter-group">
+    <label class="fopt"><input type="checkbox" id="opt-cross" onchange="toggleCrossDomain(this.checked)" checked>
+      ⚠ Cross-domain edge 강조</label>
+    <label class="fopt"><input type="checkbox" checked>
+      label 표시</label>
+    <label class="fopt"><input type="checkbox">
+      매뉴얼 fragment 노드 추가</label>
+  </div>
+  <h4>Path-trace</h4>
+  <div class="filter-group" style="font-size: 11.5px; color: var(--text-dim);">
+    <p>노드 클릭 → forward + backward 영향 path highlight</p>
+    <div style="display: flex; gap: 4px; margin-top: 6px;">
+      <button onclick="setPathTrace('fwd')" style="font-size: 10.5px; padding: 2px 6px;">↓ forward</button>
+      <button onclick="setPathTrace('bwd')" style="font-size: 10.5px; padding: 2px 6px;">↑ backward</button>
+      <button onclick="setPathTrace('both')" class="primary" style="font-size: 10.5px; padding: 2px 6px; background: var(--panel-3); color: var(--accent); border-color: var(--accent);">↕ 양방향</button>
+    </div>
+    <div style="margin-top: 8px; display: flex; gap: 6px; align-items: center;">
+      <span style="font-size: 10.5px;">hop:</span>
+      <input type="range" min="1" max="5" value="2" style="flex: 1;" />
+      <span style="color: var(--accent); font-size: 10.5px;">2</span>
+    </div>
+  </div>
+</aside>
+
+<div class="graph">
+  <div class="graph-toolbar">
+    <h3>🌐 Top-down + 강화</h3>
+    <div class="graph-bread">
+      <span class="crumb">전체 도메인</span><span class="sep">›</span>
+      <span class="crumb">SCM</span><span class="sep">›</span>
+      <span class="crumb">주문 그룹</span><span class="sep">›</span>
+      <span class="crumb current">주문_검증</span>
+    </div>
+    <div class="graph-tools">
+      <input type="search" placeholder="🔍 노드 highlight (⌘F)" />
+      <div class="level-slider">
+        <button>L1</button>
+        <button>L2</button>
+        <button class="active">L3</button>
+        <button onclick="setLevel(4)">L4</button>
+        <button onclick="setLevel(5)" style="background: rgba(167,139,250,0.15); color: var(--domain-fg);">L5 ★</button>
+      </div>
+      <button>−</button>
+      <button>+</button>
+      <button onclick="toggleGraphMode(false)">⨯ esc</button>
+    </div>
+  </div>
+
+  <!-- Lens bar (NEW V7) -->
+  <div style="padding: 6px 14px; background: var(--panel-3); border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: center;">
+    <span style="font-size: 11px; color: var(--text-faint); font-weight: 600; text-transform: uppercase;">Lens:</span>
+    <div class="lens-bar">
+      <div class="lens-pill active" onclick="setLens('verify', this)">
+        <span class="dot"></span>
+        Verification
+      </div>
+      <div class="lens-pill" onclick="setLens('domain', this)">Domain</div>
+      <div class="lens-pill" onclick="setLens('confidence', this)">Confidence</div>
+      <div class="lens-pill" onclick="setLens('simulation', this)">Simulation hot</div>
+      <div class="lens-pill" onclick="setLens('none', this)">없음</div>
+    </div>
+    <span class="spacer" style="flex: 1;"></span>
+    <span style="font-size: 11px; color: var(--text-faint);">노드 우클릭 → Search Around</span>
+  </div>
+
+  <div class="graph-canvas" id="canvas">
+
+    <!-- L3 view (default) — verification lens 활성 -->
+    <div class="graph-view active lens-verify" id="gv-3">
+      <div class="graph-node action" data-vl="SIGNATURE_LOCKED" style="left: 42%; top: 30%;" oncontextmenu="showCtxMenu(event)" onclick="tracePath(this)">
+        <span class="pill action" style="font-size: 9.5px;">act</span> 주문_검증
+        <div style="font-size: 10px; color: var(--text-faint); margin-top: 2px;">SL ●●●○○○</div>
+      </div>
+      <div class="graph-node action path-traced" data-vl="SIM_VERIFIED" style="left: 14%; top: 18%;" oncontextmenu="showCtxMenu(event)">
+        <span class="pill action" style="font-size: 9.5px;">act</span> 화학성분_검증
+        <div style="font-size: 10px; color: var(--good); margin-top: 2px;">SV ●●●●●○</div>
+      </div>
+      <div class="graph-node action" data-vl="SIM_VERIFIED" style="left: 14%; top: 38%;" oncontextmenu="showCtxMenu(event)">
+        <span class="pill action" style="font-size: 9.5px;">act</span> 출하_승인
+        <div style="font-size: 10px; color: var(--good); margin-top: 2px;">SV</div>
+      </div>
+      <div class="graph-node domain path-traced" style="left: 18%; top: 60%;" oncontextmenu="showCtxMenu(event)">
+        <span class="pill domain" style="font-size: 9.5px;">T</span> 주문 (abstract)
+      </div>
+      <div class="graph-node domain path-traced" style="left: 70%; top: 22%;">
+        <span class="pill domain" style="font-size: 9.5px;">T</span> 긴급주문
+      </div>
+      <div class="graph-node domain" data-vl="DRAFT" style="left: 70%; top: 42%;" class="dimmed">
+        <span class="pill domain" style="font-size: 9.5px;">T</span> 표준주문
+      </div>
+      <div class="graph-node rule path-traced" style="left: 42%; top: 65%;">
+        <span class="pill rule" style="font-size: 9.5px;">R</span> rule.c_range
+        <div style="font-size: 10px; color: var(--bad); margin-top: 2px;">⚠ HARD 위반 가능</div>
+      </div>
+      <div class="graph-node rule" data-vl="DRAFT" style="left: 60%; top: 68%;">
+        <span class="pill rule" style="font-size: 9.5px;">R</span> rule.priority_range
+      </div>
+
+      <svg style="position: absolute; inset: 0; pointer-events: none;" width="100%" height="100%">
+        <defs>
+          <marker id="arr3v7" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#818cf8" />
+          </marker>
+          <marker id="arrH" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#f59e0b" />
+          </marker>
+        </defs>
+        <!-- 정상 엣지 -->
+        <line x1="55%" y1="33%" x2="69%" y2="25%" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arr3v7)" />
+        <text x="58%" y="26%" fill="#fb923c" font-size="10">realized&lt;Rush&gt;</text>
+        <line x1="55%" y1="35%" x2="69%" y2="45%" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arr3v7)" />
+        <line x1="50%" y1="35%" x2="22%" y2="60%" stroke="#94a3b8" stroke-width="1" marker-end="url(#arr3v7)" />
+        <text x="32%" y="55%" fill="#94a3b8" font-size="10">declared_on</text>
+        <line x1="48%" y1="38%" x2="46%" y2="65%" stroke="#f472b6" stroke-width="2" marker-end="url(#arr3v7)" />
+        <text x="48%" y="55%" fill="#f472b6" font-size="10">precondition</text>
+        <!-- Path-trace highlight (path-traced 노드 사이 굵은 강조) -->
+        <line x1="42%" y1="32%" x2="20%" y2="20%" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arr3v7)" />
+        <text x="28%" y="22%" fill="#38bdf8" font-size="10" font-weight="600">cascade↓</text>
+        <line x1="20%" y1="22%" x2="20%" y2="40%" stroke="#38bdf8" stroke-width="2" marker-end="url(#arr3v7)" />
+        <text x="22%" y="32%" fill="#38bdf8" font-size="10" font-weight="600">cascade↓ (간접)</text>
+        <!-- Cross-domain edge (Quality → SCM) -->
+        <line class="cd cross-domain" x1="20%" y1="20%" x2="46%" y2="65%" stroke="#94a3b8" stroke-width="1" marker-end="url(#arrH)" />
+        <text x="32%" y="42%" fill="#f59e0b" font-size="10" font-weight="600">⚠ cross-domain (Quality→SCM)</text>
+      </svg>
+    </div>
+
+    <!-- L5 — Anchor micro-graph (NEW V7, 우리 고유) -->
+    <div class="graph-view" id="gv-5">
+      <div style="position: absolute; left: 50%; top: 4%; transform: translateX(-50%); font-size: 12px; color: var(--text-dim);">
+        <strong style="color: var(--accent);">L5 — RushOrder.validate 의 anchor micro-graph</strong>
+        <span style="color: var(--text-faint);">(메서드 본체 dataflow — 팔란티어가 못 다루는 것 ★)</span>
+      </div>
+      <!-- params -->
+      <div class="graph-node code" style="left: 8%; top: 22%; border-left-color: var(--code-fg);">
+        <span class="pill" style="font-size: 9.5px; color: var(--text-faint);">param</span> this (RushOrder)
+      </div>
+      <div class="graph-node code" style="left: 8%; top: 36%;">
+        <span class="pill" style="font-size: 9.5px; color: var(--text-faint);">field</span> this.priority
+      </div>
+      <div class="graph-node code" style="left: 8%; top: 50%;">
+        <span class="pill" style="font-size: 9.5px; color: var(--text-faint);">field</span> this.spec.diameter
+      </div>
+      <div class="graph-node code" style="left: 8%; top: 64%;">
+        <span class="pill" style="font-size: 9.5px; color: var(--text-faint);">field</span> this.comps[-1].C
+      </div>
+      <!-- branches with literal -->
+      <div class="graph-node" style="left: 38%; top: 36%; border-left-color: var(--warn);">
+        <span class="pill warn" style="font-size: 9.5px;">branch</span> priority &lt; 1 || &gt; 5
+        <div style="font-size: 10px; color: var(--text-faint);">literal: 1, 5</div>
+      </div>
+      <div class="graph-node" style="left: 38%; top: 50%; border-left-color: var(--warn);">
+        <span class="pill warn" style="font-size: 9.5px;">branch</span> diameter &gt; 200
+        <div style="font-size: 10px; color: var(--text-faint);">literal: 200.0</div>
+      </div>
+      <div class="graph-node path-traced" style="left: 38%; top: 64%; border-left-color: var(--warn);">
+        <span class="pill warn" style="font-size: 9.5px;">branch</span> C &lt; 0.10 || &gt; 0.25
+        <div style="font-size: 10px; color: var(--accent);">⚡ literal: 0.10, <strong>0.25 (변경 대상)</strong></div>
+      </div>
+      <!-- exits -->
+      <div class="graph-node code" style="left: 70%; top: 30%;">
+        <span class="pill" style="font-size: 9.5px; color: var(--bad);">return</span> fail("우선도")
+      </div>
+      <div class="graph-node code" style="left: 70%; top: 44%;">
+        <span class="pill" style="font-size: 9.5px; color: var(--bad);">return</span> fail("긴급주문 직경")
+      </div>
+      <div class="graph-node code path-traced" style="left: 70%; top: 58%;">
+        <span class="pill" style="font-size: 9.5px; color: var(--bad);">return</span> fail("C 함량")
+      </div>
+      <div class="graph-node code" style="left: 70%; top: 75%;">
+        <span class="pill" style="font-size: 9.5px; color: var(--good);">return</span> ok()
+      </div>
+      <!-- Action (위에) -->
+      <div class="graph-node action" style="left: 42%; top: 4%;">
+        <span class="pill action" style="font-size: 9.5px;">act</span> 주문_검증
+        <div style="font-size: 10px; color: var(--text-faint);">declared on 주문</div>
+      </div>
+      <!-- BusinessRule -->
+      <div class="graph-node rule path-traced" style="left: 38%; top: 80%;">
+        <span class="pill rule" style="font-size: 9.5px;">R</span> rule.c_range
+      </div>
+
+      <svg style="position: absolute; inset: 0; pointer-events: none;" width="100%" height="100%">
+        <defs>
+          <marker id="arr5" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#94a3b8" />
+          </marker>
+        </defs>
+        <!-- field → branch -->
+        <line x1="22%" y1="38%" x2="36%" y2="38%" stroke="#94a3b8" marker-end="url(#arr5)" />
+        <line x1="22%" y1="52%" x2="36%" y2="52%" stroke="#94a3b8" marker-end="url(#arr5)" />
+        <line x1="22%" y1="66%" x2="36%" y2="66%" stroke="#94a3b8" marker-end="url(#arr5)" stroke-width="2" stroke="#38bdf8" />
+        <!-- branch → return -->
+        <line x1="50%" y1="38%" x2="68%" y2="32%" stroke="#94a3b8" stroke-dasharray="3 3" marker-end="url(#arr5)" />
+        <line x1="50%" y1="52%" x2="68%" y2="46%" stroke="#94a3b8" stroke-dasharray="3 3" marker-end="url(#arr5)" />
+        <line x1="50%" y1="66%" x2="68%" y2="60%" stroke="#38bdf8" stroke-width="2" stroke-dasharray="3 3" marker-end="url(#arr5)" />
+        <!-- 마지막 OK 경로 -->
+        <line x1="50%" y1="38%" x2="68%" y2="76%" stroke="#94a3b8" stroke-dasharray="2 2" />
+        <!-- Action 어떤 anchor 가 어디 매핑됐는지 -->
+        <line x1="48%" y1="6%" x2="48%" y2="36%" stroke="#fb923c" stroke-width="1" stroke-dasharray="2 2" />
+        <line x1="48%" y1="6%" x2="48%" y2="50%" stroke="#fb923c" stroke-width="1" stroke-dasharray="2 2" />
+        <line x1="48%" y1="6%" x2="48%" y2="64%" stroke="#fb923c" stroke-width="2" />
+        <text x="49%" y="20%" fill="#fb923c" font-size="10">anchor binding (params&lt;Rush&gt;.spec.diameter.range[1] 등)</text>
+        <!-- branch → BusinessRule -->
+        <line x1="42%" y1="68%" x2="42%" y2="80%" stroke="#f472b6" stroke-width="2" marker-end="url(#arr5)" />
+        <text x="44%" y="74%" fill="#f472b6" font-size="10">extracted_rule</text>
+      </svg>
+
+      <div style="position: absolute; bottom: 16px; right: 16px; background: var(--panel); border: 1px solid var(--accent); padding: 10px 14px; border-radius: 6px; font-size: 11px; max-width: 280px;">
+        <div style="font-weight: 600; color: var(--accent); margin-bottom: 4px;">★ L5 — onTong 차별 강점</div>
+        <p style="color: var(--text-dim); line-height: 1.5;">
+          팔란티어는 Functions 추상화 뒤에 코드를 숨기지만,
+          onTong 은 메서드 본체의 anchor 흐름까지 시각화. 변경 영향이 정확히 어느 dataflow path 인지 추적.
+        </p>
+      </div>
+    </div>
+
+    <!-- Right-click menu -->
+    <div class="ctxmenu" id="ctxmenu">
+      <div class="item">⊕ X-hop dependencies (forward)</div>
+      <div class="item">⊖ X-hop dependents (backward)</div>
+      <div class="item">📖 관련 매뉴얼 fragments</div>
+      <div class="item">📁 영향 받는 코드 위치</div>
+      <div class="sep"></div>
+      <div class="item">★ Path-trace 양방향</div>
+      <div class="item">🔧 Backward 모드로 (변경 가설)</div>
+      <div class="sep"></div>
+      <div class="item">📌 detail 카드 열기</div>
+    </div>
+
+    <div class="graph-legend">
+      <div style="font-weight: 600; color: var(--text-dim); margin-bottom: 4px;">Lens: Verification</div>
+      <div class="row"><span style="width: 10px; height: 10px; background: rgba(248,113,113,0.4); border-radius: 2px;"></span> UNMAPPED</div>
+      <div class="row"><span style="width: 10px; height: 10px; background: rgba(245,158,11,0.4); border-radius: 2px;"></span> DRAFT/SL</div>
+      <div class="row"><span style="width: 10px; height: 10px; background: rgba(56,189,248,0.4); border-radius: 2px;"></span> BODY_ANCHORED</div>
+      <div class="row"><span style="width: 10px; height: 10px; background: rgba(52,211,153,0.4); border-radius: 2px;"></span> SIM_VERIFIED+</div>
+      <div class="row" style="margin-top: 4px;"><span style="width: 12px; height: 2px; background: var(--warn);"></span> ⚠ cross-domain</div>
+      <div class="row"><span style="width: 12px; height: 2px; background: var(--accent);"></span> path-traced</div>
+    </div>
+  </div>
+</div>
+
+<footer class="statusbar">
+  <span class="verification">
+    <span class="pill bad" style="font-size: 9px;">U</span>16
+    <span class="pill warn" style="font-size: 9px;">D</span>18
+    <span class="pill" style="font-size: 9px;">SL</span>22
+    <span class="pill" style="font-size: 9px;">BA</span>47
+    <span class="pill good" style="font-size: 9px;">SV</span>31
+    <span class="pill good" style="font-size: 9px;">PR</span>8
+  </span>
+  <span>총 142 actions · BODY_ANCHORED+ <strong style="color: var(--good);">86</strong> (61%)</span>
+  <span class="spacer" style="flex: 1;"></span>
+  <span id="dir-badge" style="color: var(--warn);">🔧 Backward 모드 (수정 영향)</span>
+</footer>
+
+</div>
+
+<script>
+function toggleGraphMode(on) {
+  document.getElementById('shell').classList.toggle('graph-mode', on);
+}
+function setLevel(l) {
+  for (let i = 1; i <= 5; i++) {
+    const v = document.getElementById('gv-' + i);
+    if (v) v.classList.toggle('active', i === l);
+  }
+  document.querySelectorAll('.level-slider button').forEach((btn, idx) => {
+    btn.classList.toggle('active', idx + 1 === l);
+  });
+}
+function setLens(lens, btn) {
+  document.querySelectorAll('.lens-pill').forEach(p => p.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  // 단순화: verify lens 만 CSS 로 토글
+  document.querySelectorAll('.graph-view').forEach(v => {
+    v.classList.toggle('lens-verify', lens === 'verify');
+  });
+}
+function setPathTrace(dir) {
+  // mock: 모든 노드 dim 후 path-traced 만 부각
+  document.querySelectorAll('.graph-view.active .graph-node').forEach(n => {
+    n.classList.add('dimmed');
+  });
+  document.querySelectorAll('.graph-view.active .graph-node.path-traced').forEach(n => {
+    n.classList.remove('dimmed');
+  });
+}
+function tracePath(node) {
+  // 클릭한 노드 + path-traced 노드들만 부각
+  setPathTrace('both');
+  node.classList.remove('dimmed');
+}
+function showCtxMenu(e) {
+  e.preventDefault();
+  const m = document.getElementById('ctxmenu');
+  m.classList.add('show');
+  m.style.left = e.clientX + 'px';
+  m.style.top = e.clientY + 'px';
+}
+document.addEventListener('click', () => document.getElementById('ctxmenu').classList.remove('show'));
+function toggleCrossDomain(on) {
+  document.querySelectorAll('.cd').forEach(e => {
+    e.classList.toggle('cross-domain', on);
+  });
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('shell').classList.contains('graph-mode')) {
+    toggleGraphMode(false);
+  }
+  if (document.getElementById('shell').classList.contains('graph-mode')) {
+    if (e.key === '5') setLevel(5);
+    if (e.key === '3') setLevel(3);
+  }
+});
+</script>
+</body>
+</html>

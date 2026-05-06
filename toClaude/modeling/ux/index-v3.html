@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>onTong Workbench — V6 (3차 사이클)</title>
+<style>
+  :root {
+    --bg: #0b1018; --panel: #111827; --panel-2: #0f172a; --panel-3: #0a0f1a;
+    --border: #1f2937; --border-2: #334155;
+    --text: #e5e7eb; --text-dim: #94a3b8; --text-faint: #64748b;
+    --accent: #38bdf8; --accent-2: #818cf8; --good: #34d399;
+    --bad: #f87171; --warn: #f59e0b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Helvetica Neue", "Pretendard", sans-serif; padding: 32px 24px 80px; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
+  h1 .badge { display: inline-block; margin-left: 12px; padding: 4px 10px; background: rgba(52,211,153,0.1); border: 1px solid var(--good); color: var(--good); font-size: 11px; font-weight: 500; border-radius: 4px; vertical-align: middle; }
+  .lead { font-size: 14px; color: var(--text-dim); margin-bottom: 24px; }
+  .lead strong { color: var(--text); }
+  h2 { font-size: 18px; font-weight: 600; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); color: var(--accent); }
+  ul, ol { margin: 8px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: var(--panel-3); padding: 1px 6px; border-radius: 3px; font-family: "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--accent); border: 1px solid var(--border); }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 12px 0; }
+  .panel.info { border-left: 3px solid var(--accent); }
+  .panel.good { border-left: 3px solid var(--good); }
+  .open-row { display: flex; gap: 12px; align-items: center; margin: 16px 0; }
+  .open-btn { display: inline-block; padding: 9px 18px; background: var(--accent); color: var(--bg); border-radius: 6px; font-weight: 600; font-size: 13.5px; }
+  .open-btn:hover { background: var(--accent-2); text-decoration: none; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 12.5px; }
+  th, td { padding: 8px 10px; text-align: left; border: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--panel-2); color: var(--text-dim); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td .from { font-size: 10.5px; color: var(--text-faint); }
+  .qcard { background: var(--panel-2); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 16px 20px; margin: 16px 0; }
+  .qcard h3 { margin-top: 0; color: var(--accent); font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .qcard h3 .qid { background: var(--panel-3); border: 1px solid var(--border-2); color: var(--text-dim); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .qcard .ctx { color: var(--text-dim); font-size: 12.5px; background: rgba(56,189,248,0.04); border-left: 2px solid var(--border-2); padding: 8px 12px; margin: 10px 0; }
+  .options { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+  .options label { display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px; border-radius: 6px; background: var(--panel-3); border: 1px solid var(--border); cursor: pointer; }
+  .options label:hover { background: rgba(56,189,248,0.05); border-color: var(--border-2); }
+  .options input { margin-top: 4px; accent-color: var(--accent); }
+  .options label:has(input:checked) { background: rgba(56,189,248,0.08); border-color: var(--accent); }
+  .options .opt-text { flex: 1; line-height: 1.5; font-size: 13px; }
+  .options .opt-text .lbl { font-weight: 600; color: var(--text); margin-right: 4px; }
+  .options .opt-text .desc { color: var(--text-dim); font-size: 12px; }
+  textarea { width: 100%; margin-top: 8px; padding: 10px 12px; background: var(--panel-3); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit; font-size: 13px; line-height: 1.55; resize: vertical; min-height: 60px; }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  .copybar { position: sticky; bottom: 16px; z-index: 10; background: var(--panel); border: 1px solid var(--border-2); border-radius: 10px; padding: 14px 18px; margin: 32px 0 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .copybar .progress { color: var(--text-dim); font-size: 13px; flex: 1; }
+  .copybar .progress strong { color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--bg); border: none; padding: 9px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--text-dim); border: 1px solid var(--border-2); padding: 9px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+  #copy-status { font-size: 12px; color: var(--good); font-weight: 600; opacity: 0; transition: opacity 0.2s; }
+  #copy-status.show { opacity: 1; }
+  details { margin: 10px 0; }
+  summary { cursor: pointer; color: var(--accent); font-weight: 500; padding: 6px 0; }
+  pre { background: var(--panel-3); border: 1px solid var(--border); padding: 10px 14px; border-radius: 4px; overflow-x: auto; font-family: "SF Mono", Menlo, monospace; font-size: 11.5px; line-height: 1.5; color: var(--text-dim); }
+  .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+  .demo-card { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; }
+  .demo-card h4 { font-size: 13.5px; font-weight: 600; margin-bottom: 6px; display: flex; gap: 8px; align-items: center; }
+  .demo-card .desc { color: var(--text-dim); font-size: 12px; }
+  .demo-card .try { margin-top: 8px; font-size: 11.5px; color: var(--text-faint); }
+  .demo-card .try kbd { background: var(--panel-3); border: 1px solid var(--border); padding: 1px 5px; border-radius: 2px; font-size: 10.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>V6 두 방향 매핑 + Top-down Graph <span class="badge">C6 · 3차 사이클</span></h1>
+<p class="lead">
+  V5 위에 사용자 P5/P7 메모 흡수.
+  <strong>매핑 2 방향 (Forward 코드→도메인 / Backward 도메인→코드)</strong> +
+  <strong>Top-down 그래프 4 레벨</strong> (도메인 → 그룹 → 노드 → 코드).
+</p>
+
+<div class="open-row">
+  <a href="prototypes/v6-bidirectional.html" class="open-btn" target="_blank">▶ V6 열기 (인터랙티브)</a>
+  <span style="color: var(--text-faint); font-size: 12px;">
+    Forward/Backward 토글, Graph L1-L4 keyboard navigate, ⌘K
+  </span>
+</div>
+
+<h2>V6 의 새 기능 — 3차 피드백 흡수</h2>
+
+<div class="demo-grid">
+  <div class="demo-card">
+    <h4>🔍 Forward 매핑 (default)</h4>
+    <p class="desc">"코드를 도메인 의미로 매핑" — 초기 작업 (P5 의 1번).</p>
+    <p class="desc">메서드 발견 → Action/Term 연결 → anchor binding. V5 의 흐름 그대로.</p>
+    <div class="try">상단 Forward 버튼 활성화 시 표시</div>
+  </div>
+  <div class="demo-card">
+    <h4>🔧 Backward 매핑 (NEW)</h4>
+    <p class="desc">"도메인 변경 → 코드 영향 추적" — 유지보수 (P5 의 2번).</p>
+    <p class="desc">예: "C 함량 0.25 → 0.30 으로 변경하면?" → 영향받는 Action 6 / Code 14위치 / Rule 2 / 매뉴얼 fragment 자동 표시 + Java patch 자동 preview + 시뮬/PR 한 번에.</p>
+    <div class="try">상단 <kbd>🔧 Backward</kbd> 토글</div>
+  </div>
+  <div class="demo-card">
+    <h4>📊 Domain Map landing (NEW)</h4>
+    <p class="desc">좌측 첫 탭. Top-down 진입점 — 도메인 (SCM/Quality/Production/Logistics) 카드 + 그룹 미리보기 + 진척 bar.</p>
+    <p class="desc">"평면 term 리스트" 가 아닌 "도메인 → 카테고리 → term" 흐름.</p>
+    <div class="try">좌측 첫 탭 (default 활성)</div>
+  </div>
+  <div class="demo-card">
+    <h4>🌐 Top-down Graph 4 레벨 (NEW)</h4>
+    <p class="desc">P7 메모 정합 — IT 운영자 큰 그림 → 세부.</p>
+    <p class="desc"><strong>L1</strong> 도메인 카테고리 (4개 박스) → <strong>L2</strong> 그룹 cluster → <strong>L3</strong> 개별 노드 (Action/Term/Rule) → <strong>L4</strong> 코드/anchor.</p>
+    <p class="desc">Breadcrumb + Level slider + 키보드 (1-4, ↑↓) navigate.</p>
+    <div class="try">🌐 그래프 → <kbd>1</kbd>~<kbd>4</kbd> level 점프</div>
+  </div>
+</div>
+
+<h2>V5 → V6 변경 매트릭스</h2>
+<table>
+  <thead><tr><th>피드백 (P5/P7)</th><th>V6 의 해결</th><th>출처</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>"매핑 2 방향 (Code→Domain / Domain→Code) 둘 다 효과적 UI"</td>
+      <td><strong>Direction 토글 추가</strong> (Forward / Backward). Backward 모드는 색상 대비 (warn/orange) 로 시각적으로 구분. 영향 받는 Action/Code/Rule/매뉴얼 4-card grid + Java patch preview + 시뮬/PR 한 번에.</td>
+      <td><span class="from">P5</span></td>
+    </tr>
+    <tr>
+      <td>"Top-down 큰 그림 → 세부"</td>
+      <td><strong>4 level Graph</strong> + breadcrumb + level slider + 키보드. L1 도메인 박스 (treemap-like) → L2 cluster → L3 개별 노드 → L4 코드/anchor.</td>
+      <td><span class="from">P7</span></td>
+    </tr>
+    <tr>
+      <td>"노드 hover/click/drag/zoom 등 인터랙션"</td>
+      <td>Hover scale + 클릭 → 다음 level + breadcrumb 업데이트 + 키보드 navigation. (실제 zoom/drag 는 React 단계에서 cytoscape/d3 통합)</td>
+      <td><span class="from">P7</span></td>
+    </tr>
+    <tr>
+      <td>"진입점은 도메인 맵 (memory feedback_topdown_domain_view 정합)"</td>
+      <td><strong>좌측 첫 탭 = Domain Map</strong> (4 도메인 카드). 클릭 시 Graph 모드 진입. workbench 첫 인상이 "큰 그림".</td>
+      <td><span class="from">memory</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>대표 시나리오 — Backward (수정 모드) 흐름</h2>
+<ol style="line-height: 1.8;">
+  <li>탭 바에서 "C 함량 변경 영향" 탭 활성</li>
+  <li>중앙 main 의 <strong>🔧 Backward</strong> 토글 → 화면 색조 amber 로 변경</li>
+  <li>Banner: <code>term.scm.c_pct.range[1]</code> 0.25 → 0.30 시뮬</li>
+  <li>4-card grid 자동 표시:
+    <ul>
+      <li>📋 영향 Action 6개 (주문_검증 / 화학성분_검증 / 품질_평가 ...)</li>
+      <li>📁 영향 Code 14 위치 (RushOrder.validate:11 ...)</li>
+      <li>📜 업데이트 Rule 2개 (rule.scm.c_range)</li>
+      <li>📖 매뉴얼 fragment 2 (slab-design §3.2 ...)</li>
+    </ul>
+  </li>
+  <li>Java 코드 변경 preview 자동 — diff highlight 로 0.25 → 0.30</li>
+  <li>"🌊 시뮬레이션 실행" 클릭 → A2 agent 가 영향 검증</li>
+  <li>"📤 draft PR 생성" 클릭 → A3 agent 가 14곳 patch + Rule 갱신 PR</li>
+</ol>
+<p style="color: var(--text-dim); font-size: 12.5px; margin-top: 8px;">
+  → 이게 사용자가 메모한 <em>"경쟁력 가져갈 만큼 효과적"</em>의 의미.
+  Backward = onTong 만의 차별화 (다른 IDE 도 forward 는 다 가능 / backward 는 ontology 위에서만).
+</p>
+
+<h2>당신의 판단을 받습니다</h2>
+
+<form id="answers-form">
+
+<div class="qcard" data-q="P9">
+  <h3><span class="qid">P9</span> V6 가 P5/P7 흡수했나?</h3>
+  <div class="ctx">
+    Forward/Backward 토글 + Top-down 4-level Graph + Domain Map landing.
+  </div>
+  <div class="options">
+    <label><input type="radio" name="P9" value="yes_done"><span class="opt-text"><span class="lbl">A.</span> 충분 — React 구현 시작 OK</span></label>
+    <label><input type="radio" name="P9" value="yes_with_tweaks"><span class="opt-text"><span class="lbl">B.</span> 거의 — 작은 다듬기 후 React (메모로)</span></label>
+    <label><input type="radio" name="P9" value="more_iter"><span class="opt-text"><span class="lbl">C.</span> 부족 — 한 사이클 더 (메모로)</span></label>
+  </div>
+  <textarea name="P9_note" placeholder="다듬을 부분 / 새 방향"></textarea>
+</div>
+
+<div class="qcard" data-q="P10">
+  <h3><span class="qid">P10</span> Backward (수정 모드) 충분?</h3>
+  <div class="ctx">
+    Domain → Code 영향 추적 + 자동 Java patch preview + 시뮬/PR 한 번에. 더 필요한 게 있나?
+  </div>
+  <div class="options">
+    <label><input type="checkbox" name="P10" value="enough"><span class="opt-text">충분</span></label>
+    <label><input type="checkbox" name="P10" value="diff_view"><span class="opt-text">side-by-side diff view 가 필요 (현재/제안 비교)</span></label>
+    <label><input type="checkbox" name="P10" value="risk_score"><span class="opt-text">위험도 점수 (영향 크기 / 시뮬 통과 / Rule HARD-위반 가능성)</span></label>
+    <label><input type="checkbox" name="P10" value="cascade_preview"><span class="opt-text">cascade 영향 preview (이 변경이 다른 Action 의 effect 를 또 어떻게)</span></label>
+    <label><input type="checkbox" name="P10" value="rollback"><span class="opt-text">rollback / undo / branch 분기 (가설 여러 개 동시)</span></label>
+    <label><input type="checkbox" name="P10" value="other"><span class="opt-text">다른 (메모)</span></label>
+  </div>
+  <textarea name="P10_note" placeholder="..."></textarea>
+</div>
+
+<div class="qcard" data-q="P11">
+  <h3><span class="qid">P11</span> Top-down Graph 4-level 충분?</h3>
+  <div class="ctx">
+    L1 도메인 → L2 그룹 → L3 노드 → L4 코드. 다른 view 또는 인터랙션 필요?
+  </div>
+  <div class="options">
+    <label><input type="checkbox" name="P11" value="enough"><span class="opt-text">충분</span></label>
+    <label><input type="checkbox" name="P11" value="zoom_pan"><span class="opt-text">실제 줌/팬 (마우스 휠 + 드래그)</span></label>
+    <label><input type="checkbox" name="P11" value="filter"><span class="opt-text">필터 (verification level / role / 도메인)</span></label>
+    <label><input type="checkbox" name="P11" value="search_highlight"><span class="opt-text">검색어 highlight (그래프 위에서)</span></label>
+    <label><input type="checkbox" name="P11" value="time_travel"><span class="opt-text">시간 여행 (지난 주 vs 이번 주 그래프 비교)</span></label>
+    <label><input type="checkbox" name="P11" value="path_trace"><span class="opt-text">노드 클릭 → 그 노드의 영향 경로 highlight (어디까지 전파)</span></label>
+    <label><input type="checkbox" name="P11" value="other"><span class="opt-text">다른 (메모)</span></label>
+  </div>
+  <textarea name="P11_note" placeholder="..."></textarea>
+</div>
+
+<div class="qcard" data-q="P12">
+  <h3><span class="qid">P12</span> 다음 사이클</h3>
+  <div class="options">
+    <label><input type="radio" name="P12" value="implement_react"><span class="opt-text"><span class="lbl">A.</span> React 구현 시작 (full V6 한 번에)</span></label>
+    <label><input type="radio" name="P12" value="implement_phased"><span class="opt-text"><span class="lbl">B.</span> React 단계 (Forward 먼저 → Backward → Graph)</span></label>
+    <label><input type="radio" name="P12" value="more_design"><span class="opt-text"><span class="lbl">C.</span> 한 사이클 더 (P10/P11 다듬을 게 많을 때)</span></label>
+    <label><input type="radio" name="P12" value="other"><span class="opt-text"><span class="lbl">D.</span> 다른 (메모)</span></label>
+  </div>
+  <textarea name="P12_note" placeholder="..."></textarea>
+</div>
+
+</form>
+
+<div class="copybar">
+  <div class="progress">진행: <strong id="progress-count">0</strong> / 4 응답</div>
+  <button type="button" class="secondary" id="clear-btn">초기화</button>
+  <button type="button" class="primary" id="copy-btn">📋 답변 복사</button>
+  <span id="copy-status">✓ 클립보드에 복사됨</span>
+</div>
+
+<details>
+  <summary>복사 결과 미리보기</summary>
+  <pre id="preview-output">(아직 응답 없음)</pre>
+</details>
+
+</div>
+
+<script>
+(function () {
+  const STORAGE_KEY = 'ontong-c6-cycle3';
+  const QIDS = ['P9','P10','P11','P12'];
+  const form = document.getElementById('answers-form');
+  const progressEl = document.getElementById('progress-count');
+  const previewEl = document.getElementById('preview-output');
+  const statusEl = document.getElementById('copy-status');
+  function readAnswers() {
+    const out = {};
+    for (const q of QIDS) {
+      const note = form.querySelector('textarea[name="' + q + '_note"]');
+      const noteVal = note ? note.value.trim() : '';
+      let value = null;
+      const radio = form.querySelector('input[type=radio][name="' + q + '"]:checked');
+      if (radio) value = radio.value;
+      else {
+        const cb = form.querySelectorAll('input[type=checkbox][name="' + q + '"]:checked');
+        if (cb.length) value = Array.from(cb).map(c => c.value);
+      }
+      if (value || noteVal) out[q] = { value, note: noteVal };
+    }
+    return out;
+  }
+  function persist() { const ans = readAnswers(); try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ans)); } catch (e) {} refreshProgress(ans); refreshPreview(ans); }
+  function restore() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) {}
+    for (const q of QIDS) {
+      const a = saved[q]; if (!a) continue;
+      if (Array.isArray(a.value)) {
+        for (const v of a.value) {
+          const cb = form.querySelector(`input[type=checkbox][name="${q}"][value="${v}"]`);
+          if (cb) cb.checked = true;
+        }
+      } else if (a.value) {
+        const r = form.querySelector(`input[type=radio][name="${q}"][value="${a.value}"]`);
+        if (r) r.checked = true;
+      }
+      if (a.note) {
+        const n = form.querySelector(`textarea[name="${q}_note"]`);
+        if (n) n.value = a.note;
+      }
+    }
+    refreshProgress(saved); refreshPreview(saved);
+  }
+  function refreshProgress(ans) { let c = 0; for (const q of QIDS) if (ans[q] && (ans[q].value || ans[q].note)) c++; progressEl.textContent = c; }
+  function buildMarkdown(ans) {
+    let md = '# C6 3차 사이클 — V6 답변\n\n';
+    md += '_답변 기준일: ' + new Date().toISOString().slice(0,10) + '_\n\n';
+    const titles = { P9: 'V6 가 P5/P7 흡수했나', P10: 'Backward (수정모드) 충분?', P11: 'Top-down Graph 4-level 충분?', P12: '다음 사이클' };
+    for (const q of QIDS) {
+      const a = ans[q];
+      md += '## ' + q + '. ' + titles[q] + '\n';
+      if (!a) { md += '_(미응답)_\n\n'; continue; }
+      if (Array.isArray(a.value)) md += '- **선택**: ' + a.value.join(', ') + '\n';
+      else if (a.value) md += '- **선택**: ' + a.value + '\n';
+      if (a.note) md += '- **메모**: ' + a.note.replace(/\n/g, '\n  ') + '\n';
+      md += '\n';
+    }
+    return md;
+  }
+  function refreshPreview(ans) { if (!Object.keys(ans).length) { previewEl.textContent = '(아직 응답 없음)'; return; } previewEl.textContent = buildMarkdown(ans); }
+  document.getElementById('copy-btn').addEventListener('click', async function () {
+    const md = buildMarkdown(readAnswers());
+    try { await navigator.clipboard.writeText(md); statusEl.classList.add('show'); setTimeout(() => statusEl.classList.remove('show'), 2200); }
+    catch (e) {
+      const ta = document.createElement('textarea'); ta.value = md; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e2) {} document.body.removeChild(ta);
+      statusEl.textContent = '✓ 복사됨'; statusEl.classList.add('show');
+      setTimeout(() => { statusEl.classList.remove('show'); statusEl.textContent = '✓ 클립보드에 복사됨'; }, 2200);
+    }
+  });
+  document.getElementById('clear-btn').addEventListener('click', function () {
+    if (!confirm('초기화?')) return;
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    for (const r of form.querySelectorAll('input')) r.checked = false;
+    for (const t of form.querySelectorAll('textarea')) t.value = '';
+    refreshProgress({}); refreshPreview({});
+  });
+  form.addEventListener('change', persist);
+  form.addEventListener('input', persist);
+  restore();
+})();
+</script>
+</body>
+</html>

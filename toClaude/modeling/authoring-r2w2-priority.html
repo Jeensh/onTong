@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Authoring AI · R2-W2 새 우선순위 토론</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#111b2e; --line:#1f2a44; --fg:#e6edf7; --muted:#94a3b8;
+    --primary:#38bdf8; --emerald:#10b981; --amber:#f59e0b; --rose:#f43f5e; --violet:#8b5cf6;
+  }
+  body{margin:0;font:13px -apple-system,Pretendard,sans-serif;background:var(--bg);color:var(--fg);padding:24px;line-height:1.55;max-width:1100px;margin:0 auto}
+  h1{margin:0 0 6px 0;font-size:20px}
+  h2{font-size:15px;margin:24px 0 8px 0;padding:6px 0;border-bottom:1px solid var(--line)}
+  h3{font-size:13px;margin:14px 0 6px 0;color:var(--violet)}
+  h4{font-size:12.5px;margin:10px 0 4px 0;color:var(--primary)}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:16px}
+  pre{background:#0f172a;color:#e6edf7;padding:10px;border-radius:6px;overflow-x:auto;font-size:11.5px;line-height:1.5;border:1px solid var(--line)}
+  code{background:rgba(56,189,248,0.1);color:var(--primary);padding:1px 5px;border-radius:3px;font-size:11.5px;font-family:ui-monospace,Consolas,monospace}
+  table{border-collapse:collapse;width:100%;margin:8px 0;font-size:12px}
+  th,td{padding:5px 8px;border:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:rgba(56,189,248,0.08);color:var(--primary);font-weight:600}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;margin:14px 0}
+  .panel.crit{border-color:rgba(244,63,94,0.5);background:rgba(244,63,94,0.04)}
+  .panel.warn{border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.04)}
+  .panel.ok{border-color:rgba(16,185,129,0.5);background:rgba(16,185,129,0.04)}
+  .panel.info{border-color:rgba(139,92,246,0.5);background:rgba(139,92,246,0.04)}
+  .quote{background:#0f172a;border-left:3px solid var(--rose);padding:8px 12px;margin:8px 0;font-style:italic;color:#e2e8f0;font-size:12.5px}
+  .my-guess{background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.3);border-radius:6px;padding:10px;margin:8px 0}
+  .my-guess .label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.04em;color:var(--violet);font-weight:600;margin-bottom:6px}
+  textarea{width:100%;box-sizing:border-box;background:#0f172a;color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-size:12px;font-family:inherit;line-height:1.4;min-height:50px;resize:vertical}
+  textarea:focus{outline:none;border-color:var(--primary)}
+  .field{margin:10px 0}
+  .field label{display:block;font-size:12px;margin-bottom:4px}
+  .field label .hint{display:block;font-size:11px;color:var(--muted);font-style:italic;margin-top:1px;font-weight:normal}
+  .form{background:rgba(56,189,248,0.04);border:1px solid rgba(56,189,248,0.2);border-radius:8px;padding:14px;margin:14px 0}
+  .form h4{color:var(--primary);margin-top:0}
+  .actions{display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap}
+  .btn{background:var(--primary);color:#0b1220;border:none;border-radius:4px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}
+  .btn:hover{opacity:0.9}
+  .btn.outline{background:transparent;border:1px solid var(--line);color:var(--fg)}
+  .btn.copied{background:var(--emerald);color:#fff}
+  .preview{display:none;background:#0f172a;border:1px solid var(--line);border-radius:6px;padding:10px;margin-top:8px;font-family:ui-monospace,Consolas,monospace;font-size:11px;white-space:pre-wrap}
+  .preview.visible{display:block}
+  .pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:600;margin-right:4px;vertical-align:middle}
+  .pill.violet{background:rgba(139,92,246,0.15);color:var(--violet);border:1px solid rgba(139,92,246,0.4)}
+  .pill.amber{background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.4)}
+  .pill.emerald{background:rgba(16,185,129,0.15);color:var(--emerald);border:1px solid rgba(16,185,129,0.4)}
+  .pill.rose{background:rgba(244,63,94,0.15);color:var(--rose);border:1px solid rgba(244,63,94,0.4)}
+  .star{color:var(--emerald);font-weight:700}
+  .ascii{font-family:ui-monospace,Consolas,monospace;background:#0f172a;padding:10px;border-radius:6px;color:#cbd5e1;font-size:11px;white-space:pre;overflow-x:auto;line-height:1.4;border:1px solid var(--line)}
+</style>
+</head>
+<body>
+
+<h1>R2-W2 새 우선순위 토론</h1>
+<div class="sub">2026-05-05 · 만족감 2/5 · 사용자 새 통찰 3개 + 즉시 fix 3개 정리</div>
+
+<div class="panel crit">
+  <strong>피드백 핵심 (사용자 직접 인용)</strong>
+  <div class="quote">"답변 퀄리티의 개선이 좀 더 필요해 보이고, 너랑 이야기 할 때 자주 사용하는, <strong>중간 내용을 파일로 저장해 가면서 하는 방법</strong>은 어떨까."</div>
+  <div class="quote">"refresh 버튼을 좀 잘 모르겠는데, 프로세스에서 가설 뿐만이 아니라 <strong>모든 프로세스 레벨에서 다시 정정하면 다시 가설을 세우고 하는 피드백 루프 과정</strong>이 필요할 것 같은데."</div>
+  <div class="quote">"<strong>참고한 자바독, 테이블, 로직 등을 나도 확인해보고 싶은 순간</strong>이 많이 생기는데, 이거 하려면 창 바꿔서 따로 찾아야해. <strong>LLM이 판단한 그거 내용을 모달이든 뭐든 확인할 수 있는 UI/UX</strong>가 필요하지 않을까."</div>
+  <div class="quote">"그런 토글이 있었나? 지금도 코드, 메뉴얼 등 보는 섹션이 필요없는데 칸을 차지하고 있는게 굉장히 불편해."</div>
+  <div class="quote">"화면색이랑 비슷해서 글자가 읽히지도 않고, HTML 방식이 더 좋을 것 같다는 생각이 자꾸만 드네."</div>
+</div>
+
+<div class="panel info">
+  <h4 style="margin-top:0;color:var(--violet)">자체 진단 — 6 항목 (3 큰 변경 + 3 즉시 fix)</h4>
+  <table>
+    <tr><th>id</th><th>영역</th><th>크기</th></tr>
+    <tr><td><strong>F1</strong></td><td>세션 진행 누적 파일 (Round 5 패턴)</td><td>큼</td></tr>
+    <tr><td><strong>F2</strong></td><td>LLM 판단 근거 transparency (modal)</td><td>중</td></tr>
+    <tr><td><strong>F3</strong></td><td>프로세스 레벨 피드백 루프 (모든 단계 refresh)</td><td>큼</td></tr>
+    <tr><td><strong>X1</strong></td><td>markdown 가독성 — 글자색 fix</td><td>즉시</td></tr>
+    <tr><td><strong>X2</strong></td><td>좌측 패널 (코드/메뉴얼/호출지점/영향) Authoring 모드에서 숨김</td><td>즉시</td></tr>
+    <tr><td><strong>X3</strong></td><td>collapsible 토글 visibility (사용자 인지 못함)</td><td>즉시</td></tr>
+  </table>
+</div>
+
+<!-- ============================================== -->
+<h2>F1. 세션 진행 누적 파일 (Round 5 패턴)</h2>
+
+<div class="my-guess">
+  <div class="label">진단</div>
+  <p style="font-size:12px;margin:4px 0">우리 Round 5 협업의 본질: 각 step 의 결정이 <code>round5-live-authoring.html</code> 안에 archive 형태로 누적. 사용자가 언제든 어느 step 결정 다시 볼 수 있고, 다음 세션에서 이어가기 가능. <strong>"진행 중인 살아있는 문서"</strong> 가 핵심.</p>
+  <p style="font-size:12px;margin:4px 0">현재 product: 매 turn 결정은 <code>authoring_decision_log</code> DB 에 들어가지만 사용자가 보려면 API 호출이나 우측 preview 의 일부만 볼 수 있음. <strong>"진행 누적 HTML 문서"</strong> 가 없음.</p>
+</div>
+
+<h4>옵션 비교</h4>
+<table>
+<tr><th>옵션</th><th>접근</th><th>장단</th></tr>
+<tr style="background:rgba(16,185,129,0.05)"><td><span class="star">★ F1-A</span></td>
+  <td><strong>각 turn 마다 HTML 누적 + 다운로드</strong> — Round 5 형식 그대로. archive markdown 만이 아니라 매 turn (extract / hypothesis / interview / answer / option / gap / naming / archive) 의 내용이 한 HTML 에 누적. 사용자가 좌측 채팅에서 "📄 진행 문서 보기" 클릭 시 새 탭에 HTML 표시.</td>
+  <td>Round 5 패턴 정확 / backend 신규 endpoint + frontend HTML 빌더</td></tr>
+<tr><td><strong>F1-B</strong></td>
+  <td>frontend 가 채팅 thread 를 통째로 HTML 로 export — chat message 들을 Round 5 archive 형식으로 변환</td>
+  <td>backend 변경 0 / 데이터가 chat thread 의 ephemeral state 라서 다음 세션에서 못 가져옴</td></tr>
+<tr><td><strong>F1-C</strong></td>
+  <td>backend 가 매 turn 시 HTML 파일을 디스크에 누적 (<code>toClaude/modeling/sessions/&lt;sid&gt;.html</code>) + URL 제공</td>
+  <td>Multi-operator 기반 / 디스크 i/o 비용 / 최강의 transparency</td></tr>
+<tr><td><strong>F1-D</strong></td>
+  <td>session_id URL 보존 + 우측 preview 가 모든 decisions 를 표시 (현재는 latest 5 만)</td>
+  <td>가장 작은 변경 / "파일" 형태가 아님</td></tr>
+</table>
+
+<!-- ============================================== -->
+<h2>F2. LLM 판단 근거 Transparency (modal)</h2>
+
+<div class="my-guess">
+  <div class="label">진단</div>
+  <p style="font-size:12px;margin:4px 0">사용자: <em>"참고한 자바독, 테이블, 로직 등을 나도 확인해보고 싶은 순간이 많이 생기는데, 이거 하려면 창 바꿔서 따로 찾아야해."</em></p>
+  <p style="font-size:12px;margin:4px 0">현재: 가설/옵션/갭이 어떤 코드 정보 + Korean 주석을 보고 만들어졌는지 사용자가 모름. backend 는 <code>extracted_jpo</code> 를 hypothesis 에 전달하지만, 사용자에게 "이 hypothesis 가 어디서 왔나?" 표시 안 함.</p>
+</div>
+
+<h4>옵션 비교</h4>
+<table>
+<tr><th>옵션</th><th>접근</th><th>장단</th></tr>
+<tr style="background:rgba(16,185,129,0.05)"><td><span class="star">★ F2-A</span></td>
+  <td><strong>hypothesis / option / gap 카드에 "🔍 근거 보기" 버튼</strong> — 클릭 시 modal 에 입력 데이터 (extracted JPO + Korean 주석 + 호출 시그니처) + LLM 출력의 매핑 (어느 column 의 주석이 어느 hypothesis 결정에 영향) 표시</td>
+  <td>매우 구체 / modal 구현 + LLM 의 출력에 evidence pointer 추가 필요</td></tr>
+<tr><td><strong>F2-B</strong></td>
+  <td>"🔍 raw input 보기" 만 — modal 에 단순히 LLM 에 보낸 prompt + extracted JPO 정보 표시. evidence pointer 없음.</td>
+  <td>구현 간단 / 사용자가 직접 매핑 추론해야 함</td></tr>
+<tr><td><strong>F2-C</strong></td>
+  <td>각 hypothesis field 옆에 source citation — <code>candidate_term_korean: "열연공장 표준?" [HrSpecJpo class docstring]</code> 형식</td>
+  <td>inline 가독성 ↑ / LLM 이 매번 citation 추가해야 함 (prompt 수정 + 응답 길이 ↑)</td></tr>
+<tr><td><strong>F2-D</strong></td>
+  <td>좌측 채팅 옆에 "input panel" 항상 표시 — 매 turn 의 입력 데이터 인라인. 별도 modal 안 띄움.</td>
+  <td>창 전환 부담 0 / 화면 공간 부족</td></tr>
+</table>
+
+<!-- ============================================== -->
+<h2>F3. 프로세스 레벨 피드백 루프 (모든 단계 정정)</h2>
+
+<div class="my-guess">
+  <div class="label">진단</div>
+  <p style="font-size:12px;margin:4px 0">사용자: <em>"refresh 버튼을 좀 잘 모르겠는데, 프로세스에서 가설 뿐만이 아니라 모든 프로세스 레벨에서 다시 정정하면 다시 가설을 세우고 하는 피드백 루프 과정이 필요할 것 같은데, 지금은 그냥 가설에 리프레시 버튼 하나 있고 땡이야."</em></p>
+  <p style="font-size:12px;margin:4px 0">현재: <code>🔄 가설 다시 보기</code> 버튼만. 그것도 답변(answer) 만 반영하지 다른 단계에서 정정 사항이 있어도 적용 안 됨. <strong>전체 흐름의 어디서나 정정 → 영향받는 후속 단계 재실행</strong> 패턴 필요.</p>
+</div>
+
+<h4>흐름 비교</h4>
+<div class="ascii">현재 (단방향 + 가설만 refresh):
+  extract → hypothesis → interview → answer → option → gap → naming → archive → confirm
+              ↑
+              [refresh 가설] (답변 반영, 후속 다 cleared)
+
+Round 5 패턴 (모든 단계 정정 가능):
+  extract → hypothesis → interview → answer → option → gap → naming → archive → confirm
+  ↕         ↕            ↕           ↕        ↕        ↕        ↕         ↕
+  (각 단계 카드 옆에 "다시 / 수정" 버튼 + 사용자 코멘트 영역)
+
+  → 사용자가 어느 단계에서든 "이게 잘못됐어, X 라고 정정" 하면
+     → 그 단계 + 후속 단계 모두 재실행 (또는 사용자가 선택)</div>
+
+<h4>옵션 비교</h4>
+<table>
+<tr><th>옵션</th><th>접근</th><th>장단</th></tr>
+<tr style="background:rgba(16,185,129,0.05)"><td><span class="star">★ F3-A</span></td>
+  <td><strong>각 chat 메시지 카드에 "✏ 수정 / 🔄 다시" 버튼 페어</strong> — 가설/인터뷰/옵션/갭/명명/archive 모든 단계. ✏ 클릭 시 사용자 코멘트 입력 → 그 단계 prompt 에 추가해서 재실행. 🔄 클릭 시 그 단계만 단순 재호출. 둘 다 후속 단계는 cleared.</td>
+  <td>Round 5 패턴 정확 / 모든 capability 가 "사용자 정정 코멘트" 받을 수 있게 prompt 수정 필요</td></tr>
+<tr><td><strong>F3-B</strong></td>
+  <td>chat 입력란에 자유 chat 명령 — "옵션 다시 보여줘" / "가설 정정해줘 — 이건 plant 가 아니야" 같은 명령. AI 가 명령 의도 분석 → 적절한 capability 재호출.</td>
+  <td>유연 / chat command routing capability 추가 필요 (의도 분석 LLM)</td></tr>
+<tr><td><strong>F3-C</strong></td>
+  <td>"이전 단계로 돌아가기" 단순 — toolbar 의 ① ~ ⑨ 버튼이 이미 활성화 됐으면 다시 클릭 가능 (cleared 후 재진행)</td>
+  <td>가장 간단 / 사용자 코멘트 반영 안 됨</td></tr>
+</table>
+
+<!-- ============================================== -->
+<h2>X1 ~ X3 — 즉시 fix (작은 작업)</h2>
+
+<div class="panel ok">
+  <h4 style="margin-top:0;color:var(--emerald)">X1. markdown 글자색 fix</h4>
+  <p style="font-size:12px;margin:4px 0">현재 <code>prose-invert</code> 가 어두운 배경 + 흐린 회색 글자 → 가독성 부족. 글자색을 <code>--fg</code> (밝은 흰색) 로 강제 + 강조색 살리기.</p>
+</div>
+
+<div class="panel ok">
+  <h4 style="margin-top:0;color:var(--emerald)">X2. 좌측 패널 Authoring 모드에서 숨김</h4>
+  <p style="font-size:12px;margin:4px 0">사용자: "지금도 코드, 메뉴얼 등 보는 섹션이 필요없는데 칸을 차지하고 있는게 굉장히 불편해." → Authoring 모드 진입 시 좌측 LeftPanel + RightPanel 숨김 (또는 collapse). MainPanel 이 전체 너비 차지.</p>
+</div>
+
+<div class="panel ok">
+  <h4 style="margin-top:0;color:var(--emerald)">X3. Collapsible 토글 visibility</h4>
+  <p style="font-size:12px;margin:4px 0">사용자가 토글 인지 못함. 헤더 전체를 클릭 가능 (✓ 이미 됨) 이지만 시각적 affordance 부족. ▾ 아이콘 더 크게 + hover 시 강조 + "클릭하여 접기" 안내 tooltip.</p>
+</div>
+
+<!-- ============================================== -->
+<h2>📋 R2-W2 새 wave 후보</h2>
+
+<div class="panel">
+  <h4>★ R2-W2-Now (즉시) — X1 + X2 + X3 (~30분)</h4>
+  <p style="font-size:12px;margin:4px 0">markdown 가독성 fix + 좌측 패널 숨김 + 토글 visibility. 사용자 즉시 만족감 ↑.</p>
+</div>
+
+<div class="panel">
+  <h4>R2-W2-Big-A — F2 (LLM 근거 modal, 중)</h4>
+  <p style="font-size:12px;margin:4px 0">매 카드에 "🔍 근거 보기" 버튼 → modal 에 input 데이터 + Korean 주석 표시. 가장 자주 발생하는 사용자 needs.</p>
+</div>
+
+<div class="panel">
+  <h4>R2-W2-Big-B — F3 (모든 단계 피드백 루프, 큼)</h4>
+  <p style="font-size:12px;margin:4px 0">매 chat 메시지에 ✏ 수정 / 🔄 다시 버튼. 사용자 코멘트 받아서 prompt 에 추가. Round 5 의 핵심 패턴.</p>
+</div>
+
+<div class="panel">
+  <h4>R2-W2-Big-C — F1 (세션 진행 누적 HTML, 큼)</h4>
+  <p style="font-size:12px;margin:4px 0">매 turn 결정이 HTML 에 누적 + 다운로드. Round 5 처럼 살아있는 문서.</p>
+</div>
+
+<div class="panel info">
+  <strong>내 추천 순서</strong> — R2-W2-Now (즉시 즉각 효과) → F3 (피드백 루프 — 사용자가 가장 명시적으로 강조) → F2 (modal 근거) → F1 (세션 누적 파일) → R2-W3 (streaming) → R2-W4 (multi-entity).
+  <br><br>
+  F3 가 본질적으로 가장 큰 가치 — Round 5 협업의 핵심이 "사용자 정정 → AI 재검토" 였는데 그 자체.
+</div>
+
+<!-- ============================================== -->
+<h2>📝 답변 폼 — 우선순위 결정</h2>
+
+<div class="form">
+  <h4>각 질문 1-2 줄 OK · "동의" 만 답해도 OK</h4>
+
+  <div class="field">
+    <label>Q1. <strong>R2-W2-Now (X1 + X2 + X3) 즉시 진행 OK?</strong>
+      <span class="hint">markdown 색 + 좌측 패널 숨김 + 토글 visibility — 30분 작업</span>
+    </label>
+    <textarea name="q1_now" placeholder="예: OK / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q2. <strong>R2-W2-Big 우선순위</strong>
+      <span class="hint">★ F3 (피드백 루프) → F2 (modal 근거) → F1 (누적 파일) — 동의?</span>
+    </label>
+    <textarea name="q2_priority" placeholder="예: 동의 / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>F1. <strong>세션 진행 누적 파일 옵션</strong>
+      <span class="hint">★ A (HTML 누적 + 다운로드) / B (chat thread export) / C (디스크 파일) / D (URL 보존만) / 다른 안</span>
+    </label>
+    <textarea name="f1_choice" placeholder="예: A / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>F2. <strong>LLM 근거 transparency 옵션</strong>
+      <span class="hint">★ A (modal + evidence pointer) / B (raw input modal) / C (inline citation) / D (input panel 상시)</span>
+    </label>
+    <textarea name="f2_choice" placeholder="예: A / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>F3. <strong>피드백 루프 옵션</strong>
+      <span class="hint">★ A (✏/🔄 버튼 페어) / B (chat 자유 명령 + 의도 분석) / C (toolbar 재클릭) / 조합</span>
+    </label>
+    <textarea name="f3_choice" placeholder="예: A + B 조합 / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q3. <strong>제가 빠뜨린 영역 / 더 시급한 것</strong></label>
+    <textarea name="missed" placeholder="예: ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q4. <strong>다음 행동</strong>
+      <span class="hint">R2-W2-Now 부터 즉시 / 또는 더 토론 후</span>
+    </label>
+    <textarea name="next_action" placeholder="예: Now 부터 시작 / 또는 ..."></textarea>
+  </div>
+
+  <div class="actions">
+    <button class="btn" data-action="copy">📋 답변 복사</button>
+    <button class="btn outline" data-action="preview">미리보기</button>
+    <span style="font-size:11px;color:var(--muted)">Q1 + Q2 만 답해도 진행 가능</span>
+  </div>
+
+  <div class="preview" id="preview"></div>
+</div>
+
+<script>
+const fields = [
+  ["q1_now",       "Q1. R2-W2-Now 즉시 진행"],
+  ["q2_priority",  "Q2. R2-W2-Big 우선순위"],
+  ["f1_choice",    "F1. 세션 누적 파일 옵션"],
+  ["f2_choice",    "F2. LLM 근거 transparency 옵션"],
+  ["f3_choice",    "F3. 피드백 루프 옵션"],
+  ["missed",       "빠뜨린 영역 / 더 시급한 것"],
+  ["next_action",  "다음 행동"],
+];
+
+function buildText() {
+  const out = ["[Authoring AI R2-W2 새 우선순위 — 사용자 답변]"];
+  for (const [k, label] of fields) {
+    const v = (document.querySelector(`textarea[name="${k}"]`)?.value ?? "").trim();
+    if (v) out.push(`\n## ${label}\n${v}`);
+  }
+  return out.join("\n");
+}
+
+document.querySelector('[data-action="preview"]').addEventListener("click", () => {
+  const slot = document.getElementById("preview");
+  slot.textContent = buildText();
+  slot.classList.add("visible");
+});
+
+document.querySelector('[data-action="copy"]').addEventListener("click", async (e) => {
+  const txt = buildText();
+  try {
+    await navigator.clipboard.writeText(txt);
+    const btn = e.currentTarget;
+    const orig = btn.textContent;
+    btn.textContent = "✓ 복사됨";
+    btn.classList.add("copied");
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove("copied"); }, 1500);
+    const slot = document.getElementById("preview");
+    slot.textContent = txt;
+    slot.classList.add("visible");
+  } catch {
+    alert("복사 실패. 미리보기 영역에서 수동 복사하세요.");
+  }
+});
+</script>
+
+</body>
+</html>

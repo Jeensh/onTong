@@ -60,7 +60,11 @@ function CommandDialog({
         )}
         showCloseButton={showCloseButton}
       >
-        {children}
+        {/* cmdk store context: CommandInput / CommandList / CommandItem 등이
+            cmdk Command store 의 subscribe() 를 호출하므로 반드시 <Command>
+            로 감싸야 한다. 빠지면 "Cannot read properties of undefined
+            (reading 'subscribe')" 에러. shadcn 표준 패턴. */}
+        <Command>{children}</Command>
       </DialogContent>
     </Dialog>
   )

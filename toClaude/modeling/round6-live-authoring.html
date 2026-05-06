@@ -1,0 +1,1078 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Round 6 — Customer / Productivity Live Authoring (G1 + M1)</title>
+<style>
+  :root {
+    --bg: #0f172a; --card: #1e293b; --line: #334155;
+    --fg: #e2e8f0; --muted: #94a3b8;
+    --primary: #38bdf8; --emerald: #10b981; --amber: #f59e0b;
+    --rose: #fb7185; --violet: #a78bfa; --orange: #fb923c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:13.5px/1.55 -apple-system,"Pretendard","Apple SD Gothic Neo",sans-serif;background:var(--bg);color:var(--fg)}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 28px 80px}
+  header h1{font-size:22px;margin:0 0 6px}
+  header .sub{color:var(--muted);font-size:12px}
+  .progress{margin:18px 0 28px;display:flex;gap:6px;flex-wrap:wrap}
+  .phase{padding:5px 11px;border-radius:6px;background:var(--card);border:1px solid var(--line);font-size:11px;color:var(--muted)}
+  .phase.active{border-color:var(--primary);color:var(--fg);background:rgba(56,189,248,0.08)}
+  .phase.done{border-color:var(--emerald);color:var(--emerald);background:rgba(16,185,129,0.05)}
+  .phase.paused{border-color:var(--amber);color:var(--amber);background:rgba(245,158,11,0.05)}
+
+  .step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:22px 26px;margin-bottom:24px}
+  .step h2{font-size:18px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  .step .meta{font-size:11px;color:var(--muted);margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .badge{padding:2px 8px;border-radius:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;font-weight:600}
+  .b-discuss{background:rgba(56,189,248,0.15);color:var(--primary)}
+  .b-applied{background:rgba(16,185,129,0.15);color:var(--emerald)}
+  .b-deferred{background:rgba(245,158,11,0.15);color:var(--amber)}
+  .b-paused{background:rgba(245,158,11,0.15);color:var(--amber)}
+
+  h3{font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:20px 0 8px;font-weight:600}
+  h4{margin:14px 0 6px;font-size:13px;color:var(--violet)}
+  p{margin:6px 0 10px}
+  ul, ol{margin:6px 0 10px 20px;padding:0}
+  ul li, ol li{padding:3px 0}
+  code{font-family:"JetBrains Mono","SF Mono",monospace;font-size:91%;background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px;color:#c4b5fd}
+
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12.3px}
+  th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+  th{background:rgba(255,255,255,0.04);color:var(--primary);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:0.04em}
+
+  pre{background:rgba(0,0,0,0.35);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-family:"JetBrains Mono",monospace;font-size:11.5px;overflow-x:auto;color:#c4b5fd;margin:8px 0}
+
+  .my-guess{background:rgba(245,158,11,0.05);border-left:3px solid var(--amber);padding:12px 14px;border-radius:4px;margin:10px 0}
+  .my-guess .label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--amber);font-weight:700;margin-bottom:6px}
+  .my-guess .label::before{content:"🤔 "}
+
+  .question{background:rgba(56,189,248,0.05);border-left:3px solid var(--primary);padding:12px 14px;border-radius:4px;margin:10px 0}
+  .question .label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--primary);font-weight:700;margin-bottom:6px}
+  .question .label::before{content:"❓ "}
+
+  .applied{background:rgba(16,185,129,0.06);border-left:3px solid var(--emerald);padding:12px 14px;border-radius:4px;margin:10px 0}
+  .applied .label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--emerald);font-weight:700;margin-bottom:6px}
+  .applied .label::before{content:"✅ "}
+
+  .panel{background:rgba(0,0,0,0.20);border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin:8px 0}
+  .panel.gap{background:rgba(251,113,133,0.04);border-color:rgba(251,113,133,0.3)}
+  .panel .label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);font-weight:600;margin-bottom:6px}
+
+  .quote{background:rgba(167,139,250,0.06);border-left:3px solid var(--violet);padding:10px 14px;border-radius:4px;margin:10px 0;font-size:12.5px}
+  .quote .label{font-size:10px;color:var(--violet);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;font-weight:600}
+
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:600}
+  .p-primary{background:rgba(56,189,248,0.12);color:var(--primary)}
+  .p-emerald{background:rgba(16,185,129,0.12);color:var(--emerald)}
+  .p-amber{background:rgba(245,158,11,0.15);color:var(--amber)}
+  .p-rose{background:rgba(251,113,133,0.15);color:var(--rose)}
+  .p-violet{background:rgba(167,139,250,0.15);color:var(--violet)}
+
+  .row2col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:10px 0}
+  @media(max-width:760px){.row2col{grid-template-columns:1fr}}
+
+  .small{font-size:11px;color:var(--muted)}
+
+  /* form section */
+  .form-section{margin:16px 0;padding:14px 16px;background:rgba(0,0,0,0.2);border-radius:8px;border:1px solid var(--line)}
+  .form-section h4{margin:0 0 10px;font-size:12px;color:var(--fg);font-weight:600}
+  .field{margin:10px 0}
+  .field > label{display:block;font-size:12.5px;color:var(--fg);margin-bottom:4px;font-weight:500;line-height:1.5}
+  .field .recommend{display:block;font-size:11px;color:var(--muted);margin:2px 0 4px}
+  input.text, textarea.text {
+    width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--line);border-radius:5px;
+    color:var(--fg);padding:7px 10px;font:inherit;font-size:12.5px
+  }
+  input.text:focus, textarea.text:focus {outline:none;border-color:var(--primary)}
+  textarea.text{min-height:80px;resize:vertical;font-family:"Pretendard",sans-serif}
+  textarea.text.large{min-height:160px}
+  textarea.text.mono{font-family:"JetBrains Mono",monospace;font-size:11.5px}
+
+  .options-row{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+  .opt-radio{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;background:rgba(255,255,255,0.04);border:1px solid var(--line);font-size:12px;cursor:pointer;color:var(--fg);user-select:none}
+  .opt-radio:hover{border-color:var(--primary)}
+  .opt-radio input{margin:0;cursor:pointer}
+  .opt-radio.checked{background:rgba(56,189,248,0.12);border-color:var(--primary)}
+
+  .ds-actions{display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap}
+  .btn{padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--fg);font-size:12px;cursor:pointer;font-weight:500}
+  .btn:hover{border-color:var(--primary)}
+  .btn.primary{background:var(--primary);color:var(--bg);border-color:var(--primary)}
+  .btn.primary:hover{filter:brightness(1.1)}
+  .btn.copied{background:var(--emerald);border-color:var(--emerald);color:var(--bg)}
+  .copy-hint{font-size:11px;color:var(--muted);margin-left:auto}
+
+  .preview{margin-top:10px;padding:10px 12px;background:rgba(0,0,0,0.35);border-radius:6px;font-family:"JetBrains Mono",monospace;font-size:11.5px;white-space:pre-wrap;border:1px solid var(--line);display:none;color:var(--fg)}
+  .preview.visible{display:block}
+  .preview-label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px;font-family:"Pretendard",sans-serif}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Round 6 — Customer / Productivity Live Authoring</h1>
+  <p class="sub">
+    Round 5 Phase A.8 보류 풀고 재개. <strong>G1 + M1</strong> — 직접 HTML 인터뷰, Authoring AI 도구 안 씀.
+    공유 atomic → composite → TR → Action → AnchorBinding → DB confirm 한 번에 끝.
+    각 step 끝의 form 에 답변 → 「📋 답변 복사」 → 채팅에 붙여넣기.
+  </p>
+  <div class="progress">
+    <span class="phase done">A.8.0 — 시작 + 합의 ✓</span>
+    <span class="phase done">A.8.1 — 공유 atomic 6종 ✓</span>
+    <span class="phase active">A.8.2 — 고객표준 composite (지금)</span>
+    <span class="phase">A.8.3 — 실수율표준 composite</span>
+    <span class="phase">A.8.4 — TypeRealization 검증</span>
+    <span class="phase">A.8.5 — Customer Action</span>
+    <span class="phase">A.8.6 — Productivity Action</span>
+    <span class="phase">A.8.7 — AnchorBinding</span>
+    <span class="phase">A.8.8 — DB confirm + archive</span>
+  </div>
+</header>
+
+<!-- ====================================================================== -->
+<section class="step" id="step-0">
+  <h2>Step 0 — 보류 풀고 시작 (Customer + Productivity)</h2>
+  <div class="meta">
+    <span class="badge b-discuss">시작</span>
+    <span>대상: 8 표준 중 마지막 2개</span>
+    <span>repo: <code>slab-design-real</code></span>
+  </div>
+
+  <h3>왜 지금 이 두 entity?</h3>
+  <p>
+    Round 5 에서 8 표준 중 6개 (HrSpec / CastSpec / EdgingSpec / EdgingGroup / HrMinWgt / HrMaxWgt) 정리 후
+    Authoring AI 작업 진입 → R6 (graph-aware ReAct) + P1a (multi-entity) + P3 폴리싱 모두 완성.
+    이제 보류 풀어 Customer + Productivity 마무리.
+  </p>
+  <div class="quote">
+    <div class="label">사용자 강조 (2026-05-05)</div>
+    "지금 큐에 있는 애들은 그냥 recommend 로 추가된 애들이야. 우리가 html 로 대화하면서 구체화하고
+    만들어갔던 방식으로 전체 한 사이클이 돌아야해."
+  </div>
+  <p class="small">→ 큐의 자동 추천 (composite 2 + action 1 + TR 2) 만 있고 사용자-Claude 합의 의미 부재. 풀 사이클로 채워 confirm.</p>
+
+  <!-- ====================================================================== -->
+  <h3>이번 세션 합의 (위 채팅에서 OK 받음)</h3>
+  <div class="applied">
+    <div class="label">합의 사항 3가지</div>
+    <ul>
+      <li><strong>같이 진행</strong> — Customer + Productivity 한 세션. (CMP, ORG, customerCd) 등 atomic 공유 → 한 번에 정의 + 둘의 패턴 비교</li>
+      <li><strong>큐 비교 모드</strong> — 자동 추천 (composite 2 + action 1 + TR 2) 을 baseline 으로 두고 보강·검증</li>
+      <li><strong>atomic 부터</strong> — 공유 atomic 6종 (cmp/org/proc/grade/product/customer) 먼저 합의 → composite (PK + facet) → Action → AnchorBinding → DB confirm</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>코드 인벤토리 — Customer 영역</h3>
+
+  <h4>1) 데이터 모델 (slab-design-store)</h4>
+  <table>
+    <tr><th>클래스</th><th>역할</th><th>주요 필드 / 메서드</th></tr>
+    <tr>
+      <td><code>CustomerStdJpo</code></td>
+      <td>JPA Entity (Oracle)</td>
+      <td>@Table CUSTOMER_STD · @IdClass CustomerStdPK · 7 컬럼: cmpCd, orgCd, <strong>priority</strong>, productNameCd, customerCd, <strong>pkgWgtHigh, pkgWgtLow</strong></td>
+    </tr>
+    <tr>
+      <td><code>CustomerStdPK</code></td>
+      <td>composite PK (3-tuple)</td>
+      <td>(cmpCd, orgCd, priority) — EDGING_GROUP 과 동일한 우선순위 tiebreaker 패턴</td>
+    </tr>
+    <tr>
+      <td><code>CustomerStdEntity</code></td>
+      <td>도메인 entity (Jpo 1:1 mirror)</td>
+      <td>같은 7 필드</td>
+    </tr>
+    <tr>
+      <td><code>CustomerStdLogic</code></td>
+      <td>Jpo → Entity 변환</td>
+      <td>toEntity(Jpo) — null 체크 후 setter 7회</td>
+    </tr>
+    <tr>
+      <td><code>CustomerStdRepository</code></td>
+      <td>Spring Data JPA</td>
+      <td>findByCmpCdAndOrgCdAndProductNameCdAndCustomerCdOrderByPriorityAsc — 4-key + PRIORITY ASC</td>
+    </tr>
+  </table>
+
+  <h4>2) 서비스 (slab-design-feature)</h4>
+  <table>
+    <tr><th>클래스</th><th>메서드</th><th>의미</th></tr>
+    <tr>
+      <td><code>CustomerStdService</code></td>
+      <td><code>findFirstMatch(cmpCd, orgCd, productNameCd, customerCd)</code></td>
+      <td>4-key 매칭 후 PRIORITY ASC 첫 row → toEntity. 미매칭 시 null (제한 없음)</td>
+    </tr>
+  </table>
+
+  <h4>3) 사용처 (Action — 룰엔진 fallback)</h4>
+  <table>
+    <tr><th>Action</th><th>알고리즘 step</th><th>활용 컬럼</th></tr>
+    <tr><td><code>SdSecondWgtLowAction</code></td><td>Step 5 — 단중하한</td><td><code>pkgWgtLow</code> (특정 고객사 단중 하한 fallback) → max(...) 의 한 입력</td></tr>
+    <tr><td><code>SdSecondWgtHighAction</code></td><td>Step 6 — 단중상한</td><td><code>pkgWgtHigh</code> (특정 고객사 단중 상한 fallback) → min(...) 의 한 입력</td></tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>코드 인벤토리 — Productivity 영역</h3>
+
+  <h4>1) 데이터 모델</h4>
+  <table>
+    <tr><th>클래스</th><th>역할</th><th>주요 필드 / 메서드</th></tr>
+    <tr>
+      <td><code>SdProductivityStdJpo</code></td>
+      <td>JPA Entity (Oracle)</td>
+      <td>@Table SD_PRODUCTIVITY_STD · @IdClass SdProductivityStdPK · 7 컬럼: cmpCd, orgCd, procCd, gradeCd, prodKindCd, customerCd, <strong>productivity</strong></td>
+    </tr>
+    <tr>
+      <td><code>SdProductivityStdPK</code></td>
+      <td>composite PK (6-tuple ★)</td>
+      <td>(cmpCd, orgCd, procCd, gradeCd, prodKindCd, customerCd) — 회사·소·공정·강종·품종·고객 6-축 (Customer 보다 1단 더 깊음)</td>
+    </tr>
+    <tr>
+      <td><code>SdProductivityStdEntity</code></td>
+      <td>도메인 entity</td>
+      <td>Jpo 와 1:1</td>
+    </tr>
+    <tr>
+      <td><code>SdProductivityStdLogic</code></td>
+      <td>Jpo → Entity 변환</td>
+      <td>toEntity(Jpo)</td>
+    </tr>
+    <tr>
+      <td><code>SdProductivityStdRepository</code></td>
+      <td>Spring Data JPA</td>
+      <td>findById(SdProductivityStdPK) — 정확매칭 only (PRIORITY 패턴 없음)</td>
+    </tr>
+  </table>
+
+  <h4>2) 서비스 — 핵심: <code>ProductivityService</code></h4>
+  <table>
+    <tr><th>메서드</th><th>의미</th><th>비고</th></tr>
+    <tr>
+      <td><code>lookup(cmp, org, proc, grade, prodKind, customer)</code></td>
+      <td>6-축 정확매칭 → null 가능</td>
+      <td>repository.findById</td>
+    </tr>
+    <tr>
+      <td><code>lookupOrDefault(...same 6...)</code></td>
+      <td>null 시 <strong>0.95 fallback</strong></td>
+      <td><code>DEFAULT_PRODUCTIVITY = 0.95</code> (2017년 0.90 → 2019년 0.92 → 2021년 0.95). TODO: 운영자 슬랙 알림 (OPS-2199 미진행)</td>
+    </tr>
+    <tr>
+      <td><code>cumulativeProductivity(cmp, org, confirmedPlantCd, grade, prodKind, customer)</code></td>
+      <td>8 공정 활성 자리 (<code>confirmedPlantCd[i] != ' '</code>) <strong>모두</strong> lookupOrDefault 한 결과의 곱</td>
+      <td>★ 핵심 비즈니스 로직. 알고리즘 Step 6/9/13 활용. 결과는 SDOrderEntity.productivity 작업용 필드 캐시</td>
+    </tr>
+  </table>
+
+  <h4>3) 8 공정 약어 (private static final String[] PROC_CODES)</h4>
+  <pre>{ "SM", "HR", "HRF", "CR", "ANL1", "ANL2", "GAL", "CRF" }</pre>
+  <p class="small">공정 i (0~7) ↔ confirmedPlantCd 의 char i. 활성=공장코드 char, 비활성=' '.</p>
+
+  <h4>4) 운영이슈 (코드 주석에 보존)</h4>
+  <ul>
+    <li><strong>P-2018-0721</strong> — "실수율 과다 → 분할수 폭주". Round 5 Q9 에서 의미 정정 보류 (실수율 과대 → 분할수 부족이 자연 / 과소 → 폭주가 자연. 도메인 확인 필요).</li>
+    <li><strong>P-2020-0834</strong> — std 1.05 (>1.0) 등록 → 누적값 비정상 상승. 임시 std 화면 검증 추가, 본 메서드 방어로직은 보류 (주석으로 남음).</li>
+  </ul>
+
+  <!-- ====================================================================== -->
+  <h3>큐 자동 추천 — 현재 baseline</h3>
+  <table>
+    <tr><th>Layer</th><th>FQN</th><th>label</th><th>kind / domain</th><th>confirmed</th><th>비어있는 항목</th></tr>
+    <tr>
+      <td>Term</td>
+      <td><code>term.scm.customer_std</code></td>
+      <td>고객표준</td>
+      <td>composite / scm</td>
+      <td>✗</td>
+      <td>description, parts, facets</td>
+    </tr>
+    <tr>
+      <td>Term</td>
+      <td><code>term.scm.product.productivity_std</code></td>
+      <td>실수율표준</td>
+      <td>composite / scm.product</td>
+      <td>✗</td>
+      <td>description, parts, facets</td>
+    </tr>
+    <tr>
+      <td>Action</td>
+      <td><code>action.scm.product.cumulative_productivity</code></td>
+      <td>cumulative_productivity</td>
+      <td>pure_function</td>
+      <td>✗</td>
+      <td>description, params, output, realizations, AnchorBinding</td>
+    </tr>
+    <tr>
+      <td>TR</td>
+      <td>term.scm.customer_std → CustomerStdEntity</td>
+      <td>—</td>
+      <td>PRIMARY</td>
+      <td>✗</td>
+      <td>partial_parts (해당 없음 — primary)</td>
+    </tr>
+    <tr>
+      <td>TR</td>
+      <td>term.scm.product.productivity_std → SdProductivityStdEntity</td>
+      <td>—</td>
+      <td>PRIMARY</td>
+      <td>✗</td>
+      <td>partial_parts</td>
+    </tr>
+  </table>
+
+  <div class="my-guess">
+    <div class="label">큐의 빈 영역 (자동 추천 한계)</div>
+    <ul>
+      <li><strong>atomic terms 누락</strong> — 회사 / 소 / 공정 / 강종 / 품종 / 고객사 / 우선순위 / 포장단중상하한 등이 큐에 없음</li>
+      <li><strong>Jpo / PK / Logic / Service / Repository TR</strong> 누락 — Entity 만 PRIMARY 하나. 다른 layer 도 mapping 필요</li>
+      <li><strong>Action 메서드 누락</strong> — <code>findFirstMatch</code> / <code>lookup</code> / <code>lookupOrDefault</code> 없음. cumulative_productivity 만 있고 description/realization 도 없음</li>
+      <li><strong>composite parts 미분해</strong> — composite 인데 parts 가 비어있음. 7 컬럼 facet 명시 필요</li>
+      <li><strong>AnchorBinding 0건</strong> — method body fragment ↔ atomic / action 매핑 없음</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>합의된 흐름 (8 step) — 이번 세션 목표</h3>
+  <table>
+    <tr><th>Step</th><th>주제</th><th>출력 (큐 변경)</th></tr>
+    <tr><td>A.8.1</td><td>공유 atomic 6종</td><td>+6 atomic terms (cmp/org/proc/grade/product/customer)</td></tr>
+    <tr><td>A.8.2</td><td>고객표준 composite 보강</td><td>customer_std description + parts (cmp/org/priority/productName/customer/pkgWgtHigh/pkgWgtLow) + facets</td></tr>
+    <tr><td>A.8.3</td><td>실수율표준 composite 보강</td><td>productivity_std description + parts (6-축 + productivity) + facets</td></tr>
+    <tr><td>A.8.4</td><td>TypeRealization 검증/추가</td><td>+ 기존 PRIMARY 2건 검증, +Jpo/PK/Logic/Service/Repository TR (PARTIAL or PRIMARY 결정)</td></tr>
+    <tr><td>A.8.5</td><td>Customer Action</td><td>+findFirstMatch action + 사용처 SdSecondWgtLowAction/HighAction realization</td></tr>
+    <tr><td>A.8.6</td><td>Productivity Action</td><td>+lookup / lookupOrDefault / 보강된 cumulativeProductivity</td></tr>
+    <tr><td>A.8.7</td><td>AnchorBinding</td><td>+cumulativeProductivity body 의 PROC_CODES / DEFAULT / 8자리 loop fragment ↔ atomic 매핑</td></tr>
+    <tr><td>A.8.8</td><td>DB confirm + archive</td><td>모든 row confirm (curl) + round6-archive HTML 마무리</td></tr>
+  </table>
+
+  <h3>진행 원칙</h3>
+  <ul>
+    <li>각 step 끝에 <strong>합의 → 승인 → 다음 step</strong>. 합의 결과는 본 HTML 의 archive section 으로 추가.</li>
+    <li>합의된 개체는 <strong>Step 8 에 한 번에</strong> DB confirm (중간 상태로 인한 큐 오염 방지).</li>
+    <li>중간에 <strong>코드 사실</strong> 더 보고 싶으면 step 안에서 추가 read. 사용자 피드백 우선.</li>
+    <li>사용자 응답이 짧을 때 (예: "OK") 도 그대로 진행. 길게 정정·보강하면 archive 에 그대로 반영.</li>
+  </ul>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>Step 0 답변 — 시작 화면 검토</h4>
+
+    <div class="field">
+      <label>Q1. <strong>위 코드 인벤토리에 잘못된 fact / 빠뜨린 항목 있나요?</strong>
+        <span class="recommend">내 추천: <strong>없음 / Customer 5 클래스 + Productivity 5 클래스 + 운영이슈 2건이면 인터뷰 시작 충분.</strong></span>
+      </label>
+      <textarea class="text" name="q1_inventory" placeholder="예: 없음 / 또는: SdInitialSlabWgtAction 도 productivity 사용 / Customer 도 다른 곳에서 사용..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Q2. <strong>큐 baseline (자동 추천 5건) 과 빈 영역 5종 인식이 맞나요?</strong>
+        <span class="recommend">내 추천: <strong>맞음.</strong> atomic / 다른 layer TR / 메서드 Action / composite parts / AnchorBinding 모두 인터뷰로 채워야 함.</span>
+      </label>
+      <textarea class="text" name="q2_baseline" placeholder="예: 맞음 / 또는: ___ 항목은 자동 추천에 이미 있는데 누락 표시됨..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Q3. <strong>합의된 8 step 흐름</strong> — 순서 / 분량 / 빠뜨린 step 있나요?
+        <span class="recommend">내 추천: <strong>그대로.</strong> atomic → composite → TR → Action → AnchorBinding → confirm 이 자연 의존 순서.</span>
+      </label>
+      <textarea class="text" name="q3_flow" placeholder="예: OK / 또는: A.8.4 와 A.8.5/6 순서 바꿀까 / Step X 추가..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Q4. <strong>Step 1 진입 OK?</strong> 공유 atomic 6종 (cmp/org/proc/grade/product/customer) 부터 정의.
+        <span class="recommend">내 추천: <strong>OK.</strong> Customer/Productivity 둘 다 사용하므로 한 번에.</span>
+      </label>
+      <textarea class="text" name="q4_step1_go" placeholder="예: OK / 또는: 잠깐, 그 전에 ___ 확인하고..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Q5. <strong>추가로 봐야 할 코드</strong> 가 있으면 알려주세요.
+        <span class="recommend">예: SdSecondWgtLowAction body / SdInitialSlabWgtAction (productivity 사용처 일 수 있음) / SDOrderEntity 의 productivity field 정의 / 기타.</span>
+      </label>
+      <textarea class="text" name="q5_more_code" placeholder="optional — 비워도 됨. 비우면 곧장 Step 1 진입."></textarea>
+    </div>
+
+    <div class="field">
+      <label>추가 의견</label>
+      <textarea class="text" name="freeform0" placeholder="optional"></textarea>
+    </div>
+  </div>
+
+  <div class="ds-actions">
+    <button class="btn primary" data-action="copy-step0">📋 답변 복사</button>
+    <button class="btn" data-action="preview-step0">미리보기</button>
+    <span class="copy-hint">Q1~Q4 만 답해도 진행 가능. Q5 는 선택.</span>
+  </div>
+  <div class="preview" id="preview-step0">
+    <div class="preview-label">복사될 내용</div>
+    <div class="preview-body"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step" id="archive-step-0" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 Step 0 답변 받음 — 시작 화면 합의</h2>
+  <div class="meta">
+    <span class="badge b-applied">아카이브</span>
+    <span>Q1·Q3·Q4 OK · Q2 "모르겠음" · Q5 답변 없음</span>
+  </div>
+
+  <h3>답변 그대로</h3>
+  <div class="applied">
+    <div class="label">사용자 답변</div>
+    <ul>
+      <li><strong>Q1 코드 인벤토리</strong>: OK — Customer 5 / Productivity 5 / 운영이슈 2건 그대로 사용.</li>
+      <li><strong>Q2 큐 baseline</strong>: 모르겠음 — 큐 baseline 의 의미가 와닿지 않음. <em>진행 중 큐 변화 (현재 5 row → confirm 후) 를 보여주면서 자연스럽게 이해하도록 한다.</em></li>
+      <li><strong>Q3 8 step 흐름</strong>: OK — atomic → composite → TR → Action → AnchorBinding → confirm 그대로.</li>
+      <li><strong>Q4 Step 1 진입</strong>: OK — 공유 atomic 6종 부터.</li>
+      <li><strong>Q5 추가 코드</strong>: 답변 없음 — Step 1 진행 중 필요 시 추가 read.</li>
+    </ul>
+  </div>
+
+  <h3>이 답변이 다음 step 에 미친 영향</h3>
+  <ul>
+    <li>Step 1 form 의 default 추천 그대로 (정정 없음)</li>
+    <li>큐 baseline 의 의미는 Step 1·2·3 진행 중 큐 row 비교를 보여주며 명시</li>
+    <li>코드 read 는 step 안에서 필요 발생 시 추가 (예: SdSecondWgtLowAction body, SdInitialSlabWgtAction productivity 사용처)</li>
+  </ul>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step" id="step-1">
+  <h2>Step 1 — 공유 atomic 6종 (cmp / org / proc / grade / product / customer)</h2>
+  <div class="meta">
+    <span class="badge b-discuss">토론</span>
+    <span>Customer + Productivity 둘 다 사용하므로 한 번에 정의</span>
+    <span>큐의 atomic term: <strong>0개</strong> (29 term 모두 composite)</span>
+  </div>
+
+  <h3>왜 atomic 부터?</h3>
+  <p>
+    Customer / Productivity composite 의 7 컬럼 중 5~6 컬럼이 atomic 이고,
+    그 atomic 들은 <strong>다른 표준 (HrSpec, CastSpec, EdgingGroup, HrMinWgt, HrMaxWgt) 과 SDOrderEntity 까지 다 공유</strong>.
+    여기서 정의한 atomic 은 다음 phase 에 6 표준 + Order/Slab 풀 사이클에서도 그대로 재사용.
+  </p>
+  <p class="small">
+    참고: 큐의 29 term 은 모두 composite. 자동 recommend 가 atomic 분해를 수행하지 않음 (한계).
+    인터뷰로 처음 도입.
+  </p>
+
+  <!-- ====================================================================== -->
+  <h3>현재 큐의 domain 분포 — atomic 추가 시 어디 둘지 결정 입력</h3>
+  <table>
+    <tr><th>domain</th><th>term 수</th><th>예시</th></tr>
+    <tr><td><code>scm</code></td><td>16</td><td>customer_std, edging_group, hr_min_wgt, hr_max_wgt, error_code, ...</td></tr>
+    <tr><td><code>scm.order</code></td><td>5</td><td>order, order_om, order_os, order_qd, order_chemical</td></tr>
+    <tr><td><code>scm.slab</code></td><td>4</td><td>slab, slab_design_hist, slab_no_sequence, slab_result</td></tr>
+    <tr><td><code>scm.spec</code></td><td>3</td><td>cast_spec, edging_spec, hr_spec</td></tr>
+    <tr><td><code>scm.product</code></td><td>1</td><td>productivity_std (★ 다른 표준은 scm 평면이고 이 하나만 sub-domain — 일관성 부재)</td></tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>내 추천 — atomic 6종 정의 표</h3>
+  <p class="small">아래 표는 default. 정정/추가는 Q1~Q6 에 textarea 로 알려주세요. 표 자체가 OK 면 Q1: "OK".</p>
+
+  <table>
+    <tr>
+      <th>#</th>
+      <th>한국어</th>
+      <th>fqn 후보</th>
+      <th>type</th>
+      <th>enum 값</th>
+      <th>출처 컬럼</th>
+      <th>공유 entity</th>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>회사</td>
+      <td><code>term.scm.shared.cmp</code></td>
+      <td>string(2)</td>
+      <td>(자유 식별자)</td>
+      <td>모든 std PK[0]: <code>CMP_CD</code>. SDOrderEntity / SDSlabEntity 의 cmpCd</td>
+      <td>거의 모든 entity</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>소</td>
+      <td><code>term.scm.shared.org</code></td>
+      <td>string(1)</td>
+      <td>(자유 식별자)</td>
+      <td>모든 std PK[1]: <code>ORG_CD</code></td>
+      <td>거의 모든 entity</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>공정</td>
+      <td><code>term.scm.shared.proc</code></td>
+      <td>string(4) <strong>enum</strong></td>
+      <td>SM / HR / HRF / CR / ANL1 / ANL2 / GAL / CRF (8 값)</td>
+      <td><code>SdProductivityStdJpo.procCd</code> + <code>SDOrderEntity.confirmedPlantCd</code> (8자리 → 자리별로 1 enum)</td>
+      <td>ProductivityStd, Order(confirmedPlantCd 의 인덱스 매핑)</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>강종</td>
+      <td><code>term.scm.shared.grade</code></td>
+      <td>string(10)</td>
+      <td>(자유 식별자 — 강종 코드)</td>
+      <td><code>SdProductivityStdJpo.gradeCd</code>, <code>OrderQd.gradeCd</code>, HrSpec/CastSpec PK</td>
+      <td>ProductivityStd, Order, HrSpec, CastSpec, ChemicalSpec</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>품종</td>
+      <td><code>term.scm.shared.product_kind</code></td>
+      <td>string(3~4)</td>
+      <td>(자유 식별자)</td>
+      <td>★ <strong>4 alias chaos</strong>: <code>CUSTOMER_STD.PRODUCT_NAME_CD</code> + <code>SD_PRODUCTIVITY_STD.PROD_KIND_CD</code> + 다른 테이블의 <code>PRODUCT_TYPE_CD</code> + 기타. 같은 도메인 다른 컬럼명.</td>
+      <td>거의 모든 std + Order</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>고객사</td>
+      <td><code>term.scm.shared.customer</code></td>
+      <td>string(10)</td>
+      <td>(자유 식별자)</td>
+      <td><code>CustomerStdJpo.customerCd</code>, <code>SdProductivityStdJpo.customerCd</code>, OrderOm 의 customerCd</td>
+      <td>CustomerStd, ProductivityStd, Order</td>
+    </tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>특히 결정해야 할 4가지</h3>
+
+  <h4>① domain naming — atomic 6종 어디 둘까?</h4>
+  <ul>
+    <li><strong>옵션 A</strong>: <code>scm</code> 평면 (다른 16 composite 와 같이) — 단순. atomic + composite 섞임.</li>
+    <li><strong>옵션 B</strong>: <code>scm.shared</code> 신규 (atomic 그룹화) ★ 내 추천 — 어디든 공유 명시. 위 표가 옵션 B.</li>
+    <li><strong>옵션 C</strong>: 의미 별 분산 (<code>scm.org.cmp</code> / <code>scm.process.proc</code> 등) — 너무 분산.</li>
+  </ul>
+
+  <h4>② 공정 (proc) — enum 처리 방식</h4>
+  <ul>
+    <li><strong>B-1</strong>: atomic 의 <code>enum_values</code> facet (<code>["SM","HR",...,"CRF"]</code>) ★ 추천</li>
+    <li><strong>B-2</strong>: 8 개 atomic term 따로 (<code>term.scm.proc.sm</code>, <code>...hr</code>) — 너무 많음</li>
+    <li><strong>B-3</strong>: 그냥 atomic, enum 은 doc 으로만 — 실수 검출 약함</li>
+  </ul>
+
+  <h4>③ 품종 (product_kind) — 4 alias 처리</h4>
+  <p>같은 도메인이지만 컬럼명 4가지 다름 (PRODUCT_NAME_CD / PROD_KIND_CD / PRODUCT_TYPE_CD / 기타). drama DNA.</p>
+  <ul>
+    <li><strong>C-1</strong>: <code>term.scm.shared.product_kind</code> 1개 + 4 PARTIAL TR (각 컬럼 → 같은 atomic) ★ 추천</li>
+    <li><strong>C-2</strong>: 컬럼별로 atomic 4개 (의미 같은데 분리) — 매핑 가치 망실</li>
+    <li><strong>C-3</strong>: 1 atomic + alias facet (<code>aliases: ["product_name_cd","prod_kind_cd","product_type_cd"]</code>) — 단순</li>
+  </ul>
+
+  <h4>④ pkgWgtHigh / pkgWgtLow / priority / productivity (값 컬럼) — atomic 이긴 하지만 entity 별 고유. 공유 vs 비공유?</h4>
+  <ul>
+    <li><strong>D-1</strong>: 공유 atomic 6종 에서 제외. composite 의 facet 으로만 (entity 별 고유) ★ 추천</li>
+    <li><strong>D-2</strong>: 공유 atomic 으로 추가 (예: <code>term.scm.shared.pkg_wgt</code>) — Customer 에서만 등장하므로 공유성 약함</li>
+    <li><strong>D-3</strong>: 별도 atomic 으로 정의하되 도메인은 entity 별 (예: <code>term.scm.customer_std.pkg_wgt</code>) — naming 복잡</li>
+  </ul>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>Step 1 답변 — 공유 atomic 6종 합의</h4>
+
+    <div class="field">
+      <label>Q1. <strong>위 표의 6 atomic 정의</strong> (한국어 / fqn / type / 출처 / 공유) 가 OK 인가요? 정정/추가/삭제 있으면 row 별로.
+        <span class="recommend">내 추천: <strong>OK 그대로</strong>. 정정 없으면 "OK" 한 단어 가능.</span>
+      </label>
+      <textarea class="text" name="q1_table" placeholder="예: OK / 또는: 강종은 enum 으로 — 코드에 명시된 강종 list 있다면 ___ / 또는: 품종에 추가로 ___ alias..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Q2. <strong>① domain naming</strong> — A (scm 평면) / B (scm.shared) / C (의미 별 분산) ?
+        <span class="recommend">내 추천: <strong>B</strong> (scm.shared) — atomic 임을 명시 + 어디든 공유.</span>
+      </label>
+      <textarea class="text" name="q2_domain" placeholder="예: B / 또는: A / 또는: B 인데 cmp+org 만 scm.shared.org.* 식으로 묶어..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Q3. <strong>② 공정 enum 처리</strong> — B-1 (atomic 의 enum_values facet) / B-2 (8 atomic 분리) / B-3 (doc only) ?
+        <span class="recommend">내 추천: <strong>B-1</strong> — facet 으로 8 enum 명시 (실수율 lookup 시 검증 가능).</span>
+      </label>
+      <textarea class="text" name="q3_proc_enum" placeholder="예: B-1 / 또는: B-3 (간단)"></textarea>
+    </div>
+
+    <div class="field">
+      <label>Q4. <strong>③ 품종 4 alias 처리</strong> — C-1 (1 atomic + 4 PARTIAL TR) / C-2 (4 atomic) / C-3 (1 atomic + alias facet) ?
+        <span class="recommend">내 추천: <strong>C-1</strong> — drama DNA 시각화. 자동 매핑 도구의 가치 가장 강하게 보임.</span>
+      </label>
+      <textarea class="text" name="q4_product_alias" placeholder="예: C-1 / 또는: C-3 (단순)"></textarea>
+    </div>
+
+    <div class="field">
+      <label>Q5. <strong>④ 값 컬럼 (pkgWgtHigh/Low / priority / productivity)</strong> 처리 — D-1 (공유 X, composite facet) / D-2 (공유 atomic) / D-3 (entity별 atomic) ?
+        <span class="recommend">내 추천: <strong>D-1</strong> — composite 의 facet 으로 entity 별 고유 처리.</span>
+      </label>
+      <textarea class="text" name="q5_value_cols" placeholder="예: D-1 / 또는: D-3"></textarea>
+    </div>
+
+    <div class="field">
+      <label>Q6. <strong>빠뜨린 atomic / 추가할 atomic</strong> 있나요?
+        <span class="recommend">내 추천: <strong>없음</strong> — 6종이 Customer + Productivity 의 PK + 자유 식별자 컬럼 다 커버.</span>
+      </label>
+      <textarea class="text" name="q6_missing" placeholder="예: 없음 / 또는: confirmedPlantCd 자체도 atomic 이라 추가, 또는 priority 도 공유..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Q7. <strong>Step 2 (고객표준 composite) 진입 OK?</strong>
+        <span class="recommend">내 추천: <strong>OK</strong>. atomic 6종 합의되면 Customer composite 의 parts 매핑은 거의 자동.</span>
+      </label>
+      <textarea class="text" name="q7_step2_go" placeholder="예: OK / 또는: 잠깐, ___ 더 토론하고"></textarea>
+    </div>
+
+    <div class="field">
+      <label>추가 의견</label>
+      <textarea class="text" name="freeform1" placeholder="optional"></textarea>
+    </div>
+  </div>
+
+  <div class="ds-actions">
+    <button class="btn primary" data-action="copy-step1">📋 답변 복사</button>
+    <button class="btn" data-action="preview-step1">미리보기</button>
+    <span class="copy-hint">Q1+Q2 만 답해도 진행 가능</span>
+  </div>
+  <div class="preview" id="preview-step1">
+    <div class="preview-label">복사될 내용</div>
+    <div class="preview-body"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step" id="archive-step-1" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 Step 1 답변 받음 — 합의 + Q4 추가 질문 답 + 종합 브리핑</h2>
+  <div class="meta">
+    <span class="badge b-applied">아카이브</span>
+    <span>모두 추천대로 채택 + Q4 alias 충돌 의문 명시 답변</span>
+  </div>
+
+  <h3>답변 그대로</h3>
+  <div class="applied">
+    <div class="label">사용자 답변</div>
+    <ul>
+      <li><strong>Q1</strong> atomic 6종 표: OK</li>
+      <li><strong>Q2</strong> domain naming: 추천대로 → <code>scm.shared.*</code></li>
+      <li><strong>Q3</strong> 공정 enum: 추천대로 → atomic 의 <code>enum_values</code> facet (8 값)</li>
+      <li><strong>Q4</strong> 품종 4 alias: 추천대로 → 1 atomic + 4 PARTIAL TR. <em>+ alias 충돌 가능성 의문 (아래 답변)</em></li>
+      <li><strong>Q5</strong> 값 컬럼: 추천대로 → composite facet (entity 별 고유)</li>
+      <li><strong>Q6</strong> 빠뜨림: 없음</li>
+      <li><strong>Q7</strong> Step 2 진입: OK + <strong>브리핑 요청</strong></li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>Q4 추가 의문에 답 — alias 가 다른 atomic 에서도 중복 사용되면?</h3>
+  <div class="quote">
+    <div class="label">사용자 인용</div>
+    "alias도 여기저기에 중복으로 사용될 수 있잖아. 맥락에 따라서. 예를들어 A의 alias가 q, w, e 라면
+    C의 alias가 q, r, b 일 수 있는거잖아? 코드 맥락안에서는 그걸 판단 가능하지만 우리 지금 작성하는 것도 그게 고려되는거지?"
+  </div>
+
+  <div class="my-guess" style="border-color:rgba(16,185,129,0.5);background:rgba(16,185,129,0.04)">
+    <div class="label" style="color:var(--emerald)">★ 답: 그게 정확히 C-1 의 가치. 자동 처리됨.</div>
+    <p>alias 를 <strong>atomic 자체의 속성</strong> 으로 박으면 (= C-3 옵션) → "q" 가 어떤 atomic 인지 모호 → 충돌.</p>
+    <p>대신 C-1 은 <strong>매핑 단위 = (atomic, codeType, codeField) 3-tuple</strong>. 같은 컬럼명도 entity 별로 독립 매핑 가능.</p>
+  </div>
+
+  <h4>구체 예시 — PRODUCT_NAME_CD 컬럼이 4 entity 에 다 있다고 가정</h4>
+  <table>
+    <tr><th>코드 위치</th><th>매핑되는 atomic</th><th>TR scope</th><th>의미</th></tr>
+    <tr><td><code>CustomerStdJpo.PRODUCT_NAME_CD</code></td><td><code>term.scm.shared.product_kind</code></td><td>PARTIAL</td><td>품종 (= 같은 의미)</td></tr>
+    <tr><td><code>SdProductivityStdJpo.PROD_KIND_CD</code></td><td><code>term.scm.shared.product_kind</code></td><td>PARTIAL</td><td>품종 (다른 컬럼명, 같은 의미)</td></tr>
+    <tr><td><code>HrSpecJpo.PRODUCT_TYPE_CD</code></td><td><code>term.scm.shared.product_kind</code></td><td>PARTIAL</td><td>품종 (또 다른 컬럼명, 같은 의미)</td></tr>
+    <tr><td>★ 가상의 케이스 — <code>OtherJpo.PRODUCT_NAME_CD</code></td><td><code>term.scm.something.else</code> (다른 atomic)</td><td>PARTIAL</td><td><strong>같은 컬럼명, 다른 의미 — 충돌 X</strong></td></tr>
+  </table>
+  <p class="small">
+    매핑 row 가 (atomic + codeType + codeField) 3개 키로 unique 하므로,
+    <code>CustomerStdJpo.PRODUCT_NAME_CD</code> 와 <code>OtherJpo.PRODUCT_NAME_CD</code> 가 같은 컬럼명이어도 다른 row.
+    각자 다른 atomic 가리킬 수 있음. 코드 맥락이 그대로 살아있음.
+  </p>
+
+  <h4>역방향 — atomic 입장에서 보면?</h4>
+  <pre>term.scm.shared.product_kind  ← (PARTIAL TR 4 row)
+  ├─ CustomerStdJpo.productNameCd
+  ├─ SdProductivityStdJpo.prodKindCd
+  ├─ HrSpecJpo.productTypeCd
+  └─ ... (다른 6 std 도 추가 가능)
+
+term.scm.something.else  ← (PARTIAL TR 1 row, 가상)
+  └─ OtherJpo.productNameCd  ★ 같은 컬럼명이지만 다른 atomic
+</pre>
+  <p>즉 ontology 가 보장하는 건 <strong>"이 컬럼 ↔ 이 atomic"</strong> 쌍의 명시적 등록. <em>"PRODUCT_NAME_CD 라는 컬럼명이면 자동으로 품종"</em> 같은 추측은 없음. 매핑은 항상 코드 위치 단위.</p>
+
+  <p class="small">
+    참고: alias facet (C-3) 도 추가 가능 — atomic 에 자주 쓰이는 컬럼명 list 박아두면 검색·자동 추천 시 hint.
+    단 매핑의 결정권은 항상 TR 에 있음. alias 는 hint 일 뿐 ground truth 아님.
+  </p>
+
+  <!-- ====================================================================== -->
+  <h3>★ Step 1 종합 브리핑 — 결정된 것</h3>
+
+  <h4>1. atomic 6종 (모두 신규 추가)</h4>
+  <table>
+    <tr><th>#</th><th>한국어</th><th>fqn</th><th>type</th><th>enum / 비고</th></tr>
+    <tr><td>1</td><td>회사</td><td><code>term.scm.shared.cmp</code></td><td>string(2)</td><td>—</td></tr>
+    <tr><td>2</td><td>소</td><td><code>term.scm.shared.org</code></td><td>string(1)</td><td>—</td></tr>
+    <tr><td>3</td><td>공정</td><td><code>term.scm.shared.proc</code></td><td>string(4) enum</td><td>enum_values: <code>["SM","HR","HRF","CR","ANL1","ANL2","GAL","CRF"]</code></td></tr>
+    <tr><td>4</td><td>강종</td><td><code>term.scm.shared.grade</code></td><td>string(10)</td><td>자유 식별자</td></tr>
+    <tr><td>5</td><td>품종</td><td><code>term.scm.shared.product_kind</code></td><td>string(3~4)</td><td>4 컬럼 alias chaos — 컬럼별 PARTIAL TR 로 매핑</td></tr>
+    <tr><td>6</td><td>고객사</td><td><code>term.scm.shared.customer</code></td><td>string(10)</td><td>Customer/Productivity/Order 공유</td></tr>
+  </table>
+
+  <h4>2. 4가지 결정 사항</h4>
+  <ol>
+    <li><strong>domain</strong> = <code>scm.shared</code> 신규 sub-domain. atomic 임을 명시 + 어디든 공유.</li>
+    <li><strong>공정 enum</strong> = atomic 의 <code>enum_values</code> facet (8 값 명시). 룩업 시 검증 가능.</li>
+    <li><strong>품종 4 alias</strong> = 1 atomic + 4 PARTIAL TR. 컬럼 맥락 의존성 자동 처리 (위 표 참조).</li>
+    <li><strong>값 컬럼</strong> (pkgWgtHigh/Low, priority, productivity) = composite 의 facet 으로 entity 별 고유 처리. 공유 atomic 아님.</li>
+  </ol>
+
+  <h4>3. Step 2~8 에 미치는 영향 — 미리 보기</h4>
+
+  <p><strong>Step 2 (Customer composite)</strong> 에서 CustomerStd 7 필드 분해:</p>
+  <table>
+    <tr><th>컬럼</th><th>type</th><th>매핑 종류</th><th>대상</th></tr>
+    <tr><td>cmpCd</td><td>string(2)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.cmp</code></td></tr>
+    <tr><td>orgCd</td><td>string(1)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.org</code></td></tr>
+    <tr><td>priority</td><td>integer</td><td>composite facet</td><td>(entity 고유 — 우선순위 tiebreaker)</td></tr>
+    <tr><td>productNameCd</td><td>string(3)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.product_kind</code> (alias chaos)</td></tr>
+    <tr><td>customerCd</td><td>string(10)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.customer</code></td></tr>
+    <tr><td>pkgWgtHigh</td><td>BigDecimal</td><td>composite facet</td><td>(entity 고유 — 포장단중상한)</td></tr>
+    <tr><td>pkgWgtLow</td><td>BigDecimal</td><td>composite facet</td><td>(entity 고유 — 포장단중하한)</td></tr>
+  </table>
+  <p class="small">→ <strong>4 atomic + 3 facet</strong> 으로 깔끔 분해. Step 2 form 이 이 표를 default 로 제시.</p>
+
+  <p><strong>Step 3 (Productivity composite)</strong> 에서 ProductivityStd 7 필드 분해:</p>
+  <table>
+    <tr><th>컬럼</th><th>type</th><th>매핑 종류</th><th>대상</th></tr>
+    <tr><td>cmpCd</td><td>string(2)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.cmp</code></td></tr>
+    <tr><td>orgCd</td><td>string(1)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.org</code></td></tr>
+    <tr><td>procCd</td><td>string(4) enum</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.proc</code></td></tr>
+    <tr><td>gradeCd</td><td>string(10)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.grade</code></td></tr>
+    <tr><td>prodKindCd</td><td>string(4)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.product_kind</code> (alias chaos — Customer 의 productNameCd 와 같은 atomic)</td></tr>
+    <tr><td>customerCd</td><td>string(10)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.customer</code></td></tr>
+    <tr><td>productivity</td><td>BigDecimal(7,4)</td><td>composite facet</td><td>(entity 고유 — 실수율 0.0~1.0)</td></tr>
+  </table>
+  <p class="small">→ <strong>6 atomic + 1 facet</strong>. ProductivityStd 가 Customer 보다 atomic 공유 1단 깊음 (proc/grade 추가).</p>
+
+  <h4>4. 큐 변화 미리 보기 (Step 8 confirm 시점)</h4>
+  <pre>현재 큐 (29 term, 35 action, 34 TR):
+  → Step 8 confirm 후:
+    + 6 신규 atomic terms (cmp/org/proc/grade/product_kind/customer)
+    + 11 신규 PARTIAL TR (Customer 4 + Productivity 6 + 0~7 공유 보너스)
+    + 기존 2 composite term (customer_std, productivity_std) 의 description/parts/facets 보강
+    + 기존 1 action (cumulative_productivity) 의 description/realization 보강
+    + 신규 actions (findFirstMatch / lookup / lookupOrDefault — Step 5/6 결정)
+    + 신규 AnchorBinding (Step 7 결정)</pre>
+
+  <!-- ====================================================================== -->
+  <h3>이게 왜 의미있나 (큐 baseline 의 의미 — Step 0 Q2 의 답)</h3>
+  <p>Step 0 의 Q2 ("큐 baseline 모르겠음") 에 답:</p>
+  <div class="panel">
+    <div class="label">큐 baseline 의 의미</div>
+    <p><strong>큐</strong> = onTong 의 ontology 저장소. 코드 분석 도구가 자동으로 채워둔 row + 사용자가 confirm 한 row 가 섞여있음.</p>
+    <p><strong>baseline</strong> = 자동 추천만 있는 미합의 상태. 모든 row 의 <code>confirmed=False</code>.</p>
+    <p>이번 G1+M1 의 가치 = baseline 의 빈 영역 (atomic 0 / parts 0 / AnchorBinding 0 / Action description 0) 을 인터뷰로 채우고 confirm 으로 의미 부여.</p>
+    <p>Step 8 confirm 후 큐 row 가 <strong>"자동 추천 (의심)"</strong> → <strong>"사용자 합의 (ground truth)"</strong> 로 status 전환. 다른 도구 (시뮬레이션 / Authoring AI / 영향도 분석) 가 ground truth 만 신뢰하고 사용 시작.</p>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>Step 2 (고객표준 composite) 진입 준비 완료</h3>
+  <p>위 브리핑 OK 면 다음 응답으로 Step 2 카드 추가합니다. 이해 안 되는 부분 있으면 추가 질문 주세요.</p>
+  <p class="small">Step 2 = CustomerStd composite term (이미 큐에 있는 자동 추천) 의 description / parts / facets 채움. 위 "Customer 7 필드 분해" 표가 그대로 form 의 default.</p>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step" id="step-2">
+  <h2>Step 2 — 고객표준 (CustomerStd) composite 보강</h2>
+  <div class="meta">
+    <span class="badge b-discuss">토론</span>
+    <span>큐 row: <code>term.scm.customer_std</code> (자동 추천, description/parts/facets 모두 비어있음)</span>
+  </div>
+
+  <h3>왜 composite "보강"?</h3>
+  <p>큐의 자동 추천이 <strong>label + composite kind + domain</strong> 만 채움. <strong>description / parts / facets</strong> 비어있음.
+    Customer 의 7 컬럼이 도메인 의미상 어떻게 나뉘는지 인터뷰로 채워서 confirm 가능 상태로 만들기.</p>
+
+  <div class="panel">
+    <div class="label">parts vs facets — 핵심 구분</div>
+    <ul>
+      <li><strong>parts</strong> = composite 가 어떤 <strong>atomic 들의 묶음</strong> 인지 (도메인 정의). 다른 entity 와 공유 가능.</li>
+      <li><strong>facets</strong> = entity <strong>고유</strong> 속성 (atomic 으로 분해 안 됨, 다른 entity 에 등장 안 함).</li>
+      <li>참고: 코드 위치 매핑 (어느 컬럼이 어느 atomic 인지) 은 <strong>Step 4 의 TR</strong> 에서 다룸. Step 2 는 도메인 정의만.</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>현재 큐 row (자동 추천)</h3>
+  <table>
+    <tr><th>field</th><th>현재 값</th></tr>
+    <tr><td>fqn</td><td><code>term.scm.customer_std</code></td></tr>
+    <tr><td>label</td><td>고객표준</td></tr>
+    <tr><td>kind</td><td>composite</td></tr>
+    <tr><td>domain</td><td><code>scm</code> ★ (다른 6 표준은 <code>scm.spec</code> 또는 <code>scm</code>, <code>scm.product</code> — 일관성 부재)</td></tr>
+    <tr><td>description</td><td>(비어있음)</td></tr>
+    <tr><td>parts</td><td>(비어있음)</td></tr>
+    <tr><td>facets</td><td>(비어있음)</td></tr>
+    <tr><td>confirmed</td><td>✗</td></tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>내 추천 — 7 필드 분해 (Step 1 archive 에서 결정)</h3>
+
+  <h4>parts (atomic 4종)</h4>
+  <table>
+    <tr><th>코드 컬럼</th><th>type</th><th>atomic</th></tr>
+    <tr><td><code>cmpCd</code></td><td>string(2)</td><td><code>term.scm.shared.cmp</code></td></tr>
+    <tr><td><code>orgCd</code></td><td>string(1)</td><td><code>term.scm.shared.org</code></td></tr>
+    <tr><td><code>productNameCd</code> ★</td><td>string(3)</td><td><code>term.scm.shared.product_kind</code> (4 alias 중 하나)</td></tr>
+    <tr><td><code>customerCd</code></td><td>string(10)</td><td><code>term.scm.shared.customer</code></td></tr>
+  </table>
+
+  <h4>facets (CustomerStd 고유 3종)</h4>
+  <table>
+    <tr><th>이름</th><th>type</th><th>의미</th></tr>
+    <tr><td><code>priority</code></td><td>integer</td><td>우선순위 tiebreaker (PRIORITY ASC 첫 row 사용). EdgingGroup 과 동일 패턴.</td></tr>
+    <tr><td><code>pkg_wgt_high</code></td><td>BigDecimal(10,3)</td><td>특정 고객사 단중 상한. 알고리즘 Step 6 (단중상한 계산) 의 min(...) 한 입력.</td></tr>
+    <tr><td><code>pkg_wgt_low</code></td><td>BigDecimal(10,3)</td><td>특정 고객사 단중 하한. 알고리즘 Step 5 (단중하한 계산) 의 max(...) 한 입력.</td></tr>
+  </table>
+
+  <h4>description 추천 (한 두 문장)</h4>
+  <pre>특정 고객사 별 포장 단중 (pkg_wgt) 제한 표준.
+PK = (회사, 소, 우선순위) 3-tuple. 룩업 키 = (회사, 소, 품종, 고객사) 4-key,
+PRIORITY ASC 정렬 후 첫 row 채택. 매칭 실패 시 null = 제한 없음.
+알고리즘 Step 5 (단중하한 max) + Step 6 (단중상한 min) 의 룰엔진 fallback 입력.</pre>
+
+  <!-- ====================================================================== -->
+  <h3>특히 결정해야 할 — 8 표준의 domain 일관성</h3>
+
+  <h4>현재 8 표준의 domain (자동 추천 그대로)</h4>
+  <table>
+    <tr><th>표준</th><th>현재 domain</th></tr>
+    <tr><td>HrSpec / CastSpec / EdgingSpec</td><td><code>scm.spec</code></td></tr>
+    <tr><td>EdgingGroup / HrMinWgt / HrMaxWgt / <strong>CustomerStd</strong></td><td><code>scm</code> 평면</td></tr>
+    <tr><td>ProductivityStd</td><td><code>scm.product</code></td></tr>
+  </table>
+  <p class="small">자동 추천이 일관성 있게 grouping 하지 못함 (recommend bulk 한계).</p>
+
+  <h4>옵션</h4>
+  <ul>
+    <li><strong>S-1</strong> 그대로 두기 — 자동 추천 결과 보존. 8 표준 흩어짐 받아들임.</li>
+    <li><strong>S-2</strong> <code>scm.std</code> 신규 sub-domain — 8 표준 모두 묶기. 다른 6 표준은 이번 세션 후 별도 정정 ★ 내 추천</li>
+    <li><strong>S-3</strong> 이번 세션은 <code>scm.std</code> 로 가되 다른 6 표준은 그대로 — 일관성 더 깨짐</li>
+    <li><strong>S-4</strong> <code>scm.spec</code> 으로 통합 — spec (사양) 과 std (표준) 의미 다를 수 있음</li>
+  </ul>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>Step 2 답변 — 고객표준 composite 보강</h4>
+
+    <div class="field">
+      <label>Q1. <strong>label / fqn</strong> — 추천대로 (고객표준 / <code>term.scm.customer_std</code>) OK?
+        <span class="recommend">내 추천: <strong>OK</strong>. 자동 추천 label 그대로 사용. fqn 은 domain 결정 따라 변경 가능 (Q5).</span>
+      </label>
+      <textarea class="text" name="q1_label_fqn" placeholder="예: OK / 또는: 한국어를 '고객사 단중 표준' 으로 명확히..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Q2. <strong>description</strong> — 위 추천 4문장 OK? 정정/보강?
+        <span class="recommend">내 추천: 위 그대로 (PK + 룩업 키 + null fallback + 알고리즘 step 활용). 한국어 요약.</span>
+      </label>
+      <textarea class="text" name="q2_description" placeholder="예: OK / 또는: 더 짧게 / 또는: ___ 추가..." rows="4"></textarea>
+    </div>
+
+    <div class="field">
+      <label>Q3. <strong>parts (atomic 4종)</strong> — 위 표 OK? 추가/제거 atomic 있나요?
+        <span class="recommend">내 추천: <strong>OK</strong> 그대로 4 atomic.</span>
+      </label>
+      <textarea class="text" name="q3_parts" placeholder="예: OK / 또는: priority 도 atomic 으로 (D-1 결정과 다르게)..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Q4. <strong>facets 3종 (priority / pkg_wgt_high / pkg_wgt_low)</strong> — 위 표 OK? 정정?
+        <span class="recommend">내 추천: <strong>OK</strong>. type 도 코드와 동일 (BigDecimal(10,3) / Integer).</span>
+      </label>
+      <textarea class="text" name="q4_facets" placeholder="예: OK / 또는: pkg_wgt_high/low 를 하나의 range facet 으로 묶기..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Q5. <strong>domain 일관성 (8 표준)</strong> — S-1 (그대로) / S-2 (scm.std 통일) / S-3 (이번만 std) / S-4 (scm.spec 통합) ?
+        <span class="recommend">내 추천: <strong>S-2</strong> — <code>scm.std</code> 로 통일. CustomerStd 의 fqn 도 <code>term.scm.std.customer_std</code> 로 변경. 다른 6 표준은 다음 세션 정정 (이번 세션 스코프 외).</span>
+      </label>
+      <textarea class="text" name="q5_domain_consistency" placeholder="예: S-2 / 또는: S-1 (이번 세션은 변경 X)..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Q6. <strong>매칭 로직 (4-key + PRIORITY ASC + null fallback)</strong> — composite 에 별도 facet (예: <code>lookup_pattern</code>) 박을까, description 에만 박을까?
+        <span class="recommend">내 추천: <strong>description 에만</strong>. 매칭 로직은 사용처 (Action — Step 5/6) 의 metadata 에 박는 게 더 자연. composite 자체에는 부담 X.</span>
+      </label>
+      <textarea class="text" name="q6_lookup" placeholder="예: description 만 / 또는: facet 도 박아 (구조화 metadata)..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>Q7. <strong>Step 3 (실수율표준 composite) 진입 OK?</strong>
+        <span class="recommend">내 추천: <strong>OK</strong>. Customer 결정 패턴 그대로 Productivity 에 재사용. 6-axis 추가 + facet 1개 (productivity) 만 차이.</span>
+      </label>
+      <textarea class="text" name="q7_step3_go" placeholder="예: OK / 또는: 잠깐, ___ 더..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>추가 의견</label>
+      <textarea class="text" name="freeform2" placeholder="optional"></textarea>
+    </div>
+  </div>
+
+  <div class="ds-actions">
+    <button class="btn primary" data-action="copy-step2">📋 답변 복사</button>
+    <button class="btn" data-action="preview-step2">미리보기</button>
+    <span class="copy-hint">Q1+Q5 만 답해도 진행 가능</span>
+  </div>
+  <div class="preview" id="preview-step2">
+    <div class="preview-label">복사될 내용</div>
+    <div class="preview-body"></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+function buildStep0Text() {
+  const fields = [
+    ["q1_inventory", "Q1. 코드 인벤토리"],
+    ["q2_baseline",  "Q2. 큐 baseline"],
+    ["q3_flow",      "Q3. 8 step 흐름"],
+    ["q4_step1_go",  "Q4. Step 1 진입"],
+    ["q5_more_code", "Q5. 추가 코드"],
+    ["freeform0",    "추가"],
+  ];
+  const slot = document.querySelector('#step-0');
+  const parts = ["[Step 0 — 시작 화면 검토]"];
+  for (const [k, label] of fields) {
+    const v = (slot.querySelector(`textarea[name="${k}"]`)?.value ?? '').trim();
+    if (v) parts.push(`\n## ${label}\n${v}`);
+  }
+  return parts.join("\n");
+}
+
+document.querySelector('button[data-action="preview-step0"]').addEventListener('click', () => {
+  const slot = document.querySelector('#preview-step0');
+  const body = slot.querySelector('.preview-body');
+  body.textContent = buildStep0Text();
+  slot.classList.add('visible');
+});
+
+document.querySelector('button[data-action="copy-step0"]').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  const txt = buildStep0Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    const orig = btn.textContent;
+    btn.textContent = '✓ 복사됨';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+    const slot = document.querySelector('#preview-step0');
+    const body = slot.querySelector('.preview-body');
+    body.textContent = txt;
+    slot.classList.add('visible');
+  } catch {
+    alert('복사 실패. 미리보기 영역에서 수동 복사하세요.');
+  }
+});
+
+function buildStep1Text() {
+  const fields = [
+    ["q1_table",         "Q1. atomic 6종 표"],
+    ["q2_domain",        "Q2. domain naming"],
+    ["q3_proc_enum",     "Q3. 공정 enum 처리"],
+    ["q4_product_alias", "Q4. 품종 4 alias 처리"],
+    ["q5_value_cols",    "Q5. 값 컬럼 처리"],
+    ["q6_missing",       "Q6. 빠뜨림/추가"],
+    ["q7_step2_go",      "Q7. Step 2 진입"],
+    ["freeform1",        "추가"],
+  ];
+  const slot = document.querySelector('#step-1');
+  const parts = ["[Step 1 — 공유 atomic 6종]"];
+  for (const [k, label] of fields) {
+    const v = (slot.querySelector(`textarea[name="${k}"]`)?.value ?? '').trim();
+    if (v) parts.push(`\n## ${label}\n${v}`);
+  }
+  return parts.join("\n");
+}
+
+document.querySelector('button[data-action="preview-step1"]').addEventListener('click', () => {
+  const slot = document.querySelector('#preview-step1');
+  const body = slot.querySelector('.preview-body');
+  body.textContent = buildStep1Text();
+  slot.classList.add('visible');
+});
+
+document.querySelector('button[data-action="copy-step1"]').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  const txt = buildStep1Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    const orig = btn.textContent;
+    btn.textContent = '✓ 복사됨';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+    const slot = document.querySelector('#preview-step1');
+    const body = slot.querySelector('.preview-body');
+    body.textContent = txt;
+    slot.classList.add('visible');
+  } catch {
+    alert('복사 실패. 미리보기 영역에서 수동 복사하세요.');
+  }
+});
+
+function buildStep2Text() {
+  const fields = [
+    ["q1_label_fqn",         "Q1. label / fqn"],
+    ["q2_description",       "Q2. description"],
+    ["q3_parts",             "Q3. parts (atomic 4)"],
+    ["q4_facets",            "Q4. facets (3)"],
+    ["q5_domain_consistency","Q5. domain 일관성 (S-1~S-4)"],
+    ["q6_lookup",            "Q6. 매칭 로직 표현"],
+    ["q7_step3_go",          "Q7. Step 3 진입"],
+    ["freeform2",            "추가"],
+  ];
+  const slot = document.querySelector('#step-2');
+  const parts = ["[Step 2 — 고객표준 composite 보강]"];
+  for (const [k, label] of fields) {
+    const v = (slot.querySelector(`textarea[name="${k}"]`)?.value ?? '').trim();
+    if (v) parts.push(`\n## ${label}\n${v}`);
+  }
+  return parts.join("\n");
+}
+
+document.querySelector('button[data-action="preview-step2"]').addEventListener('click', () => {
+  const slot = document.querySelector('#preview-step2');
+  const body = slot.querySelector('.preview-body');
+  body.textContent = buildStep2Text();
+  slot.classList.add('visible');
+});
+
+document.querySelector('button[data-action="copy-step2"]').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  const txt = buildStep2Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    const orig = btn.textContent;
+    btn.textContent = '✓ 복사됨';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+    const slot = document.querySelector('#preview-step2');
+    const body = slot.querySelector('.preview-body');
+    body.textContent = txt;
+    slot.classList.add('visible');
+  } catch {
+    alert('복사 실패. 미리보기 영역에서 수동 복사하세요.');
+  }
+});
+</script>
+</body>
+</html>

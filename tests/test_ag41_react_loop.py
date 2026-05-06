@@ -1,21 +1,7 @@
 """AG-4-1: Q&A ReAct loop — unit tests."""
 
 import sys
-import types
 from pathlib import Path
-
-# ── Module stubs ────────────────────────────────────────────────
-for mod_name in [
-    "chromadb", "chromadb.config", "pydantic_ai", "pydantic_ai.models",
-    "pydantic_ai.models.openai", "pydantic_settings",
-    "litellm", "httpx",
-]:
-    if mod_name not in sys.modules:
-        sys.modules[mod_name] = types.ModuleType(mod_name)
-
-_ps = sys.modules["pydantic_settings"]
-if not hasattr(_ps, "BaseSettings"):
-    _ps.BaseSettings = type("BaseSettings", (), {"model_config": {}})
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 

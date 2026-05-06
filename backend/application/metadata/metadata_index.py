@@ -251,6 +251,9 @@ class MetadataIndex:
         status: str = "",
         supersedes: str = "",
         superseded_by: str = "",
+        authors: list[str] | None = None,
+        doc_type: str = "",
+        mtime_epoch: float = 0.0,
     ) -> None:
         """Incremental update after a file is saved."""
         with self._lock:
@@ -278,6 +281,9 @@ class MetadataIndex:
                 "status": status,
                 "supersedes": supersedes,
                 "superseded_by": superseded_by,
+                "authors": authors or [],
+                "doc_type": doc_type,
+                "mtime_epoch": mtime_epoch,
             }
             files[path] = new_entry
             self._increment(d, new_entry, path)
@@ -354,6 +360,9 @@ class MetadataIndex:
                     "status": item.get("status", ""),
                     "supersedes": item.get("supersedes", ""),
                     "superseded_by": item.get("superseded_by", ""),
+                    "authors": item.get("authors", []),
+                    "doc_type": item.get("doc_type", ""),
+                    "mtime_epoch": item.get("mtime_epoch", 0.0),
                 }
                 d["files"][path] = entry
                 self._increment(d, entry, path)

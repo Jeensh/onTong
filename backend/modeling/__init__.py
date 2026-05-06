@@ -1,5 +1,6 @@
-"""Section 2 — Modeling: code mapping, ontology management, impact analysis, simulation execution.
+"""Section 2 — Modeling: ontology-first redesign.
 
-Owner: Team Leader
-Users: IT operators
+Scope: Primary Layer DSL (schema/validator/loader), SCOR+ISA-95 template store,
+manual-to-YAML ontology builder. Code-mapping / simulation / impact-analysis are
+deferred to Section 3.
 """

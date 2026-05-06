@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Round 3 — 기준서 × 조직 + 갭 탐지</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161a22;
+    --panel-2: #1d222d;
+    --border: #2a3142;
+    --text: #e6e8ee;
+    --muted: #9aa3b2;
+    --accent: #6ea8fe;
+    --accent-2: #7ee787;
+    --warn: #f2b35b;
+    --danger: #ff6b6b;
+    --code-bg: #0b0d13;
+
+    /* Round 1 / 2 팔레트 유지 */
+    --code: #6ea8fe;
+    --spring: #7ee787;
+    --db: #f2b35b;
+    --cfg: #c792ea;
+    --biz: #ff9ec7;
+    --rule: #ffb86c;
+    --process: #8be9fd;    /* cyan : BusinessProcess (Round 3 도입) */
+    --role: #bd93f9;       /* violet : Role (Round 3 도입) */
+
+    /* Round 3 신규 */
+    --manual: #ff9100;     /* amber-orange : ManualDocument */
+    --section: #ffd166;    /* yellow : ManualSection */
+    --fragment: #ffe9a8;   /* pale yellow : ManualFragment */
+    --gap: #ff6b6b;        /* danger : CONFLICTS_WITH / MISSING_IN */
+
+    --edge: #9aa3b2;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, "SF Pro Display", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; line-height: 1.6; }
+  body { padding: 40px 24px 120px; }
+  .container { max-width: 1120px; margin: 0 auto; }
+  h1 { font-size: 34px; margin: 0 0 8px; letter-spacing: -0.3px; }
+  h2 { font-size: 24px; margin: 56px 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); letter-spacing: -0.2px; }
+  h3 { font-size: 18px; margin: 32px 0 10px; color: var(--text); }
+  h4 { font-size: 14px; margin: 20px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  p { margin: 10px 0; color: var(--text); }
+  a { color: var(--accent); text-decoration: none; }
+  code.inline { background: var(--code-bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; font-size: 13px; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; overflow: auto; font-size: 13px; line-height: 1.55; color: #c9d1d9; }
+  pre code { white-space: pre; }
+  .kw { color: #ff7b72; }
+  .an { color: #79c0ff; }
+  .tp { color: #d2a8ff; }
+  .st { color: #a5d6ff; }
+  .fn { color: #d2a8ff; }
+  .cm { color: #8b949e; font-style: italic; }
+
+  .lead { font-size: 17px; color: #cfd3db; background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--manual); padding: 16px 20px; border-radius: 10px; margin: 20px 0 10px; }
+  .callout { border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin: 14px 0; background: var(--panel); }
+  .callout.warn { border-left: 4px solid var(--warn); }
+  .callout.ok { border-left: 4px solid var(--accent-2); }
+  .callout.danger { border-left: 4px solid var(--danger); }
+  .callout.q { border-left: 4px solid var(--accent); }
+  .muted { color: var(--muted); }
+  .hstack { display: flex; gap: 16px; flex-wrap: wrap; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; flex: 1; min-width: 260px; }
+  .card h4 { margin-top: 0; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--panel-2); color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  tr:last-child td { border-bottom: none; }
+  td code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; color: #c9d1d9; font-size: 12px; }
+
+  .chip { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); margin-right: 6px; }
+  .chip.code { color: var(--code); border-color: color-mix(in srgb, var(--code) 35%, var(--border)); }
+  .chip.spring { color: var(--spring); border-color: color-mix(in srgb, var(--spring) 35%, var(--border)); }
+  .chip.db { color: var(--db); border-color: color-mix(in srgb, var(--db) 35%, var(--border)); }
+  .chip.cfg { color: var(--cfg); border-color: color-mix(in srgb, var(--cfg) 35%, var(--border)); }
+  .chip.biz { color: var(--biz); border-color: color-mix(in srgb, var(--biz) 35%, var(--border)); }
+  .chip.rule { color: var(--rule); border-color: color-mix(in srgb, var(--rule) 35%, var(--border)); }
+  .chip.process { color: var(--process); border-color: color-mix(in srgb, var(--process) 35%, var(--border)); }
+  .chip.role { color: var(--role); border-color: color-mix(in srgb, var(--role) 35%, var(--border)); }
+  .chip.manual { color: var(--manual); border-color: color-mix(in srgb, var(--manual) 35%, var(--border)); }
+  .chip.section { color: var(--section); border-color: color-mix(in srgb, var(--section) 35%, var(--border)); }
+  .chip.fragment { color: var(--fragment); border-color: color-mix(in srgb, var(--fragment) 35%, var(--border)); }
+  .chip.gap { color: var(--gap); border-color: color-mix(in srgb, var(--gap) 35%, var(--border)); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 20px; }
+  .legend .chip { font-size: 12px; padding: 4px 10px; }
+
+  .svg-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; overflow-x: auto; }
+  svg text { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+  .node-label { fill: #e6e8ee; }
+  .edge-label { fill: var(--muted); font-size: 10px; }
+
+  .toc { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; font-size: 14px; }
+  .toc ol { margin: 6px 0 0 18px; padding: 0; }
+  .toc li { margin: 3px 0; color: var(--muted); }
+  .toc a { color: var(--text); }
+  .toc a:hover { color: var(--accent); }
+
+  .walk-step { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin: 14px 0; }
+  .walk-step .step-title { font-size: 15px; font-weight: 700; color: var(--manual); margin-bottom: 6px; }
+  .walk-step .step-title .num { display: inline-block; background: var(--manual); color: #0b0d13; border-radius: 6px; padding: 1px 8px; margin-right: 8px; font-weight: 700; }
+
+  .field-row { display: grid; grid-template-columns: 180px 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
+  .field-row:last-child { border-bottom: none; }
+  .field-row .k { color: var(--muted); }
+  .field-row .v { color: var(--text); }
+
+  .badge { display: inline-block; background: var(--panel-2); border: 1px solid var(--border); padding: 1px 8px; border-radius: 4px; font-size: 11px; color: var(--muted); margin-left: 6px; }
+  .badge.new { color: var(--manual); border-color: color-mix(in srgb, var(--manual) 35%, var(--border)); }
+  .badge.deferred { color: var(--muted); }
+
+  .qbox { background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 10px; padding: 14px 18px; margin: 18px 0; }
+  .qbox .qtitle { font-weight: 700; color: var(--accent); margin-bottom: 6px; font-size: 15px; }
+  .qbox .qopts { margin: 10px 0 4px 0; padding-left: 18px; }
+  .qbox .qopts li { margin: 4px 0; }
+  .qbox .draft { color: var(--warn); font-size: 12px; margin-top: 8px; }
+  .qbox .rec { color: var(--accent-2); font-size: 13px; margin-top: 6px; opacity: 0.75; }
+  .qbox .decision { color: var(--text); background: color-mix(in srgb, var(--accent-2) 14%, transparent); border-left: 3px solid var(--accent-2); padding: 8px 12px; margin-top: 10px; font-size: 13px; border-radius: 4px; }
+  .qbox .decision strong { color: var(--accent-2); }
+
+  footer { margin-top: 80px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <div class="muted" style="font-size:12px; letter-spacing: 0.6px;">ONTONG · SECTION 2 · ROUND 3 · 2026-04-20 · rev.2 (Q1~Q9 합의 반영)</div>
+  <h1>기준서 × 조직 + 갭 탐지</h1>
+  <p class="muted">Round 1 = 코드. Round 2 = 코드 ↔ 개념. Round 3 = <em>코드 바깥</em>. 기준서(PDF/PPT/Word/이미지) 가 어떤 개념을 서술하는지, 누가 그 업무 프로세스를 책임지는지, 코드와 기준서가 어긋난 지점이 어디인지.</p>
+  <div class="callout ok" style="margin-top:18px;">
+    <strong>rev.2 — Q1~Q9 합의 반영 (2026-04-20)</strong>
+    <ul style="margin:6px 0 0 18px; padding:0;">
+      <li><strong>Option 1 통합</strong> : 층 A (조직/책임) + 층 B (기준서/갭) 동시 진입. 사용자 승인 2026-04-20.</li>
+      <li><strong>1차 노드 5종</strong> : <code class="inline">BusinessProcess</code> / <code class="inline">Role</code> / <code class="inline">ManualDocument</code> / <code class="inline">ManualSection</code> / <code class="inline">ManualFragment</code></li>
+      <li><strong>1차 엣지 6종</strong> : <code class="inline">PART_OF</code> / <code class="inline">RESPONSIBLE_FOR</code> / <code class="inline">DESCRIBED_IN</code> / <code class="inline">CONFLICTS_WITH</code> / <code class="inline">MISSING_IN</code> / <code class="inline">PARENT_PROCESS</code> <span class="badge new">Q1=C 반영</span></li>
+      <li><strong>Q1~Q9 결정 요약</strong> :
+        <ul style="margin:4px 0 0 0; padding-left: 18px;">
+          <li>Q1 = <strong>C</strong> (PARENT_PROCESS 엣지, 노드 필드 아님)</li>
+          <li>Q2 = <strong>A</strong> (Role 은 team 단위 고정, title/person 은 Phase E+ 연장)</li>
+          <li>Q3 = <strong>C</strong> (DESCRIBED_IN 이 Section + Fragment 양쪽 다 가리킴)</li>
+          <li>Q4 = <strong>C + A 전환 옵션</strong> (기본 3단 계층, <code>gap_mode=llm_only</code> 로 LLM 단독 모드 선택 가능)</li>
+          <li>Q5 = <strong>A</strong> (LLM 이 severity 4단계 제안 + 사람 승인)</li>
+          <li>Q6 = <strong>A</strong> (MISSING_IN 양방향 — code_only + manual_only)</li>
+          <li>Q7 = <strong>E</strong> (UI 업로드 + watch folder + git hook 3개 트리거 모두 구현)</li>
+          <li>Q8 = <strong>B</strong> (명시적 <code>authoritative</code> 플래그, 기본 false)</li>
+          <li>Q9 = <strong>D</strong> (pypdf + pdfplumber + python-docx 전부 설치, 이미지는 OCREngine 재사용)</li>
+        </ul>
+      </li>
+      <li><strong>인제스트 재사용</strong> : <code class="inline">ocr_engine.py</code> (tesseract+easyocr) + <code class="inline">files.py::_parse_pptx_slides</code> (python-pptx) — 이미 존재. 신규 : <code class="inline">pypdf</code> + <code class="inline">pdfplumber</code> + <code class="inline">python-docx</code>.</li>
+    </ul>
+  </div>
+</header>
+
+<div class="lead">
+  <strong>이 라운드의 한 줄</strong><br>
+  "<em>안전재고 계산식을 바꾸기 전에, 어느 기준서를 업데이트해야 하고 누구에게 알려야 하나?</em>" 라는 질문에 답할 수 있는 스키마를 확정한다. 동시에 "<em>코드에는 있는데 기준서에 없다 / 기준서에 있는데 구현 안 됐다</em>" 는 드리프트를 자동 탐지한다.
+</div>
+
+<div class="toc">
+  <strong>목차</strong>
+  <ol>
+    <li><a href="#why">왜 Round 3 는 '기준서 × 조직' 인가</a></li>
+    <li><a href="#nodes">노드 5종 — BusinessProcess / Role / ManualDocument / Section / Fragment</a></li>
+    <li><a href="#edges">엣지 6종 — PART_OF / RESPONSIBLE_FOR / DESCRIBED_IN / CONFLICTS_WITH / MISSING_IN / PARENT_PROCESS</a></li>
+    <li><a href="#layers">4층 아키텍처 — Code × Concept × Manual × Organization</a></li>
+    <li><a href="#walk">워킹 예시 — "안전재고 변경 시 누구에게 알리나"</a></li>
+    <li><a href="#ingest">기준서 인제스트 파이프라인 (OCR/PPT/PDF/Word)</a></li>
+    <li><a href="#gap">Gap Detection — code-only / manual-only / conflict</a></li>
+    <li><a href="#ops">운영 — 책임 전파 + 변경 알림</a></li>
+    <li><a href="#questions">결정 사항 (Q1~Q9) <span class="badge new">합의 완료</span></a></li>
+    <li><a href="#next">다음 단계 — Phase D 코드 + Phase E 실증</a></li>
+  </ol>
+</div>
+
+<div class="legend">
+  <span class="chip code">CODE (Round 1)</span>
+  <span class="chip biz">BusinessTerm (R2)</span>
+  <span class="chip rule">BusinessRule (R2)</span>
+  <span class="chip process">BusinessProcess <span class="badge new">R3</span></span>
+  <span class="chip role">Role <span class="badge new">R3</span></span>
+  <span class="chip manual">ManualDocument <span class="badge new">R3</span></span>
+  <span class="chip section">ManualSection <span class="badge new">R3</span></span>
+  <span class="chip fragment">ManualFragment <span class="badge new">R3</span></span>
+  <span class="chip gap">Gap 엣지 <span class="badge new">R3</span></span>
+</div>
+
+<!-- =================================================================== -->
+<h2 id="why">1. 왜 Round 3 는 '기준서 × 조직' 인가</h2>
+
+<p>
+  Round 2 에서 확정한 3각 구도 (코드 ↔ BusinessTerm ↔ BusinessRule) 는 "이 메서드가 어떤 개념을 실현하는가" 질문에 답한다. 하지만 실제 팀에서 일어나는 일은 한 층 더 있다:
+</p>
+<ol>
+  <li><strong>규칙의 진실(authoritative) 은 기준서에 산다</strong>. 공장 운영의 "룰" 은 PDF/PPT/Word/이미지 에 적혀있고, 코드는 그것을 <em>구현</em>한 사본이다. 기준서가 바뀌면 코드가 따라가야 하고, 코드가 먼저 바뀌면 기준서도 업데이트돼야 한다.</li>
+  <li><strong>책임자는 코드 바깥에 산다</strong>. "이 프로세스는 재고관리팀 소관" 같은 정보는 Git blame 이 아니라 조직도/내규에 있다. 변경 알림을 보낼 대상이 누군지 모르면 Reverse Lookup 은 UI 상 버튼일 뿐이다.</li>
+  <li><strong>드리프트 감지</strong>. 10년 운영된 레거시에서 가장 비싼 버그는 "아무도 모르는 사이 코드가 기준서와 어긋나 있었다" 류다. Round 3 은 이 어긋남을 그래프 위에서 검출 가능한 1급 시민으로 만든다.</li>
+</ol>
+
+<div class="callout ok">
+  <strong>3대 기능 관점</strong><br>
+  <ul style="margin:6px 0 0 18px; padding:0;">
+    <li><strong>Impact Analysis</strong> : 코드 변경 → 영향 프로세스 → <em>책임자</em> + <em>업데이트해야 할 기준서 섹션</em> 까지 한 번에.</li>
+    <li><strong>Reverse Lookup</strong> : "안전재고" 용어 → 코드 위치 (Round 2) → <em>설명 섹션</em> (Round 3) → <em>담당자</em> (Round 3).</li>
+    <li><strong>Test Generation</strong> : 기준서에서 입력 범위 / 경계값 / 금지 조건을 <em>추출</em> 해 테스트 케이스 시드. (Round 3 기준서 인제스트가 전제).</li>
+  </ul>
+</div>
+
+<!-- =================================================================== -->
+<h2 id="nodes">2. 노드 5종</h2>
+
+<p>
+  Round 3 가 추가하는 5개 신규 노드는 두 층으로 나뉜다 — <span class="chip process">조직</span> + <span class="chip manual">기준서</span>.
+</p>
+
+<h3>2-1. <span class="chip process">BusinessProcess</span> — 업무 프로세스</h3>
+<div class="field-row"><span class="k">qualified_name</span><span class="v"><code>{domain}.{process_name}</code>. 예: <code class="inline">inventory.safety_stock_management</code>, <code class="inline">order.payment_settlement</code></span></div>
+<div class="field-row"><span class="k">canonical_label</span><span class="v">사람이 읽는 한글 명칭. 예: "안전재고 관리", "주문 결제 정산"</span></div>
+<div class="field-row"><span class="k">description</span><span class="v">프로세스 요약 (1~3문장)</span></div>
+<div class="field-row"><span class="k">(계층 관계)</span><span class="v">노드 필드 아님. <code>PARENT_PROCESS</code> 엣지로 분리 (§3). <strong>Q1=C 결정</strong> : graph 쿼리 유연성 우선 (자식 탐색 / 루트 집계 / 재부모화 모두 엣지 쿼리로).</span></div>
+<div class="field-row"><span class="k">domain</span><span class="v">도메인 태그. <code>inventory</code> / <code>order</code> / <code>production</code> 등</span></div>
+<div class="field-row"><span class="k">source</span><span class="v">enum: <code>manual</code> / <code>extracted</code> / <code>llm_proposed</code></span></div>
+<div class="field-row"><span class="k">confirmed</span><span class="v">bool. 사람 승인 여부</span></div>
+
+<h3>2-2. <span class="chip role">Role</span> — 책임자/조직 (team 단위)</h3>
+<div class="field-row"><span class="k">qualified_name</span><span class="v"><code>team.{slug}</code>. 예: <code class="inline">team.inventory_mgmt</code>, <code class="inline">team.production_ops</code>, <code class="inline">team.qa</code>. <strong>Q2=A 결정</strong> : team 단위 고정.</span></div>
+<div class="field-row"><span class="k">kind</span><span class="v">고정값 <code>team</code> (<strong>Q2=A</strong>). 컬럼은 유지해 Phase E+ 에서 <code>title</code>/<code>person</code> 으로 확장 여지 보존. 초기 데이터 는 모두 <code>team</code>.</span></div>
+<div class="field-row"><span class="k">label</span><span class="v">팀 이름. 예: "재고관리팀", "생산관리팀", "품질관리팀".</span></div>
+<div class="field-row"><span class="k">contact</span><span class="v">Optional. 팀 메일링리스트 / 슬랙 채널. 변경 알림 디스패치 키. 예: <code class="inline">inv-mgmt@example.com</code>, <code class="inline">#team-inv-mgmt</code>.</span></div>
+<div class="field-row"><span class="k">source</span><span class="v">enum: <code>manual</code> / <code>hr_import</code> / <code>llm_proposed</code></span></div>
+<div class="field-row"><span class="k">confirmed</span><span class="v">bool. 자동 제안된 Role 은 false (승인 대기)</span></div>
+
+<h3>2-3. <span class="chip manual">ManualDocument</span> — 기준서 문서 하나</h3>
+<div class="field-row"><span class="k">qualified_name</span><span class="v">저장소 기준 상대 경로 + SHA-256 prefix. 예: <code class="inline">manuals/inventory/SOP-안전재고-v3.pdf#sha256:a1b2c3...</code></span></div>
+<div class="field-row"><span class="k">title</span><span class="v">문서 제목 (메타데이터 or 파일명 기반)</span></div>
+<div class="field-row"><span class="k">format</span><span class="v">enum: <code>pdf</code> / <code>pptx</code> / <code>docx</code> / <code>md</code> / <code>image</code> / <code>html</code></span></div>
+<div class="field-row"><span class="k">last_modified</span><span class="v">파일시스템 mtime 또는 인제스트 시 기록</span></div>
+<div class="field-row"><span class="k">version</span><span class="v">Optional. 문서 내 명시된 버전 문자열 ("v3.1" 등) 파싱</span></div>
+<div class="field-row"><span class="k">authoritative</span><span class="v">bool <strong>Q8</strong>. 한 Term 을 여러 문서가 서술할 때 권위 플래그</span></div>
+<div class="field-row"><span class="k">checksum</span><span class="v">SHA-256. 재인제스트 스킵 판단</span></div>
+<div class="field-row"><span class="k">source_repo</span><span class="v">Optional. 기준서가 별도 git 레포일 때</span></div>
+
+<h3>2-4. <span class="chip section">ManualSection</span> — 문서 내 섹션</h3>
+<div class="field-row"><span class="k">qualified_name</span><span class="v"><code>{doc_fqn}#{section_path}</code>. 예: <code class="inline">manuals/.../SOP-안전재고-v3.pdf#3.2</code>, <code class="inline">manuals/.../slides.pptx#slide-7</code></span></div>
+<div class="field-row"><span class="k">doc_fqn</span><span class="v">부모 ManualDocument.qualified_name</span></div>
+<div class="field-row"><span class="k">heading</span><span class="v">"3.2 안전재고 계산식" 같은 제목</span></div>
+<div class="field-row"><span class="k">ordinal</span><span class="v">문서 내 순번 (UI 정렬)</span></div>
+<div class="field-row"><span class="k">page_or_slide</span><span class="v">PDF 페이지 번호 / PPT 슬라이드 번호 / DOCX heading anchor</span></div>
+
+<h3>2-5. <span class="chip fragment">ManualFragment</span> — 추출 조각</h3>
+<div class="field-row"><span class="k">qualified_name</span><span class="v"><code>{section_fqn}::{ordinal}</code></span></div>
+<div class="field-row"><span class="k">section_fqn</span><span class="v">부모 ManualSection.qualified_name</span></div>
+<div class="field-row"><span class="k">kind</span><span class="v">enum: <code>text</code> / <code>image</code> / <code>table</code> / <code>formula</code> / <code>ocr_text</code></span></div>
+<div class="field-row"><span class="k">content</span><span class="v">추출된 텍스트 (이미지는 OCR 결과)</span></div>
+<div class="field-row"><span class="k">content_hash</span><span class="v">SHA-256. 중복 감지 + 재임베딩 스킵</span></div>
+<div class="field-row"><span class="k">ocr_confidence</span><span class="v">Optional. image/ocr_text 에만. tesseract/easyocr confidence</span></div>
+<div class="field-row"><span class="k">embedding</span><span class="v">chromadb collection <code>manual_fragments</code>. Round 2 임베딩 스택 재사용 (OpenAI text-embedding-3-small).</span></div>
+
+<div class="callout">
+  <strong>왜 Section + Fragment 2층 인가?</strong><br>
+  Section 은 <em>사람이 참조</em>하는 단위 ("SOP 섹션 3.2"). Fragment 는 <em>알고리즘이 처리</em>하는 단위 (임베딩 / gap 비교). UI 에서는 Section 을 보여주고, 내부 매칭은 Fragment 로 한다. <strong>Q3</strong> 에서 DESCRIBED_IN 이 어느 층에 걸리는지 결정.
+</div>
+
+<!-- =================================================================== -->
+<h2 id="edges">3. 엣지 6종</h2>
+
+<p>Round 2 엣지 (REALIZES / VALIDATES / DERIVED_FROM) 는 유지. Round 3 가 추가하는 6개. <code class="inline">PARENT_PROCESS</code> 는 <strong>Q1=C 결정</strong> 에 따라 노드 필드 대신 엣지로 분리 — 계층은 그래프 쿼리로 풀어낸다.</p>
+
+<table>
+  <thead>
+    <tr><th>엣지</th><th>Source</th><th>Target</th><th>Cardinality</th><th>주요 속성</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="chip process">PART_OF</span></td>
+      <td><code>BusinessTerm</code> / <code>BusinessRule</code></td>
+      <td><code>BusinessProcess</code></td>
+      <td>N:M</td>
+      <td><code>confidence</code>, <code>source ∈ {manual, llm}</code>, <code>confirmed</code></td>
+    </tr>
+    <tr>
+      <td><span class="chip role">RESPONSIBLE_FOR</span></td>
+      <td><code>Role</code></td>
+      <td><code>BusinessProcess</code></td>
+      <td>N:M</td>
+      <td><code>responsibility_kind ∈ {owner, approver, reviewer, notify}</code>, <code>confirmed</code></td>
+    </tr>
+    <tr>
+      <td><span class="chip section">DESCRIBED_IN</span></td>
+      <td><code>BusinessTerm</code> / <code>BusinessRule</code> / <code>BusinessProcess</code></td>
+      <td><code>ManualSection</code> (기본) 또는 <code>ManualFragment</code> (선택) <strong>Q3</strong></td>
+      <td>N:M</td>
+      <td><code>confidence</code>, <code>source ∈ {manual, name_match, embedding, llm}</code>, <code>confirmed</code>, <code>excerpt</code> (첫 200자)</td>
+    </tr>
+    <tr>
+      <td><span class="chip gap">CONFLICTS_WITH</span></td>
+      <td><code>BusinessTerm</code> / <code>BusinessRule</code> (코드 측)</td>
+      <td>동일 타입 (기준서 측 extracted 사본) 또는 <code>ManualFragment</code></td>
+      <td>N:M</td>
+      <td><code>severity ∈ {low, medium, high, critical}</code>, <code>detected_by ∈ {llm, rule_ast, embedding_drift}</code>, <code>summary</code>, <code>confirmed</code></td>
+    </tr>
+    <tr>
+      <td><span class="chip gap">MISSING_IN</span></td>
+      <td><code>BusinessTerm</code> / <code>BusinessRule</code></td>
+      <td><code>ManualDocument</code> (code_only) 또는 가상 <code>&lt;no-code&gt;</code> sink (manual_only)</td>
+      <td>N:1</td>
+      <td><code>direction ∈ {code_only, manual_only}</code>, <code>severity</code>, <code>confirmed</code></td>
+    </tr>
+    <tr>
+      <td><span class="chip process">PARENT_PROCESS</span> <span class="badge new">Q1=C</span></td>
+      <td><code>BusinessProcess</code> (자식)</td>
+      <td><code>BusinessProcess</code> (부모)</td>
+      <td>N:1</td>
+      <td><code>source ∈ {manual, scor_template, llm}</code>, <code>confirmed</code>. 자기 참조 금지, cycle 검출 필수.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>3-1. 엣지 세부 규약</h3>
+<ul>
+  <li><strong>PART_OF</strong> : <em>개념 → 프로세스</em> 소속. Term "안전재고" 가 Process "inventory.safety_stock_management" 에 속함. Rule 도 동일 관계.</li>
+  <li><strong>RESPONSIBLE_FOR</strong> : <em>Role → Process</em>. 한 프로세스에 여러 책임자 (owner 1 + approver N + notify N). <em>직접 Term/Rule 로 걸지 않는다</em> — 책임 관리 단위는 Process.</li>
+  <li><strong>DESCRIBED_IN</strong> : <em>개념 → 기준서</em>. Round 2 의 REALIZES (개념 → 코드) 와 거울. 둘 다 있으면 그래프 상에서 "코드 ← Term → 기준서" 삼각 연결.</li>
+  <li><strong>CONFLICTS_WITH</strong> : <em>같은 의미의 두 해석이 다름</em>. 예: BusinessRule.statement "SS = μ × L" (코드) vs Fragment.content "SS = z × σ × √L" (기준서) 의 수식 차이. 방향 없는 대칭 엣지로 모델링하되 저장은 (a, b) 정규화 (a.fqn &lt; b.fqn).</li>
+  <li><strong>MISSING_IN</strong> : <em>한쪽에만 있음</em>. code_only = REALIZES 는 있는데 DESCRIBED_IN 이 없다. manual_only = DESCRIBED_IN 은 있는데 REALIZES 도 없고 Term 등록도 없다 (신규 기준서에서 추출됐지만 Term 으로 승격 전).</li>
+  <li><strong>PARENT_PROCESS</strong> : <em>Process → Process</em> 계층 (자식 → 부모). SCOR L1/L2/L3 같은 프로세스 트리. cardinality N:1 일방향. 자기 참조 금지, cycle 검출 필수 (쓰기 시 ancestors 검사). <strong>Q1=C</strong> : 노드 필드 대신 엣지로 분리해 재부모화 / depth 쿼리 / 루트 집계 모두 단일 패턴으로 처리.</li>
+</ul>
+
+<div class="callout q">
+  <strong>DESCRIBED_IN 의 target 선택</strong><br>
+  기본은 <code>ManualSection</code> — 사람이 "섹션 3.2" 로 참조한다. 세밀한 매칭이 필요한 경우 (예: 섹션 내 여러 수식 중 특정 수식을 집어내야 할 때) <code>ManualFragment</code> 로 내려간다. <strong>Q3</strong>.
+</div>
+
+<!-- =================================================================== -->
+<h2 id="layers">4. 4층 아키텍처</h2>
+
+<p>Round 1/2/3 를 합치면 4개 층이 된다. 각 층이 세로로 연결되고, 가로로도 연결(COFLICTS/MISSING) 된다.</p>
+
+<div class="svg-wrap">
+  <svg viewBox="0 0 1020 520" width="100%" height="520">
+    <!-- Layer backgrounds -->
+    <rect x="10" y="20"  width="1000" height="100" fill="#1d222d" stroke="#2a3142" rx="10"/>
+    <rect x="10" y="140" width="1000" height="100" fill="#1d222d" stroke="#2a3142" rx="10"/>
+    <rect x="10" y="260" width="1000" height="100" fill="#1d222d" stroke="#2a3142" rx="10"/>
+    <rect x="10" y="380" width="1000" height="100" fill="#1d222d" stroke="#2a3142" rx="10"/>
+
+    <!-- Layer labels -->
+    <text x="24" y="42" fill="#6ea8fe" font-size="13">LAYER 1 — CODE (Round 1)</text>
+    <text x="24" y="162" fill="#ff9ec7" font-size="13">LAYER 2 — CONCEPT (Round 2)</text>
+    <text x="24" y="282" fill="#ff9100" font-size="13">LAYER 3 — MANUAL (Round 3)</text>
+    <text x="24" y="402" fill="#bd93f9" font-size="13">LAYER 4 — ORGANIZATION (Round 3)</text>
+
+    <!-- Layer 1 nodes -->
+    <rect x="180" y="60" width="140" height="40" fill="#0b0d13" stroke="#6ea8fe" rx="6"/>
+    <text x="250" y="85" text-anchor="middle" class="node-label">MethodA.calc()</text>
+    <rect x="360" y="60" width="140" height="40" fill="#0b0d13" stroke="#6ea8fe" rx="6"/>
+    <text x="430" y="85" text-anchor="middle" class="node-label">MethodB.derive()</text>
+    <rect x="540" y="60" width="140" height="40" fill="#0b0d13" stroke="#6ea8fe" rx="6"/>
+    <text x="610" y="85" text-anchor="middle" class="node-label">DB_TABLE.stock</text>
+
+    <!-- Layer 2 nodes -->
+    <rect x="180" y="180" width="140" height="40" fill="#0b0d13" stroke="#ff9ec7" rx="6"/>
+    <text x="250" y="205" text-anchor="middle" class="node-label">Term: 안전재고</text>
+    <rect x="400" y="180" width="140" height="40" fill="#0b0d13" stroke="#ffb86c" rx="6"/>
+    <text x="470" y="205" text-anchor="middle" class="node-label">Rule: SS=z·σ·√L</text>
+
+    <!-- Layer 3 nodes -->
+    <rect x="140" y="300" width="160" height="40" fill="#0b0d13" stroke="#ff9100" rx="6"/>
+    <text x="220" y="325" text-anchor="middle" class="node-label">Doc: SOP-SS-v3.pdf</text>
+    <rect x="320" y="300" width="140" height="40" fill="#0b0d13" stroke="#ffd166" rx="6"/>
+    <text x="390" y="325" text-anchor="middle" class="node-label">§3.2 안전재고</text>
+    <rect x="480" y="300" width="140" height="40" fill="#0b0d13" stroke="#ffe9a8" rx="6"/>
+    <text x="550" y="325" text-anchor="middle" class="node-label">Fragment: 수식</text>
+
+    <!-- Layer 4 nodes -->
+    <rect x="180" y="420" width="160" height="40" fill="#0b0d13" stroke="#8be9fd" rx="6"/>
+    <text x="260" y="445" text-anchor="middle" class="node-label">Process: SS 관리</text>
+    <rect x="380" y="420" width="140" height="40" fill="#0b0d13" stroke="#bd93f9" rx="6"/>
+    <text x="450" y="445" text-anchor="middle" class="node-label">Role: 재고관리팀</text>
+
+    <!-- Edges: Round 2 -->
+    <line x1="250" y1="100" x2="250" y2="180" stroke="#ff9ec7" stroke-width="1.5"/>
+    <text x="258" y="145" class="edge-label">REALIZES</text>
+    <line x1="430" y1="100" x2="470" y2="180" stroke="#ffb86c" stroke-width="1.5"/>
+    <text x="450" y="145" class="edge-label">VALIDATES</text>
+
+    <!-- Edges: DESCRIBED_IN (concept → manual) -->
+    <line x1="250" y1="220" x2="390" y2="300" stroke="#ffd166" stroke-width="1.5"/>
+    <text x="270" y="262" class="edge-label">DESCRIBED_IN</text>
+    <line x1="470" y1="220" x2="550" y2="300" stroke="#ffd166" stroke-width="1.5"/>
+    <text x="520" y="262" class="edge-label">DESCRIBED_IN</text>
+
+    <!-- Edges: doc containment -->
+    <line x1="220" y1="340" x2="320" y2="320" stroke="#9aa3b2" stroke-width="1" stroke-dasharray="3,3"/>
+    <text x="250" y="320" class="edge-label">contains</text>
+    <line x1="390" y1="340" x2="480" y2="320" stroke="#9aa3b2" stroke-width="1" stroke-dasharray="3,3"/>
+
+    <!-- Edges: PART_OF (concept → process) -->
+    <line x1="250" y1="220" x2="260" y2="420" stroke="#8be9fd" stroke-width="1.5"/>
+    <text x="145" y="330" class="edge-label">PART_OF</text>
+
+    <!-- Edges: RESPONSIBLE_FOR (role → process) -->
+    <line x1="450" y1="460" x2="340" y2="450" stroke="#bd93f9" stroke-width="1.5"/>
+    <text x="380" y="478" class="edge-label">RESPONSIBLE_FOR</text>
+
+    <!-- Horizontal CONFLICTS on layer 2 -->
+    <line x1="320" y1="200" x2="400" y2="200" stroke="#ff6b6b" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <text x="330" y="194" class="edge-label">(CONFLICTS_WITH if drift)</text>
+  </svg>
+</div>
+
+<p class="muted">
+  세로 축 = 같은 의미의 4가지 표현 (실행 가능한 코드 / 개념 / 사람 읽는 문서 / 책임자). Impact Analysis 는 세로로 올라갔다가 내려온다. Gap Detection 은 가로 축에서 층 2 ↔ 층 3 어긋남을 찾는다. 책임 전파는 층 4 에서 수렴한다.
+</p>
+
+<!-- =================================================================== -->
+<h2 id="walk">5. 워킹 예시 — "안전재고 공식 변경 시 누구에게 알리나"</h2>
+
+<div class="walk-step">
+  <div class="step-title"><span class="num">1</span>트리거</div>
+  <p>개발자가 <code class="inline">SafetyStockService.calc()</code> 메서드를 수정하는 PR 을 올린다. CI가 <code class="inline">QueryEngine.impact(method_fqn, direction=outgoing, edge_kinds={REALIZES,PART_OF,RESPONSIBLE_FOR,DESCRIBED_IN})</code> 호출.</p>
+</div>
+
+<div class="walk-step">
+  <div class="step-title"><span class="num">2</span>REALIZES 역방향 → BusinessTerm</div>
+  <p>Method <code class="inline">com.example.inv.SafetyStockService.calc</code> → REALIZES 입방향으로 Term <code class="inline">inventory.safety_stock</code> 도달. Round 2 에서 이미 확정된 경로.</p>
+</div>
+
+<div class="walk-step">
+  <div class="step-title"><span class="num">3</span>PART_OF → BusinessProcess</div>
+  <p>Term → PART_OF → Process <code class="inline">inventory.safety_stock_management</code>. 동일 Term 이 여러 Process 에 속할 수 있음 (N:M).</p>
+</div>
+
+<div class="walk-step">
+  <div class="step-title"><span class="num">4</span>RESPONSIBLE_FOR 역방향 → Role</div>
+  <p>Process ← RESPONSIBLE_FOR ← Role(들). 예: <code class="inline">team.inventory_mgmt</code> (owner) + <code class="inline">team.production_ops</code> (approver) + <code class="inline">team.qa</code> (notify).</p>
+  <p>각 Role (team 단위) 의 <code class="inline">contact</code> 필드 → 팀 메일링리스트/슬랙 채널 dispatcher 로 전달. <strong>Q2=A 결정</strong> : team 단위 고정 (title/person 은 Phase E+ 확장).</p>
+</div>
+
+<div class="walk-step">
+  <div class="step-title"><span class="num">5</span>DESCRIBED_IN → ManualSection</div>
+  <p>Term / Rule → DESCRIBED_IN → Section (들). 예: "SOP-안전재고-v3.pdf §3.2" 와 "계산기준서-2024.pptx slide-7". PR 설명에 <em>"다음 기준서 섹션도 업데이트 필요"</em> 체크리스트 자동 추가.</p>
+</div>
+
+<div class="walk-step">
+  <div class="step-title"><span class="num">6</span>CONFLICTS_WITH 스캔</div>
+  <p>Gap Detector (<a href="#gap">§7</a>) 가 비동기로 (A) PR 변경 Term 의 Rule.statement 와 (B) 해당 Term 의 DESCRIBED_IN Fragment.content 를 비교. 차이가 크면 <code class="inline">CONFLICTS_WITH{severity:high, detected_by:llm}</code> 엣지 신규 생성 + 승인 큐로.</p>
+</div>
+
+<div class="walk-step">
+  <div class="step-title"><span class="num">7</span>자동 액션</div>
+  <ul>
+    <li>Role 3명에게 변경 알림 발송 (이메일 템플릿 : "안전재고 계산 공식 변경 PR #1234 - 기준서 2건 업데이트 필요")</li>
+    <li>PR checklist 에 Section 2개 링크 삽입 + CONFLICTS_WITH 1건 경고 배너</li>
+    <li>승인 큐에 "이 변경이 기준서와 충돌 — 둘 중 어느 쪽이 맞는가" 카드 생성</li>
+  </ul>
+</div>
+
+<!-- =================================================================== -->
+<h2 id="ingest">6. 기준서 인제스트 파이프라인</h2>
+
+<p>5 포맷 (PDF / PPT / Word / Image / MD) 을 마크다운 통합 중간표현 으로 변환 → 섹션 분할 → Fragment 추출 → 임베딩 → ManualDocument/Section/Fragment 노드 생성.</p>
+
+<div class="hstack">
+  <div class="card">
+    <h4>PPT — 이미 존재 ✅</h4>
+    <p><code class="inline">backend/api/files.py::_parse_pptx_slides()</code> (python-pptx 기반). 슬라이드별 텍스트 + 도형 + 이미지 추출. Section = 슬라이드 1장 단위.</p>
+  </div>
+  <div class="card">
+    <h4>Image / OCR — 이미 존재 ✅</h4>
+    <p><code class="inline">backend/application/image/ocr_engine.py::OCREngine</code> (tesseract 우선, easyocr fallback). Section 1 이미지 자산에서 검증됨. confidence 필드 재사용.</p>
+  </div>
+  <div class="card">
+    <h4>PDF — 신규 의존성 필요 <span class="badge new">Q9</span></h4>
+    <p><code class="inline">pypdf</code> (구조 파싱) + <code class="inline">pdfplumber</code> (표 / 수식 / 이미지 추출). 페이지별 텍스트 + 임베디드 이미지 → 이미지면 OCREngine 재호출.</p>
+  </div>
+  <div class="card">
+    <h4>Word — 신규 의존성 필요 <span class="badge new">Q9</span></h4>
+    <p><code class="inline">python-docx</code>. heading 파싱으로 Section 분할 자연스럽게 가능. 표 / 이미지 / 수식 OMML 도 추출.</p>
+  </div>
+  <div class="card">
+    <h4>MD — 기본 파이썬 ✅</h4>
+    <p>마크다운은 heading (`#`/`##`/`###`) 으로 섹션 분할. 그 외 코드펜스 / 표는 text Fragment.</p>
+  </div>
+</div>
+
+<h3>6-1. 파이프라인 단계</h3>
+<pre><code><span class="cm"># backend/modeling/manual_ingest/pipeline.py (D2 예정)</span>
+<span class="kw">class</span> <span class="tp">ManualIngestor</span>:
+    <span class="kw">def</span> <span class="fn">ingest</span>(<span class="kw">self</span>, path: <span class="tp">Path</span>) -> <span class="tp">IngestResult</span>:
+        <span class="cm"># 1. checksum 체크 → 이미 동일 문서면 skip</span>
+        <span class="kw">if</span> <span class="kw">self</span>.registry.exists(checksum):
+            <span class="kw">return</span> IngestResult.SKIP
+
+        <span class="cm"># 2. format 별 파서 디스패치</span>
+        parser = <span class="kw">self</span>._resolve_parser(path.suffix)
+        doc, sections, fragments = parser.parse(path)
+
+        <span class="cm"># 3. 각 Fragment 임베딩 → chromadb "manual_fragments"</span>
+        <span class="kw">for</span> f <span class="kw">in</span> fragments:
+            <span class="kw">if</span> f.kind <span class="kw">in</span> (<span class="st">"text"</span>, <span class="st">"ocr_text"</span>):
+                f.embedding = <span class="kw">self</span>.embed_fn(f.content)
+                <span class="kw">self</span>.chroma.upsert(f)
+
+        <span class="cm"># 4. Neo4j 에 ManualDocument/Section/Fragment 노드 생성</span>
+        <span class="kw">self</span>.graph_writer.write_manual(doc, sections, fragments)
+
+        <span class="cm"># 5. DESCRIBED_IN 자동 제안 (optional):</span>
+        <span class="cm"># 각 Fragment 에 대해 기존 BusinessTerm 과 임베딩 cosine 상위 K.</span>
+        <span class="cm"># cutoff ≥ 0.78 이면 confirmed=False 로 DESCRIBED_IN 엣지 큐.</span>
+        <span class="kw">return</span> IngestResult.OK(doc_fqn=doc.qualified_name)
+</code></pre>
+
+<h3>6-2. 트리거 옵션 <span class="badge new">Q7=E 결정</span></h3>
+<p>3가지 트리거 모두 구현. <code class="inline">ManualDocument.source</code> 에 진입 경로 기록 (<code>ui_upload</code> / <code>watch_folder</code> / <code>git_hook</code>). 동일 checksum 은 트리거 무관 skip (중복 방지).</p>
+<ol>
+  <li><strong>A : UI 업로드</strong> — 관리자 endpoint <code class="inline">POST /api/modeling/manuals/upload</code>. 시연 / 1회성 주입. D2 1순위 (demo guide 작성 용).</li>
+  <li><strong>B : watch folder</strong> — <code class="inline">/var/ontong/manuals/</code> (환경변수로 override) 5분 주기 스캔. 일상 운영 경로. D2 2순위.</li>
+  <li><strong>C : git push hook</strong> — 기준서가 별도 git 레포인 경우. webhook endpoint <code class="inline">POST /api/modeling/manuals/git-hook</code> (GitHub/GitLab payload 파싱). D2 에서 endpoint 만 구현, 실제 레포 연동은 <strong>Phase E 실증</strong> 에서 activate.</li>
+</ol>
+
+<!-- =================================================================== -->
+<h2 id="gap">7. Gap Detection</h2>
+
+<p>3 가지 케이스. 각 케이스는 감지 알고리즘 + 저장 엣지 + UI 카드가 다르다.</p>
+
+<h3>7-1. Case A — code-only (코드에는 있는데 기준서에 없음)</h3>
+<ul>
+  <li><strong>검출</strong> : <code class="inline">BusinessTerm</code> 에 REALIZES 는 1개 이상인데 DESCRIBED_IN 은 0개.</li>
+  <li><strong>Cypher 초안</strong>:
+    <pre><code>MATCH (t:OntNode {kind:'business_term'})&lt;-[:REALIZES]-()
+WHERE NOT (t)-[:DESCRIBED_IN]-&gt;(:OntNode {kind:'manual_section'})
+RETURN t.qualified_name</code></pre>
+  </li>
+  <li><strong>엣지</strong> : <code class="inline">MISSING_IN{direction:'manual_only', severity:'medium'}</code> → 가상 <code class="inline">&lt;no-manual&gt;</code> sink 노드.</li>
+  <li><strong>UI</strong> : "이 Term 은 문서화가 없습니다. 기준서 업로드 또는 해당 섹션 작성 필요."</li>
+</ul>
+
+<h3>7-2. Case B — manual-only (기준서에 있는데 코드에 없음)</h3>
+<ul>
+  <li><strong>검출</strong> : Fragment 에서 자동 추출된 용어가 있는데 대응 BusinessTerm 으로 등록되지 않음. Round 2 term_resolver 4단 MISS 가 일정 기간 반복되면 자동 트리거.</li>
+  <li><strong>엣지</strong> : <code class="inline">MISSING_IN{direction:'code_only', severity:'high'}</code> — Rule 이 코드로 구현되지 않음 = 규정 위반 가능성.</li>
+  <li><strong>UI</strong> : "다음 Rule 이 기준서에 있지만 구현 안 됨: ..."</li>
+</ul>
+
+<h3>7-3. Case C — conflict (양쪽 있지만 불일치)</h3>
+<ul>
+  <li><strong>검출 우선순위 (Q4=C, 기본 모드)</strong> :
+    <ol>
+      <li><strong>Rule AST diff</strong> — BusinessRule.statement 가 Round 2 DSL 로 파싱되면 AST 비교 (가장 확실). Fragment.content 에서 동일 변수/연산 추출 가능하면 diff.</li>
+      <li><strong>Embedding drift</strong> — Term.embedding 과 Fragment.embedding cosine &lt; 0.65 인 쌍은 conflict 의심.</li>
+      <li><strong>LLM semantic compare</strong> — 위 2단 후보를 LLM 에 전달 → "같은 의미인가 / 차이가 무엇인가 / severity 예측". 프롬프트 : <em>"다음 코드 규칙과 기준서 문구가 같은 의미인지 판정. 다르면 차이 요약 + severity(low/medium/high/critical)"</em>.</li>
+    </ol>
+  </li>
+  <li><strong>모드 전환 <span class="badge new">Q4=C + A 선택 옵션</span></strong> : <code class="inline">gap_mode</code> 설정값 2종 —
+    <ul>
+      <li><code class="inline">hierarchical</code> (기본) : 위 3단 우선순위 그대로. 비용 효율. 일상 사용 / 월간 전수 스캔.</li>
+      <li><code class="inline">llm_only</code> : 최대 정확도 요구 시. Rule AST / Embedding 1차 스크리닝을 스킵하고 모든 (Term × Fragment) 쌍을 LLM 으로 직접 비교. 토큰 비용 약 10× 증가하지만 AST / embedding 이 놓치는 의미 차이까지 포착. <em>언제 쓰나</em> : 분기별 감사 / 신규 도메인 onboarding / 승인 직전 최종 검증.</li>
+    </ul>
+    선택은 CLI / UI / API 파라미터 (<code>?gap_mode=llm_only</code>) 로 노출. D3 엔진은 두 모드 모두 지원하는 strategy 패턴.
+  </li>
+  <li><strong>엣지</strong> : <code class="inline">CONFLICTS_WITH{severity, detected_by, summary, confirmed:false, gap_mode}</code> — 항상 승인 큐로 (Q5). <code>detected_by</code> 에는 실제 검출 단계 기록 (<code>rule_ast</code> / <code>embedding_drift</code> / <code>llm</code>).</li>
+  <li><strong>UI</strong> : "안전재고 공식이 코드는 <code>SS = μ · L</code>, 기준서는 <code>SS = z · σ · √L</code>. 차이 요약: ..."</li>
+</ul>
+
+<h3>7-4. 실행 주기</h3>
+<ul>
+  <li><strong>인제스트 직후</strong> : 신규 ManualDocument 의 모든 Fragment × 전체 BusinessTerm 스크리닝 (embedding 1차).</li>
+  <li><strong>PR webhook</strong> : PR 로 변경된 Term/Rule 의 DESCRIBED_IN Fragment 만 재검증 (Round 2 Q7 재검증 정책 동일).</li>
+  <li><strong>월간 전수</strong> : 배경 잡. 임베딩 드리프트 모델 업데이트 시 한 번.</li>
+</ul>
+
+<!-- =================================================================== -->
+<h2 id="ops">8. 운영 — 책임 전파 + 변경 알림</h2>
+
+<h3>8-1. 책임 전파 규칙</h3>
+<ol>
+  <li>Term/Rule 변경 → PART_OF 따라 Process 집합 도출</li>
+  <li>Process 각각에서 RESPONSIBLE_FOR 역방향 → Role 집합. <code>responsibility_kind</code> 별 그룹화 :
+    <ul>
+      <li><code>owner</code> — 승인권자. PR approval 필수 (optional).</li>
+      <li><code>approver</code> — 승인권자 후보.</li>
+      <li><code>reviewer</code> — 리뷰 코멘트 요청.</li>
+      <li><code>notify</code> — 참조. 읽기만.</li>
+    </ul>
+  </li>
+  <li>Role.contact 가 있으면 dispatcher 로. 없으면 UI 만.</li>
+</ol>
+
+<h3>8-2. 변경 알림 페이로드 예시</h3>
+<pre><code>{
+  "trigger": "pr_merge",
+  "pr_number": 1234,
+  "changed_method": "com.example.inv.SafetyStockService.calc",
+  "affected_terms": ["inventory.safety_stock"],
+  "affected_processes": ["inventory.safety_stock_management"],
+  "affected_manuals": [
+    {"doc": "SOP-안전재고-v3.pdf", "section": "§3.2", "excerpt": "..."},
+    {"doc": "계산기준서-2024.pptx", "section": "slide-7"}
+  ],
+  "conflicts": [
+    {
+      "term": "inventory.safety_stock",
+      "severity": "high",
+      "summary": "코드는 μ·L, 기준서는 z·σ·√L",
+      "detected_by": "llm",
+      "manual_ref": "SOP-안전재고-v3.pdf#3.2::fragment-2"
+    }
+  ],
+  "roles_to_notify": [
+    {"role": "team.inventory_mgmt", "kind": "owner", "contact": "inv-mgmt@example.com"},
+    {"role": "team.production_ops", "kind": "approver", "contact": "#team-prod-ops"},
+    {"role": "team.qa", "kind": "notify", "contact": "qa@example.com"}
+  ]
+}</code></pre>
+
+<h3>8-3. Dispatcher 후보</h3>
+<ul>
+  <li><strong>1차</strong> : 로그 + UI 카드만. 외부 알림 OFF (개발 단계).</li>
+  <li><strong>2차</strong> : 이메일 (SMTP / SES). contact 필드 이메일만 처리.</li>
+  <li><strong>3차</strong> : 슬랙 (incoming webhook). 채널 라우팅은 Role → channel 맵.</li>
+  <li><strong>Phase E+</strong> : PR comment bot (GitHub App).</li>
+</ul>
+
+<!-- =================================================================== -->
+<h2 id="questions">9. 결정 사항 (Q1~Q9)</h2>
+
+<p>이 라운드 확정 전에 합의가 필요한 9개 질문. <span class="chip">Claude 제안</span> 은 초안 — 피드백 주시면 rev.2 로 반영.</p>
+
+<div class="qbox">
+  <div class="qtitle">Q1. BusinessProcess 계층 규칙</div>
+  <ol class="qopts">
+    <li><strong>A</strong>. flat — parent_process_fqn 없이 qualified_name 만. 가장 단순. SCOR/ISA95 템플릿은 별도 처리.</li>
+    <li><strong>B</strong>. Optional <code>parent_process_fqn</code> 필드. 필요 시 (SCOR L1/L2/L3) 계층 형성.</li>
+    <li><strong>C</strong>. 별도 엣지 <code>PARENT_PROCESS</code>. graph 쿼리 유연성 최고.</li>
+  </ol>
+  <div class="rec">Claude 제안 : <strong>B</strong>. 계층이 <em>흔히</em> 필요하지만 <em>반드시 필요</em>하지는 않음. Optional 필드로 시작해 Phase E 실측 후 C 로 승격 여부 재결정.</div>
+  <div class="decision">✅ <strong>결정 : C</strong> — 별도 <code>PARENT_PROCESS</code> 엣지로 분리. graph 쿼리 유연성 우선 (재부모화 / 자식 탐색 / depth 집계 모두 단일 패턴). <em>반영</em> : §2-1 에서 <code>parent_process_fqn</code> 필드 제거, §3 에 PARENT_PROCESS 엣지 행 추가, §3-1 bullet 추가.</div>
+</div>
+
+<div class="qbox">
+  <div class="qtitle">Q2. Role 단위 — team / title / person 어디까지?</div>
+  <ol class="qopts">
+    <li><strong>A</strong>. team 단위만. "재고관리팀" 등. 인물 변경에 영향 안 받음.</li>
+    <li><strong>B</strong>. title 단위만. "재고관리팀 팀장". 승격/이동 반영.</li>
+    <li><strong>C</strong>. person 단위만. 이메일/이름. 실제 인물 추적 가능하지만 HR 연동 필요.</li>
+    <li><strong>D</strong>. 3종 혼재 + <code>kind</code> 필드. 초기 seed 는 team/title 위주, person 은 선택.</li>
+  </ol>
+  <div class="rec">Claude 제안 : <strong>D</strong>. 혼재 + kind. 팀 수준 일괄 공지 + 특정 인물 지정 알림 둘 다 필요. 초기 수동 seed 는 team 기본, 개인 contact 은 선택적.</div>
+  <div class="decision">✅ <strong>결정 : A</strong> — team 단위 고정. Role 은 "재고관리팀" 처럼 팀 이름만. 승격/이동 영향 없음, 스키마 단순화. <code>kind</code> 컬럼은 <code>team</code> 고정값으로 유지해 Phase E+ 에서 <code>title</code>/<code>person</code> 확장 여지 보존. <em>반영</em> : §2-2 qualified_name/kind/label 예시 team-only 로 수정, §5 워크스텝 4 와 §8-2 payload 예시 팀 3개로 통일.</div>
+</div>
+
+<div class="qbox">
+  <div class="qtitle">Q3. DESCRIBED_IN 의 target 층</div>
+  <ol class="qopts">
+    <li><strong>A</strong>. ManualSection 만. 단순. "섹션 3.2" 로 참조.</li>
+    <li><strong>B</strong>. ManualFragment 만. 세밀. 한 섹션에 여러 개념 있을 때 정확 매칭.</li>
+    <li><strong>C</strong>. 둘 다 허용. 기본은 Section, Fragment 가 필요하면 추가.</li>
+  </ol>
+  <div class="rec">Claude 제안 : <strong>C</strong>. Term → Section 기본, Rule → Fragment (수식은 세밀해야 함). 스키마상 target 은 <code>OntNode</code> 다형이므로 양쪽 모두 허용해도 쿼리 복잡도 증가 없음.</div>
+  <div class="decision">✅ <strong>결정 : C</strong> (추천 채택) — Section / Fragment 양쪽 모두 target 허용. UI 는 Section 을 기본 표시, Fragment 는 수식 / 특정 조각 매칭 시 사용. <em>반영</em> : §3 edges 테이블 DESCRIBED_IN row 유지, §2-5 Fragment 구조 그대로 유지.</div>
+</div>
+
+<div class="qbox">
+  <div class="qtitle">Q4. Gap Detection 엔진 조합</div>
+  <ol class="qopts">
+    <li><strong>A</strong>. LLM 단독. gpt-4 제로샷 비교. 가장 강력, 가장 비쌈.</li>
+    <li><strong>B</strong>. Embedding 1차 스크리닝 → 낮은 쌍만 LLM.</li>
+    <li><strong>C</strong>. Rule AST diff (가능 시) → Embedding → LLM 3단.</li>
+  </ol>
+  <div class="rec">Claude 제안 : <strong>C</strong>. BusinessRule.statement 가 DSL 로 파싱되면 AST diff (결정적, 무료). 아니면 Embedding 스크리닝 → 하위 20% 만 LLM. 비용/정확도 균형.</div>
+  <div class="decision">✅ <strong>결정 : C + A 전환 옵션</strong> — 기본은 C (Rule AST → Embedding → LLM 3단 우선순위). 다만 A (LLM 단독) 가 가장 강력한 모드이므로 필요 시 선택 가능하도록 <code class="inline">gap_mode</code> 파라미터 노출. <code>hierarchical</code> (기본) / <code>llm_only</code> 2 값. <em>반영</em> : §7-3 에 모드 전환 섹션 추가, <code>CONFLICTS_WITH</code> 엣지에 <code>gap_mode</code> 속성 추가, D3 엔진 strategy 패턴으로 구현.</div>
+</div>
+
+<div class="qbox">
+  <div class="qtitle">Q5. CONFLICTS_WITH severity 라벨링</div>
+  <ol class="qopts">
+    <li><strong>A</strong>. LLM 이 4단계 (low/medium/high/critical) 자동 제안 + 사람 승인.</li>
+    <li><strong>B</strong>. 고정 규칙 (예: 공식 숫자 차이 &gt;10% → high, 변수 이름만 다름 → low).</li>
+    <li><strong>C</strong>. 항상 medium 시작, 사람이 수정.</li>
+  </ol>
+  <div class="rec">Claude 제안 : <strong>A</strong>. LLM 제안 + confirmed=false 로 항상 승인 큐. Round 2 와 동일 정책 (LLM 제안은 사람 승인 전제).</div>
+  <div class="decision">✅ <strong>결정 : A</strong> (추천 채택) — LLM 이 severity (low/medium/high/critical) 4단계 자동 제안 + <code>confirmed=false</code> 로 승인 큐 진입. Round 2 와 동일 정책 (LLM 제안은 항상 사람 승인 전제). <em>반영</em> : §7-3 현 구조 유지.</div>
+</div>
+
+<div class="qbox">
+  <div class="qtitle">Q6. MISSING_IN 방향 — 두 방향 다?</div>
+  <ol class="qopts">
+    <li><strong>A</strong>. 두 방향 모두 (code_only + manual_only). 완전 symmetric.</li>
+    <li><strong>B</strong>. code_only 만. 코드가 있고 문서가 없음만 추적.</li>
+    <li><strong>C</strong>. manual_only 만. 문서에 있고 구현 없음만 추적.</li>
+  </ol>
+  <div class="rec">Claude 제안 : <strong>A</strong>. 두 방향 다. 방향별 심각도 정책은 분기 (manual_only &gt; code_only 일반적이지만 도메인별 판단).</div>
+  <div class="decision">✅ <strong>결정 : A</strong> (추천 채택) — MISSING_IN 양방향. code_only (기준서 없음) + manual_only (구현 없음) 둘 다 추적. 기본 severity 정책 : code_only=medium, manual_only=high (규정 위반 가능성). 도메인별로 조정 가능. <em>반영</em> : §3 edges 테이블 MISSING_IN row 유지, §7-1/7-2 두 케이스 모두 보존.</div>
+</div>
+
+<div class="qbox">
+  <div class="qtitle">Q7. 기준서 인제스트 트리거</div>
+  <ol class="qopts">
+    <li><strong>A</strong>. 수동 업로드 + 관리자 endpoint 만. UI 에서 파일 선택 → POST.</li>
+    <li><strong>B</strong>. watch folder (예: <code>/var/ontong/manuals/</code>) + 30분 cron 스캔.</li>
+    <li><strong>C</strong>. git push hook (기준서가 별도 레포일 때).</li>
+    <li><strong>D</strong>. A + B (UI + watch folder).</li>
+    <li><strong>E</strong>. A + B + C 전부.</li>
+  </ol>
+  <div class="rec">Claude 제안 : <strong>D</strong>. UI (시연/1회성) + watch folder (일상). git hook 은 Phase E+ 에서 필요 시.</div>
+  <div class="decision">✅ <strong>결정 : E</strong> — 3개 트리거 모두 구현. A (UI 업로드) + B (watch folder) + C (git push hook). <code>ManualDocument.source</code> 로 진입 경로 기록. 동일 checksum 중복 skip. D2 우선순위 : A 1순위 (데모 필수) → B 2순위 → C 3순위 (endpoint 는 구현, 실제 레포 연동은 Phase E 에서 activate). <em>반영</em> : §6-2 트리거 섹션 3개 상세 전개.</div>
+</div>
+
+<div class="qbox">
+  <div class="qtitle">Q8. 여러 문서가 같은 Term 서술할 때 권위 우선순위</div>
+  <ol class="qopts">
+    <li><strong>A</strong>. last_modified 최신 우선. 가장 단순. 버전 관리 책임은 사람.</li>
+    <li><strong>B</strong>. 명시적 <code>authoritative=true</code> 플래그 문서만 권위. 나머지는 참고용.</li>
+    <li><strong>C</strong>. 포맷 우선순위 (예: MD SOP &gt; PDF &gt; PPT).</li>
+    <li><strong>D</strong>. LLM 판단 — 문서 내용 보고 권위 순위 제안.</li>
+  </ol>
+  <div class="rec">Claude 제안 : <strong>B</strong>. <code>authoritative</code> 플래그 명시. 팀 리더가 인제스트 시 표시. gap detection 은 authoritative=true 문서를 기준으로 나머지와 conflict 계산.</div>
+  <div class="decision">✅ <strong>결정 : B</strong> (추천 채택) — 명시적 <code>authoritative</code> 플래그 (기본 false). 팀 리더가 인제스트 시 true 로 승격. 여러 문서가 같은 Term 을 서술할 때 authoritative=true 를 기준점으로 삼아 나머지는 CONFLICTS_WITH 후보. <em>반영</em> : §2-3 ManualDocument 의 <code>authoritative</code> 필드 유지.</div>
+</div>
+
+<div class="qbox">
+  <div class="qtitle">Q9. 신규 Python 의존성 — PDF / Word</div>
+  <ol class="qopts">
+    <li><strong>A</strong>. 전부 설치 — <code>pypdf</code> + <code>pdfplumber</code> + <code>python-docx</code>.</li>
+    <li><strong>B</strong>. PDF 만 (pypdf) — Word 는 나중에. MS Word 사용 빈도가 낮다면.</li>
+    <li><strong>C</strong>. 외부 CLI 위임 — pandoc / unoconv / libreoffice --headless. Python 의존성 최소.</li>
+    <li><strong>D</strong>. A + 그러나 PPT 이미지 내 텍스트는 OCREngine 로 처리 (중복 방지).</li>
+  </ol>
+  <div class="rec">Claude 제안 : <strong>D</strong>. A 와 동일한 설치 + OCR 은 이미지 Fragment 에만 적용. Docker 이미지 빌드 시간이 증가하지만 데모 UX 가 매끄러움.</div>
+  <div class="decision">✅ <strong>결정 : D</strong> (추천 채택) — <code>pypdf</code> + <code>pdfplumber</code> + <code>python-docx</code> 전부 설치 + 이미지 Fragment 는 기존 <code>OCREngine</code> (tesseract+easyocr) 재사용. 중복 의존성 방지 + 데모 UX 매끄러움. <em>반영</em> : §6 ingest 카드 (PDF/Word) 와 D2 의존성 리스트 그대로 유지. requirements 에 <code>pypdf</code>, <code>pdfplumber</code>, <code>python-docx</code> 3개 추가.</div>
+</div>
+
+<!-- =================================================================== -->
+<h2 id="next">10. 다음 단계 — Phase D 코드 + Phase E 실증</h2>
+
+<p>Round 3 HTML rev.2 합의 완료 (Q1~Q9). 이제 코드 복원/확장 순서 :</p>
+
+<ol>
+  <li><strong>D1.5 — DTO 확장</strong> : <code class="inline">backend/modeling/mapping/mapping_models.py</code> 에 <code>BusinessProcess</code> (계층 필드 <em>없음</em> — <strong>Q1=C</strong>) / <code>Role</code> (team 단위, <code>kind="team"</code> 고정 — <strong>Q2=A</strong>) 추가. 별도 모듈 <code>backend/modeling/manuals/manual_models.py</code> 신규 — <code>ManualDocument</code> (<code>authoritative:bool=False</code> — <strong>Q8=B</strong>) / <code>ManualSection</code> / <code>ManualFragment</code>. 엣지 DTO 6종 (<code>PartOfBinding</code> / <code>RoleBinding</code> / <code>DescribedInBinding</code> / <code>ConflictBinding</code> / <code>MissingBinding</code> / <code>ParentProcessBinding</code>).</li>
+  <li><strong>D1.6 — parser_protocol 등록</strong> : <code>EntityKinds.BUSINESS_PROCESS</code> / <code>ROLE</code> / <code>MANUAL_DOCUMENT</code> / <code>MANUAL_SECTION</code> / <code>MANUAL_FRAGMENT</code>. <code>RelationKinds.PART_OF</code> / <code>RESPONSIBLE_FOR</code> / <code>DESCRIBED_IN</code> / <code>CONFLICTS_WITH</code> / <code>MISSING_IN</code> / <code>PARENT_PROCESS</code> (총 6종, <strong>Q1=C</strong>). 카테고리는 모두 <code>concept</code> (Round 2 와 통일).</li>
+  <li><strong>D2 — 인제스트 파이프라인</strong> : <code>backend/modeling/manual_ingest/{pipeline,pdf_parser,pptx_parser,docx_parser,md_parser,image_parser,watch_folder,git_hook_webhook}.py</code>. 기존 <code>OCREngine</code> + <code>_parse_pptx_slides</code> 재사용. 신규 의존성 <code>pypdf</code> + <code>pdfplumber</code> + <code>python-docx</code> (<strong>Q9=D</strong>). 트리거 3종 (UI endpoint / watch folder / git webhook — <strong>Q7=E</strong>), 구현 우선순위 A&gt;B&gt;C.</li>
+  <li><strong>D3 — Gap Detector</strong> : <code>backend/modeling/gap_detection/{rule_ast_differ,embedding_drifter,llm_comparator,gap_engine}.py</code>. strategy 패턴으로 2 모드 (<code>hierarchical</code> 기본 / <code>llm_only</code>) 지원 — <strong>Q4=C+A</strong>. severity 는 LLM 제안 + 승인 큐 (<strong>Q5=A</strong>). MISSING_IN 양방향 검출 (<strong>Q6=A</strong>).</li>
+  <li><strong>D4 — 사람 검증 UI</strong> : 프론트 디자인 스펙. CONFLICTS_WITH 승인 큐 카드 (severity 조정 + confirm 버튼) + Role (team) 관리 + Manual 업로드 (authoritative 토글). (별도 디자인 세션에서.)</li>
+  <li><strong>Phase E — 실증</strong> :
+    <ul>
+      <li>E1 Slab 엔진 sample repo 수령 → Round 1/2/3 전 스택 적용.</li>
+      <li>E2 실 기준서 샘플 (PDF 1개 + PPT 1개 + MD 1개) 업로드 → Gap Detection 시나리오 시연.</li>
+      <li>E3 "안전재고 PR 머지 → Role 3명 알림 + 기준서 2건 업데이트 체크리스트" 워킹 데모.</li>
+    </ul>
+  </li>
+</ol>
+
+<div class="callout">
+  <strong>이 Round 의 성공 기준</strong> : "PR 머지 전에 <em>기준서 업데이트 필요 체크리스트</em> 가 자동 생성되고, 책임자 3명 이하로 정확히 식별되며, 코드/기준서 충돌이 있다면 LLM 요약 카드로 즉시 드러난다." 이 3가지가 1 도메인에서 돌면 Phase E 진입.
+</div>
+
+<footer>
+  ONTONG · Section 2 · Round 3 — manual-gap-org <strong>rev.2 (Q1~Q9 합의 반영)</strong> — 2026-04-20<br>
+  선행 : Round 1 (code-schema rev.3, 2026-04-19) + Round 2 (concept-bridge rev.2, 2026-04-20) + Phase C 코드 (C2/C3/C4 완료, 2026-04-20).<br>
+  후행 : <strong>D1.5</strong> DTO 확장 (BusinessProcess + Role team-only + ManualDocument/Section/Fragment) → <strong>D1.6</strong> parser_protocol (EntityKinds 5종 + RelationKinds 6종) → <strong>D2</strong> 인제스트 (UI+watch+git hook, PDF/PPT/Word/Image/MD) → <strong>D3</strong> gap detector (hierarchical + llm_only 모드) → <strong>D4</strong> UI 디자인 → <strong>Phase E</strong> Slab 샘플 실증.<br>
+  주요 결정 : Q1=C (PARENT_PROCESS 엣지), Q2=A (team), Q3=C (Section+Fragment), Q4=C+A 모드, Q5=A (LLM 승인 큐), Q6=A (양방향), Q7=E (3트리거), Q8=B (authoritative flag), Q9=D (PDF/Word 전부).
+</footer>
+
+</div>
+</body>
+</html>

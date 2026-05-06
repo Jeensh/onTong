@@ -1684,6 +1684,7 @@ export function TreeNav() {
   const treeVersion = useWorkspaceStore((s) => s.treeVersion);
   const activeFilePath = tabs.find((t) => t.id === activeTabId)?.filePath ?? null;
   const openSearch = useSearchStore((s) => s.setOpen);
+  const openSearchWithFilters = useSearchStore((s) => s.openWithFilters);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -2288,6 +2289,16 @@ export function TreeNav() {
             action: () => {
               const p = isRoot ? "__root__" : node!.path;
               setCreatingIn(p); setCreatingType("folder");
+              setContextMenu(null);
+            },
+          },
+          {
+            label: "이 폴더에서 검색",
+            icon: <Search className="h-3.5 w-3.5" />,
+            visible: !isRoot && isDir,
+            separator: true,
+            action: () => {
+              openSearchWithFilters({ folders: [node!.path] });
               setContextMenu(null);
             },
           },

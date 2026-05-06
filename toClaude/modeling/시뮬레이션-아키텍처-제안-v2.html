@@ -1,0 +1,948 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>onTong — 시뮬레이션 아키텍처 v2 (정정본)</title>
+<style>
+  :root {
+    --bg: #0b1018;
+    --panel: #111827;
+    --panel-2: #0f172a;
+    --panel-3: #0a0f1a;
+    --border: #1f2937;
+    --border-2: #334155;
+    --text: #e5e7eb;
+    --text-dim: #94a3b8;
+    --text-faint: #64748b;
+    --accent: #38bdf8;
+    --accent-2: #818cf8;
+    --warn: #f59e0b;
+    --bad: #f87171;
+    --good: #34d399;
+    --code-bg: #0a0f1a;
+    --layer-code: #38bdf8;
+    --layer-term: #a78bfa;
+    --layer-rule: #fb923c;
+    --layer-manual: #34d399;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.65 -apple-system, BlinkMacSystemFont, "SF Pro Text",
+      "Segoe UI", "Helvetica Neue", "Pretendard", sans-serif;
+  }
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 32px 96px;
+  }
+  header.top {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+  h1 {
+    font-size: 28px;
+    margin: 0 0 8px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  h1 .badge {
+    display: inline-block;
+    margin-left: 12px;
+    padding: 4px 10px;
+    background: var(--panel);
+    border: 1px solid var(--border-2);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 4px;
+    vertical-align: middle;
+  }
+  h2 {
+    font-size: 22px;
+    margin: 56px 0 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  h3 {
+    font-size: 17px;
+    margin: 28px 0 10px;
+    color: var(--text);
+    font-weight: 600;
+  }
+  h4 {
+    font-size: 13px;
+    margin: 16px 0 6px;
+    color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12.5px;
+    color: var(--accent);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  pre code { background: none; border: none; padding: 0; color: var(--text); }
+  .lead {
+    font-size: 15px;
+    color: var(--text-dim);
+    margin-top: 8px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin: 14px 0;
+  }
+  .panel.warn { border-left: 3px solid var(--warn); }
+  .panel.bad { border-left: 3px solid var(--bad); }
+  .panel.good { border-left: 3px solid var(--good); }
+  .panel.accent { border-left: 3px solid var(--accent); }
+  .panel h3, .panel h4 { margin-top: 0; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    color: var(--text-dim);
+    font-weight: 500;
+    background: var(--panel);
+    font-size: 12px;
+  }
+
+  .toc {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 22px;
+    margin-bottom: 32px;
+  }
+  .toc ol { margin: 4px 0; padding-left: 22px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  .correction {
+    background: rgba(248, 113, 113, 0.05);
+    border: 1px solid rgba(248, 113, 113, 0.3);
+    border-left: 4px solid var(--bad);
+    border-radius: 6px;
+    padding: 14px 18px;
+    margin: 14px 0;
+  }
+  .correction .head {
+    color: var(--bad);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+  }
+  .correction .row {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: 8px;
+    margin-top: 6px;
+    font-size: 13px;
+  }
+  .correction .row .lab {
+    color: var(--text-dim);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 11px;
+  }
+
+  .agreed {
+    background: rgba(52, 211, 153, 0.05);
+    border-left: 4px solid var(--good);
+    padding: 14px 18px;
+    border-radius: 6px;
+    margin: 14px 0;
+  }
+  .agreed .head {
+    color: var(--good);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+  }
+  .agreed blockquote {
+    margin: 6px 0;
+    padding-left: 12px;
+    border-left: 2px solid rgba(52, 211, 153, 0.3);
+    color: var(--text-dim);
+    font-style: italic;
+    font-size: 13px;
+  }
+
+  .mapping-row {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px dashed var(--border);
+    align-items: start;
+  }
+  .mapping-row:last-child { border-bottom: none; }
+  .mapping-row .anchor {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    color: var(--accent-2);
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    border-radius: 4px;
+  }
+  .mapping-row .desc {
+    font-size: 13px;
+    color: var(--text);
+  }
+  .mapping-row .desc .meta { color: var(--text-dim); font-size: 12px; margin-top: 4px; }
+
+  .pipeline {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 16px 0;
+  }
+  .step-flow { display: flex; flex-direction: column; gap: 6px; }
+  .step-flow .step {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    font-size: 13px;
+  }
+  .step .num {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--accent);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .step .step-title { font-weight: 500; }
+  .step .step-detail { color: var(--text-dim); font-size: 12px; margin-top: 2px; }
+  .step-arrow { text-align: center; color: var(--text-faint); font-size: 16px; line-height: 1; }
+
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .pill.have { background: rgba(52, 211, 153, 0.1); color: var(--good); border: 1px solid rgba(52, 211, 153, 0.3); }
+  .pill.miss { background: rgba(248, 113, 113, 0.1); color: var(--bad); border: 1px solid rgba(248, 113, 113, 0.3); }
+  .pill.partial { background: rgba(245, 158, 11, 0.1); color: var(--warn); border: 1px solid rgba(245, 158, 11, 0.3); }
+  .pill.new { background: rgba(129, 140, 248, 0.1); color: var(--accent-2); border: 1px solid rgba(129, 140, 248, 0.3); }
+
+  .code-vs-py {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .code-vs-py > div {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+  }
+  .code-vs-py h5 {
+    margin: 0 0 8px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+  }
+  .code-vs-py pre {
+    margin: 0;
+    font-size: 11.5px;
+  }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--text-faint);
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>onTong — 시뮬레이션 아키텍처 v2 (정정본) <span class="badge">2026-04-26</span></h1>
+  <p class="lead">
+    이전 v1 제안 (Docker + mvn 기반) 은 사용자가 명시적으로 합의했던 architectural 결정 3 가지를
+    제가 잃어버려서 잘못 잡은 방향입니다. 본 v2 는 그 합의를 복구하고, 메서드 단위 매핑이 어떻게
+    Python 시뮬레이션까지 연결되는지를 그림으로 명확히 합니다.
+  </p>
+</header>
+
+<nav class="toc">
+  <h4 style="margin-top:0">목차</h4>
+  <ol>
+    <li><a href="#correction">v1 → v2 정정 (사용자 지적 3 가지)</a></li>
+    <li><a href="#design-base">기존에 합의된 메서드 노드 설계 (round1-code-schema.html §6)</a></li>
+    <li><a href="#mapping">메서드 단위 매핑이 무엇인지 — 구체 anchor 6 종</a></li>
+    <li><a href="#example">실제 예시 — slab demo 의 한 메서드 → 매뉴얼 → Python</a></li>
+    <li><a href="#sandbox">Python Sandbox 시뮬레이션 (Docker 아님)</a></li>
+    <li><a href="#rule-extraction">BusinessRule 추출 — Javadoc 아님, body 분석</a></li>
+    <li><a href="#layered">정정된 4-layer 아키텍처</a></li>
+    <li><a href="#phases">단계 계획 — P13~P28 (재정의)</a></li>
+    <li><a href="#questions">결정 질문 (재정의)</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<h2 id="correction">1. v1 → v2 정정 — 사용자 지적 3 가지</h2>
+
+<div class="agreed">
+  <div class="head">합의 #1 — 샌드박스는 온톨로지 기반 Python 생성 + 실행</div>
+  <blockquote>"샌드박스 시뮬레이션은 우리 설계하면서 영향 범위에 대한 온톨로지를 확인하고 소스를 직접 만들어서 실행까지 해보는 걸로 확인했던 것 같은데. 맞지?" / "시뮬레이션 코드는 꼭 자바가 아닌 파이썬이어도 괜찮지 않을까?"</blockquote>
+</div>
+<div class="correction">
+  <div class="head">v1 잘못</div>
+  <div class="row"><div class="lab">제안</div><div>Docker + mvn test (Java 빌드)</div></div>
+  <div class="row"><div class="lab">왜 틀림</div><div>합의는 ontology → Python 동등 함수 생성 → Python 실행. Java 빌드는 무겁고 LLM patch fragile. 사용자가 Python 으로 충분하다고 명시.</div></div>
+  <div class="row"><div class="lab">v2</div><div>Python equivalent 함수를 ontology 에서 LLM 생성 → subprocess 또는 RestrictedPython 으로 격리 실행 → output diff. <strong>§5 참고.</strong></div></div>
+</div>
+
+<div class="agreed">
+  <div class="head">합의 #2 — 코드가 ground truth, Javadoc/매뉴얼이 아님</div>
+  <blockquote>"자바doc같은걸 주요 지표로 왜 삼는거야 레거시 시스템은 그런게 제대로 안되어있는 것들 천지인데, 실제 소스 내용을 기반으로 가야지" / 이전 세션 summary: "integrate it properly with code as ground truth (not docs)"</blockquote>
+</div>
+<div class="correction">
+  <div class="head">v1 잘못</div>
+  <div class="row"><div class="lab">제안</div><div>BusinessRule 시드 = `seed_rules_from_repo` 가 Javadoc 텍스트 추출</div></div>
+  <div class="row"><div class="lab">왜 틀림</div><div>레거시 Javadoc 은 부재/거짓. slab-design-real 도 일부 Javadoc 만 있고 진짜 비즈니스 룰은 method body 의 if 조건/literal/throw 에 있음.</div></div>
+  <div class="row"><div class="lab">v2</div><div>Rule 추출은 method body AST 에서. if/else 조건 → guard rule, literal → constant rule, throw → exception rule, 비교 연산 → bound rule. Javadoc 은 부차 신호. <strong>§6 참고.</strong></div></div>
+</div>
+
+<div class="agreed">
+  <div class="head">합의 #3 — 메서드 단위 매핑은 필드만 아니라 method body 변수/로직까지</div>
+  <blockquote>"메서드 단위까지 일단 어떻게 메뉴얼과 매핑이 되는지 명확히 내가 이해를 못하겠고, 내가 생각하기에 샌드박스 시뮬레이션 까지 가려면 필드뿐만 아니라 메서드 내에 변수나 로직도 잘 매핑할 수 있는 방법이 필요할 것 같은데"</blockquote>
+</div>
+<div class="correction">
+  <div class="head">v1 잘못</div>
+  <div class="row"><div class="lab">제안</div><div>BusinessTerm ↔ field/column 만 매핑 (alias 매핑 위주)</div></div>
+  <div class="row"><div class="lab">왜 틀림</div><div>method body 안의 local variable, 분기 조건, literal, return value 매핑 없으면 Python 함수 재구성 불가. 시뮬레이션의 본질이 빠짐.</div></div>
+  <div class="row"><div class="lab">v2</div><div>매핑 anchor 6 종으로 확장 — field / param / local / return / branch / literal. <strong>§3 참고.</strong></div></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="design-base">2. 잊지 않았던 기존 설계 — round1 메서드 노드 (§6)</h2>
+
+<p>이미 round1 합의 시점에 메서드 노드는 body-level 정보를 담을 자리를 미리 잡아뒀습니다. v1 제안에서 이걸 활용 안 했던 게 실수.</p>
+
+<table>
+  <thead>
+    <tr><th>METHOD 노드 속성</th><th>의미</th><th>현재 채워짐?</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>signature_hash</code></td><td>시그니처 SHA1 (변경 감지)</td><td><span class="pill have">✓</span></td></tr>
+    <tr><td><code>body_hash</code></td><td>본문 SHA1 (Change Detection 핵심)</td><td><span class="pill partial">tree-sitter 추출 OK, 사용 X</span></td></tr>
+    <tr><td><code>params</code></td><td><code>[{name, type, nullable}]</code></td><td><span class="pill have">✓</span></td></tr>
+    <tr><td><code>return_type</code></td><td>반환 타입</td><td><span class="pill have">✓</span></td></tr>
+    <tr><td><code>annotations</code></td><td><code>@Transactional</code> 등</td><td><span class="pill have">✓</span></td></tr>
+    <tr><td><code>precondition</code></td><td>선언식 (DSL). 예 <code>req.items.size > 0</code></td><td><span class="pill miss">자리만, 비어있음</span></td></tr>
+    <tr><td><code>postcondition</code></td><td>선언식. 예 <code>result.status == "PENDING"</code></td><td><span class="pill miss">자리만</span></td></tr>
+    <tr><td><code>input_domain</code></td><td>파라미터 값 범위. 시뮬레이션 input 생성 핵심</td><td><span class="pill miss">자리만</span></td></tr>
+    <tr><td><code>exception_paths</code></td><td><code>["ValidationException", ...]</code></td><td><span class="pill partial">tree-sitter 가능, 미사용</span></td></tr>
+    <tr><td><code>value_flow</code></td><td>method 내부 변수 전파. <code>{var: [target_vars]}</code></td><td><span class="pill miss">설계만, 미구현</span></td></tr>
+    <tr><td><code>reflection_escape</code></td><td>reflection/dynamic invoke 사용 여부</td><td><span class="pill have">✓</span></td></tr>
+  </tbody>
+</table>
+
+<p><strong>field-to-field 엣지</strong> (round1-code-schema §6-B-1, 미구현):</p>
+<ul>
+  <li><code>DERIVES_FROM</code> — FIELD → FIELD, "A 값이 B 로부터 계산됨" + <code>via_methods</code> 로 어느 메서드가 carry 했는지</li>
+  <li><code>PROPAGATES_TO</code> — FIELD → FIELD, "A 가 B 로 그대로 복사" + <code>via_methods</code></li>
+</ul>
+
+<div class="panel accent">
+  <strong>v2 의 핵심 출발점</strong> — 위 6 개 미구현 자리 (precondition/postcondition/input_domain/value_flow/DERIVES_FROM/PROPAGATES_TO) 를 채워야 시뮬레이션 가능. 이게 P13~P15 의 backbone.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="mapping">3. 메서드 단위 매핑이 무엇인지 — anchor 6 종</h2>
+
+<p>BusinessTerm / BusinessRule 이 method 의 어디에 붙는지 6 종 anchor 를 정의합니다. 한 메서드에 여러 anchor 가 동시에 붙을 수 있음.</p>
+
+<div class="mapping-row">
+  <div class="anchor">field<br/><span style="color:var(--text-faint); font-size:11px;">기존 (alias 매핑)</span></div>
+  <div class="desc">
+    클래스 필드 / DB 컬럼. 예: <code>SlabDesignHistJpo.slabNo (col=SLAB_NO)</code> ↔ <code>term.슬래브번호</code>
+    <div class="meta">현재 ConceptBinding (REALIZES) 가 이 anchor 만 다룸. 70% 구현됨.</div>
+  </div>
+</div>
+
+<div class="mapping-row">
+  <div class="anchor">param <span class="pill new">신규</span></div>
+  <div class="desc">
+    메서드 파라미터. 예: <code>findGroup(BigDecimal hrTgtWidth)</code> 의 <code>hrTgtWidth</code> ↔ <code>term.열연타겟폭</code>
+    <div class="meta">시뮬레이션 시 param 별로 입력값을 무엇으로 넣을지 결정 (input_domain).</div>
+  </div>
+</div>
+
+<div class="mapping-row">
+  <div class="anchor">local <span class="pill new">신규</span></div>
+  <div class="desc">
+    메서드 본문 안의 지역 변수. 예: <code>BigDecimal slabLengthLow = max(slabWgt / (widthHigh * thickness * gravity), primaryLengthLow)</code> 의 <code>slabLengthLow</code> ↔ <code>term.슬래브길이하한</code>
+    <div class="meta">value_flow 로 추출. 이 변수가 어떤 도메인 개념을 들고 있는지 사람이 확정.</div>
+  </div>
+</div>
+
+<div class="mapping-row">
+  <div class="anchor">return <span class="pill new">신규</span></div>
+  <div class="desc">
+    메서드 반환값. 예: <code>SdProductivityStdEntity</code> 반환 ↔ <code>term.생산성기준</code>
+    <div class="meta">시뮬레이션 output 의 의미 검증에 사용.</div>
+  </div>
+</div>
+
+<div class="mapping-row">
+  <div class="anchor">branch <span class="pill new">신규</span></div>
+  <div class="desc">
+    if / else / switch / when / case 조건. 예: <code>if (hrTgtWidth.compareTo(HR_TGT_WIDTH_LOW) >= 0 && hrTgtWidth.compareTo(HR_TGT_WIDTH_HIGH) <= 0)</code> ↔ <code>rule.HR타겟폭_범위검증</code>
+    <div class="meta">조건식 자체가 BusinessRule 의 statement. AST sub-tree 가 rule body. 시뮬레이션 시 이 조건을 변경하면 영향 명확.</div>
+  </div>
+</div>
+
+<div class="mapping-row">
+  <div class="anchor">literal <span class="pill new">신규</span></div>
+  <div class="desc">
+    method body 안의 literal 상수. 예: <code>0.95</code> (안전계수) / <code>"^[A-Z0-9]{4}$"</code> (품종코드 정규식) / <code>240</code> (최대 두께)
+    <div class="meta">매직 넘버가 도메인 의미를 가짐. literal ↔ <code>rule.안전계수</code> / <code>rule.품종코드포맷</code> 매핑. ChangeSpec 의 가장 흔한 변경 단위.</div>
+  </div>
+</div>
+
+<h3>매핑 데이터 모델 (신규)</h3>
+
+<pre><code>class MethodAnchor:
+    method_fqn: str          # com.example...EdgingService.findGroup
+    kind: AnchorKind         # field | param | local | return | branch | literal
+    locator: str             # "param[0]" | "local[slabLengthLow]" | "branch[if-line:42]" | "literal[0.95@line:78]"
+    ast_path: str            # JSON path within method AST (precise pointer)
+    source_snippet: str      # 추출된 텍스트 (사용자 검토용)
+
+class TermBinding:           # 기존 ConceptBinding 확장
+    term_fqn: str
+    anchor: MethodAnchor     # 또는 기존 code_fqn (field 만)
+    confidence: float
+    source: BindingSource    # manual | name_match | embedding | llm | body_analysis
+    confirmed: bool
+
+class RuleBinding:
+    rule_fqn: str
+    anchor: MethodAnchor     # branch / literal / 메서드 전체
+    statement_ast: dict      # AST sub-tree (시뮬레이션 시 patch 대상)
+    extracted_constant: str  # literal 일 때 값
+    confirmed: bool
+</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="example">4. 실제 예시 — slab demo 의 한 메서드 → 매뉴얼 → Python</h2>
+
+<p>slab-design-real 의 실제 메서드 하나를 가지고 anchor 매핑 → Python 생성 까지 보여줍니다.</p>
+
+<h3>4-A. 원본 Java 메서드</h3>
+<pre><code>// 파일: SdFinalLengthRangeAction.java
+public LengthRange computeFinalLength(
+    BigDecimal slabWgt,
+    BigDecimal widthLow, BigDecimal widthHigh,
+    BigDecimal thickness, BigDecimal gravity,
+    BigDecimal primaryLengthLow, BigDecimal primaryLengthHigh
+) {
+    // rule1 — 길이 하한
+    BigDecimal slabLengthLow = max(
+        slabWgt.divide(widthHigh.multiply(thickness).multiply(gravity), 4, HALF_UP),
+        primaryLengthLow
+    );
+    // rule2 — 길이 상한
+    BigDecimal slabLengthHigh = min(
+        slabWgt.divide(widthLow.multiply(thickness).multiply(gravity), 4, HALF_UP),
+        primaryLengthHigh
+    );
+    if (slabLengthLow.compareTo(slabLengthHigh) > 0) {
+        throw new ValidationException("DG107");
+    }
+    return new LengthRange(slabLengthLow, slabLengthHigh);
+}</code></pre>
+
+<h3>4-B. 추출된 anchor + 매핑 (사용자 확정 후)</h3>
+
+<table>
+  <thead>
+    <tr><th>Anchor</th><th>Locator</th><th>Bound to</th><th>Confidence / Source</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>param</td><td><code>param[slabWgt]</code></td><td><code>term.슬래브단중</code></td><td>1.0 / 사람</td></tr>
+    <tr><td>param</td><td><code>param[widthLow]</code></td><td><code>term.슬래브폭하한</code></td><td>1.0</td></tr>
+    <tr><td>param</td><td><code>param[thickness]</code></td><td><code>term.슬래브두께</code></td><td>1.0</td></tr>
+    <tr><td>param</td><td><code>param[gravity]</code></td><td><code>term.비중</code></td><td>1.0</td></tr>
+    <tr><td>local</td><td><code>local[slabLengthLow]</code></td><td><code>term.슬래브길이하한</code></td><td>0.95 / LLM 추천 + 사람 확정</td></tr>
+    <tr><td>local</td><td><code>local[slabLengthHigh]</code></td><td><code>term.슬래브길이상한</code></td><td>0.95</td></tr>
+    <tr><td>return</td><td><code>return</code></td><td><code>term.슬래브길이범위</code></td><td>1.0</td></tr>
+    <tr><td>branch</td><td><code>branch[if@line:14]</code></td><td><code>rule.슬래브길이_상하한일관성</code> (statement: <code>lengthLow > lengthHigh → throw</code>)</td><td>1.0 / body 분석</td></tr>
+    <tr><td>literal</td><td><code>literal["DG107"@line:15]</code></td><td><code>rule.오류코드_DG107</code></td><td>1.0</td></tr>
+    <tr><td>(method 전체)</td><td><code>method</code></td><td><code>rule.SlabFinalLengthRange.formula</code> (statement: <code>length_low = slabWgt/(widthHigh*thickness*gravity)</code>)</td><td>1.0 / body AST 추출</td></tr>
+  </tbody>
+</table>
+
+<h3>4-C. 매뉴얼 fragment 와의 연결 — 메서드 ↔ 매뉴얼 매핑이 어떻게 성립하나</h3>
+
+<p>핵심은 <strong>전이적 (transitive) 링크</strong> 입니다 :
+<code>method anchor → BusinessTerm/Rule → ManualFragment</code>.
+직접 메서드 ↔ 매뉴얼 link 는 없고, 중간에 ontology 가 다리.</p>
+
+<h4>매뉴얼 (사람이 작성, slab-design.md 일부)</h4>
+<pre><code># 슬래브 길이 산식
+
+&lt;!-- ontong: rule=rule.SlabFinalLengthRange.formula --&gt;
+슬래브 길이 하한은 슬래브 단중을 (슬래브 폭 상한 × 두께 × 비중) 으로 나눈 값과
+1차 길이 하한 중 큰 값. 길이 상한은 그 반대.
+
+&lt;!-- ontong: rule=rule.슬래브길이_상하한일관성 --&gt;
+산출된 길이 하한이 상한보다 크면 입력 오류. 오류코드 DG107 으로 차단.
+
+&lt;!-- ontong: term=term.슬래브단중 --&gt;
+슬래브 1 본의 무게. kg 단위. 발주 단계에서 결정되며 변경 불가.
+
+&lt;!-- ontong: term=term.비중 --&gt;
+강종별 무게/부피 비. 슬래브 길이 산식에서 분모로 들어감.
+값은 SpecificGravityProvider 에서 강종 코드로 lookup.</code></pre>
+
+<h4>매뉴얼 → ontology → method 연결 결과</h4>
+<table>
+  <thead><tr><th>매뉴얼 fragment</th><th>directive</th><th>method anchor 까지 도달</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>"슬래브 길이 하한은 ..." 단락</td>
+      <td><code>rule=rule.SlabFinalLengthRange.formula</code></td>
+      <td>→ <code>SdFinalLengthRangeAction.computeFinalLength</code> 메서드 전체 (formula rule)</td>
+    </tr>
+    <tr>
+      <td>"산출된 길이 하한이 상한보다 크면..." 단락</td>
+      <td><code>rule=rule.슬래브길이_상하한일관성</code></td>
+      <td>→ 같은 메서드의 <code>branch[if@line:14]</code> anchor</td>
+    </tr>
+    <tr>
+      <td>"슬래브 1본의 무게..." 단락</td>
+      <td><code>term=term.슬래브단중</code></td>
+      <td>→ 같은 메서드의 <code>param[slabWgt]</code> anchor + <code>SlabOrderJpo.slabWgt</code> field anchor</td>
+    </tr>
+    <tr>
+      <td>"강종별 무게/부피 비..." 단락</td>
+      <td><code>term=term.비중</code></td>
+      <td>→ <code>param[gravity]</code> + <code>SpecificGravityProvider.get</code> 메서드 return anchor</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>UI 에서의 사용 예</strong> :</p>
+<ul>
+  <li><strong>역탐색 — "슬래브 단중" 검색</strong> → ontology 에서 <code>term.슬래브단중</code> → 4 개 anchor (param, field, manual fragment, ConceptBinding) 모두 표시.</li>
+  <li><strong>매뉴얼 작성 탭 — 「rule directive 삽입」 클릭</strong> → 추출된 BusinessRule 리스트 (rule.SlabFinalLengthRange.formula 등) → 선택 시 매뉴얼에 directive 자동 삽입 + 사용자가 그 rule 의 한국어 설명 작성.</li>
+  <li><strong>갭 큐</strong> → 매뉴얼이 가리키는 rule 이 method body 와 일관 안하면 (예: 매뉴얼이 "두께 ≥ 200" 인데 코드가 "≥ 250") conflict 자동 검출.</li>
+</ul>
+
+<div class="panel accent">
+  <strong>왜 directive 가 method body anchor 까지 가는가</strong> — directive 자체는 <code>rule=&lt;rule_fqn&gt;</code> 만 가리킵니다.
+  하지만 그 rule 이 추출된 출처는 method body AST 의 특정 anchor (branch / literal / formula expression).
+  ontology 가 두 개를 묶고 있으니, 매뉴얼 → rule → anchor → method 까지 자동으로 navigable.
+  사용자는 매뉴얼 한 단락에서 「코드 위치 보기」 버튼만 눌러도 method body 의 정확한 line 까지 점프 가능.
+</div>
+
+<h3>4-D. LLM 이 ontology 에서 생성한 Python 동등 함수</h3>
+
+<div class="code-vs-py">
+  <div>
+    <h5>Java (원본)</h5>
+    <pre><code>BigDecimal slabLengthLow = max(
+  slabWgt.divide(
+    widthHigh.multiply(thickness)
+      .multiply(gravity), 4, HALF_UP),
+  primaryLengthLow
+);</code></pre>
+  </div>
+  <div>
+    <h5>Python (시뮬레이션용 동등)</h5>
+    <pre><code>from decimal import Decimal, ROUND_HALF_UP
+
+def compute_final_length(
+    슬래브단중, 슬래브폭하한, 슬래브폭상한,
+    슬래브두께, 비중,
+    1차길이하한, 1차길이상한,
+):
+    슬래브길이하한 = max(
+        (슬래브단중 / (슬래브폭상한 * 슬래브두께 * 비중))
+            .quantize(Decimal('0.0001'), ROUND_HALF_UP),
+        1차길이하한,
+    )
+    슬래브길이상한 = min(...)
+    if 슬래브길이하한 > 슬래브길이상한:
+        raise ValueError('DG107')
+    return (슬래브길이하한, 슬래브길이상한)</code></pre>
+  </div>
+</div>
+
+<p><strong>Python 함수의 의미</strong>: ontology 의 BusinessTerm 으로 변수 이름이 한국어 도메인어로 치환됨 → 사람이 읽기 쉬움 + 시뮬레이션 결과를 도메인어로 보고 가능.</p>
+
+<!-- ============================================================ -->
+<h2 id="sandbox">5. Python Sandbox 시뮬레이션 흐름 (Docker 아님)</h2>
+
+<div class="pipeline">
+  <div class="step-flow">
+    <div class="step">
+      <div class="num">1</div>
+      <div>
+        <div class="step-title">ChangeSpec 입력</div>
+        <div class="step-detail">예시 — <code>kind=literal_change</code>, <code>target=literal["DG107"@SlabRule.line:15]</code> 변경 또는 <code>kind=branch_condition</code>, <code>target=branch[if@SlabRule.line:14]</code>, <code>after="lengthLow ≥ lengthHigh"</code> (≥ 로 변경, edge case 허용).</div>
+      </div>
+    </div>
+    <div class="step-arrow">↓</div>
+    <div class="step">
+      <div class="num">2</div>
+      <div>
+        <div class="step-title">Multi-Layer ImpactPropagator (4 layer BFS)</div>
+        <div class="step-detail">
+          영향받는 메서드/룰/터미/매뉴얼 식별 — 이전 v1 §3 와 동일 구조, 단 anchor 단위까지 정밀.
+        </div>
+      </div>
+    </div>
+    <div class="step-arrow">↓</div>
+    <div class="step">
+      <div class="num">3</div>
+      <div>
+        <div class="step-title">PythonGenerator — ontology → Python 함수</div>
+        <div class="step-detail">
+          영향받는 메서드 N개 의 anchor 매핑 + body AST + ChangeSpec patch 를 prompt 로 LLM 호출 →
+          영향받는 모든 메서드의 Python 동등 함수 생성. 변수명 한국어 (BusinessTerm).
+          ChangeSpec 이 적용된 버전 + before 버전 둘 다 생성.
+        </div>
+      </div>
+    </div>
+    <div class="step-arrow">↓</div>
+    <div class="step">
+      <div class="num">4</div>
+      <div>
+        <div class="step-title">SyntheticInputGenerator — input_domain 활용</div>
+        <div class="step-detail">
+          각 param 의 <code>input_domain</code> 또는 BusinessTerm 의 typical value range 에서 N 개 input 샘플 생성.
+          예: <code>슬래브단중 = [10000, 20000, 50000, 100000]</code>, <code>슬래브두께 = [200, 230, 280]</code>.
+          edge case (min/max/0/null) 자동 추가.
+        </div>
+      </div>
+    </div>
+    <div class="step-arrow">↓</div>
+    <div class="step">
+      <div class="num">5</div>
+      <div>
+        <div class="step-title">SandboxRunner — Python subprocess 격리 실행</div>
+        <div class="step-detail">
+          <code>data/simulations/{run_id}/before.py</code> + <code>after.py</code> + <code>inputs.json</code> →
+          subprocess (timeout 5s, no network, no fs write 외) 또는 RestrictedPython.
+          각 input 별로 before(input) 와 after(input) 의 output 캡처. 예외 발생 여부도 캡처.
+        </div>
+      </div>
+    </div>
+    <div class="step-arrow">↓</div>
+    <div class="step">
+      <div class="num">6</div>
+      <div>
+        <div class="step-title">DiffReporter — 도메인어로 차이 보고</div>
+        <div class="step-detail">
+          • 같은 input 에서 before/after output 차이 (예: <code>슬래브길이하한: 850 → 845</code>)<br/>
+          • 새로 발생하는 예외 / 사라진 예외 (예: DG107 throw 사례 5건 → 3건)<br/>
+          • 매뉴얼 stale 항목 (해당 rule binding 이 가리키던 fragment 가 더 이상 정확하지 않음)<br/>
+          • 영향받는 다른 rule (rule graph BFS 결과) 의 시뮬레이션도 동시 실행 (chain effect)
+        </div>
+      </div>
+    </div>
+    <div class="step-arrow">↓</div>
+    <div class="step">
+      <div class="num">7</div>
+      <div>
+        <div class="step-title">Apply / Discard — 사용자 결정</div>
+        <div class="step-detail">
+          • <strong>Apply</strong> → ontology 갱신 (rule statement / literal 변경 commit) + 매뉴얼 stale 항목은 갭 큐로 자동 추가 + Java 코드 patch 제안 PR 옵션<br/>
+          • <strong>Discard</strong> → simulation_run audit log 만 보존
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel good">
+  <strong>왜 Python 으로 충분한가</strong> — 비즈니스 규칙은 본질적으로 <em>"입력 → 조건 → 계산 → 출력"</em>.
+  Java 로 표현된 것은 framework / DI / DB 같은 <em>인프라</em> + <em>비즈니스 로직</em>. 시뮬레이션이 알고 싶은 건
+  <em>비즈니스 로직만</em> 이라 인프라를 stripping 한 Python 함수면 충분. Java 빌드 비용 없이 100배 빠름.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="rule-extraction">6. BusinessRule 추출 — Javadoc 아님, body 분석</h2>
+
+<p>현재 <code>seed_rules_from_repo</code> 는 Javadoc 텍스트만 보고 있음. 정정:</p>
+
+<table>
+  <thead><tr><th>Rule 종류</th><th>추출 위치</th><th>예시</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>guard rule</strong></td>
+      <td>method 시작부 if/throw 패턴, validate-prefix 메서드 호출</td>
+      <td><code>if (productCode == null) throw IllegalArgumentException("...")</code> → rule.품종코드_null검증</td>
+    </tr>
+    <tr>
+      <td><strong>bound rule</strong></td>
+      <td>비교 연산 (<, >, ≤, ≥) + literal</td>
+      <td><code>if (thickness < 200 || thickness > 280)</code> → rule.두께범위_200_280</td>
+    </tr>
+    <tr>
+      <td><strong>formula rule</strong></td>
+      <td>대입문의 RHS (산술 expression)</td>
+      <td><code>length = wgt / (width * thickness * gravity)</code> → rule.슬래브길이산식</td>
+    </tr>
+    <tr>
+      <td><strong>enum rule</strong></td>
+      <td>switch / equals / contains literal 집합</td>
+      <td><code>plantCd.equals("HR1") || plantCd.equals("HR2")</code> → rule.유효열연공장_HR1_HR2</td>
+    </tr>
+    <tr>
+      <td><strong>regex rule</strong></td>
+      <td>Pattern.compile / matches 호출</td>
+      <td><code>"^[A-Z0-9]{4}$"</code> → rule.품종코드_4자리포맷</td>
+    </tr>
+    <tr>
+      <td><strong>throw rule</strong></td>
+      <td>throw 문 + 에러코드 literal</td>
+      <td><code>throw new ValidationException("DG107")</code> → rule.오류_DG107</td>
+    </tr>
+    <tr>
+      <td><strong>lookup rule</strong></td>
+      <td>JPA findBy / native query + 비교 식</td>
+      <td><code>findByThicknessLessThanEqual</code> + <code>WIDTH_LOW ≤ x AND WIDTH_HIGH ≥ x</code> → rule.HR타겟폭_lookup</td>
+    </tr>
+    <tr>
+      <td><strong>(부차) javadoc rule</strong></td>
+      <td>Javadoc 의 한국어 설명 + LLM</td>
+      <td>위 7 종을 사람이 검토할 때 보조 신호로만</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="panel accent">
+  <strong>Body 분석 방법</strong> — tree-sitter 로 method body AST 추출 후 visitor 패턴.
+  각 visitor 는 위 7 종 중 하나를 찾아 <code>RuleBinding</code> 후보 생성. confidence 는 패턴 명확성에 따라.
+  사람이 「rule 검토」 탭에서 일괄 확정.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="layered">7. 정정된 4-Layer 아키텍처</h2>
+
+<p>v1 의 4 layer 구조는 유지하되, <strong>method anchor</strong> 를 1급 시민으로 추가.</p>
+
+<table>
+  <thead><tr><th>Layer</th><th>노드</th><th>엣지 (intra)</th><th>cross-layer 연결</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Code</strong></td>
+      <td>Class / Method / Field / <span class="pill new">MethodAnchor (param/local/return/branch/literal)</span></td>
+      <td>CALLS / READS / WRITES / DERIVES_FROM / PROPAGATES_TO (with via_methods)</td>
+      <td>↓ binds to Term/Rule</td>
+    </tr>
+    <tr>
+      <td><strong>Term</strong></td>
+      <td>BusinessTerm + alias</td>
+      <td>IS_A / PART_OF / EQUIVALENT / RELATED</td>
+      <td>↑ TermBinding(anchor) → Code anchor</td>
+    </tr>
+    <tr>
+      <td><strong>Rule</strong></td>
+      <td>BusinessRule (with statement_ast) + 7 종 분류</td>
+      <td>DERIVES_FROM / CONFLICTS / REFERENCES / SUPERSEDES / APPLIES_TO_TERMS</td>
+      <td>↑ RuleBinding(anchor) → Code anchor (branch/literal/method)</td>
+    </tr>
+    <tr>
+      <td><strong>Manual</strong></td>
+      <td>ManualDocument / Section / Fragment</td>
+      <td>—</td>
+      <td>↑ DescribedInBinding → Term/Rule</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="phases">8. 단계 계획 — P13~P28 (재정의)</h2>
+
+<table>
+  <thead><tr><th style="width:60px;">단계</th><th>작업</th><th style="width:90px;">추정</th></tr></thead>
+  <tbody>
+    <tr><td>P13</td><td><strong>Persistence (SQLite)</strong> — 기존 + MethodAnchor / RuleBinding 영구화</td><td>1~2일</td></tr>
+    <tr><td>P14</td><td><strong>Method body AST 추출 확장</strong> — tree-sitter visitor 로 params/locals/branches/literals/returns 추출 → MethodAnchor 인덱스 생성</td><td>2일</td></tr>
+    <tr><td>P15</td><td><strong>value_flow + DERIVES_FROM/PROPAGATES_TO</strong> 추출 (round1 §6-B 설계 구현)</td><td>2일</td></tr>
+    <tr><td>P16</td><td><strong>Body-driven RuleExtractor (7 종)</strong> — Javadoc 의존 제거, body AST visitor 로 guard/bound/formula/enum/regex/throw/lookup 추출</td><td>2~3일</td></tr>
+    <tr><td>P17</td><td><strong>TermBinding / RuleBinding 모델 + REST + 「Rule 검토」 탭</strong> — body 추출 후보 사용자 확정 UI</td><td>2일</td></tr>
+    <tr><td>P18</td><td><strong>TermRelation + RuleRelation</strong> — IS-A/PART-OF/DERIVES-FROM 등 graph 추가 + LLM 추천 + 「온톨로지 그래프」 탭 (xyflow)</td><td>2~3일</td></tr>
+    <tr><td>P19</td><td><strong>Multi-Layer ImpactPropagator</strong> — anchor 단위까지 정밀</td><td>2일</td></tr>
+    <tr><td>P20</td><td><strong>「영향 분석」 탭 재설계</strong> — anchor 단위 결과 시각화</td><td>1~2일</td></tr>
+    <tr><td>P21</td><td><strong>ChangeSpec model + 「시뮬레이션」 탭 입력 폼</strong> (anchor 선택 + before/after)</td><td>1일</td></tr>
+    <tr><td>P22</td><td><strong>PythonGenerator (LLM)</strong> — ontology + body AST → Python 동등 함수 (한국어 변수명)</td><td>2~3일</td></tr>
+    <tr><td>P23</td><td><strong>SyntheticInputGenerator</strong> — input_domain / term value range 기반 자동 입력 + edge case</td><td>1일</td></tr>
+    <tr><td>P24</td><td><strong>SandboxRunner</strong> — Python subprocess (timeout/network/fs 격리) 또는 RestrictedPython</td><td>2일</td></tr>
+    <tr><td>P25</td><td><strong>DiffReporter</strong> — output diff (도메인어) + 예외 변화 + 매뉴얼 stale + chain effect</td><td>1~2일</td></tr>
+    <tr><td>P26</td><td><strong>「시뮬레이션 결과」 viewer</strong> — before/after side-by-side, input/output table, 매뉴얼 stale list</td><td>1~2일</td></tr>
+    <tr><td>P27</td><td><strong>Apply / Discard 워크플로우</strong> — ontology commit + 갭 큐 자동 추가 + (옵션) Java patch PR</td><td>1일</td></tr>
+    <tr><td>P28</td><td><strong>E2E 검증</strong> — slab demo 의 SdFinalLengthRangeAction 1 메서드 + ChangeSpec 1건 풀 사이클</td><td>1일</td></tr>
+  </tbody>
+</table>
+
+<p>총 추정 ~25일 (5주). v1 의 ~3주에서 늘어난 이유 = method anchor 추출 + body-driven rule + Python 생성 추가.</p>
+
+<!-- ============================================================ -->
+<h2 id="questions">9. 결정 질문 (재정의)</h2>
+
+<div class="panel warn">
+  <strong>v1 의 Q1~Q5 중 다음만 유효</strong> :
+  <ul>
+    <li>Q1 (Persistence) — 여전히 SQLite vs Postgres 선택 필요</li>
+    <li>Q5 (UI 탭 구조) — 11+ 탭 정리 필요</li>
+  </ul>
+  <strong>v1 의 다음은 폐기</strong> :
+  <ul>
+    <li>Q2 (Docker vs git worktree) — Python sandbox 라 무관</li>
+    <li>Q3 (LLM 모델) — 그대로 Anthropic 유지, 별도 결정 불필요</li>
+    <li>Q4 (Maven 빌드 단위) — Java 빌드 안 함, 무관</li>
+  </ul>
+</div>
+
+<h3>v2 신규 결정 질문</h3>
+
+<div class="panel">
+  <strong>Q-A — Python sandbox 격리 강도</strong>
+  <ul>
+    <li><strong>A1 (가벼움)</strong> — subprocess + timeout 5s + `seccomp` 없이. 빠름 (50ms/run). 호스트 신뢰 가정.</li>
+    <li><strong>A2 (중간)</strong> — RestrictedPython 라이브러리. import / open / eval 차단. 코드 호환성 손실 약간.</li>
+    <li><strong>A3 (강함)</strong> — gVisor 또는 firecracker microVM. 격리 강함, 무거움 (1초/run).</li>
+  </ul>
+  <em>추천 A1 또는 A2 — 우리가 생성한 코드라 신뢰 OK.</em>
+</div>
+
+<div class="panel">
+  <strong>Q-B — body 분석 추출 깊이</strong>
+  <ul>
+    <li><strong>B1 (얕음)</strong> — top-level if/throw/literal 만. 빠름. nested 패턴 못 잡음.</li>
+    <li><strong>B2 (완전 AST visitor)</strong> — nested if/loop/try/lambda 모두 traversal. 정확. 구현 복잡도 ↑.</li>
+  </ul>
+  <em>추천 B2 — Slab demo 가 4단 nested if 흔함, B1 으론 부족.</em>
+</div>
+
+<div class="panel">
+  <strong>Q-C — anchor 자동 추출 + 사람 확정 균형</strong>
+  <ul>
+    <li><strong>C1 (전부 자동, 자동 confirmed)</strong> — body 분석이 patten-매칭이라 confidence 1.0 으로 바로 적용. 사람 검토 생략.</li>
+    <li><strong>C2 (전부 큐로 → 사람 확정)</strong> — 모든 anchor 후보를 「Rule 검토」 큐에 → 사람이 일괄 확정. 안전. 노가다.</li>
+    <li><strong>C3 (혼합)</strong> — formula/literal 같은 명백한 패턴은 자동, branch/lookup 처럼 의미 모호한 것만 큐.</li>
+  </ul>
+  <em>추천 C3 — 사람 부담 줄이면서 모호한 것만 검토.</em>
+</div>
+
+<div class="panel">
+  <strong>Q-D — Python 생성 prompt 에 변수명을 한국어로 치환?</strong>
+  <ul>
+    <li><strong>D1 (한국어 치환)</strong> — 시뮬레이션 결과를 도메인어로 읽을 수 있음. LLM 이 한국어 변수 잘 다루는지 확인 필요.</li>
+    <li><strong>D2 (영문 유지)</strong> — Python 표준. 결과는 별도 mapping table 로 한국어 표시.</li>
+  </ul>
+  <em>추천 D1 — 시뮬레이션 결과를 도메인 전문가가 직접 보기 좋음. Claude/GPT 모두 한국어 변수 OK.</em>
+</div>
+
+<div class="panel">
+  <strong>Q-E — Java 코드 patch PR 자동 생성 여부</strong>
+  <ul>
+    <li><strong>E1 (생성 X)</strong> — Apply 시 ontology 만 갱신. 코드 patch 는 사람이 별도 작업.</li>
+    <li><strong>E2 (생성 O, draft PR)</strong> — Python 시뮬레이션 통과 시 LLM 이 Java patch 생성 → GitHub draft PR.</li>
+  </ul>
+  <em>추천 E2 — 시뮬레이션 결과를 코드까지 propagate 해야 진짜 가치. 다만 review-only.</em>
+</div>
+
+<h3>유지되는 v1 질문</h3>
+
+<div class="panel">
+  <strong>Q1 (Persistence)</strong> : SQLite (단일 파일) vs Postgres (multi-user) ?
+  <em>추천 SQLite.</em>
+</div>
+
+<div class="panel">
+  <strong>Q5 (UI 탭 구조)</strong> : 그룹화 (코드/도메인/시뮬레이션) vs flat ?
+  <em>추천 그룹화.</em>
+</div>
+
+<!-- ============================================================ -->
+<h2>10. 답변 양식</h2>
+
+<div class="panel accent">
+  <p>아래 양식으로 답주시면 P13 (Persistence) 부터 시작합니다.</p>
+  <pre><code>Q1 (Persistence): SQLite | Postgres
+Q5 (UI 탭): 그룹화 | flat | 통합
+Q-A (Python 격리): A1 | A2 | A3
+Q-B (Body 분석 깊이): B1 | B2
+Q-C (Anchor 자동/검토): C1 | C2 | C3
+Q-D (Python 변수명 한국어): D1 | D2
+Q-E (Java patch PR): E1 | E2</code></pre>
+  <p>또는 다른 의견/대안 있으면 자유롭게.</p>
+</div>
+
+<footer>
+  <p>onTong / Section 2 — 시뮬레이션 아키텍처 v2 (정정본). 작성: 2026-04-26.
+    이 문서는 <code>toClaude/modeling/시뮬레이션-아키텍처-제안-v2.html</code> 에 위치합니다.
+    v1 (<code>시뮬레이션-아키텍처-제안.html</code>) 은 잘못된 방향, 폐기.</p>
+</footer>
+
+</div>
+</body>
+</html>

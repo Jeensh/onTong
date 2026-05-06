@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>onTong 모델링 — 사용자 워크플로우 가이드</title>
+<style>
+  :root {
+    --bg: #0b1018;
+    --panel: #111827;
+    --panel-2: #0f172a;
+    --border: #1f2937;
+    --border-2: #334155;
+    --text: #e5e7eb;
+    --text-dim: #94a3b8;
+    --text-faint: #64748b;
+    --accent: #38bdf8;
+    --accent-2: #818cf8;
+    --warn: #f59e0b;
+    --bad: #f87171;
+    --good: #34d399;
+    --code-bg: #0a0f1a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.65 -apple-system, BlinkMacSystemFont, "SF Pro Text",
+      "Segoe UI", "Helvetica Neue", "Pretendard", sans-serif;
+  }
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 48px 32px 96px;
+  }
+  header.top {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+  h1 {
+    font-size: 28px;
+    margin: 0 0 8px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  h1 .badge {
+    display: inline-block;
+    margin-left: 12px;
+    padding: 4px 10px;
+    background: var(--panel);
+    border: 1px solid var(--border-2);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 4px;
+    vertical-align: middle;
+  }
+  h2 {
+    font-size: 20px;
+    margin: 48px 0 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  h3 {
+    font-size: 16px;
+    margin: 28px 0 10px;
+    color: var(--text);
+    font-weight: 600;
+  }
+  h4 {
+    font-size: 13px;
+    margin: 16px 0 6px;
+    color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  p { margin: 8px 0; color: var(--text); }
+  ul, ol { margin: 8px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12.5px;
+    color: var(--accent);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  pre code { background: none; border: none; padding: 0; color: var(--text); }
+  .lead {
+    font-size: 15px;
+    color: var(--text-dim);
+    margin-top: 8px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin: 14px 0;
+  }
+  .panel.warn { border-left: 3px solid var(--warn); }
+  .panel.bad { border-left: 3px solid var(--bad); }
+  .panel.good { border-left: 3px solid var(--good); }
+  .panel.accent { border-left: 3px solid var(--accent); }
+  .panel h3, .panel h4 { margin-top: 0; }
+
+  .phase {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 26px;
+    margin: 20px 0;
+    position: relative;
+  }
+  .phase-tag {
+    display: inline-block;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    border-radius: 4px;
+    background: rgba(56, 189, 248, 0.1);
+    color: var(--accent);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    margin-right: 8px;
+  }
+  .phase-tag.req { background: rgba(248, 113, 113, 0.1); color: var(--bad); border-color: rgba(248, 113, 113, 0.3); }
+  .phase-tag.opt { background: rgba(148, 163, 184, 0.1); color: var(--text-dim); border-color: rgba(148, 163, 184, 0.3); }
+
+  .meta-row {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin: 8px 0 16px;
+    color: var(--text-faint);
+    font-size: 12.5px;
+  }
+  .meta-row span strong { color: var(--text-dim); font-weight: 500; }
+
+  .tab {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--code-bg);
+    border: 1px solid var(--border-2);
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 11.5px;
+    color: var(--accent-2);
+  }
+
+  hr.soft {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 24px 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+  th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    color: var(--text-dim);
+    font-weight: 500;
+    background: var(--panel);
+  }
+  td .pill {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .pill.have { background: rgba(52, 211, 153, 0.1); color: var(--good); border: 1px solid rgba(52, 211, 153, 0.3); }
+  .pill.miss { background: rgba(248, 113, 113, 0.1); color: var(--bad); border: 1px solid rgba(248, 113, 113, 0.3); }
+  .pill.partial { background: rgba(245, 158, 11, 0.1); color: var(--warn); border: 1px solid rgba(245, 158, 11, 0.3); }
+
+  .toc {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 22px;
+    margin-bottom: 32px;
+  }
+  .toc ol { margin: 4px 0; padding-left: 22px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  .quote {
+    border-left: 2px solid var(--accent-2);
+    padding: 4px 14px;
+    margin: 12px 0;
+    color: var(--text-dim);
+    font-style: italic;
+    font-size: 13px;
+  }
+  footer {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--text-faint);
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>onTong 모델링 — 사용자 워크플로우 가이드 <span class="badge">v2 / 2026-04-25 (P1~P5 반영)</span></h1>
+  <p class="lead">
+    레거시 Spring/JPA 코드와 회사 업무처리기준서를 한 몸에 묶는 도구.
+    이 가이드는 "신선한 사용자"가 처음 onTong 모델링 섹션을 켰을 때
+    무엇부터 해야 하는지, 그리고 지금 어디까지 가능하고 어디서 막히는지를 정리합니다.
+  </p>
+  <p class="lead" style="color: var(--good); font-size: 13px;">
+    <strong>v2 변경</strong> — 사용자 답변 (2026-04-25) 에 기반한 5 개 작업 (P1~P5) 모두 완료.
+    cold-start → 데모 로드 → 코드 분석 → 코드 옆 매뉴얼 작성 → LLM 용어 추천 → 매핑 → 갭 큐 → 역탐색
+    까지 풀 사이클 가능.
+  </p>
+</header>
+
+<nav class="toc">
+  <h4 style="margin-top:0">목차</h4>
+  <ol>
+    <li><a href="#why">왜 이게 필요한가</a></li>
+    <li><a href="#scenario">기준 시나리오 — 신선한 사용자</a></li>
+    <li><a href="#flow">정규 워크플로우 (P5 까지 반영)</a></li>
+    <li><a href="#gaps">기능 인벤토리 — v2 갱신</a></li>
+    <li><a href="#next">다음 우선순위 — 실데모 검증 + 폴리시</a></li>
+    <li><a href="#cheatsheet">치트시트 — 탭별 한 줄 요약</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<h2 id="why">1. 왜 이게 필요한가</h2>
+
+<div class="panel accent">
+  <p><strong>문제</strong> — 30년 운영된 SCM 시스템에서 다음이 매일 일어난다.</p>
+  <ul>
+    <li>도메인 전문가가 떠나고, 후임은 코드를 봐도 비즈니스 의미를 모름.</li>
+    <li>업무처리기준서(PDF/DOCX)와 실제 코드 동작이 어긋나 있는데 아무도 모름.</li>
+    <li><code>a1</code>, <code>i</code> 같은 의미 모를 필드가 핵심 비즈니스 로직에 박혀 있음.</li>
+    <li>"이 컬럼 바꾸면 어디 영향?" 질문에 답하려면 사람이 grep 노가다.</li>
+  </ul>
+  <p><strong>onTong 의 가설</strong> — 코드 그래프 + 도메인 용어 + 기준서를 같은 그래프에 정렬해 두면,
+    위 네 가지가 모두 자동/반자동으로 풀린다.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="scenario">2. 기준 시나리오 — 신선한 사용자</h2>
+
+<table>
+  <thead>
+    <tr><th>입력</th><th>상태</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>레거시 Spring/JPA 코드</td><td>이미 등록 완료 (예: <code>slab-design-engine</code>)</td></tr>
+    <tr><td>회사 업무처리기준서 PDF/DOCX</td><td>아직 없음 (또는 곧 업로드 예정)</td></tr>
+    <tr><td>BusinessTerm 도메인 용어</td><td>0 개 — 사람 머릿속에만 있음</td></tr>
+    <tr><td>매핑 / 갭</td><td>0 개</td></tr>
+  </tbody>
+</table>
+
+<p>이 상태에서 사용자가 첫 화면에서 보는 것은 사이드바 8 탭 — <span class="tab">Repository</span> · <span class="tab">기준서</span> · <span class="tab">매뉴얼 작성</span> · <span class="tab">용어 매핑</span> · <span class="tab">갭 큐</span> · <span class="tab">역탐색</span> · <span class="tab">영향 분석</span> · <span class="tab">DI 그래프</span> — 그리고 사이드바 하단의 「데모 데이터 로드 / 전체 초기화」 버튼입니다.
+ "여기서 뭐부터 하라는 건지 모르겠다"가 정직한 첫 반응이라, 본 가이드는 그 막막함을 단계별로 풉니다.</p>
+
+<!-- ============================================================ -->
+<h2 id="flow">3. 정규 워크플로우 (지금 있는 기능 기준)</h2>
+
+<p>이 흐름은 사용자 답변에 기반합니다 — <em>"코드 탐색 우선 → 분석된 코드를 보면서 매뉴얼을 작성 → LLM 이 후보를 추천 → 사용자가 확정"</em>.</p>
+
+<!-- ---- Phase 0 ---- -->
+<div class="phase">
+  <span class="phase-tag req">필수</span><strong>Phase 0 — 시작 상태 결정 (cold start vs 데모 로드)</strong>
+  <div class="meta-row">
+    <span><strong>탭</strong> 사이드바 하단</span>
+    <span><strong>소요</strong> 5초</span>
+  </div>
+  <p>backend 부팅 시 <strong>아무 시드도 깔리지 않습니다</strong> (P1 완료, 2026-04-25).
+    매뉴얼 0건 / BusinessTerm 0건 / 매핑 0건의 cold start 가 default.</p>
+  <div class="panel good">
+    <strong>사이드바 하단</strong> — 「<em>데모 데이터 로드</em>」 버튼 (cold-start 일 때만 활성):
+    클릭하면 slab demo 매뉴얼 2건 + BusinessTerm 2건 (품종코드 / 열연공장코드) +
+    auto-link DescribedInBinding 이 한 번에 적재됩니다.
+    「<em>전체 초기화</em>」 버튼은 매뉴얼/용어/매핑/갭 모두 비웁니다 (사용자 입력 포함, confirm 다이얼로그).
+  </div>
+  <p class="lead">실 사용자는 데모 로드 클릭 없이 Phase 1 로 진행. 시연 / QA 때만 데모 로드.</p>
+</div>
+
+<!-- ---- Phase 1 ---- -->
+<div class="phase">
+  <span class="phase-tag req">필수</span><strong>Phase 1 — Repository 등록 + 코드 분석</strong>
+  <div class="meta-row">
+    <span><strong>탭</strong> <span class="tab">Repository</span></span>
+    <span><strong>소요</strong> 1~5 분 (코드 크기 따라)</span>
+  </div>
+  <ol>
+    <li>Repository 탭 → 「+ 등록」 → 로컬 경로 입력 (예: <code>~/workspace/sample-repos/slab-design-real</code>).</li>
+    <li>등록되면 12 개 analyzer 가 SSE 스트림으로 진행률을 보냅니다 (Spring Bean / JPA / DI / Rule 등).</li>
+    <li>완료되면 사이드바에 "선택된 Repository" 가 채워지고, DI 그래프 / 영향분석 / 역탐색 등 모든 후속 기능이 활성화됩니다.</li>
+  </ol>
+  <h4>검증</h4>
+  <ul>
+    <li><span class="tab">DI 그래프</span> 탭에 들어가 bean 노드가 보이면 파싱 성공.</li>
+    <li>없으면 사이드바에서 다른 repo 를 선택하거나, 분석 로그를 확인.</li>
+  </ul>
+</div>
+
+<!-- ---- Phase 2 ---- -->
+<div class="phase">
+  <span class="phase-tag req">필수</span><strong>Phase 2 — 코드 탐색 (매뉴얼이 0 개여도 가능)</strong>
+  <div class="meta-row">
+    <span><strong>탭</strong> <span class="tab">DI 그래프</span> · <span class="tab">영향 분석</span> · <span class="tab">Repository</span></span>
+    <span><strong>소요</strong> 30 분 ~ 며칠</span>
+  </div>
+  <p>이 단계의 목적은 사용자가 코드 구조를 머릿속에 그리는 것이며,
+    동시에 "여기는 매뉴얼이 필요하다" 는 직감을 모으는 것입니다.</p>
+  <ol>
+    <li><strong>DI 그래프</strong> — Spring bean 의존 그래프. 시스템 전체 구조 한눈에 본다. 클릭으로 노드 선택, 연결 관계 추적.</li>
+    <li><strong>영향 분석</strong> — 클래스/메서드 FQN 입력 → 호출자/피호출자 BFS. "이 메서드 바꾸면 누가 영향?" 답변용.</li>
+    <li><strong>Repository 검색</strong> — Repository 탭 안의 검색 박스로 클래스/메서드명 키워드로 위치 찾기.</li>
+  </ol>
+  <p class="lead">이 단계가 끝나면 사용자는 다음 두 가지를 결정해야 합니다.</p>
+  <ul>
+    <li>(A) 어느 영역(패키지/클래스)에 매뉴얼을 먼저 쓸 것인가?</li>
+    <li>(B) 어떤 도메인 용어가 코드에 등장하는가? (예: <code>productCode</code>, <code>shipDate</code>, <code>rolledMillCode</code>)</li>
+  </ul>
+</div>
+
+<!-- ---- Phase 3 ---- -->
+<div class="phase">
+  <span class="phase-tag">권장</span><strong>Phase 3 — 매뉴얼 등록 / 작성</strong>
+  <div class="meta-row">
+    <span><strong>탭</strong> <span class="tab">기준서</span> · <span class="tab">매뉴얼 작성</span></span>
+    <span><strong>소요</strong> 매뉴얼 1 건당 1~30 분</span>
+  </div>
+
+  <h4>3-A. 외부 매뉴얼이 이미 있을 때 (PDF / DOCX / PPTX / 이미지)</h4>
+  <ol>
+    <li>「기준서」 탭 → 파일 드래그 → 파싱 → ManualDocument / Section / Fragment 자동 생성.</li>
+    <li>파싱 결과는 검색 가능. BusinessTerm 자동 추출은 Phase 4 (AI 추천) 에서 한 번에 처리.</li>
+  </ol>
+
+  <h4>3-B. 우리 앱 안에서 매뉴얼을 새로 작성 (P5 완료, 2026-04-25)</h4>
+  <p>「매뉴얼 작성」 탭 — 3분할 split-view :</p>
+  <ul>
+    <li><strong>좌측</strong> — 코드 엔티티 검색 (메서드/필드/클래스 필터) + 등록된 BusinessTerm 검색.
+      hover 시 「+」 버튼으로 ontong directive 가 에디터 끝에 자동 삽입.</li>
+    <li><strong>중앙</strong> — Markdown textarea + 표/코드펜스 템플릿 삽입 버튼.</li>
+    <li><strong>우측</strong> — react-markdown 미리보기 (GFM 표 / 코드 하이라이트).</li>
+  </ul>
+  <p>헤더의 「저장 + 인제스트」 클릭 → backend 가 <code>data/manual_writes/{repo_id}/{filename}.md</code> 로 디스크 저장 + 매뉴얼 파이프라인 자동 실행 → ManualRegistry 에 즉시 등록.
+    같은 파일명을 다시 저장하면 force 모드로 재파싱 (편집 → 저장 → 편집 루프 가능).</p>
+
+  <h4>3-C. Structured Manual directive 문법</h4>
+  <p>「기준서」 탭 상단의 호박색 가이드 패널 (P2 완료) 에 문법 + 예시 + 「복사」 버튼이 노출됩니다.
+    auto-linker 가 directive 를 만나면 임베딩 매칭을 우회하고 <code>confidence = 1.0</code> binding 을 만듭니다.</p>
+  <pre><code># 슬라브 발주 규칙
+
+&lt;!-- ontong: term=term.품종코드 --&gt;
+품종코드는 4자리 영문+숫자 조합이며, 첫 글자가 'S'면 강재.
+
+&lt;!-- ontong: rule=engine.SlabRule.validateProductCode --&gt;
+품종코드 검증은 정규식 `^[A-Z0-9]{4}$` 로 수행.</code></pre>
+  <p>지원 키 — <code>term=&lt;BusinessTerm.qualified_name&gt;</code> / <code>rule=&lt;BusinessRule.qualified_name&gt;</code>.
+    이 directive 가 등장한 다음 단락 / 코드펜스 / 표가 binding 의 타겟 fragment 가 됩니다.
+    Markdown(.md) 만 인식. PDF/DOCX 는 인식하지 않습니다.</p>
+</div>
+
+<!-- ---- Phase 4 ---- -->
+<div class="phase">
+  <span class="phase-tag req">필수</span><strong>Phase 4 — BusinessTerm 등록 (직접 입력 + AI 추천)</strong>
+  <div class="meta-row">
+    <span><strong>탭</strong> <span class="tab">용어 매핑</span></span>
+    <span><strong>소요</strong> 직접 입력 30초/건, AI 추천은 한 번에 30개</span>
+  </div>
+
+  <h4>4-A. 직접 입력</h4>
+  <ol>
+    <li>「용어 매핑」 탭 → 좌측 「+ 새 용어」.</li>
+    <li>이름 / alias / 정의 입력. 예: <code>품종코드</code>, alias <code>productCode, prodCd</code>, 정의 "강재의 품종을 4자리 영문숫자로 표기한 코드".</li>
+    <li>저장하면 즉시 자동 매핑 후보 (TermResolver 4-stage) 가 우측 패널에 뜸.</li>
+  </ol>
+
+  <h4>4-B. 「AI 추천」 — LLM 일괄 추출 (P3+P4 완료, 2026-04-25)</h4>
+  <p>「용어 매핑」 탭 좌측 헤더의 「<em>AI 추천</em>」 버튼 → 모달 → <strong>매뉴얼 / 코드</strong> source 토글:</p>
+  <ul>
+    <li><strong>매뉴얼 source</strong> — 등록된 매뉴얼 1건 또는 모든 매뉴얼의 fragment 를 LLM 에 넘겨 BusinessTerm 후보 N 개 추출.
+      한국어 시스템 프롬프트 + JSON 배열 응답 강제. 이미 등록된 fqn 은 「이미 등록됨」 뱃지 + disabled.</li>
+    <li><strong>코드 source</strong> — 매뉴얼 0건이어도 사용 가능 (cold-start 도구).
+      JPA <code>@Column</code> + 필드명 + Javadoc 을 합성해서 LLM 에 넘김.
+      ID/created/updated 같은 메타 컬럼은 자동 제외.</li>
+  </ul>
+  <p>추천 결과는 체크박스 멀티 선택 → 「<em>선택 항목 등록</em>」 → bulk-add → 자동 새로고침. 사용자가 모든 용어를 직접 타이핑할 필요 없음.</p>
+
+  <p class="lead"><strong>LLM 호출 graceful degrade</strong> — Anthropic API key 가 없거나 SDK 가 설치 안 돼 있으면 「추천 받기」 버튼이 503 응답을 반환하고, 다른 기능은 정상 동작.</p>
+</div>
+
+<!-- ---- Phase 5 ---- -->
+<div class="phase">
+  <span class="phase-tag req">필수</span><strong>Phase 5 — 용어 ↔ 코드 매핑 확정</strong>
+  <div class="meta-row">
+    <span><strong>탭</strong> <span class="tab">용어 매핑</span></span>
+  </div>
+  <ol>
+    <li>용어를 클릭하면 우측에 <strong>자동 후보 리스트</strong> 가 뜸.
+      각 후보는 <code>source</code> (exact / alias / embedding / llm) 와 <code>confidence</code> 표시.</li>
+    <li>각 후보의 「확정」 / 「거부」 버튼으로 사람이 검토.</li>
+    <li>자동 후보가 만족스럽지 않으면 「수동 매핑」 폼으로 source_fqn (BusinessTerm) + target_fqn (Java 클래스/필드) 직접 입력.</li>
+    <li>한 번 확정한 매핑도 「거부로 변경」 가능 (양방향 토글). 스캔 다시 돌려도 사람이 확정한 것은 유지됨.</li>
+  </ol>
+</div>
+
+<!-- ---- Phase 6 ---- -->
+<div class="phase">
+  <span class="phase-tag opt">선택</span><strong>Phase 6 — 갭 큐 (매뉴얼 + 용어 + 매핑이 어느 정도 쌓였을 때)</strong>
+  <div class="meta-row">
+    <span><strong>탭</strong> <span class="tab">갭 큐</span></span>
+  </div>
+  <p>코드와 매뉴얼이 같은 개념을 다르게 주장하는 지점, 한쪽에만 존재하는 개념을 자동 검출합니다.</p>
+  <ul>
+    <li><strong>missing_in_manual</strong> — 코드에는 있는데 기준서가 비어 있음. 매뉴얼 작성 todo.</li>
+    <li><strong>missing_in_code</strong> — 기준서에는 있는데 코드 구현이 없음. 누락 기능 / 데드 룰 의심.</li>
+    <li><strong>conflict</strong> — 양쪽 다 있는데 숫자/연산자/단위 등이 다름. AST diff 로 증거 표시.</li>
+  </ul>
+  <p>각 갭을 클릭하면 우측에 증거 (코드 스니펫 + fragment 텍스트) 가 표시되고,
+    「매뉴얼 보기」 / 「코드로 점프」 / 「영향 분석으로 점프」 크로스-네비게이션 가능.</p>
+  <p class="lead"><strong>주의</strong> — 매뉴얼이 0 개면 갭 큐는 거의 비어 있음. 이건 정상 동작.</p>
+</div>
+
+<!-- ---- Phase 7 ---- -->
+<div class="phase">
+  <span class="phase-tag opt">선택</span><strong>Phase 7 — 역탐색 (BusinessTerm 이 등록된 후 가능)</strong>
+  <div class="meta-row">
+    <span><strong>탭</strong> <span class="tab">역탐색</span></span>
+  </div>
+  <ol>
+    <li>BusinessTerm 이름 또는 alias 를 입력 → BFS 로 binding → 코드 노드 → 호출자까지 한 번에 수집.</li>
+    <li>결과 노드를 클릭하면 「영향 분석」 탭으로 자동 이동, target_fqn 자동 prefill.</li>
+  </ol>
+  <p>"사람이 도메인 단어 하나만 알 때 → 코드의 모든 관련 위치 즉시 확인" 에 필요.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="gaps">4. 기능 인벤토리 — v2 갱신</h2>
+
+<p>v1 가이드에서 식별된 빠진 기능 6 종 중 5 종 (P1~P5) 은 2026-04-25 후속 세션에서 모두 완료.
+  마지막 1 종 (in-app 시작하기 위젯) 만 미완으로 남음.</p>
+
+<table>
+  <thead>
+    <tr><th>기능</th><th>상태</th><th>구현 위치 / 메모</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>「데모 데이터 로드」 버튼 + 자동 시드 제거 (P1)</td>
+      <td><span class="pill have">완료</span></td>
+      <td><code>backend/modeling/demo/seeder.py</code>, <code>api/demo_api.py</code>, 사이드바 하단 컨트롤. cold start 시 manuals=0/terms=0.</td>
+    </tr>
+    <tr>
+      <td>Structured Manual directive UI 가이드 (P2)</td>
+      <td><span class="pill have">완료</span></td>
+      <td><code>ManualUpload.tsx</code> collapsible 호박색 패널 + 예시 + 「복사」 버튼.</td>
+    </tr>
+    <tr>
+      <td>매뉴얼 → BusinessTerm LLM 추천 (P3)</td>
+      <td><span class="pill have">완료</span></td>
+      <td><code>mapping/term_suggester.py</code> + <code>POST /terms/suggest-from-manual</code> + 「AI 추천」 모달.</td>
+    </tr>
+    <tr>
+      <td>코드 → BusinessTerm 추천 (P4)</td>
+      <td><span class="pill have">완료</span></td>
+      <td><code>_collect_column_summaries</code> + <code>POST /terms/suggest-from-code</code>. 모달 source 토글 (매뉴얼/코드).</td>
+    </tr>
+    <tr>
+      <td>코드 옆 매뉴얼 작성 인-앱 에디터 (P5)</td>
+      <td><span class="pill have">완료</span></td>
+      <td>새 탭 「매뉴얼 작성」 (<code>ManualWriter.tsx</code>) — 3분할 split-view + directive 자동 삽입. <code>POST /manuals/write</code>.</td>
+    </tr>
+    <tr>
+      <td>첫 사용자 가이드 / 시작하기 위젯 (in-app)</td>
+      <td><span class="pill miss">미완</span></td>
+      <td>현재 본 HTML 가이드는 사이드 문서. 첫 방문 시 Modal 또는 사이드바 진입 시 onboarding tour 로 변환 필요.</td>
+    </tr>
+    <tr>
+      <td>역탐색 / 영향 분석 / DI 그래프 / 갭 큐 + AST diff / Term resolver 4-stage / 매뉴얼 업로드+파싱</td>
+      <td><span class="pill have">완료</span></td>
+      <td>이전 phase 누적.</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="next">5. 다음 우선순위 — v2 시점</h2>
+
+<div class="panel good">
+  <p><strong>P1~P5 완료 (2026-04-25)</strong> — 사용자 답변에 기반한 5 개 작업 모두 종결. 53/53 회귀 PASS, TS clean, E2E (cold→load→reset, write→ingest→list) 검증 완료.</p>
+</div>
+
+<div class="panel accent">
+  <p><strong>제안되는 다음 단계</strong> (사용자 결정 필요) :</p>
+  <ol>
+    <li><strong>실제 데모 코드로 풀 사이클 검증</strong> — 사용자가 만들고 있는 Slab 데모 코드가 도착하면, Repository 등록 → 코드 분석 → 매뉴얼 작성 → AI 추천 → 매핑 확정 → 갭 큐 5건 검증 → 역탐색 까지 한 번에 돌려보기. 이게 데모 시연의 골든패스.</li>
+    <li><strong>In-app 시작하기 가이드</strong> (반나절) — 첫 방문 시 modal 또는 사이드바 onboarding tour 로 본 HTML 가이드 핵심 5단계를 안내. 사이드 HTML 문서를 보여줘야만 사용 가능한 현 상태에서 벗어남.</li>
+    <li><strong>「AI 추천」 모달 폴리시</strong> — 추천 받은 후 「수정 후 등록」 (필드 인라인 편집), 「추가 매뉴얼/repo 합산」 옵션 등. 단순 등록 뿐 아니라 사용자 검수 워크플로우 강화.</li>
+    <li><strong>매뉴얼 작성 에디터 폴리시</strong> — 커서 위치 삽입 (현재는 끝에 append 만), 자동완성 (term=/rule= 옆에서 ghost suggestion), Monaco 또는 CodeMirror 로 교체 (syntax highlight + line number).</li>
+    <li><strong>auto-link 자동 재실행</strong> — 매뉴얼 작성 탭에서 「저장 + 인제스트」 후 gaps_api auto-link 를 자동 호출 (현재 demo_api 만 자동 갱신, 일반 ingest 는 사용자가 「갭 큐」 탭에서 「자동 링크 재계산」 수동 클릭 필요).</li>
+  </ol>
+  <p>1번 (실데모 검증) 이 가장 가치 있고, 그 결과를 보고 2~5번 순서를 다시 정하는 게 합리적.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="cheatsheet">6. 치트시트 — 탭별 한 줄 요약</h2>
+
+<table>
+  <thead>
+    <tr><th>탭</th><th>언제 쓰나</th><th>입력</th><th>결과</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><span class="tab">Repository</span></td><td>코드 처음 등록 + 분석</td><td>로컬 경로</td><td>12-analyzer 자동 파싱</td></tr>
+    <tr><td><span class="tab">기준서</span></td><td>외부 매뉴얼 업로드</td><td>PDF/DOCX/PPTX/MD/이미지</td><td>Document/Section/Fragment 등록 + directive 가이드</td></tr>
+    <tr><td><span class="tab">매뉴얼 작성</span></td><td>코드 옆에서 매뉴얼 신규 작성</td><td>좌측 검색 → directive 자동 삽입 → markdown 작성</td><td>디스크 .md 저장 + 즉시 인제스트</td></tr>
+    <tr><td><span class="tab">용어 매핑</span></td><td>BusinessTerm 등록 + 매핑 확정 (직접 / AI 추천)</td><td>용어명 + alias + 정의 OR 「AI 추천」 모달</td><td>자동 후보 + 사람 확정 + bulk-add</td></tr>
+    <tr><td><span class="tab">갭 큐</span></td><td>매뉴얼 vs 코드 정합성 검증</td><td>(자동)</td><td>missing/conflict 리스트 + AST diff</td></tr>
+    <tr><td><span class="tab">역탐색</span></td><td>도메인 단어 → 코드 위치</td><td>BusinessTerm 이름</td><td>관련 코드 노드 BFS</td></tr>
+    <tr><td><span class="tab">영향 분석</span></td><td>코드 한 점 → 누가 영향</td><td>FQN</td><td>호출자/피호출자 BFS</td></tr>
+    <tr><td><span class="tab">DI 그래프</span></td><td>시스템 구조 한눈에</td><td>(자동)</td><td>Spring bean + autowire 시각화</td></tr>
+    <tr><td>사이드바 하단</td><td>cold start ↔ 데모 데이터 토글</td><td>(버튼)</td><td>「데모 로드」 / 「전체 초기화」</td></tr>
+  </tbody>
+</table>
+
+<footer>
+  <p>onTong / Section 2 — 모델링. v2 갱신 : 2026-04-25 (P1~P5 반영).
+    이 가이드는 <code>toClaude/modeling/사용자-가이드.html</code> 에 위치합니다.
+    업데이트가 필요하면 같은 파일을 수정하세요. 변경 이력은 <code>CHANGES.md</code> 참고.</p>
+</footer>
+
+</div>
+</body>
+</html>

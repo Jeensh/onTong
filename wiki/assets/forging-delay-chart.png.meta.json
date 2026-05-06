@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "ocr_text": "2026 Q1 단조 라인 남기 지연 분석\n작성: @박선우 2026-04-02\nFORGING LINE DELAY ANALYSIS . 2026 Q1\n요약: 2026 Q1 단조 라인 평균 지연 5.2일 (전분기 대비 +2,8일)\n주 원인: 가열로 온도 편차 재발\nLOT-A123 7일 지연\n평균 지연(일)\n10.0\n7.1일\n5.2일\n5.0\n3.8일\n2.4일\n25\n2025\n2026\n2026\n2026\n3월",
+  "description": "",
+  "provider": "none",
+  "ocr_engine": "easyocr",
+  "processed_at": "2026-04-17T04:31:30.810631+00:00",
+  "source": ""
+}

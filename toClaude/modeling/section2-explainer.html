@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Section 2 — 매뉴얼 빌더 & 도메인 온톨로지 설명서</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1d2129;
+    --border: #2a2f3a;
+    --text: #e5e7eb;
+    --text-dim: #9ca3af;
+    --accent: #60a5fa;
+    --accent-2: #a78bfa;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --red: #f87171;
+    --code-bg: #0b0d12;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Segoe UI', sans-serif;
+    line-height: 1.7;
+  }
+  .container { max-width: 1100px; margin: 0 auto; padding: 40px 24px 120px; }
+  header { text-align: center; padding: 32px 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 48px; }
+  h1 { font-size: 2.4rem; margin: 0 0 8px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .subtitle { color: var(--text-dim); font-size: 1.05rem; }
+  h2 { font-size: 1.6rem; margin-top: 56px; padding-bottom: 10px; border-bottom: 2px solid var(--accent); color: var(--accent); }
+  h3 { font-size: 1.2rem; margin-top: 28px; color: var(--accent-2); }
+  p { color: var(--text); }
+  code { font-family: 'JetBrains Mono', Menlo, monospace; background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: #fbbf24; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; font-size: 0.85rem; font-family: 'JetBrains Mono', Menlo, monospace; line-height: 1.5; }
+  pre code { background: transparent; padding: 0; color: #e5e7eb; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 20px 0; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 860px) { .two-col { grid-template-columns: 1fr; } }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; margin-right: 6px; }
+  .badge-done { background: rgba(52, 211, 153, 0.15); color: var(--green); border: 1px solid var(--green); }
+  .badge-todo { background: rgba(251, 191, 36, 0.15); color: var(--yellow); border: 1px solid var(--yellow); }
+  .badge-blocked { background: rgba(248, 113, 113, 0.15); color: var(--red); border: 1px solid var(--red); }
+  .diagram { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin: 20px 0; font-family: 'JetBrains Mono', Menlo, monospace; white-space: pre; overflow-x: auto; font-size: 0.9rem; line-height: 1.6; color: var(--text-dim); }
+  .step-flow { display: flex; gap: 12px; margin: 20px 0; align-items: stretch; flex-wrap: wrap; }
+  .step {
+    flex: 1; min-width: 160px; background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px; position: relative;
+  }
+  .step .num { display: inline-block; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #0b0d12; text-align: center; font-weight: 700; line-height: 24px; margin-right: 8px; }
+  .step .title { font-weight: 600; font-size: 0.95rem; }
+  .step .desc { color: var(--text-dim); font-size: 0.82rem; margin-top: 6px; }
+  .step-arrow { display: flex; align-items: center; color: var(--accent); font-size: 1.4rem; }
+  .layer-box { border: 2px solid var(--border); border-radius: 10px; padding: 16px; margin: 10px 0; position: relative; }
+  .layer-box.primary { border-color: var(--green); background: rgba(52, 211, 153, 0.05); }
+  .layer-box.execution { border-color: var(--yellow); background: rgba(251, 191, 36, 0.05); }
+  .layer-box.agents { border-color: var(--accent-2); background: rgba(167, 139, 250, 0.05); }
+  .layer-box .layer-label { position: absolute; top: -11px; left: 14px; background: var(--bg); padding: 0 8px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; }
+  .layer-box.primary .layer-label { color: var(--green); }
+  .layer-box.execution .layer-label { color: var(--yellow); }
+  .layer-box.agents .layer-label { color: var(--accent-2); }
+  ul.tight { padding-left: 20px; }
+  ul.tight li { margin: 4px 0; }
+  .warn { background: rgba(248, 113, 113, 0.08); border-left: 4px solid var(--red); padding: 14px 18px; border-radius: 6px; margin: 16px 0; }
+  .info { background: rgba(96, 165, 250, 0.08); border-left: 4px solid var(--accent); padding: 14px 18px; border-radius: 6px; margin: 16px 0; }
+  .ok { background: rgba(52, 211, 153, 0.08); border-left: 4px solid var(--green); padding: 14px 18px; border-radius: 6px; margin: 16px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.9rem; }
+  th, td { border: 1px solid var(--border); padding: 10px 12px; text-align: left; }
+  th { background: var(--panel-2); color: var(--accent); font-weight: 600; }
+  td code { font-size: 0.85em; }
+  .toc { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin-bottom: 40px; }
+  .toc h3 { margin-top: 0; color: var(--text); }
+  .toc ol { margin: 0; padding-left: 22px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .kv { display: grid; grid-template-columns: 160px 1fr; gap: 8px 16px; margin: 12px 0; font-size: 0.92rem; }
+  .kv .k { color: var(--text-dim); }
+  .node-box { display: inline-block; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; margin: 4px; font-size: 0.88rem; }
+  .node-box.process { border-color: var(--accent); color: var(--accent); }
+  .node-box.entity { border-color: var(--green); color: var(--green); }
+  .node-box.role { border-color: var(--yellow); color: var(--yellow); }
+  .arrow { color: var(--accent); margin: 0 6px; }
+  footer { text-align: center; color: var(--text-dim); font-size: 0.85rem; margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Section 2 — 매뉴얼 빌더 & 도메인 온톨로지</h1>
+  <div class="subtitle">지금 무엇이 있고, 어떻게 최종 목적에 도달하며, 한계는 무엇인가</div>
+  <div style="margin-top: 8px; color: var(--text-dim); font-size: 0.85rem;">2026-04-18 기준</div>
+</header>
+
+<div class="toc">
+  <h3>📑 목차</h3>
+  <ol>
+    <li><a href="#goal">최종 목적 — 우리가 만들려는 것</a></li>
+    <li><a href="#arch">전체 아키텍처 — 3층 모델</a></li>
+    <li><a href="#builder">매뉴얼 빌더 (Manual Builder)</a></li>
+    <li><a href="#ontology">도메인 온톨로지 (Domain Ontology)</a></li>
+    <li><a href="#synergy">둘의 관계와 최종 목적 기여</a></li>
+    <li><a href="#limits">현재 한계</a></li>
+    <li><a href="#roadmap">로드맵</a></li>
+  </ol>
+</div>
+
+<!-- ========================================================= -->
+<h2 id="goal">1. 최종 목적 — 우리가 만들려는 것</h2>
+
+<div class="panel">
+  <p><strong>공장의 암묵지를 기계가 추론 가능한 온톨로지로 바꾼다.</strong></p>
+  <p>SOP, 표준, 절차서, 품질 기준. 모두 <strong>사람이 읽는 마크다운</strong>으로만 존재한다. 안전재고 계산이 어떻게 되는지, 가열 공정 파라미터가 어떤 기준으로 결정되는지, 누가 책임자인지. 전부 PDF나 위키 어딘가에 흩어져 있다.</p>
+  <p>이걸 AI가 "What-if", "Why", "어디에 영향?"을 대답할 수 있는 <strong>구조화된 지식</strong>으로 바꾼다.</p>
+</div>
+
+<div class="step-flow">
+  <div class="step">
+    <div class="title"><span class="num">1</span>매뉴얼 (마크다운)</div>
+    <div class="desc">SOP, 표준, 절차서 — 자연어</div>
+  </div>
+  <div class="step-arrow">→</div>
+  <div class="step">
+    <div class="title"><span class="num">2</span>Ontology YAML</div>
+    <div class="desc">Primary Layer — 검증된 구조</div>
+  </div>
+  <div class="step-arrow">→</div>
+  <div class="step">
+    <div class="title"><span class="num">3</span>Neo4j 그래프</div>
+    <div class="desc">:OntNode — 연결된 지식</div>
+  </div>
+  <div class="step-arrow">→</div>
+  <div class="step">
+    <div class="title"><span class="num">4</span>AI 에이전트</div>
+    <div class="desc">What-if / Why / Diagnostic</div>
+  </div>
+</div>
+
+<div class="info">
+  <strong>핵심 가치</strong>: "안전재고를 10% 올리면 생산 일정에 무슨 영향?" — 지금은 사람이 엑셀 뒤지고 담당자 찾아서 전화해야 답 나온다. 이걸 AI가 1초에 답하게 만드는 게 최종 목적.
+</div>
+
+<!-- ========================================================= -->
+<h2 id="arch">2. 전체 아키텍처 — 3층 모델</h2>
+
+<div class="layer-box primary">
+  <div class="layer-label">✅ LAYER 1 — PRIMARY (현재 구현 완료)</div>
+  <p><strong>매뉴얼 기반 온톨로지</strong>. 코드 없이도 이해 가능한 자체 완결 구조.</p>
+  <ul class="tight">
+    <li><code>ontologies/*.yaml</code> 파일로 영구 저장</li>
+    <li>Process · Entity · Role · Relation · Term · Formula · Rule</li>
+    <li>Pydantic strict 검증 (<code>extra="forbid"</code>) + 3단계 그래프 검증</li>
+    <li>Sub-DSL로 공식(formula)과 룰(rule) 표현 — AST 화이트리스트 파싱</li>
+  </ul>
+</div>
+
+<div class="layer-box execution">
+  <div class="layer-label">⏳ LAYER 2 — EXECUTION (Section 3, 예정)</div>
+  <p><strong>시뮬레이션 엔진</strong>. 공식과 룰을 실제로 실행.</p>
+  <ul class="tight">
+    <li>Sub-DSL AST를 Python 함수로 변환해 실행</li>
+    <li>입력값 주입 → 공식 계산 → 룰 적용 → 출력</li>
+    <li>What-if 시뮬레이션 엔진의 기반</li>
+  </ul>
+</div>
+
+<div class="layer-box agents">
+  <div class="layer-label">⏳ LAYER 3 — AGENTS (Section 3, 예정)</div>
+  <p><strong>3개 추론 에이전트</strong>. Primary + Execution 위에서 동작.</p>
+  <ul class="tight">
+    <li><strong>WhatIf Agent</strong> — "X를 바꾸면 어떻게 될까?" → 공식 재계산</li>
+    <li><strong>WhyTrace Agent</strong> — "이 값이 왜 이렇게 나왔나?" → 의존성 역추적</li>
+    <li><strong>Diagnostic Agent</strong> — "이 이상 징후의 원인은?" → 룰 위반 탐지</li>
+  </ul>
+</div>
+
+<div class="warn">
+  <strong>지금 우리가 보는 화면 (매뉴얼 빌더 + 도메인 온톨로지)은 Layer 1만 담당한다.</strong> 실행 엔진과 에이전트는 Section 3로 이관되어 현재 UI에는 없다.
+</div>
+
+<!-- ========================================================= -->
+<h2 id="builder">3. 매뉴얼 빌더 (Manual Builder)</h2>
+
+<div class="panel">
+  <p><strong>역할</strong>: 마크다운 SOP 하나 → 검증된 Ontology YAML 한 개.</p>
+  <p><strong>사용 흐름</strong>: 좌측에 매뉴얼을 붙여넣거나 드롭다운에서 불러온다. "LLM 드래프트" 버튼 클릭. 우측에 YAML이 생성된다. 자동 검증이 돌고, 통과하면 "저장" 버튼으로 <code>ontologies/*.yaml</code>에 영구 저장.</p>
+</div>
+
+<h3>내부 동작 4단계</h3>
+
+<div class="step-flow">
+  <div class="step">
+    <div class="title"><span class="num">1</span>마크다운 로드</div>
+    <div class="desc"><code>ontologies/manuals/*.md</code>에서 선택하거나 직접 붙여넣기</div>
+  </div>
+  <div class="step-arrow">→</div>
+  <div class="step">
+    <div class="title"><span class="num">2</span>LLM 드래프트</div>
+    <div class="desc">pydantic_ai Agent가 마크다운 → raw YAML 문자열 변환 (code fence 자동 제거)</div>
+  </div>
+  <div class="step-arrow">→</div>
+  <div class="step">
+    <div class="title"><span class="num">3</span>3단 검증</div>
+    <div class="desc">parse → schema → graph. 실패 시 구조화된 에러 반환</div>
+  </div>
+  <div class="step-arrow">→</div>
+  <div class="step">
+    <div class="title"><span class="num">4</span>저장</div>
+    <div class="desc"><code>/api/modeling/ontology/save</code> → 파일로 영구화</div>
+  </div>
+</div>
+
+<h3>3단 검증의 의미</h3>
+
+<table>
+  <thead>
+    <tr><th>단계</th><th>무엇을 검증하나</th><th>실패 예시</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>① parse</strong></td>
+      <td><code>yaml.safe_load()</code> — YAML 문법 자체</td>
+      <td>들여쓰기 오류, 콜론 빠짐</td>
+    </tr>
+    <tr>
+      <td><strong>② schema</strong></td>
+      <td>Pydantic strict (<code>extra="forbid"</code>) — 필드명/타입/enum 일치</td>
+      <td>오타 필드 <code>formular</code>, 알 수 없는 <code>action_type: "alert"</code></td>
+    </tr>
+    <tr>
+      <td><strong>③ graph</strong></td>
+      <td>id 중복, <code>depends_on</code> 순환, <code>refers_to</code> 경로 유효성, Sub-DSL AST 파싱</td>
+      <td>A→B→A 순환, <code>term.refers_to: "FakeProc.outputs.x"</code>, 공식 안의 <code>eval(user_input)</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Sub-DSL 화이트리스트</h3>
+
+<p>공식(formula)과 룰(rule)은 <strong>수학/불리언 식</strong>만 허용한다. 함수 호출과 임의 코드 실행 차단.</p>
+
+<div class="two-col">
+  <div class="panel">
+    <strong>산술 연산자</strong>
+    <pre><code>+  -  *  /  **  //  %
+단항: +x, -x</code></pre>
+    <strong>비교 연산자</strong>
+    <pre><code>&lt;  &lt;=  &gt;  &gt;=  ==  !=</code></pre>
+    <strong>불리언 연산자</strong>
+    <pre><code>AND  OR  NOT
+(대소문자 무관)</code></pre>
+  </div>
+  <div class="panel">
+    <strong>허용된 함수 (6개만)</strong>
+    <pre><code>sqrt   # 제곱근
+abs    # 절댓값
+min    # 최솟값
+max    # 최댓값
+norminv # 표준정규 역함수
+round  # 반올림</code></pre>
+    <div class="warn" style="margin-top: 12px; font-size: 0.85rem;">
+      <strong>차단되는 것</strong>: <code>eval</code>, <code>exec</code>, <code>import</code>, 함수 정의, 어트리뷰트 접근, 리스트 컴프리헨션, lambda.
+    </div>
+  </div>
+</div>
+
+<h3>실제 YAML 예시 — safety_stock_v1.yaml</h3>
+
+<pre><code>ontology:
+  id: safety-stock-v1
+  source_document: assets/manuals/inventory-planning.md
+  scope: v1-inventory
+  version: "1.0"
+
+processes:
+  - id: SafetyStockCalculation
+    name: 안전재고 계산
+    inputs:
+      - id: demand_variability    # 수요 표준편차
+        type: float
+      - id: lead_time_days
+        type: int
+        range: [1, 365]
+      - id: service_level
+        type: float
+        range: [0.8, 0.999]
+    outputs:
+      - id: safety_stock_level
+        type: float
+    formula:
+      expression: z * demand_variability * sqrt(lead_time_days)
+      derived_params:
+        z: norminv(service_level)
+    rules:
+      - id: SSR-002
+        condition: lead_time_days > 30
+        action_type: assign
+        target: safety_stock_level
+        expression: safety_stock_level * 1.15
+      - id: SSR-003
+        condition: demand_variability > 100 AND lead_time_days > 14
+        action_type: warning
+        action_message: 고변동 + 롱리드타임 — 재고 계획 재검토 필요</code></pre>
+
+<div class="ok">
+  <strong>왜 이게 중요한가</strong>: 이 YAML 하나만 있으면 — ① 사람이 공식을 읽고 이해할 수 있고, ② 기계가 AST로 파싱해 실행할 수 있고, ③ "lead_time_days > 30일 때 왜 1.15배를 곱하는지" 같은 설명 가능성이 확보된다.
+</div>
+
+<!-- ========================================================= -->
+<h2 id="ontology">4. 도메인 온톨로지 (Domain Ontology)</h2>
+
+<div class="panel">
+  <p><strong>역할</strong>: 회사 전체 제조/SCM의 <strong>표준 참조 계층</strong>을 한눈에 본다. SCOR + ISA-95 하이브리드.</p>
+  <p><strong>사용 흐름</strong>: 좌측에 Process / Entity / Role 트리. 상단 "템플릿 불러오기" 버튼으로 SCOR+ISA-95 초기 트리 생성 (26 process + 7 entity + 5 role + 16 relation). 노드 클릭 → 우측 상세 패널. "+ 노드 추가" 버튼으로 새 노드 등록.</p>
+</div>
+
+<h3>2개의 표준을 합친 이유</h3>
+
+<div class="two-col">
+  <div class="panel">
+    <h4 style="color: var(--accent); margin-top: 0;">SCOR (수평축)</h4>
+    <p><strong>공급망 프로세스 분류</strong>. "무슨 일을 하는가".</p>
+    <ul class="tight">
+      <li><strong>Plan</strong> — 수요 예측, S&OP</li>
+      <li><strong>Source</strong> — 구매, 입고</li>
+      <li><strong>Make</strong> — 생산, 조립</li>
+      <li><strong>Deliver</strong> — 출하, 배송</li>
+      <li><strong>Return</strong> — 반품 처리</li>
+    </ul>
+  </div>
+  <div class="panel">
+    <h4 style="color: var(--accent-2); margin-top: 0;">ISA-95 (수직축)</h4>
+    <p><strong>자동화 레벨 계층</strong>. "어느 층위에서 일어나나".</p>
+    <ul class="tight">
+      <li><strong>L4</strong> — ERP (사업계획)</li>
+      <li><strong>L3</strong> — MES (운영관리)</li>
+      <li><strong>L2</strong> — SCADA (감시제어)</li>
+      <li><strong>L1</strong> — PLC (센서/액추에이터)</li>
+      <li><strong>L0</strong> — 물리 공정</li>
+    </ul>
+  </div>
+</div>
+
+<p>둘을 합치면 2차원 격자가 된다. "안전재고 계산"은 <em>Plan</em> × <em>L4</em>, "가열 공정 온도 제어"는 <em>Make</em> × <em>L2</em>. 새 프로세스를 추가할 때 이 격자 어디에 속하는지만 정하면 된다.</p>
+
+<h3>데이터 모델 — Neo4j <code>:OntNode</code></h3>
+
+<p>OD-6 마이그레이션으로 <strong>단일 레이블 통합</strong>했다. 이전에는 <code>:DomainNode</code>, <code>:Process</code>, <code>:Entity</code> 등이 분리되어 있어 쿼리가 복잡했다. 지금은 <code>kind</code> 속성으로만 구분한다.</p>
+
+<pre><code>// Process 노드
+(:OntNode {id: "SafetyStockCalculation", kind: "process", name: "안전재고 계산"})
+
+// Entity 노드
+(:OntNode {id: "SafetyStock", kind: "entity", name: "안전재고"})
+
+// Role 노드
+(:OntNode {id: "Planner", kind: "role", name: "계획담당자"})
+
+// Relation (4종 edge)
+(a)-[:RELATION {kind: "part_of"}]-&gt;(b)         // 하위-상위 포함 관계
+(a)-[:RELATION {kind: "uses"}]-&gt;(b)            // 프로세스가 엔티티 사용
+(a)-[:RELATION {kind: "produces"}]-&gt;(b)        // 프로세스가 엔티티 생산
+(a)-[:RELATION {kind: "responsible_for"}]-&gt;(b) // 역할이 프로세스 담당</code></pre>
+
+<h3>트리 예시 (템플릿 로드 시)</h3>
+
+<div class="diagram">Plan (L4)
+├─ DemandPlanning         ←[responsible_for]── Planner
+│  └─ uses → DemandForecast (entity)
+├─ SafetyStockPlanning
+│  ├─ uses → SafetyStock (entity)
+│  └─ produces → ReorderPoint (entity)
+└─ SupplyPlanning
+
+Source (L3-L4)
+├─ PurchaseOrderManagement ←[responsible_for]── Buyer
+│  └─ produces → PurchaseOrder (entity)
+└─ Receiving
+
+Make (L2-L3)
+├─ ProductionScheduling
+├─ ShopFloorExecution      ←[responsible_for]── Operator
+└─ QualityInspection       ←[responsible_for]── QualityEngineer
+
+Deliver · Return  ...</div>
+
+<h3>API 3개</h3>
+
+<table>
+  <thead>
+    <tr><th>Endpoint</th><th>역할</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>POST /api/modeling/ontology/template</code></td><td>SCOR+ISA-95 초기 트리 생성 (26+7+5+16)</td></tr>
+    <tr><td><code>GET  /api/modeling/ontology/tree</code></td><td>현재 Neo4j 트리 전체 조회</td></tr>
+    <tr><td><code>POST /api/modeling/ontology/add</code></td><td>새 노드/관계 추가</td></tr>
+  </tbody>
+</table>
+
+<!-- ========================================================= -->
+<h2 id="synergy">5. 둘의 관계와 최종 목적 기여</h2>
+
+<div class="panel">
+  <p>매뉴얼 빌더와 도메인 온톨로지는 <strong>같은 온톨로지 그래프에 기여하는 두 가지 입력 경로</strong>다.</p>
+</div>
+
+<div class="two-col">
+  <div class="panel">
+    <h4 style="color: var(--accent); margin-top: 0;">🔍 매뉴얼 빌더 = 수직 (깊이)</h4>
+    <p>하나의 프로세스에 대한 <strong>세부 지식</strong>. 공식, 룰, 입출력 포트, 용어까지 상세하게.</p>
+    <p style="color: var(--text-dim); font-size: 0.9rem;">예: SafetyStockCalculation 안에 z * σ * √L 공식과 3개 룰.</p>
+  </div>
+  <div class="panel">
+    <h4 style="color: var(--accent-2); margin-top: 0;">🗺️ 도메인 온톨로지 = 수평 (넓이)</h4>
+    <p>전사 프로세스들의 <strong>관계와 위치</strong>. 어디 속하나, 누가 책임지나, 무엇과 연결되나.</p>
+    <p style="color: var(--text-dim); font-size: 0.9rem;">예: SafetyStockCalculation이 Plan 카테고리, Planner 담당, PurchaseOrderManagement와 연결.</p>
+  </div>
+</div>
+
+<h3>최종 목적에 기여하는 방식</h3>
+
+<div class="diagram">┌──────────────────────────────────────────────────────────────┐
+│              "안전재고를 10% 올리면 어떻게 될까?"             │
+└──────────────────────────────────────────────────────────────┘
+                             ↓
+            ┌────────────────┴─────────────────┐
+            │                                   │
+    [도메인 온톨로지]                    [매뉴얼 빌더 산출물]
+    SafetyStock 엔티티 관계                 SafetyStockCalculation
+    영향 받는 프로세스 탐색                   공식 재계산
+    · PurchaseOrderMgmt                     · z * σ * √L
+    · ProductionScheduling                  · 룰 재평가
+    · DemandPlanning                          (SSR-002: L&gt;30일 +15%)
+            │                                   │
+            └────────────────┬─────────────────┘
+                             ↓
+                    [3개 에이전트 종합]
+                    · WhatIf: 수치 재계산
+                    · WhyTrace: 영향 경로 설명
+                    · Diagnostic: 경고/위험 감지</div>
+
+<div class="ok">
+  <strong>둘 다 필요하다</strong>. 공식만 있고 관계가 없으면 "무엇에 영향?"을 답할 수 없다. 관계만 있고 공식이 없으면 "얼마나 영향?"을 답할 수 없다.
+</div>
+
+<!-- ========================================================= -->
+<h2 id="limits">6. 현재 한계</h2>
+
+<div class="panel">
+  <p>솔직하게. 지금 구현된 Layer 1은 <strong>입력 도구의 절반</strong>이다. 아직 안 되는 것들.</p>
+</div>
+
+<h3>6-1. Builder ↔ Tree 단절 <span class="badge badge-blocked">Critical</span></h3>
+
+<p>매뉴얼 빌더로 <code>safety_stock_v1.yaml</code>을 저장해도, 도메인 온톨로지 트리(Neo4j)에는 <strong>자동으로 반영되지 않는다</strong>. 두 경로가 같은 DB에 써야 하는데 지금은 각자 따로 쓴다.</p>
+
+<div class="warn">
+  <strong>결과</strong>: 사용자가 빌더에서 만든 SafetyStockCalculation은 트리에서 안 보이고, 트리에 만든 Process는 빌더 YAML과 연결 안 된다. 의도된 기여 구조가 아직 이어지지 않았다.
+</div>
+
+<h3>6-2. 실행 엔진 없음 <span class="badge badge-todo">Section 3</span></h3>
+
+<p>Sub-DSL로 공식을 썼지만 <strong>실제로 실행할 수 없다</strong>. 파싱만 하고 계산은 못 한다. What-if 시뮬레이션의 기반이 빠져 있다.</p>
+
+<h3>6-3. 3개 에이전트 미구현 <span class="badge badge-todo">Section 3</span></h3>
+
+<p>WhatIf, WhyTrace, Diagnostic. 이게 있어야 Layer 1이 최종 목적에 닿는다. 현재는 "입력 도구만 있고 소비자가 없는" 상태.</p>
+
+<h3>6-4. LLM 드래프트 품질 의존 <span class="badge badge-todo">OD-9</span></h3>
+
+<p>LLM이 마크다운에서 Ontology를 잘 뽑아내면 3단 검증 통과. 못 뽑으면 구조화 에러가 줄줄 나고 사용자가 수동으로 고쳐야 한다.</p>
+
+<ul class="tight">
+  <li>복잡한 공식은 놓치거나 잘못 번역할 수 있음</li>
+  <li>용어 정규화(canonical/aliases)가 일관되지 않을 수 있음</li>
+  <li>한국어 매뉴얼 → 영어 id 변환 품질이 매뉴얼마다 다름</li>
+</ul>
+
+<h3>6-5. 기존 YAML 편집 모드 없음 <span class="badge badge-todo">OD-9</span></h3>
+
+<p><code>ontologies/safety_stock_v1.yaml</code>을 이미 저장했는데, 수정하려면 다시 새로 드래프트해야 한다. <strong>기존 YAML 로드 → 편집 → 저장</strong> 플로우가 없다.</p>
+
+<h3>6-6. Syntax Highlighting 없음 <span class="badge badge-todo">OD-9</span></h3>
+
+<p>YAML 에디터가 그냥 <code>&lt;textarea&gt;</code>다. Monaco나 CodeMirror가 없어서 들여쓰기 실수가 많다.</p>
+
+<h3>6-7. Relation 수동 편집 UI 부재 <span class="badge badge-todo">OD-9</span></h3>
+
+<p>도메인 온톨로지에서 노드는 추가되는데, 노드 간 <strong>관계(relation)를 끌어서 만드는 UI</strong>가 없다. 지금은 템플릿에서 자동 생성된 16개만 있다.</p>
+
+<h3>6-8. 충돌 감지 없음 <span class="badge badge-todo">확장</span></h3>
+
+<p>여러 YAML이 같은 <code>process.id</code>를 가지면? 다른 팀이 같은 엔티티를 다르게 정의하면? 지금은 탐지 안 된다.</p>
+
+<h3>6-9. 버저닝/히스토리 없음 <span class="badge badge-todo">확장</span></h3>
+
+<p><code>safety_stock_v1.yaml</code>에서 v2로 올릴 때 변경 이력이 추적 안 된다. git이 해 주긴 하지만, 도메인 관점(예: "이 룰이 언제 왜 추가됐나")으로는 볼 수 없다.</p>
+
+<!-- ========================================================= -->
+<h2 id="roadmap">7. 로드맵</h2>
+
+<h3>🔜 OD-9 — UX 개선 <span class="badge badge-todo">다음 스프린트</span></h3>
+
+<ul class="tight">
+  <li>Monaco/CodeMirror YAML 하이라이팅</li>
+  <li>기존 <code>ontologies/*.yaml</code> 불러와 편집</li>
+  <li>"Format" 버튼 (YAML 재정렬/정돈)</li>
+  <li>LLM 재드래프트 (기존 YAML + 수정사항 주면 개선)</li>
+</ul>
+
+<h3>🔗 Builder-Tree 연결 <span class="badge badge-todo">미정</span></h3>
+
+<ul class="tight">
+  <li>빌더 저장 시 YAML의 Process/Entity/Role을 Neo4j <code>:OntNode</code>로 자동 등록</li>
+  <li>트리에서 노드 클릭 → 연결된 YAML 파일 열기</li>
+</ul>
+
+<h3>🚀 Section 3 — 엔진 + 에이전트 <span class="badge badge-todo">이후</span></h3>
+
+<ul class="tight">
+  <li>Sub-DSL AST → Python 함수 컴파일러 (Execution Layer)</li>
+  <li>시뮬레이션 런너: 입력 주입 → 공식 실행 → 룰 적용 → 결과</li>
+  <li>WhatIf Agent — 수치 재계산</li>
+  <li>WhyTrace Agent — 의존성 역추적</li>
+  <li>Diagnostic Agent — 룰 위반/이상 탐지</li>
+</ul>
+
+<h3>🧩 확장 <span class="badge badge-todo">장기</span></h3>
+
+<ul class="tight">
+  <li>충돌 감지 (같은 id를 여러 YAML에서 정의 시 경고)</li>
+  <li>버저닝 (YAML diff + 의미 변경 추출)</li>
+  <li>Relation 드래그 UI (노드 2개 선택 → kind 선택 → 저장)</li>
+  <li>ACL 통합 (이미 wiki 쪽에 존재하는 <code>.acl.json</code> 방식 재사용)</li>
+</ul>
+
+<footer>
+  onTong Section 2 · Ontology-First Redesign · Phase 1a 완료 기준<br>
+  Primary Layer ✅ · Execution Layer ⏳ · Agents Layer ⏳
+</footer>
+
+</div>
+</body>
+</html>

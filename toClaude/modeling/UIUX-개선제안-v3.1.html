@@ -1,0 +1,1574 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>onTong UI/UX v3.1 — Ontology-Primary Workbench</title>
+<style>
+  :root {
+    --bg: #0b1018;
+    --panel: #111827;
+    --panel-2: #0f172a;
+    --panel-3: #0a0f1a;
+    --border: #1f2937;
+    --border-2: #334155;
+    --text: #e5e7eb;
+    --text-dim: #94a3b8;
+    --text-faint: #64748b;
+    --accent: #38bdf8;
+    --accent-2: #818cf8;
+    --warn: #f59e0b;
+    --bad: #f87171;
+    --good: #34d399;
+    --code-bg: #0a0f1a;
+    --hl-param: rgba(167, 139, 250, 0.2);
+    --hl-local: rgba(56, 189, 248, 0.2);
+    --hl-field: rgba(244, 114, 182, 0.2);
+    --hl-branch: rgba(251, 146, 60, 0.2);
+    --hl-literal: rgba(52, 211, 153, 0.25);
+    --hl-fieldaccess: rgba(244, 114, 182, 0.13);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.65 -apple-system, BlinkMacSystemFont, "Pretendard", sans-serif; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 48px 32px 96px; }
+  header.top { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 32px; }
+  h1 { font-size: 28px; margin: 0 0 8px; font-weight: 700; letter-spacing: -0.02em; }
+  h1 .badge {
+    display: inline-block; margin-left: 12px; padding: 4px 10px;
+    background: var(--panel); border: 1px solid var(--border-2); color: var(--accent);
+    font-size: 11px; font-weight: 500; border-radius: 4px; vertical-align: middle;
+  }
+  h2 {
+    font-size: 22px; margin: 56px 0 18px; padding-top: 14px;
+    border-top: 1px solid var(--border); color: var(--accent); font-weight: 600;
+  }
+  h3 { font-size: 17px; margin: 28px 0 10px; color: var(--text); font-weight: 600; }
+  h4 { font-size: 13px; margin: 16px 0 6px; color: var(--text-dim); font-weight: 600;
+       text-transform: uppercase; letter-spacing: 0.04em; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0; padding-left: 22px; }
+  code {
+    background: var(--code-bg); border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 3px;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--accent);
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    padding: 14px 16px; border-radius: 6px; overflow-x: auto;
+    font-size: 12.5px; line-height: 1.55;
+  }
+  pre code { background: none; border: none; padding: 0; color: var(--text); }
+  .lead { font-size: 15px; color: var(--text-dim); margin-top: 8px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 12px;
+           border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text-dim); font-weight: 500; background: var(--panel); font-size: 12px; }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+           padding: 18px 22px; margin: 14px 0; }
+  .panel.warn { border-left: 3px solid var(--warn); }
+  .panel.bad { border-left: 3px solid var(--bad); }
+  .panel.good { border-left: 3px solid var(--good); }
+  .panel.accent { border-left: 3px solid var(--accent); }
+
+  .toc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+         padding: 16px 22px; margin-bottom: 32px; }
+  .toc ol { margin: 4px 0; padding-left: 22px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 3px;
+          font-size: 11px; font-weight: 500; }
+  .pill.have { background: rgba(52, 211, 153, 0.1); color: var(--good);
+               border: 1px solid rgba(52, 211, 153, 0.3); }
+  .pill.miss { background: rgba(248, 113, 113, 0.1); color: var(--bad);
+               border: 1px solid rgba(248, 113, 113, 0.3); }
+  .pill.partial { background: rgba(245, 158, 11, 0.1); color: var(--warn);
+                  border: 1px solid rgba(245, 158, 11, 0.3); }
+  .pill.new { background: rgba(129, 140, 248, 0.1); color: var(--accent-2);
+              border: 1px solid rgba(129, 140, 248, 0.3); }
+
+  /* answer bar */
+  .answers {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    background: var(--panel-2); border: 1px solid var(--border);
+    padding: 10px 14px; border-radius: 6px; margin: 16px 0;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+  }
+  .answers .ans { display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 8px; background: var(--code-bg); border: 1px solid var(--border-2);
+    border-radius: 3px; }
+  .answers .ans .k { color: var(--text-dim); }
+  .answers .ans .v { color: var(--good); font-weight: 600; }
+
+  /* mockup */
+  .mockup {
+    background: #0d1320; border: 2px solid var(--border-2);
+    border-radius: 8px; padding: 0; margin: 20px 0; overflow: hidden;
+    font-size: 11.5px;
+  }
+  .mockup-titlebar {
+    background: #1a2233; padding: 6px 12px; color: var(--text-faint);
+    font-size: 10px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .mockup-titlebar .dot { width: 9px; height: 9px; border-radius: 50%; background: #4b5563; }
+  .mockup-grid {
+    display: grid;
+    grid-template-columns: 56px 220px 1fr 1.05fr 0.95fr;
+    height: 620px;
+  }
+  .mock-pane { border-right: 1px solid var(--border); overflow: hidden;
+               display: flex; flex-direction: column; }
+  .mock-pane:last-child { border-right: none; }
+  .mock-pane-head {
+    background: var(--panel); padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text); font-weight: 500; font-size: 11px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .mock-pane-head .head-meta { color: var(--text-faint); font-size: 10px; font-weight: 400; }
+  .mock-pane-head .tab-row { display: flex; gap: 8px; font-weight: 400; font-size: 10.5px; color: var(--text-faint); }
+  .mock-pane-head .tab-row .tab { padding: 1px 0; cursor: pointer; }
+  .mock-pane-head .tab-row .tab.active { color: var(--accent); border-bottom: 1.5px solid var(--accent); }
+  .mock-pane-body { padding: 8px 12px; flex: 1; overflow: hidden; color: var(--text-dim);
+                    font-size: 11px; line-height: 1.5; }
+
+  .mock-rail { background: #0a0f1a; padding: 8px 0; }
+  .mock-rail .rail-icon { display: flex; flex-direction: column; align-items: center;
+    gap: 2px; padding: 10px 4px; color: var(--text-faint); font-size: 9px;
+    border-left: 2px solid transparent; }
+  .mock-rail .rail-icon.active {
+    color: var(--accent); border-left-color: var(--accent); background: rgba(56,189,248,0.08);
+  }
+
+  .mock-tree-item { padding: 3px 4px; cursor: pointer; color: var(--text-dim);
+                    font-family: "SF Mono", Menlo, monospace; font-size: 10.5px;
+                    border-radius: 3px; }
+  .mock-tree-item.active { color: var(--accent); background: rgba(56,189,248,0.1); }
+  .mock-tree-item.dim { color: var(--text-faint); padding-left: 14px; }
+  .mock-tree-section { color: var(--text-faint); font-size: 9.5px;
+                       text-transform: uppercase; padding: 6px 4px 2px;
+                       letter-spacing: 0.04em; }
+
+  .mock-code { font-family: "SF Mono", Menlo, monospace; font-size: 10.5px;
+               line-height: 1.55; color: var(--text); white-space: pre; }
+  .mock-code .ln { color: var(--text-faint); padding-right: 8px; user-select: none; }
+  .mock-code .kw { color: #c084fc; }
+  .mock-code .ty { color: #fbbf24; }
+  .mock-code .str { color: #34d399; }
+  .mock-code .num { color: #fb923c; }
+  .mock-code .cmt { color: var(--text-faint); font-style: italic; }
+  .anc-param { background: var(--hl-param); border-bottom: 1px dashed #a78bfa; cursor: pointer; padding: 0 2px; border-radius: 2px; }
+  .anc-local { background: var(--hl-local); border-bottom: 1px dashed #38bdf8; cursor: pointer; padding: 0 2px; border-radius: 2px; }
+  .anc-field { background: var(--hl-field); border-bottom: 1px dashed #f472b6; cursor: pointer; padding: 0 2px; border-radius: 2px; }
+  .anc-fieldaccess { background: var(--hl-fieldaccess); border-bottom: 1px dotted #f472b6; cursor: pointer; padding: 0 2px; border-radius: 2px; }
+  .anc-branch { background: var(--hl-branch); border-bottom: 1px dashed #fb923c; cursor: pointer; padding: 0 2px; border-radius: 2px; }
+  .anc-literal { background: var(--hl-literal); border-bottom: 1px dashed #34d399; cursor: pointer; padding: 0 2px; border-radius: 2px; }
+
+  /* ontology editor cards (NEW: editable inline) */
+  .onto-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 5px; padding: 8px 10px; margin-bottom: 6px;
+    font-size: 10.5px;
+  }
+  .onto-card.suggest { border-left: 2px solid var(--warn); }
+  .onto-card.confirmed { border-left: 2px solid var(--good); }
+  .onto-card .card-head { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 3px; align-items: center; }
+  .onto-card .anc-pill {
+    font-size: 9px; padding: 1px 5px; border-radius: 2px;
+    background: var(--code-bg); border: 1px solid var(--border-2); color: var(--text-dim);
+  }
+  .onto-card .term-name { color: var(--text); font-weight: 600; }
+  .onto-card .field-row { display: flex; gap: 4px; margin-top: 4px; align-items: baseline; }
+  .onto-card .field-row .lab { color: var(--text-faint); font-size: 9.5px; min-width: 36px; }
+  .onto-card .field-row .val {
+    flex: 1; font-size: 10.5px; color: var(--text);
+    background: var(--code-bg); border: 1px solid var(--border);
+    padding: 2px 6px; border-radius: 3px;
+  }
+  .onto-card .field-row .val.editing { border-color: var(--warn); background: rgba(245,158,11,0.08); }
+  .onto-card .actions { margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
+  .btn-mini {
+    font-size: 9px; padding: 2px 7px; border-radius: 3px;
+    background: var(--panel-2); border: 1px solid var(--border-2); color: var(--text-dim);
+    cursor: pointer;
+  }
+  .btn-mini.primary { background: rgba(52,211,153,0.15); color: var(--good); border-color: rgba(52,211,153,0.4); }
+  .btn-mini.warn { background: rgba(245,158,11,0.15); color: var(--warn); border-color: rgba(245,158,11,0.4); }
+
+  /* manual reference panel */
+  .manual-ref {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 8px; font-size: 10.5px; color: var(--text-dim);
+  }
+  .manual-ref .quote { border-left: 2px solid var(--accent-2); padding-left: 6px;
+    margin-top: 4px; font-style: italic; color: var(--text); font-size: 10px; }
+
+  /* bottom drawer (slide-in idea) */
+  .drawer-mock {
+    margin-top: 12px; background: var(--panel-2);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 12px; font-size: 11px; color: var(--text-dim);
+  }
+  .drawer-mock .head { color: var(--accent); font-weight: 500; margin-bottom: 4px; font-size: 11px; }
+
+  /* resize handle visualization */
+  .resize-handle-v {
+    width: 4px; background: var(--border-2); cursor: col-resize;
+    position: relative;
+  }
+  .resize-handle-v::after {
+    content: ""; position: absolute; left: 1px; top: 50%;
+    width: 2px; height: 30px; background: var(--text-faint);
+    border-radius: 1px; transform: translateY(-50%);
+  }
+  .resize-handle-h {
+    height: 4px; background: var(--border-2); cursor: row-resize;
+    position: relative;
+  }
+  .pane-controls {
+    display: inline-flex; gap: 2px; margin-left: 6px;
+  }
+  .pane-ctrl-btn {
+    width: 14px; height: 14px; border: 1px solid var(--border-2);
+    background: var(--code-bg); color: var(--text-faint);
+    font-size: 9px; line-height: 12px; text-align: center;
+    border-radius: 2px; cursor: pointer;
+  }
+  .pane-ctrl-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* pattern matrix table */
+  .pattern-table {
+    width: 100%; border-collapse: collapse; font-size: 12.5px;
+  }
+  .pattern-table th { text-align: left; padding: 8px 10px;
+    background: var(--panel-2); color: var(--text-dim); border: 1px solid var(--border);
+    font-size: 11.5px; font-weight: 500; }
+  .pattern-table td { padding: 10px; border: 1px solid var(--border);
+    vertical-align: top; }
+  .pattern-table .pat-name {
+    font-weight: 600; color: var(--accent);
+    font-family: "SF Mono", Menlo, monospace; font-size: 12.5px;
+  }
+  .pattern-table .when-use { color: var(--good); font-size: 11.5px; }
+  .pattern-table .when-not { color: var(--bad); font-size: 11.5px; }
+
+  /* density guide visual */
+  .density-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    margin: 14px 0;
+  }
+  .density-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px;
+  }
+  .density-card .res {
+    font-family: "SF Mono", Menlo, monospace; font-size: 13px;
+    color: var(--accent); font-weight: 600;
+  }
+  .density-card .desc {
+    font-size: 12px; color: var(--text-dim); margin-top: 4px;
+  }
+  .density-card .layout {
+    display: flex; gap: 2px; margin-top: 10px; height: 60px;
+    border: 1px solid var(--border-2); border-radius: 3px;
+  }
+  .density-card .layout > div {
+    background: var(--panel-2); border-right: 1px solid var(--border);
+    font-size: 9px; color: var(--text-faint); padding: 4px 5px;
+    overflow: hidden;
+  }
+  .density-card .layout > div:last-child { border-right: none; }
+
+  /* popover/drawer mock */
+  .ui-mock-stack {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0;
+  }
+  .ui-mock-stack > div {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px;
+  }
+  .ui-mock-stack h5 {
+    margin: 0 0 8px; font-size: 12px; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .popover-demo {
+    position: relative; height: 110px;
+    background: var(--code-bg); border: 1px dashed var(--border-2);
+    border-radius: 4px;
+  }
+  .popover-demo .anchor-text {
+    position: absolute; top: 50%; left: 20%;
+    background: var(--hl-param); padding: 2px 5px; font-size: 11px;
+    border-bottom: 1px dashed #a78bfa; border-radius: 2px;
+    color: var(--text); transform: translateY(-50%);
+  }
+  .popover-demo .popover-box {
+    position: absolute; top: calc(50% + 18px); left: 18%;
+    background: var(--panel); border: 1px solid var(--border-2);
+    border-radius: 4px; padding: 6px 10px; font-size: 10.5px;
+    color: var(--text-dim); box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    min-width: 180px;
+  }
+  .popover-demo .popover-box .pn { color: var(--accent); font-weight: 600; }
+
+  .modal-demo {
+    background: rgba(0,0,0,0.6); border-radius: 4px; height: 110px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px dashed var(--border-2);
+  }
+  .modal-demo .modal-box {
+    background: var(--panel); border: 1px solid var(--bad);
+    border-radius: 6px; padding: 10px 14px; font-size: 11px;
+    color: var(--text); max-width: 180px;
+  }
+  .modal-demo .modal-box .mt { color: var(--bad); font-weight: 600; font-size: 11.5px; margin-bottom: 4px; }
+
+  .floating-demo {
+    position: relative; height: 110px;
+    background: var(--code-bg); border: 1px dashed var(--border-2);
+    border-radius: 4px; overflow: hidden;
+  }
+  .floating-demo .float-box {
+    position: absolute; top: 14px; right: 12px;
+    background: var(--panel); border: 1px solid var(--border-2);
+    border-radius: 6px; padding: 8px 10px; font-size: 10.5px;
+    color: var(--text-dim); box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    min-width: 130px;
+  }
+  .floating-demo .bg-text {
+    position: absolute; bottom: 8px; left: 8px; font-size: 10px; color: var(--text-faint);
+  }
+
+  .inline-expand-demo {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 4px; padding: 10px; font-size: 11px; color: var(--text-dim);
+  }
+  .inline-expand-demo .row { display: flex; justify-content: space-between; }
+  .inline-expand-demo .more {
+    font-size: 10px; color: var(--accent); margin-top: 6px;
+    border-top: 1px dashed var(--border); padding-top: 6px;
+  }
+
+  /* legend */
+  .legend {
+    display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0;
+    font-size: 11px; color: var(--text-dim);
+  }
+  .legend .lg {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+  .legend .lg .sw { width: 10px; height: 10px; border-radius: 2px; }
+
+  /* before / after compare */
+  .compare {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0;
+  }
+  .compare > div {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px 14px;
+  }
+  .compare h5 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase;
+                letter-spacing: 0.04em; color: var(--text-dim); }
+  .compare.before h5 { color: var(--bad); }
+  .compare.after h5 { color: var(--good); }
+
+  .question {
+    background: var(--panel); border-left: 3px solid var(--warn);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 14px 18px; margin: 12px 0;
+  }
+  .question .qhead {
+    color: var(--warn); font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;
+  }
+  .question .qbody { font-size: 13.5px; margin-bottom: 8px; }
+  .question .qopt {
+    background: var(--panel-2); border: 1px solid var(--border-2);
+    border-radius: 5px; padding: 8px 12px; margin: 4px 0; font-size: 12.5px;
+    cursor: pointer; transition: all 0.15s ease;
+    position: relative;
+  }
+  .question .qopt:hover {
+    border-color: var(--accent-2);
+    background: rgba(129, 140, 248, 0.06);
+  }
+  .question .qopt.recommended {
+    border-color: var(--good); background: rgba(52,211,153,0.05);
+  }
+  .question .qopt.recommended .opt-label::after {
+    content: " · 추천"; color: var(--good); font-weight: 500; font-size: 10.5px;
+  }
+  .question .qopt.selected {
+    border-color: var(--accent);
+    background: rgba(56, 189, 248, 0.12);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .question .qopt.selected::before {
+    content: "✓";
+    position: absolute;
+    top: 8px; right: 10px;
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .question .qopt.selected .opt-label { color: var(--accent); }
+  .question .opt-label { font-weight: 600; }
+  .question .opt-tradeoff { color: var(--text-dim); font-size: 11.5px; margin-top: 2px; }
+
+  /* 답변 복사 영역 */
+  .copy-area {
+    background: var(--panel); border: 2px solid var(--accent);
+    border-radius: 8px; padding: 18px 22px; margin: 16px 0;
+    box-shadow: 0 4px 18px rgba(56, 189, 248, 0.1);
+  }
+  .copy-area .copy-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px;
+  }
+  .copy-area .copy-title {
+    font-size: 14px; font-weight: 600; color: var(--accent);
+  }
+  .copy-area .copy-status {
+    font-size: 12px; color: var(--good); font-weight: 500;
+    transition: opacity 0.2s ease; opacity: 0;
+  }
+  .copy-area .copy-status.show { opacity: 1; }
+  .copy-area textarea {
+    width: 100%; min-height: 320px;
+    background: var(--code-bg); border: 1px solid var(--border-2);
+    border-radius: 4px; padding: 12px;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+    line-height: 1.55; color: var(--text);
+    resize: vertical;
+  }
+  .copy-area textarea:focus {
+    outline: none; border-color: var(--accent);
+  }
+  .copy-area .button-row {
+    display: flex; gap: 8px; margin-top: 10px; align-items: center;
+  }
+  .copy-btn {
+    background: var(--accent); color: #0b1018;
+    border: none; border-radius: 5px;
+    padding: 8px 16px; font-size: 13px; font-weight: 600;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .copy-btn:hover { background: #5cc6f5; }
+  .copy-btn:active { transform: scale(0.97); }
+  .copy-btn.secondary {
+    background: var(--panel-2); color: var(--text-dim);
+    border: 1px solid var(--border-2);
+  }
+  .copy-btn.secondary:hover { background: var(--panel); color: var(--text); }
+  .progress-summary {
+    font-size: 12px; color: var(--text-dim); margin-left: auto;
+  }
+  .progress-summary strong { color: var(--accent); }
+
+  footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--border);
+           color: var(--text-faint); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>onTong UI/UX v3.1 — Ontology-Primary Workbench <span class="badge">2026-04-26</span></h1>
+  <p class="lead">
+    v3 의 답변에 기반한 정정. <strong>핵심 변화</strong> :
+    (1) 클래스 instance field 도 매핑 anchor 로 격상,
+    (2) 매뉴얼이 main input 이 아니라 <strong>ontology 가 primary, 매뉴얼은 보조</strong>,
+    (3) 시뮬레이션 결과는 모달 X, drawer + inline 으로.
+  </p>
+</header>
+
+<!-- 사용자 답변 요약 -->
+<div class="answers">
+  <span class="ans"><span class="k">U1:</span><span class="v">A+클래스변수 추가</span></span>
+  <span class="ans"><span class="k">U2:</span><span class="v">A</span></span>
+  <span class="ans"><span class="k">U3:</span><span class="v">C</span></span>
+  <span class="ans"><span class="k">U4:</span><span class="v">미정 → §3 에서 명확화</span></span>
+  <span class="ans"><span class="k">U5:</span><span class="v">non-modal → §5 에서 제안</span></span>
+  <span class="ans"><span class="k">U6:</span><span class="v">A</span></span>
+</div>
+
+<nav class="toc">
+  <h4 style="margin-top:0">목차</h4>
+  <ol>
+    <li><a href="#anchor-extension">1. Anchor 확장 — 클래스 instance field + method 안 access</a></li>
+    <li><a href="#onto-vs-manual">2. Ontology vs 매뉴얼 — 역할 명확화 (Q-U4 의 핵심)</a></li>
+    <li><a href="#workbench31">3. 정정된 Workbench — Ontology Editor 가 main input</a></li>
+    <li><a href="#mockup">4. 정정된 Mockup</a></li>
+    <li><a href="#non-modal">5. 시뮬레이션 viewer — non-modal 패턴 (Q-U5)</a></li>
+    <li><a href="#density"><strong>6. UI Density &amp; Interaction Patterns</strong> (사이즈/모달/팝업/drawer 가이드)</a></li>
+    <li><a href="#combined">7. v2 + v3.1 합쳐진 결정 사항</a></li>
+    <li><a href="#remaining">8. 남은 결정 질문</a></li>
+    <li><a href="#answers"><strong>9. 내 답변 — 클릭 + 복사 (interactive)</strong></a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<h2 id="anchor-extension">1. Anchor 확장 — 클래스 instance field 까지</h2>
+
+<div class="panel accent">
+  <p><strong>사용자 지적 (Q-U1)</strong> : "메서드에만 뭐가 있는게 아니라 클래스 변수도 로직에 영향을 많이 주잖아."</p>
+  <p>맞습니다. v3 에선 anchor 6 종 (field/param/local/return/branch/literal) 으로 정의했는데
+    <code>field</code> 가 클래스 정적 정의 (선언 위치) 만 가리키고 있어서, method body 안에서 그 instance field
+    를 읽고/쓸 때의 의미가 빠졌습니다.</p>
+</div>
+
+<h3>Anchor 7 종 (field-access 추가) + 2 가지 scope</h3>
+
+<table>
+  <thead><tr><th>Anchor</th><th>Scope</th><th>의미</th><th>예시</th></tr></thead>
+  <tbody>
+    <tr><td><strong>field</strong></td><td>class</td><td>클래스 instance field 선언 자체</td><td><code>private final EdgingRepository repo;</code></td></tr>
+    <tr><td><strong>field_access</strong> <span class="pill new">신규</span></td><td>method body</td><td>method 안에서 instance field 의 read / write / call</td><td>method 안의 <code>this.castSpec.smCd</code> 읽기, <code>this.cache.put(...)</code> 쓰기</td></tr>
+    <tr><td>param</td><td>method body</td><td>메서드 파라미터</td><td><code>BigDecimal hrTgtWidth</code></td></tr>
+    <tr><td>local</td><td>method body</td><td>지역 변수</td><td><code>List&lt;EdgingSpec&gt; specs = ...</code></td></tr>
+    <tr><td>return</td><td>method body</td><td>반환식</td><td><code>return s.getGroup();</code></td></tr>
+    <tr><td>branch</td><td>method body</td><td>if/else/switch 조건식</td><td><code>if (widthLow ≤ x ≤ widthHigh)</code></td></tr>
+    <tr><td>literal</td><td>method body</td><td>매직넘버 / 상수 문자열</td><td><code>"DG107"</code>, <code>0.95</code></td></tr>
+  </tbody>
+</table>
+
+<div class="panel good">
+  <strong>결과</strong> — 한 메서드 동작을 ontology 가 완전 표현 가능 :
+  param (입력) → local (계산 단계) → field_access (외부 상태 사용) → branch (분기) → literal (상수) → return (출력).
+  Python 동등 함수 생성 시 모든 anchor 가 채워야 할 슬롯.
+</div>
+
+<h3>field_access 의 sub-locator</h3>
+
+<pre><code>MethodAnchor:
+    method_fqn: str
+    kind: AnchorKind         # field_access 등
+    locator: str             # 'this.castSpec.smCd' 같은 path
+    access_kind: str         # 'read' | 'write' | 'invoke' (field_access 만)
+    target_field_fqn: str    # 'EdgingService.castSpec' (정적 field 와 link)
+    line: int</code></pre>
+
+<p>이 access anchor 는 <code>field</code> anchor 와 자동으로 link됨 (target_field_fqn). 즉:
+<code>EdgingService.castSpec</code> field 의 binding 을 사용자가 변경하면, 그 field 가 read 되는 모든 method 의 anchor 도 자동으로 영향받음.</p>
+
+<!-- ============================================================ -->
+<h2 id="onto-vs-manual">2. Ontology vs 매뉴얼 — 역할 명확화</h2>
+
+<div class="panel warn">
+  <p><strong>사용자 의문 (Q-U4)</strong> : "메뉴얼은 참고인건가? 실제로는 온톨로지에 들어갈 내용이 중요한 것 같은데."</p>
+  <p>제가 v3 에서 매뉴얼 작성을 main input 으로 framing 한 게 모호함의 원인. 정확히 정리합니다.</p>
+</div>
+
+<h3>역할 분리</h3>
+<table>
+  <thead><tr><th></th><th>Ontology</th><th>매뉴얼</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>본질</strong></td>
+      <td>구조화된 데이터 (term, rule, relation, anchor binding)</td>
+      <td>사람이 읽는 자유 텍스트 (markdown)</td>
+    </tr>
+    <tr>
+      <td><strong>누가 직접 읽나</strong></td>
+      <td><strong>시뮬레이션 엔진 / 영향 propagator / Python generator</strong></td>
+      <td>사람 (도메인 전문가, 신규 입사자)</td>
+    </tr>
+    <tr>
+      <td><strong>입력 우선순위</strong></td>
+      <td><strong>primary (사용자가 직접 입력하는 main 작업)</strong></td>
+      <td>secondary (ontology 의 자연어 description, 또는 외부 reference)</td>
+    </tr>
+    <tr>
+      <td><strong>모양</strong></td>
+      <td><code>term.슬래브두께 = {label, aliases, def, unit, range, anchors[]}</code></td>
+      <td>"슬래브 두께는 발주 시 결정되며 200~280mm 범위..."</td>
+    </tr>
+    <tr>
+      <td><strong>변경 시 영향</strong></td>
+      <td>시뮬레이션 결과 즉시 변경, 갭 큐 재계산</td>
+      <td>인간 가독성만, 시뮬레이션 무관</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>두 역할이 만나는 지점</h3>
+
+<p>모든 ontology entity (term / rule) 는 <strong><code>description</code> 필드 (자연어)</strong> 를 갖습니다. 그리고 그 description 이 사용자가 보기에는 매뉴얼 단락처럼 보임. 즉:</p>
+
+<ul>
+  <li><strong>매뉴얼 = ontology description 들의 묶음 view</strong>. Ontology 입력 시 사용자가 자연어 설명도 같이 작성하면, 그게 "매뉴얼" 의 본문이 됨.</li>
+  <li><strong>외부 매뉴얼 (PDF/DOCX 등)</strong> 은 import 후 fragment 풀로 → 사용자가 ontology 입력 시 reference panel 에 보이게 → "이 내용을 ontology 의 어느 항목에 매핑할까?" 도와줌.</li>
+  <li><strong>매뉴얼 export</strong> 는 ontology 에서 자동 생성 (description 들을 markdown 으로 묶음, directive 자동 삽입). 사람이 회사 위키에 올릴 수 있게.</li>
+</ul>
+
+<div class="panel good">
+  <strong>결론</strong> — 사용자가 입력하는 것은 <strong>Ontology entity (term/rule + description)</strong>.
+  매뉴얼은 (a) 외부 import 의 reference 또는 (b) ontology description 들의 export view.
+  별도의 "매뉴얼 작성기" 탭은 사라지고, ontology 입력 폼이 main input.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="workbench31">3. 정정된 Workbench — Ontology Editor 가 Main Input</h2>
+
+<p>3 가지 변경 :</p>
+<ol>
+  <li><strong>L 패널</strong> — 메서드 트리 + 클래스 트리 토글 (instance field 도 노출).</li>
+  <li><strong>C-R 패널 = Ontology Editor</strong> (기존 카드 + <strong>인라인 편집 폼</strong>). 사용자가 anchor 별로 term/rule 를 직접 입력/수정. description 자연어 필드 포함.</li>
+  <li><strong>R 패널 = "Reference" 패널</strong> — 외부 매뉴얼 fragment + 영향 분석 + 시뮬레이션 trigger. 모두 보조. 매뉴얼 작성기는 제거.</li>
+</ol>
+
+<h3>Ontology Card 의 인라인 편집 모드 (확장)</h3>
+
+<p>각 카드는 5 가지 inline 필드 (term 의 경우):</p>
+<ul>
+  <li><strong>label</strong> — canonical 한국어 이름. 예 <code>슬래브두께</code></li>
+  <li><strong>aliases</strong> — 영문/축약 변종 list. 예 <code>[slabThickness, SLAB_THICKNESS, thickness]</code></li>
+  <li><strong>description</strong> — 자연어 정의 (markdown OK). <strong>이게 매뉴얼 본문이 됨</strong></li>
+  <li><strong>unit / range</strong> — 단위 (mm 등) + 값 범위 (input_domain 으로 쓰임)</li>
+  <li><strong>relations</strong> — IS_A / PART_OF / RELATED 다른 term 과의 link</li>
+</ul>
+
+<p>Rule 의 경우:</p>
+<ul>
+  <li><strong>statement</strong> — DSL 또는 자연어 (양쪽 가능)</li>
+  <li><strong>kind</strong> — guard / bound / formula / enum / regex / throw / lookup</li>
+  <li><strong>scope</strong> — 적용 term FQN list</li>
+  <li><strong>severity</strong> — hard / soft</li>
+  <li><strong>description</strong> — 자연어 (매뉴얼 본문 됨)</li>
+  <li><strong>relations</strong> — DERIVES_FROM / CONFLICTS_WITH 등 다른 rule 과의 link</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="mockup">4. 정정된 Mockup — Ontology Editor 가 main</h2>
+
+<div class="legend">
+  <span class="lg"><span class="sw" style="background: var(--hl-field)"></span> field (class)</span>
+  <span class="lg"><span class="sw" style="background: var(--hl-fieldaccess)"></span> field_access (in body)</span>
+  <span class="lg"><span class="sw" style="background: var(--hl-param)"></span> param</span>
+  <span class="lg"><span class="sw" style="background: var(--hl-local)"></span> local</span>
+  <span class="lg"><span class="sw" style="background: var(--hl-branch)"></span> branch</span>
+  <span class="lg"><span class="sw" style="background: var(--hl-literal)"></span> literal</span>
+</div>
+
+<div class="mockup">
+  <div class="mockup-titlebar">
+    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span style="margin-left: 12px;">onTong — Workbench · slab-design-real · EdgingService.findGroup</span>
+  </div>
+  <div class="mockup-grid">
+
+    <!-- Rail -->
+    <div class="mock-pane mock-rail">
+      <div class="rail-icon">📦<br/>Repo</div>
+      <div class="rail-icon active">🧠<br/>Bench</div>
+      <div class="rail-icon">🌐<br/>Map</div>
+      <div class="rail-icon">🔬<br/>Sim</div>
+      <div class="rail-icon">📥<br/>Import</div>
+    </div>
+
+    <!-- Left: tree (메서드 + 클래스 토글) -->
+    <div class="mock-pane">
+      <div class="mock-pane-head">
+        <div class="tab-row">
+          <span class="tab active">메서드</span>
+          <span class="tab">클래스</span>
+        </div>
+        <span class="head-meta">580/123</span>
+      </div>
+      <div class="mock-pane-body">
+        <input type="text" placeholder="🔍 메서드명/FQN" style="width:100%; background:var(--code-bg); border:1px solid var(--border); color: var(--text); padding: 3px 6px; border-radius: 3px; font-size: 10.5px; margin-bottom: 6px;"/>
+        <div style="font-size: 9.5px; color: var(--text-faint); margin-bottom: 4px;">
+          필터: <span style="color:var(--accent);">전체</span> · 미처리 · binding · 매뉴얼
+        </div>
+        <div class="mock-tree-section">std.service / EdgingService</div>
+        <div class="mock-tree-item dim" style="color: var(--text-dim);">▾ <span style="color:var(--accent);">EdgingService</span> <span style="color:var(--good);font-size:9px;">●</span></div>
+        <div class="mock-tree-item dim" style="padding-left: 18px; color: #f472b6;">⚐ castSpec (field)</div>
+        <div class="mock-tree-item dim" style="padding-left: 18px; color: #f472b6;">⚐ repo (field)</div>
+        <div class="mock-tree-item dim" style="padding-left: 18px;">findGroup() <span style="color:var(--good);font-size:9px;">●</span></div>
+        <div class="mock-tree-item dim active" style="padding-left: 18px; background: rgba(56,189,248,0.15);"><strong>findGroup</strong>() ←</div>
+        <div class="mock-tree-item dim" style="padding-left: 18px;">resolveEdging() <span style="color:var(--warn);font-size:9px;">●</span></div>
+        <div class="mock-tree-item dim" style="padding-left: 18px;">classify() <span style="color:var(--text-faint);font-size:9px;">○</span></div>
+
+        <div class="mock-tree-section" style="margin-top: 10px;">working.action</div>
+        <div class="mock-tree-item dim">▸ SdFinalLengthRangeAction <span style="color:var(--warn);font-size:9px;">●</span></div>
+        <div class="mock-tree-item dim">▸ SdFinalWidthRangeAction <span style="color:var(--text-faint);font-size:9px;">○</span></div>
+
+        <div style="font-size: 9.5px; color: var(--text-faint); margin-top: 8px; border-top:1px solid var(--border); padding-top: 6px;">
+          ⚐ field · ● 확정 · ● 검토대기 · ○ 미처리
+        </div>
+      </div>
+    </div>
+
+    <!-- Center-Left: code -->
+    <div class="mock-pane">
+      <div class="mock-pane-head">
+        EdgingService.findGroup
+        <span class="head-meta">42-68</span>
+      </div>
+      <div class="mock-pane-body">
+        <div class="mock-code"><span class="ln">38</span> <span class="kw">private final</span> <span class="ty">EdgingRepository</span> <span class="anc-field">repo</span>;
+<span class="ln">39</span> <span class="kw">private final</span> <span class="ty">CastSpec</span> <span class="anc-field">castSpec</span>;
+<span class="ln">40</span> <span class="cmt">// ↑ 클래스 instance field (anchor: field)</span>
+<span class="ln">41</span>
+<span class="ln">42</span> <span class="kw">public</span> <span class="ty">EdgingGroup</span> findGroup(
+<span class="ln">43</span>     <span class="ty">BigDecimal</span> <span class="anc-param">hrTgtWidth</span>,
+<span class="ln">44</span>     <span class="ty">String</span> <span class="anc-param">smCd</span>,
+<span class="ln">45</span>     <span class="ty">String</span> <span class="anc-param">plantCd</span>
+<span class="ln">46</span> ) {
+<span class="ln">47</span>     <span class="cmt">// rule1 — 폭 lookup</span>
+<span class="ln">48</span>     <span class="ty">List</span>&lt;<span class="ty">EdgingSpec</span>&gt; <span class="anc-local">specs</span> = <span class="anc-fieldaccess">repo</span>.findBySmCdAnd(<span class="anc-param">smCd</span>);
+<span class="ln">49</span>     <span class="kw">for</span> (<span class="ty">EdgingSpec</span> s : <span class="anc-local">specs</span>) {
+<span class="ln">50</span>         <span class="anc-branch"><span class="kw">if</span> (s.widthLow ≤ <span class="anc-param">hrTgtWidth</span>
+<span class="ln">51</span>             &amp;&amp; s.widthHigh ≥ <span class="anc-param">hrTgtWidth</span></span>) {
+<span class="ln">52</span>             <span class="kw">return</span> s.getGroup();
+<span class="ln">53</span>         }
+<span class="ln">54</span>     }
+<span class="ln">55</span>     <span class="cmt">// rule2 — fallback</span>
+<span class="ln">56</span>     <span class="anc-branch"><span class="kw">if</span> (<span class="anc-param">plantCd</span>.equals(<span class="anc-literal"><span class="str">"HR1"</span></span>)
+<span class="ln">57</span>      || <span class="anc-param">plantCd</span>.equals(<span class="anc-literal"><span class="str">"HR2"</span></span>))</span> {
+<span class="ln">58</span>         <span class="kw">return</span> <span class="anc-fieldaccess">castSpec</span>.defaultGroup;
+<span class="ln">59</span>     }
+<span class="ln">60</span>     <span class="kw">throw</span> <span class="kw">new</span> <span class="ty">EdgingException</span>(<span class="anc-literal"><span class="str">"DG107"</span></span>);
+<span class="ln">61</span> }
+</div>
+      </div>
+    </div>
+
+    <!-- Center-Right: Ontology Editor (★ MAIN INPUT) -->
+    <div class="mock-pane">
+      <div class="mock-pane-head">
+        <span style="color: var(--accent);">🧬 Ontology</span>
+        <span style="display: inline-flex; align-items: center; gap: 4px;">
+          <span class="head-meta">8 anchor · 5 confirmed</span>
+          <span class="pane-controls">
+            <span class="pane-ctrl-btn" title="패널 접기 (⌘3)">◀</span>
+            <span class="pane-ctrl-btn" title="최대화 (집중 모드)">⛶</span>
+            <span class="pane-ctrl-btn" title="별도 창으로 분리">⤴</span>
+          </span>
+        </span>
+      </div>
+      <div class="mock-pane-body" style="overflow-y: auto;">
+        <!-- Class field 카드 (★ 신규) -->
+        <div style="font-size: 9.5px; color: var(--text-faint); margin-bottom: 4px;">CLASS FIELDS (2)</div>
+        <div class="onto-card confirmed">
+          <div class="card-head">
+            <span class="anc-pill" style="color:#f472b6">⚐ field [castSpec]</span>
+            <span style="font-size:9px;color:var(--good);">✓</span>
+          </div>
+          <div class="term-name">term.<strong>주조사양</strong></div>
+          <div class="field-row"><span class="lab">def</span><span class="val">강종별 주조 공정 사양 (smCd 별 lookup table)</span></div>
+          <div class="field-row"><span class="lab">used in</span><span class="val">2 methods (findGroup, resolveEdging)</span></div>
+        </div>
+
+        <div style="font-size: 9.5px; color: var(--text-faint); margin: 8px 0 4px;">PARAMS (3)</div>
+        <div class="onto-card confirmed">
+          <div class="card-head">
+            <span class="anc-pill" style="color:#a78bfa">param[hrTgtWidth]</span>
+            <span style="font-size:9px;color:var(--good);">✓</span>
+          </div>
+          <div class="term-name">term.<strong>열연타겟폭</strong></div>
+          <div class="field-row"><span class="lab">unit</span><span class="val">mm · 800~2000</span></div>
+        </div>
+        <div class="onto-card suggest">
+          <div class="card-head">
+            <span class="anc-pill" style="color:#a78bfa">param[smCd]</span>
+            <span style="font-size:9px;color:var(--warn);">LLM 0.85</span>
+          </div>
+          <div class="term-name">term.<strong>강종코드</strong> (제안)</div>
+          <div class="field-row"><span class="lab">def</span><span class="val editing">강종 (steel material) 분류 코드. 4자리 영숫자.</span></div>
+          <div class="field-row"><span class="lab">aliases</span><span class="val">smCd, SM_CD, steelMaterial</span></div>
+          <div class="actions">
+            <button class="btn-mini primary">확정</button>
+            <button class="btn-mini">새 term</button>
+            <button class="btn-mini">거부</button>
+          </div>
+        </div>
+
+        <div style="font-size: 9.5px; color: var(--text-faint); margin: 8px 0 4px;">BRANCHES (2)</div>
+        <div class="onto-card suggest">
+          <div class="card-head">
+            <span class="anc-pill" style="color:#fb923c">branch[if@50]</span>
+            <span style="font-size:9px;color:var(--warn);">body 0.95</span>
+          </div>
+          <div class="term-name">rule.<strong>HR타겟폭_범위검증</strong> (제안)</div>
+          <div class="field-row"><span class="lab">stmt</span><span class="val">widthLow ≤ x ≤ widthHigh</span></div>
+          <div class="field-row"><span class="lab">scope</span><span class="val">term.열연타겟폭, term.엣징그룹</span></div>
+          <div class="field-row"><span class="lab">def</span><span class="val editing">열연 타겟 폭이 EdgingSpec 의 lookup 범위 안에 들면 그 그룹...</span></div>
+          <div class="actions">
+            <button class="btn-mini primary">확정</button>
+            <button class="btn-mini">수정</button>
+            <button class="btn-mini">📚 외부 참고</button>
+          </div>
+        </div>
+
+        <div style="font-size: 9.5px; color: var(--text-faint); margin: 8px 0 4px;">LITERALS (1)</div>
+        <div class="onto-card suggest">
+          <div class="card-head">
+            <span class="anc-pill" style="color:#34d399">literal["DG107"@60]</span>
+            <span style="font-size:9px;color:var(--warn);">body 1.0</span>
+          </div>
+          <div class="term-name">rule.<strong>오류_DG107</strong></div>
+        </div>
+
+        <button class="btn-mini" style="width:100%; margin-top: 6px; background: rgba(56,189,248,0.1); color: var(--accent); border-color:rgba(56,189,248,0.4);">＋ 카드 수동 추가</button>
+
+        <div style="font-size: 9.5px; color: var(--text-faint); margin-top: 10px; padding-top: 6px; border-top: 1px solid var(--border);">
+          단축키: <code style="font-size:9px;">⏎ 확정</code> · <code style="font-size:9px;">⇧⏎ 일괄 확정</code> · <code style="font-size:9px;">e 편집</code>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: REFERENCE (외부 매뉴얼 + 영향 + 시뮬레이션 trigger) -->
+    <div class="mock-pane">
+      <div class="mock-pane-head">
+        <div class="tab-row">
+          <span class="tab active">📚 참고</span>
+          <span class="tab">🧬 영향</span>
+          <span class="tab">🔬 Sim</span>
+        </div>
+        <span class="head-meta">2 ref</span>
+      </div>
+      <div class="mock-pane-body" style="overflow-y: auto;">
+        <div style="font-size: 10px; color: var(--text-faint); margin-bottom: 4px;">외부 매뉴얼 fragment (이 메서드 관련)</div>
+        <div class="manual-ref">
+          <div style="color: var(--accent); font-weight:500;">📄 manual.slab-design</div>
+          <div style="font-size:9.5px; color:var(--text-faint);">sec3 · "엣징 그룹 결정"</div>
+          <div class="quote">"열연 타겟 폭이 EdgingSpec 의 폭 하한과 폭 상한 사이에 들면 그 그룹을 선택. 그 외엔 공장 코드로 fallback."</div>
+        </div>
+        <div class="manual-ref" style="margin-top: 6px;">
+          <div style="color: var(--accent); font-weight:500;">📄 manual.sd-tables</div>
+          <div style="font-size:9.5px; color:var(--text-faint);">sec1 · "EdgingSpec 테이블"</div>
+          <div class="quote">"WIDTH_LOW / WIDTH_HIGH 컬럼은 mm 단위. SM_CD 별로 ..."</div>
+        </div>
+
+        <div style="margin-top: 12px; font-size: 10px; color: var(--text-faint); margin-bottom: 4px;">⚠ 갭 (이 메서드 관련)</div>
+        <div class="manual-ref" style="border-left: 2px solid var(--bad);">
+          <div style="color: var(--bad); font-weight:500;">missing_in_manual</div>
+          <div style="font-size:10px; color:var(--text);">rule.오류_DG107 의 매뉴얼 설명 없음. 카드의 desc 채워주세요.</div>
+        </div>
+
+        <div style="margin-top: 12px; font-size: 10px; color: var(--text-faint); margin-bottom: 4px;">🔬 시뮬레이션 (이 메서드 변경)</div>
+        <button class="btn-mini" style="width:100%; background: rgba(245,158,11,0.15); color: var(--warn); border-color: rgba(245,158,11,0.4);">＋ ChangeSpec 만들기</button>
+        <div style="font-size: 9.5px; color: var(--text-faint); margin-top: 4px;">
+          최근 시뮬레이션: 2건 (Apply 1, Discard 1)
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<p style="font-size:12px; color: var(--text-dim);">
+<strong>비교 — 매뉴얼이 main 이 아님</strong> :
+이전 v3 mockup 의 R 패널은 「매뉴얼 작성기」 였음. v3.1 은 「참고」 패널 (외부 매뉴얼 fragment 가 reference 로 보이고,
+사용자는 옆 ontology editor 의 desc 필드에 자연어를 입력). 작성하는 main 영역이 ontology 입니다.
+</p>
+
+<!-- ============================================================ -->
+<h2 id="non-modal">5. 시뮬레이션 viewer — non-modal 패턴 (Q-U5)</h2>
+
+<div class="panel accent">
+  <p><strong>사용자 의견</strong> : "모달이든 뭐든 좀 답답하지 않게 좋은 방법을 찾아봤으면 해."</p>
+  <p>모달은 작업 흐름 끊고, 또 모달 안에서 코드/ontology 보고 비교하기 답답. 다음 3 단계 패턴 제안.</p>
+</div>
+
+<h3>5-A. ChangeSpec 입력 — Bottom Drawer (slide-up)</h3>
+
+<p>R 패널의 「＋ ChangeSpec 만들기」 클릭 → 화면 하단에서 slide-up drawer (높이 ~280px). Workbench 가 위로 squash 되지만 trees / code / ontology 모두 보임.</p>
+
+<div class="drawer-mock">
+  <div class="head">▲ ChangeSpec — drawer 형태</div>
+  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px;">
+    <div>
+      <div style="font-size:10px; color: var(--text-faint);">Anchor 선택</div>
+      <div style="background: var(--code-bg); border: 1px solid var(--border); padding: 4px 6px; border-radius: 3px; font-size: 10.5px; margin-top: 3px;">literal["HR2"@line:57]</div>
+    </div>
+    <div>
+      <div style="font-size:10px; color: var(--text-faint);">Before</div>
+      <div style="background: var(--code-bg); border: 1px solid var(--border); padding: 4px 6px; border-radius: 3px; font-size: 10.5px; color: var(--bad); margin-top: 3px;">"HR2"</div>
+    </div>
+    <div>
+      <div style="font-size:10px; color: var(--text-faint);">After</div>
+      <div style="background: rgba(52,211,153,0.08); border: 1px solid var(--good); padding: 4px 6px; border-radius: 3px; font-size: 10.5px; color: var(--good); margin-top: 3px;">"HR3"</div>
+    </div>
+  </div>
+  <div style="margin-top: 8px; display: flex; gap: 6px; justify-content: flex-end;">
+    <button class="btn-mini">취소</button>
+    <button class="btn-mini primary">▶ Python 시뮬레이션 실행</button>
+  </div>
+</div>
+
+<h3>5-B. 실행 결과 — 같은 drawer 가 자동 확장</h3>
+
+<p>「실행」 누르면 drawer 가 더 커져서 (~480px) before/after 결과 보임. Workbench 는 여전히 보임 (메서드 트리/코드 클릭 가능). 결과 영역은 4 column:</p>
+
+<div class="drawer-mock">
+  <div class="head">▲ 시뮬레이션 결과 — drawer 확장</div>
+  <div style="display: grid; grid-template-columns: 0.5fr 1fr 1fr 1fr; gap: 8px; margin-top: 8px;">
+    <div style="font-size:10px;">
+      <div style="color: var(--text-faint);">Inputs (5)</div>
+      <div>plantCd=HR1</div>
+      <div>plantCd=HR2 ⚠</div>
+      <div>plantCd=HR3 ⚠</div>
+      <div>plantCd=H99</div>
+      <div>plantCd=null</div>
+    </div>
+    <div style="font-size:10px;">
+      <div style="color: var(--bad);">BEFORE output</div>
+      <div>defaultGroup ✓</div>
+      <div>defaultGroup ✓</div>
+      <div>throw DG107</div>
+      <div>throw DG107</div>
+      <div>NPE</div>
+    </div>
+    <div style="font-size:10px;">
+      <div style="color: var(--good);">AFTER output</div>
+      <div>defaultGroup ✓</div>
+      <div style="color: var(--bad);">throw DG107</div>
+      <div style="color: var(--good);">defaultGroup ✓</div>
+      <div>throw DG107</div>
+      <div>NPE</div>
+    </div>
+    <div style="font-size:10px;">
+      <div style="color: var(--accent);">Diff</div>
+      <div>same</div>
+      <div style="color: var(--bad);">REGRESSION</div>
+      <div style="color: var(--good);">새 case 통과</div>
+      <div>same</div>
+      <div>same</div>
+    </div>
+  </div>
+  <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border); display: flex; gap: 6px; justify-content: space-between; align-items: center;">
+    <span style="font-size: 10.5px; color:var(--warn);">⚠ 1 regression — HR2 사용자 영향</span>
+    <div style="display: flex; gap: 4px;">
+      <button class="btn-mini">매뉴얼 stale 보기</button>
+      <button class="btn-mini">▼ 풀 화면 보기</button>
+      <button class="btn-mini">Discard</button>
+      <button class="btn-mini primary">Apply</button>
+    </div>
+  </div>
+</div>
+
+<h3>5-C. 풀 화면 — 「🔬 Sim」 mode rail 클릭</h3>
+
+<p>Drawer 가 좁다 싶으면 「▼ 풀 화면 보기」 → mode rail 의 🔬 Sim 으로 전환 → 화면 전체에 결과 viewer (Python diff, 매뉴얼 stale 리스트, chain effect 그래프 등). 이 mode 는 Workbench 와 별개의 화면.</p>
+
+<div class="panel good">
+  <strong>3 단계 패턴 정리</strong> :
+  <ul>
+    <li><strong>Step 1 (drawer 작음)</strong> — ChangeSpec 입력. Workbench 보임.</li>
+    <li><strong>Step 2 (drawer 확장)</strong> — 결과 요약. inputs × outputs table. Workbench 여전히 보임.</li>
+    <li><strong>Step 3 (full mode)</strong> — 자세한 분석 필요할 때만 mode 전환. Workbench 가림.</li>
+  </ul>
+  모달이 아니라 <strong>점진적 확대 (progressive disclosure)</strong>. 사용자가 결과 보면서도 코드/ontology 클릭 가능.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="density">6. UI Density & Interaction Patterns</h2>
+
+<p>"사이즈 조정 / 모달 / 팝업" 어떻게 일관되게 쓸지 정리. 사용자 작업 흐름이 끊기지 않도록 <strong>"방해 정도 (intrusiveness)"</strong> 기준으로 패턴을 분류합니다.</p>
+
+<h3>6-A. 패턴 매트릭스 — 언제 무엇을</h3>
+
+<table class="pattern-table">
+  <thead>
+    <tr>
+      <th style="width: 110px;">패턴</th>
+      <th style="width: 80px;">방해도</th>
+      <th>언제 쓰나 (use)</th>
+      <th>언제 안 쓰나 (avoid)</th>
+      <th style="width: 130px;">예시 (onTong 안에서)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="pat-name">tooltip</td>
+      <td>최저</td>
+      <td class="when-use">버튼/아이콘의 짧은 라벨 (200ms hover 후, max 30자)</td>
+      <td class="when-not">상호작용 필요한 콘텐츠</td>
+      <td>「⏎ 확정」 버튼의 단축키 안내</td>
+    </tr>
+    <tr>
+      <td class="pat-name">popover</td>
+      <td>낮음</td>
+      <td class="when-use">읽기/조회 위주 + 1~2 액션. anchor 의 정의 미리보기. 다른 곳 클릭 시 자동 닫힘.</td>
+      <td class="when-not">긴 입력 (3+ 필드), multi-step</td>
+      <td>코드 hover 시 anchor binding 정보, term hover 시 정의</td>
+    </tr>
+    <tr>
+      <td class="pat-name">inline expand</td>
+      <td>낮음</td>
+      <td class="when-use">카드 자체에 "더 보기 / 덜 보기". 위치 자리 그대로.</td>
+      <td class="when-not">완전히 다른 컨텍스트로 전환 시</td>
+      <td>Ontology card 의 description 전문 펼치기</td>
+    </tr>
+    <tr>
+      <td class="pat-name">side panel<br/>(resizable)</td>
+      <td>중간</td>
+      <td class="when-use">메인 작업 화면의 상시 영역. 사용자가 자유 조정/접기.</td>
+      <td class="when-not">한번 보고 닫는 일회성 작업</td>
+      <td>Workbench 의 4 패널 (메서드 트리 / 코드 / ontology / 참고)</td>
+    </tr>
+    <tr>
+      <td class="pat-name">drawer<br/>(slide-up/in)</td>
+      <td>중간</td>
+      <td class="when-use">메인 화면 일부 가리지만 메인 클릭 가능. 점진 확대 가능.</td>
+      <td class="when-not">전역 destructive 액션</td>
+      <td>시뮬레이션 입력 → 결과 (bottom drawer 3 단계)</td>
+    </tr>
+    <tr>
+      <td class="pat-name">floating window<br/>(detached)</td>
+      <td>중간</td>
+      <td class="when-use">사용자가 multi-monitor 또는 두 영역 동시 비교. 드래그/리사이즈 자유.</td>
+      <td class="when-not">단일 모니터 small screen</td>
+      <td>Ontology card 를 detach → 다른 모니터로 떼어놓고 작업</td>
+    </tr>
+    <tr>
+      <td class="pat-name">modal<br/>(blocking)</td>
+      <td>최고</td>
+      <td class="when-use">destructive 확인 (삭제/초기화). 또는 wizard (multi-step 새 작업).</td>
+      <td class="when-not">단순 정보 표시, 자주 발생하는 작업</td>
+      <td>「전체 초기화」 confirm, 「Repository 등록 해제」 confirm</td>
+    </tr>
+    <tr>
+      <td class="pat-name">command<br/>palette</td>
+      <td>중간</td>
+      <td class="when-use">전역 검색/액션. 키보드 우선 사용자.</td>
+      <td class="when-not">초보 사용자 main UX</td>
+      <td>⌘K — 메서드/term/rule 빠른 점프 + 액션 (확정, 시뮬레이션 등)</td>
+    </tr>
+    <tr>
+      <td class="pat-name">notification<br/>(toast)</td>
+      <td>낮음</td>
+      <td class="when-use">비동기 작업 완료 알림. 사용자 액션 불필요. 자동 사라짐.</td>
+      <td class="when-not">사용자 결정 필요</td>
+      <td>"매뉴얼 인제스트 완료", "Auto-link 7 bindings", "시뮬레이션 실패"</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="panel good">
+  <strong>황금 규칙</strong> — <em>"방해도가 높을수록 사용자가 화남"</em>. 같은 작업을 popover 로 가능하면
+  popover 로, drawer 로 가능하면 drawer 로, modal 은 정말 마지막 수단. 현재 Section 2 에서 modal 은
+  「전체 초기화」 confirm 1 개만 정당화됨.
+</div>
+
+<div class="ui-mock-stack">
+  <div>
+    <h5>Popover (최소 침입)</h5>
+    <div class="popover-demo">
+      <span class="anchor-text">hrTgtWidth</span>
+      <div class="popover-box">
+        <div class="pn">term.열연타겟폭</div>
+        <div>mm · 800~2000</div>
+        <div style="font-size:9.5px; color: var(--text-faint); margin-top:3px;">파일 4곳에서 사용</div>
+      </div>
+    </div>
+    <div style="font-size: 11px; color: var(--text-dim); margin-top: 6px;">코드 hover 시. 클릭 안하면 자동 사라짐.</div>
+  </div>
+
+  <div>
+    <h5>Modal (destructive 만)</h5>
+    <div class="modal-demo">
+      <div class="modal-box">
+        <div class="mt">⚠ 전체 초기화</div>
+        <div>매뉴얼/용어/매핑/갭 모두 삭제. 되돌릴 수 없음.</div>
+        <div style="margin-top: 6px; display: flex; gap: 4px; justify-content: flex-end;">
+          <button class="btn-mini">취소</button>
+          <button class="btn-mini" style="background: rgba(248,113,113,0.2); color: var(--bad); border-color: var(--bad);">삭제</button>
+        </div>
+      </div>
+    </div>
+    <div style="font-size: 11px; color: var(--text-dim); margin-top: 6px;">결과 되돌릴 수 없는 액션만.</div>
+  </div>
+
+  <div>
+    <h5>Floating window (detach)</h5>
+    <div class="floating-demo">
+      <div class="float-box">
+        <div style="color: var(--accent); font-weight: 600;">🧬 Ontology editor</div>
+        <div style="margin-top: 3px;">분리된 창</div>
+        <div style="font-size: 9.5px; color: var(--text-faint); margin-top: 3px;">⤓ 다시 dock</div>
+      </div>
+      <div class="bg-text">↑ Workbench 메인 화면</div>
+    </div>
+    <div style="font-size: 11px; color: var(--text-dim); margin-top: 6px;">패널 우상단 ⤴ 클릭 → 별도 창. multi-monitor 환경.</div>
+  </div>
+
+  <div>
+    <h5>Inline expand (자리 그대로)</h5>
+    <div class="inline-expand-demo">
+      <div class="row">
+        <span><strong>term.슬래브두께</strong></span>
+        <span style="color: var(--text-faint);">mm · 200~280</span>
+      </div>
+      <div class="more">
+        ▼ 더 보기 — description 전문 / 매핑 위치 7곳 / 관련 rule 3개
+      </div>
+    </div>
+    <div style="font-size: 11px; color: var(--text-dim); margin-top: 6px;">컨텍스트 안 떠나면서 카드만 펼쳐짐.</div>
+  </div>
+</div>
+
+<h3>6-B. 사이즈 조정 — Resizable / Collapsible / Maximize</h3>
+
+<p>모든 메인 패널은 3 가지 인터랙션 표준 :</p>
+
+<table>
+  <thead><tr><th>인터랙션</th><th>방법</th><th>저장</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Resize (드래그)</strong></td>
+      <td>패널 사이 경계선 위에 hover 시 cursor 가 col-resize / row-resize. 드래그로 비율 조정. min/max 한계 있음 (예: tree 최소 160px).</td>
+      <td>localStorage 에 저장 (사용자별, 화면별)</td>
+    </tr>
+    <tr>
+      <td><strong>Collapse (접기)</strong></td>
+      <td>패널 헤더 우상단 ◀ 또는 ▶ 클릭. 패널 width → 0 (얇은 spine 만 남음, 클릭 시 다시 펼침). 키보드: ⌘1~⌘4 로 패널 토글.</td>
+      <td>localStorage</td>
+    </tr>
+    <tr>
+      <td><strong>Maximize (집중)</strong></td>
+      <td>패널 헤더 ⛶ 클릭. 다른 패널 모두 숨김 + 그 패널이 화면 전체. 다시 클릭 시 복원. ESC 도 복원.</td>
+      <td>일회성 (저장 안 함)</td>
+    </tr>
+    <tr>
+      <td><strong>Detach (분리)</strong></td>
+      <td>패널 헤더 ⤴ 클릭. 별도 창으로 popout. 본 화면은 빈자리에 placeholder. 다시 dock 가능.</td>
+      <td>창 위치 / 크기 저장</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>6-C. 화면 크기별 default layout (responsive)</h3>
+
+<div class="density-grid">
+  <div class="density-card">
+    <div class="res">< 1280px</div>
+    <div class="desc">노트북 좁은 화면. R 패널 자동 collapse.</div>
+    <div class="layout">
+      <div style="flex: 0 0 40px;">rail</div>
+      <div style="flex: 0 0 140px;">tree</div>
+      <div style="flex: 1;">code</div>
+      <div style="flex: 1;">ontology</div>
+    </div>
+    <div style="font-size: 10.5px; color: var(--text-faint); margin-top: 4px;">참고 패널 → 우측 toggle 버튼</div>
+  </div>
+
+  <div class="density-card">
+    <div class="res">1440 ~ 1920</div>
+    <div class="desc">기본. 4 패널 표준 비율.</div>
+    <div class="layout">
+      <div style="flex: 0 0 40px;">rail</div>
+      <div style="flex: 0 0 160px;">tree</div>
+      <div style="flex: 1;">code</div>
+      <div style="flex: 1.05;">ontology</div>
+      <div style="flex: 0.95;">참고</div>
+    </div>
+    <div style="font-size: 10.5px; color: var(--text-faint); margin-top: 4px;">사용자가 자유 조정 가능</div>
+  </div>
+
+  <div class="density-card">
+    <div class="res">≥ 2560px</div>
+    <div class="desc">대형. 참고 패널 + Map 동시 표시.</div>
+    <div class="layout">
+      <div style="flex: 0 0 40px;">rail</div>
+      <div style="flex: 0 0 200px;">tree</div>
+      <div style="flex: 1;">code</div>
+      <div style="flex: 1;">ontology</div>
+      <div style="flex: 0.8;">참고</div>
+      <div style="flex: 0.8;">map</div>
+    </div>
+    <div style="font-size: 10.5px; color: var(--text-faint); margin-top: 4px;">또는 macro view 별도 dock</div>
+  </div>
+</div>
+
+<h3>6-D. Drawer 의 점진 확대 (시뮬레이션)</h3>
+
+<p>v3.1 §5 의 3 단계 패턴을 키보드/마우스 인터랙션 으로 정밀화 :</p>
+
+<ul>
+  <li><strong>드래그 핸들</strong> — drawer 상단 4px 영역 hover 시 cursor=row-resize. 드래그로 자유롭게 키울 수 있음.</li>
+  <li><strong>스냅 포인트</strong> — 드래그 중 280px / 480px / 720px / 풀화면 4 단계 부근에서 magnetic snap.</li>
+  <li><strong>키보드</strong> — ⌘\ 로 drawer 전환 (작음 → 중간 → 풀 → 닫음 cycle).</li>
+  <li><strong>풀화면 시 자동 mode 전환</strong> — drawer 가 80% 이상 키워지면 자동으로 「🔬 Sim」 mode 로 전환 (drawer 가 풀 페이지 됨).</li>
+</ul>
+
+<h3>6-E. Command Palette (⌘K) — power user 패턴</h3>
+
+<p>대형 시스템에서 빠른 navigation/액션의 표준. Cursor / VSCode 와 동일.</p>
+
+<div class="drawer-mock">
+  <div class="head">⌘K — 전역 검색 + 액션</div>
+  <div style="background: var(--code-bg); padding: 6px 10px; border-radius: 3px; margin-top: 4px; font-family: 'SF Mono', monospace; font-size: 11px;">
+    <div style="color: var(--text);">> findGroup<span style="background: var(--accent); color: white; padding: 0 2px;">|</span></div>
+    <div style="color: var(--text-dim); margin-top: 6px;">📍 navigate</div>
+    <div style="padding: 2px 8px; background: rgba(56,189,248,0.1); border-radius: 2px; color: var(--text); margin: 2px 0;">EdgingService.findGroup() <span style="font-size:9px; color:var(--text-faint);">— Workbench 로 점프</span></div>
+    <div style="padding: 2px 8px; color: var(--text-dim);">SdHistoryService.findGroupBySm() <span style="font-size:9px; color:var(--text-faint);">— ...</span></div>
+    <div style="color: var(--text-dim); margin-top: 6px;">⚡ actions</div>
+    <div style="padding: 2px 8px; color: var(--text-dim);">▶ findGroup 시뮬레이션 만들기</div>
+    <div style="padding: 2px 8px; color: var(--text-dim);">🧬 findGroup 의 anchor 일괄 LLM 추천</div>
+  </div>
+</div>
+
+<h3>6-F. 상태 표시 — 항상 어디서 무슨 작업 중인지</h3>
+
+<ul>
+  <li><strong>상단 breadcrumb</strong> — <code>Workbench › std.service › EdgingService › findGroup()</code></li>
+  <li><strong>왼쪽 트리의 현재 메서드 highlight</strong> — 작업 중인 노드 항상 visible (auto scroll)</li>
+  <li><strong>저장 indicator</strong> — ontology 카드 우상단 ● (변경 안 됨) / ◌ (저장 안된 변경) / ⏳ (저장 중)</li>
+  <li><strong>비동기 작업 toast</strong> — bottom-right 에 자동 disappear (4초). progress bar 같이.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="combined">7. v2 (architecture) + v3.1 (UI/UX) 합쳐진 결정 사항</h2>
+
+<table>
+  <thead><tr><th>항목</th><th>결정</th></tr></thead>
+  <tbody>
+    <tr><td>샌드박스 = 온톨로지 기반 Python 생성/실행 (v2 #1)</td><td><span class="pill have">합의</span></td></tr>
+    <tr><td>코드가 ground truth (v2 #2)</td><td><span class="pill have">합의</span></td></tr>
+    <tr><td>매핑 anchor 7 종 (field/field_access/param/local/return/branch/literal)</td><td><span class="pill new">v3.1 확장</span></td></tr>
+    <tr><td>입력 main = Ontology Editor (매뉴얼 작성기 폐기)</td><td><span class="pill new">v3.1 확정</span></td></tr>
+    <tr><td>매뉴얼 = (a) 외부 import reference, (b) ontology desc 의 export view</td><td><span class="pill new">v3.1 확정</span></td></tr>
+    <tr><td>5 mode rail (Repo / Bench / Map / Sim / Import)</td><td><span class="pill have">v3 합의</span></td></tr>
+    <tr><td>Workbench L 패널 — 메서드 ↔ 클래스 트리 토글</td><td><span class="pill new">v3.1 확장</span></td></tr>
+    <tr><td>LLM 추천 inline 표시 (모달 X)</td><td><span class="pill have">v3 U2=A</span></td></tr>
+    <tr><td>Map view = xyflow 그래프 + 트리 toggle</td><td><span class="pill have">v3 U3=C</span></td></tr>
+    <tr><td>시뮬레이션 = bottom drawer (3 단계 progressive disclosure)</td><td><span class="pill new">v3.1 U5 답</span></td></tr>
+    <tr><td>키보드 단축키 핵심 5 개</td><td><span class="pill have">v3 U6=A</span></td></tr>
+    <tr><td>패턴 매트릭스 (popover / drawer / modal / floating / palette / toast)</td><td><span class="pill new">§6-A</span></td></tr>
+    <tr><td>모든 패널 resizable + collapsible + maximize + detach</td><td><span class="pill new">§6-B</span></td></tr>
+    <tr><td>화면 크기별 default layout (responsive)</td><td><span class="pill new">§6-C</span></td></tr>
+    <tr><td>Drawer 점진 확대 + 스냅 포인트 + ⌘\ 토글</td><td><span class="pill new">§6-D</span></td></tr>
+    <tr><td>⌘K Command Palette (전역 검색 + 액션)</td><td><span class="pill new">§6-E</span></td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="remaining">8. 남은 결정 질문</h2>
+
+<p>v3.1 변경에 대한 추가 확인 + v2 architecture 의 미답 질문.</p>
+
+<h3>v3.1 §6 (Density/Patterns) 신규 질문</h3>
+
+<div class="question" data-qid="Q-U10">
+  <div class="qhead">Q-U10 — 패턴 매트릭스 (§6-A) 동의 여부</div>
+  <div class="qbody">popover / drawer / modal / floating / palette / toast 의 사용 기준에 동의?
+    특히 modal 은 destructive 액션만 (전체 초기화 / repo 등록 해제) 으로 한정.</div>
+  <div class="qopt recommended">
+    <div class="opt-label">A) 동의 — 그대로</div>
+    <div class="opt-tradeoff">사용자 작업 흐름 보호 우선. modal 최소화.</div>
+  </div>
+  <div class="qopt">
+    <div class="opt-label">B) 일부 변경 — modal 을 더/덜 쓰자</div>
+    <div class="opt-tradeoff">의견 자유롭게 (어떤 경우에 modal 추가?)</div>
+  </div>
+</div>
+
+<div class="question" data-qid="Q-U11">
+  <div class="qhead">Q-U11 — Detach (별도 창) 지원 여부</div>
+  <div class="qbody">패널을 별도 창으로 떼어내는 detach 기능이 필요한가?</div>
+  <div class="qopt">
+    <div class="opt-label">A) 도입 — multi-monitor 사용자 power UX</div>
+    <div class="opt-tradeoff">구현 비용 (window pop-out + 상태 동기화). 사용자 1~2 명만 활용 가능성.</div>
+  </div>
+  <div class="qopt recommended">
+    <div class="opt-label">B) 보류 — collapse + maximize 만으로 충분</div>
+    <div class="opt-tradeoff">단순. 나중에 필요하면 추가.</div>
+  </div>
+</div>
+
+<div class="question" data-qid="Q-U12">
+  <div class="qhead">Q-U12 — Command Palette (⌘K) 우선순위</div>
+  <div class="qbody">Cursor/VSCode 식 전역 검색+액션 palette 가 필요?</div>
+  <div class="qopt recommended">
+    <div class="opt-label">A) P14 (초반) 단계에 도입 — power 사용자가 곧바로 빠르게 작업</div>
+    <div class="opt-tradeoff">학습 곡선 약간. 한번 익히면 매우 빠름.</div>
+  </div>
+  <div class="qopt">
+    <div class="opt-label">B) P25 이후 (시뮬레이션 끝나고) — 기본 UX 안정 후 추가</div>
+    <div class="opt-tradeoff">초기 작업 양 줄임. 도입 시점에 사용자가 익숙해지는 비용.</div>
+  </div>
+</div>
+
+<h3>이전 v3.1 질문 (그대로)</h3>
+
+<div class="question" data-qid="Q-U7">
+  <div class="qhead">Q-U7 — Class field 입력 흐름 (v3.1 신규)</div>
+  <div class="qbody">클래스 instance field 의 ontology 입력은 어디서?</div>
+  <div class="qopt recommended">
+    <div class="opt-label">A) Workbench L 패널 「클래스」 토글에서 클래스 선택 → C-R 패널이 "class 모드" 로 전환 → 그 클래스의 field 들이 카드로 보임</div>
+    <div class="opt-tradeoff">메서드 ↔ 클래스 작업 흐름 분리. 사용자가 명시적으로 토글.</div>
+  </div>
+  <div class="qopt">
+    <div class="opt-label">B) 메서드 보고 있을 때도 그 메서드가 사용하는 instance field 카드를 위쪽에 표시 (현재 mockup §4 가 이 방식)</div>
+    <div class="opt-tradeoff">메서드 작업 시 자연. 다만 같은 field 를 여러 메서드에서 매번 마주침.</div>
+  </div>
+  <div class="qopt">
+    <div class="opt-label">C) 둘 다 — 클래스 토글에서 정식 입력 + 메서드 보기 시 read-only summary</div>
+    <div class="opt-tradeoff">UX 좋음. 구현 복잡도 ↑.</div>
+  </div>
+</div>
+
+<div class="question" data-qid="Q-U8">
+  <div class="qhead">Q-U8 — Ontology description 의 길이/형식</div>
+  <div class="qbody">term/rule 의 description (자연어 설명) 은 얼마나 길게 허용?</div>
+  <div class="qopt recommended">
+    <div class="opt-label">A) markdown 자유 형식, 길이 제한 없음 → 매뉴얼 export 시 그대로 본문 됨</div>
+    <div class="opt-tradeoff">사용자가 풍부하게 작성 가능. 카드 펼치면 길어질 수 있음.</div>
+  </div>
+  <div class="qopt">
+    <div class="opt-label">B) 짧은 한 줄 정의 (max 200 자) — 풍부한 본문은 별도 매뉴얼 작성</div>
+    <div class="opt-tradeoff">카드 컴팩트. 매뉴얼 작성기가 다시 필요해짐 (모순).</div>
+  </div>
+</div>
+
+<div class="question" data-qid="Q-U9">
+  <div class="qhead">Q-U9 — 외부 매뉴얼 (PDF) 의 위치</div>
+  <div class="qbody">📥 Import mode 에서 PDF/DOCX 업로드 → fragment 풀 → Workbench R 패널에 보임. 그 외 어떤 작업이 더 필요?</div>
+  <div class="qopt recommended">
+    <div class="opt-label">A) Import 후 fragment 가 LLM 으로 자동 분석 → 관련 메서드 자동 link → Workbench 에 reference 로 표시</div>
+    <div class="opt-tradeoff">사용자 작업 0. fragment ↔ method link 정확도가 LLM 성능에 의존.</div>
+  </div>
+  <div class="qopt">
+    <div class="opt-label">B) Fragment 풀만 만들고 link 는 사용자가 ontology 입력 시 수동으로 ⊕ 클릭</div>
+    <div class="opt-tradeoff">사용자 통제 높음. 노가다.</div>
+  </div>
+</div>
+
+<h3>v2 미답 architecture 질문 (다시 정리)</h3>
+
+<div class="question" data-qid="Q1">
+  <div class="qhead">Q1 — Persistence 백엔드</div>
+  <div class="qopt recommended">
+    <div class="opt-label">A) SQLite 단일 파일</div>
+  </div>
+  <div class="qopt">
+    <div class="opt-label">B) Postgres (Docker compose)</div>
+  </div>
+</div>
+
+<div class="question" data-qid="Q-A">
+  <div class="qhead">Q-A — Python sandbox 격리 강도</div>
+  <div class="qopt">
+    <div class="opt-label">A1 (가벼움)</div> <span class="opt-tradeoff">subprocess + timeout</span>
+  </div>
+  <div class="qopt recommended">
+    <div class="opt-label">A2 (중간)</div> <span class="opt-tradeoff">RestrictedPython</span>
+  </div>
+  <div class="qopt">
+    <div class="opt-label">A3 (강함)</div> <span class="opt-tradeoff">gVisor / firecracker</span>
+  </div>
+</div>
+
+<div class="question" data-qid="Q-B">
+  <div class="qhead">Q-B — Body 분석 추출 깊이</div>
+  <div class="qopt">
+    <div class="opt-label">B1 (얕음, top-level only)</div>
+  </div>
+  <div class="qopt recommended">
+    <div class="opt-label">B2 (완전 AST visitor, nested 포함)</div>
+  </div>
+</div>
+
+<div class="question" data-qid="Q-C">
+  <div class="qhead">Q-C — Anchor 자동 추출 + 사람 확정 균형</div>
+  <div class="qopt">
+    <div class="opt-label">C1 (전부 자동 confirmed)</div>
+  </div>
+  <div class="qopt">
+    <div class="opt-label">C2 (전부 큐 → 사람 확정)</div>
+  </div>
+  <div class="qopt recommended">
+    <div class="opt-label">C3 (혼합 — formula/literal 자동, branch/lookup 큐)</div>
+  </div>
+</div>
+
+<div class="question" data-qid="Q-D">
+  <div class="qhead">Q-D — Python 변수명 한국어 치환?</div>
+  <div class="qopt recommended">
+    <div class="opt-label">D1 (한국어 치환 — 도메인어로 결과 가독성 ↑)</div>
+  </div>
+  <div class="qopt">
+    <div class="opt-label">D2 (영문 유지)</div>
+  </div>
+</div>
+
+<div class="question" data-qid="Q-E">
+  <div class="qhead">Q-E — Java 코드 patch PR 자동 생성?</div>
+  <div class="qopt">
+    <div class="opt-label">E1 (생성 X — ontology 만 갱신)</div>
+  </div>
+  <div class="qopt recommended">
+    <div class="opt-label">E2 (생성 O — draft PR)</div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="answers">9. 내 답변 — 클릭으로 선택, 한 번에 복사</h2>
+
+<p class="lead">
+  위 §6 ~ §8 의 12 개 질문에서 옵션을 클릭하면 자동 선택되고 아래 textarea 에 양식이 바로 채워집니다.
+  추천 옵션은 default 로 선택되어 있습니다. 다 마쳤으면 「📋 답변 복사」 버튼 한 번 누르고 채팅에 붙여넣기.
+</p>
+
+<div class="copy-area">
+  <div class="copy-head">
+    <span class="copy-title">📋 내 답변 양식</span>
+    <span class="copy-status" id="copy-status">✓ 클립보드 복사 완료!</span>
+  </div>
+  <textarea id="answer-preview" readonly aria-label="자동 생성된 답변 양식"></textarea>
+  <div class="button-row">
+    <button class="copy-btn" onclick="copyAnswers()">📋 답변 복사</button>
+    <button class="copy-btn secondary" onclick="resetToRecommended()">↺ 추천값으로 초기화</button>
+    <span class="progress-summary" id="progress-summary"></span>
+  </div>
+  <p style="margin-top: 10px; font-size: 11.5px; color: var(--text-faint);">
+    💡 textarea 끝부분에 자유 의견 (mockup 패널 비율, drawer 동작, anchor 색상 등) 도 직접 입력 가능.
+    복사 버튼은 textarea 의 현재 내용을 그대로 복사합니다.
+  </p>
+</div>
+
+<script>
+(function() {
+  const QUESTIONS = [
+    { id: 'Q-U10', label: '패턴 매트릭스 동의' },
+    { id: 'Q-U11', label: 'Detach 별도 창' },
+    { id: 'Q-U12', label: 'Command Palette 시점' },
+    { id: 'Q-U7',  label: 'Class field 입력 흐름' },
+    { id: 'Q-U8',  label: 'Description 형식' },
+    { id: 'Q-U9',  label: '외부 매뉴얼 link' },
+    { id: 'Q1',    label: 'Persistence 백엔드' },
+    { id: 'Q-A',   label: 'Python sandbox 격리' },
+    { id: 'Q-B',   label: 'Body 분석 깊이' },
+    { id: 'Q-C',   label: 'Anchor 자동/큐 균형' },
+    { id: 'Q-D',   label: 'Python 변수명 한국어' },
+    { id: 'Q-E',   label: 'Java patch PR' },
+  ];
+
+  const SECTION_HEADERS = {
+    'Q-U10': '# UI density / 인터랙션 패턴 (§6)',
+    'Q-U7':  '# v3.1 — Workbench 영역별 흐름',
+    'Q1':    '# v2 — Architecture',
+  };
+
+  function getOptionValue(opt) {
+    const labelEl = opt.querySelector('.opt-label');
+    if (!labelEl) return null;
+    const text = labelEl.textContent.trim();
+    // "A) 동의 — 그대로" → "A", "A1 (가벼움)" → "A1"
+    const m = text.match(/^([A-Z][0-9]?)/);
+    return m ? m[1] : null;
+  }
+
+  function getOptionLabel(opt) {
+    const labelEl = opt.querySelector('.opt-label');
+    if (!labelEl) return '';
+    let text = labelEl.textContent.trim();
+    text = text.replace(/\s*·\s*추천\s*$/, '');
+    return text;
+  }
+
+  function selectOption(qid, opt) {
+    const q = document.querySelector('.question[data-qid="' + qid + '"]');
+    if (!q) return;
+    q.querySelectorAll('.qopt').forEach(o => o.classList.remove('selected'));
+    opt.classList.add('selected');
+    updatePreview();
+  }
+
+  function updatePreview() {
+    const lines = [];
+    let answered = 0;
+    QUESTIONS.forEach(q => {
+      if (SECTION_HEADERS[q.id]) {
+        if (lines.length > 0) lines.push('');
+        lines.push(SECTION_HEADERS[q.id]);
+      }
+      const node = document.querySelector('.question[data-qid="' + q.id + '"] .qopt.selected');
+      if (!node) {
+        lines.push(q.id + ' (' + q.label + '): _____');
+        return;
+      }
+      answered++;
+      const value = getOptionValue(node);
+      const label = getOptionLabel(node);
+      lines.push(q.id + ' (' + q.label + '): ' + value + ' — ' + label);
+    });
+    lines.push('');
+    lines.push('# 자유 의견 (자유롭게 추가)');
+    lines.push('-');
+    document.getElementById('answer-preview').value = lines.join('\n');
+    const sum = document.getElementById('progress-summary');
+    if (sum) {
+      sum.innerHTML = '진행: <strong>' + answered + '/' + QUESTIONS.length + '</strong>';
+    }
+  }
+
+  function bindClicks() {
+    document.querySelectorAll('.question').forEach(q => {
+      const qid = q.dataset.qid;
+      if (!qid) return;
+      q.querySelectorAll('.qopt').forEach(opt => {
+        opt.addEventListener('click', () => selectOption(qid, opt));
+      });
+    });
+  }
+
+  function selectRecommended() {
+    document.querySelectorAll('.question').forEach(q => {
+      const rec = q.querySelector('.qopt.recommended');
+      const already = q.querySelector('.qopt.selected');
+      if (rec && !already) rec.classList.add('selected');
+    });
+  }
+
+  window.copyAnswers = function() {
+    const ta = document.getElementById('answer-preview');
+    ta.select();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(ta.value).then(showCopied).catch(() => {
+        try { document.execCommand('copy'); showCopied(); } catch (e) {}
+      });
+    } else {
+      try { document.execCommand('copy'); showCopied(); } catch (e) {}
+    }
+  };
+
+  function showCopied() {
+    const s = document.getElementById('copy-status');
+    s.classList.add('show');
+    setTimeout(() => s.classList.remove('show'), 2200);
+  }
+
+  window.resetToRecommended = function() {
+    document.querySelectorAll('.question').forEach(q => {
+      q.querySelectorAll('.qopt').forEach(o => o.classList.remove('selected'));
+      const rec = q.querySelector('.qopt.recommended');
+      if (rec) rec.classList.add('selected');
+    });
+    updatePreview();
+  };
+
+  // Init
+  bindClicks();
+  selectRecommended();
+  updatePreview();
+})();
+</script>
+
+<footer>
+  <p>onTong / Section 2 — UI/UX v3.1 (Ontology-Primary Workbench). 작성: 2026-04-26.
+    이 문서는 <code>toClaude/modeling/UIUX-개선제안-v3.1.html</code> 에 위치합니다.
+    v3 (<code>UIUX-개선제안-v3.html</code>) 은 매뉴얼-primary framing 이 잘못, v3.1 로 대체.</p>
+</footer>
+
+</div>
+</body>
+</html>

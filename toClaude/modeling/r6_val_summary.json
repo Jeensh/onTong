@@ -1,0 +1,237 @@
+{
+  "baseline": {
+    "session_id": "092b447a-2065-4fb1-9883-f0f6599b8153",
+    "confidence": 0.5,
+    "domain_role": "standard",
+    "label_ko": "열연설비사양기준 (HR스펙, 추정)",
+    "label_en": "HrSpec",
+    "tool_call_count": 5,
+    "duration_ms": 41096,
+    "concerns": [
+      "PK HR_PLANT_CD length=1 인데 docstring 은 'CONFIRMED_PLANT_CD 의 2자리(열연위치)' 와 매칭한다고 함 — 자릿수 불일치, 인코딩/매핑 규칙 별도 존재 가능",
+      "CastSpecJpo 는 추가 PK (smCd, castCd, machineCd) 와 SLAB_THICKNESS·WGT_LOW/HIGH 까지 보유하는데 HrSpecJpo 는 폭/길이 4컬럼만 있음 — 비대칭. 단중·두께가 HrMin/MaxWgt 로 분리된 이유 확인 필요",
+      "field 가 4개의 측정치만 있어 audit/메타 컬럼이 전혀 없음 — 기준 마스터로는 자연스럽지만 변경 이력 추적 방식이 별도 테이블인지 확인 필요"
+    ],
+    "assumptions": [
+      "Assumed '열연설비사양기준' = 열연공정에서의 제품 치수 허용 범위 (확인 필요)",
+      "Assumed CastSpecJpo 와의 sibling 관계가 '공정별 분할' 패턴 (확인 필요)",
+      "Assumed HR_PLANT_CD 1자리 = 열연공장 식별자, ORDER_OS 매칭 시 인코딩 변환됨 (확인 필요)",
+      "기존 자동추천 term 'syn*.term.scm.spec.hr_spec / HR스펙' 이 존재하지만 confirmed=false — 본 가설은 그 term 라벨과 정합"
+    ]
+  },
+  "blind": {
+    "session_id": "80c5828b-8a63-4c94-99f9-418b2be2766c",
+    "confidence": 0.45,
+    "domain_role": "standard",
+    "label_ko": "HR(열연) 스펙 추정",
+    "label_en": "HrSpec",
+    "tool_call_count": 6,
+    "duration_ms": 44586,
+    "concerns": [
+      "WGT(중량) 컬럼이 없음 — 같은 패키지 CastSpec 에는 WGT_LOW/HIGH 가 있고, HrMaxWgtJpo/HrMinWgtJpo 가 별도로 존재. HR 공정에서는 중량 제약이 별도 테이블로 분리되어 있는 듯한데, 이 비대칭이 의도된 설계인지 확인 필요",
+      "hrPlantCd 의 길이가 1자리 — 회사·조직 단위로 HR공장이 매우 적은 모델인지, 또는 코드 자릿수 설계 결정인지 불분명",
+      "도메인 검색은 'HrSpecEntity' 자동 추천 항목만 반환 (syn1~10 거의 동일) — 사람이 확정한 term 이 아직 없음, 본 가설과 충돌하지 않지만 권위 있는 출처로 인용하기는 어려움",
+      "테이블·필드에 javadoc/Korean comment 가 전혀 제공되지 않아 'spec' 의 용도(주문 검증 vs 설계 가이드)가 불명확"
+    ],
+    "assumptions": [
+      "Assumed 'HR' prefix 는 Hot-Rolling(열연) 공정을 가리킨다 (확인 필요)",
+      "Assumed productTypeCd 는 별도 코드 마스터에 해당하는 제품유형 분류 (확인 필요)",
+      "Assumed widthLow/High, lengthLow/High 는 한 쌍의 허용 범위 (range) 이며 단위는 mm (확인 필요)",
+      "Assumed sd.std 패키지 위치가 'standard 테이블' 임을 시사 (확인 필요)",
+      "Assumed 기존 매핑은 없음 — find_existing_mapping 결과 null"
+    ],
+    "trace": [
+      {
+        "tool_name": "find_existing_mapping",
+        "args": {
+          "code_fqn": "com.example.slabdesign.store.sd.std.oracle.jpo.HrSpecJpo"
+        },
+        "result_summary": "null",
+        "duration_ms": 1,
+        "cached": false
+      },
+      {
+        "tool_name": "domain_search",
+        "args": {
+          "query": "HrSpec",
+          "kind": null,
+          "repo_id": null,
+          "limit": 10
+        },
+        "result_summary": "list[10]",
+        "duration_ms": 114,
+        "cached": false
+      },
+      {
+        "tool_name": "find_related_jpos",
+        "args": {
+          "jpo_fqn": "com.example.slabdesign.store.sd.std.oracle.jpo.HrSpecJpo",
+          "limit": 10
+        },
+        "result_summary": "list[10]",
+        "duration_ms": 132,
+        "cached": false
+      },
+      {
+        "tool_name": "code_lookup",
+        "args": {
+          "fqn": "com.example.slabdesign.store.sd.std.oracle.jpo.CastSpecJpo"
+        },
+        "result_summary": "dict(kind, fqn, simple_name, package, class_kind)",
+        "duration_ms": 5,
+        "cached": false
+      },
+      {
+        "tool_name": "code_search",
+        "args": {
+          "query": "HrPlant",
+          "kind": "code_type",
+          "repo_id": null,
+          "limit": 10
+        },
+        "result_summary": "list[0]",
+        "duration_ms": 794,
+        "cached": false
+      },
+      {
+        "tool_name": "note_observation",
+        "args": {
+          "text": "HrSpecJpo (HR_SPEC) has PK [cmpCd, orgCd, hrPlantCd, productTypeCd] and width/length low-high columns. Sibling CastSpecJpo (CAST_SPEC) shares cmpCd/orgCd/productTypeCd PK plus its own equipment code (castCd/machineCd/smCd) and similar width/length/wgt range columns — both look like equipment-scoped product spec range tables. HrSpec is likely the HR(Hot-Rolling) plant version; CastSpec is the casting version.",
+          "kind": "observation"
+        },
+        "result_summary": "dict(recorded, text)",
+        "duration_ms": 2,
+        "cached": false
+      }
+    ]
+  },
+  "pipeline_blind": {
+    "gaps": {
+      "count": 0,
+      "severity_summary": "갭 없음",
+      "blocks": false,
+      "duration_ms": 8502,
+      "items": []
+    },
+    "options": {
+      "count": 3,
+      "recommended_id": "B",
+      "duration_ms": 61746,
+      "items": [
+        {
+          "id": "A",
+          "name": "옵션 A — HrSpec 단일 standard 엔티티",
+          "description": "HR_SPEC 테이블 한 행을 그대로 'HR공장 제품유형 스펙' 표준으로 1:1 모델링합니다. 폭/길이 범위만 보유하고, 중량 한도는 HrMaxWgt/HrMinWgt 가 자체적으로 관리하는 별도 표준이라는 사실을 인정합니다.",
+          "structure_sketch": "HrSpec (HR_SPEC, standard/range)\n  PK: cmpCd + orgCd + hrPlantCd + productTypeCd\n  attrs: widthLow/High, lengthLow/High\n\nHrMaxWgt, HrMinWgt — 별도 standard (다른 PK: +Thk/Wid)",
+          "pros": [
+            "코드 구조와 정확히 1:1 — JPO/PK/Entity/Logic/Service 가 이미 HrSpec 기준으로 응집",
+            "PK·필드 매핑이 단순해 anchor binding 신뢰도 높음",
+            "HrMaxWgt/HrMinWgt 가 (Thickness, Width) 격자 PK 라 HrSpec 과는 의미·차원이 다름을 정직하게 반영"
+          ],
+          "cons": [
+            "‘열연 제품 한도(폭/길이/중량)’ 라는 도메인 개념이 3개 엔티티로 흩어져 도메인 검색 시 한 번에 안 잡힘",
+            "‘HR공장 마스터’ 가 별도로 없어 hrPlantCd 가 dangling 코드처럼 보임"
+          ],
+          "entities_count_hint": "최소 (1)",
+          "domain_alignment": "medium",
+          "trade_offs_one_line": "코드 충실도 ↑ / 도메인 응집 ↓"
+        },
+        {
+          "id": "B",
+          "name": "옵션 B — HrPlant 가상 마스터 + 자매 standard 묶음",
+          "description": "(cmpCd, orgCd, hrPlantCd) 를 ‘HR공장’ 가상 마스터로 추출하고, HrSpec / HrMaxWgt / HrMinWgt 를 그 아래 자매 standard 로 묶습니다. JPO 가 없는 마스터는 ontology-only 엔티티로 둡니다.",
+          "structure_sketch": "HrPlant (가상 master, code-only)\n  PK: cmpCd + orgCd + hrPlantCd\n   ├─ N HrSpec      (productType별 폭/길이)\n   ├─ N HrMaxWgt    (Thk/Wid 격자 → MaxWgt)\n   └─ N HrMinWgt    (Thk/Wid 격자 → MinWgt)",
+          "pros": [
+            "‘HR공장의 생산 한도 표준’ 이라는 도메인 개념이 한 그룹으로 묶여 검색·문서화 용이",
+            "HrMaxWgt 의 hrCd 와 HrSpec 의 hrPlantCd 를 같은 마스터로 정렬해 명명 불일치도 동시에 노출",
+            "향후 실제 HR공장 마스터 JPO 가 발견되면 그대로 승격 가능"
+          ],
+          "cons": [
+            "HrPlant 마스터에 대응하는 JPO 가 현재 코드에 없어 ontology-only 엔티티가 됨 (근거 약함)",
+            "HrMaxWgt 의 PK 컬럼명이 hrCd 라 HrSpec.hrPlantCd 와 동일 개념인지 인터뷰로 확인 필요",
+            "엔티티 수와 관계가 늘어 인지 비용 증가"
+          ],
+          "entities_count_hint": "중간 (1 master + 3 standard)",
+          "domain_alignment": "high",
+          "trade_offs_one_line": "도메인 응집 ↑ / 코드 근거 일부 추정"
+        },
+        {
+          "id": "C",
+          "name": "옵션 C — HrLimit 통합 (폭·길이·중량을 한 개념으로)",
+          "description": "‘열연 제품 한도(HrLimit)’ 라는 단일 도메인 엔티티 아래 폭/길이 범위(HrSpec 행)와 중량 한도(HrMaxWgt+HrMinWgt 행) 를 부분 실현(PARTIAL)으로 합칩니다.",
+          "structure_sketch": "HrLimit (도메인 개념)\n  ├─ realized by HrSpecJpo  (width/length range)\n  └─ realized by HrMaxWgt/HrMinWgt (wgt by Thk×Wid)",
+          "pros": [
+            "‘열연 한도’ 라는 사용자 멘탈모델을 하나로 표현"
+          ],
+          "cons": [
+            "PK 차원이 달라 (HrSpec=productType / HrMaxWgt=Thk×Wid) 한 엔티티로 합치면 PK 의미가 깨짐",
+            "row-level 추적·매핑이 모호해져 anchor binding 신뢰도 저하",
+            "코드 4세트(HrSpec*, HrMaxWgt*, HrMinWgt*) 가 명백히 별도로 관리되는 사실과 충돌"
+          ],
+          "entities_count_hint": "최소 (1)",
+          "domain_alignment": "low",
+          "trade_offs_one_line": "도메인 단순화 ↑ / 구조·매핑 충실도 ↓"
+        }
+      ]
+    },
+    "pattern": {
+      "findings_count": 5,
+      "score": 0.55,
+      "recommendation": "사용자 의견 필요",
+      "summary": "기존 confirmed 온톨로지(`term.smoke-slab.hrplant`, `term.smoke-slab.hrplantspec`)는 이미 'HR공장 마스터 + 통합 사양' 패턴으로 정착되어 있습니다. 옵션 B의 마스터 추출 방향은 일치하나 자식 standard를 3개로 분할하는 점, scm.spec 서브도메인을 사용하지 않는 점에서 부분 이탈입니다.",
+      "duration_ms": 45317,
+      "items": [
+        {
+          "id": "hrplant_master_alignment",
+          "dimension": "composition_pattern",
+          "alignment": "matches",
+          "title": "HrPlant 가상 마스터 추출은 기존 confirmed 패턴과 일치",
+          "evidence_existing": "`term.smoke-slab.hrplant` 가 이미 confirmed=true, is_root_entity=true 인 '열연공장' 가상 루트로 등재되어 있음 (회사·조직·공장 식별자 기준 하위 사양 묶음).",
+          "evidence_proposed": "옵션 B는 (cmpCd, orgCd, hrPlantCd)를 HrPlant 가상 마스터로 추출하고 자매 standard 들을 그 아래 묶는 방식.",
+          "severity": "info",
+          "suggestion": "마스터 추출 방향은 그대로 진행하되, 식별자는 기존 `term.smoke-slab.hrplant`(라벨 '열연공장')와 동일 개념임을 cap 8 명명 단계에서 정렬하세요."
+        },
+        {
+          "id": "split_vs_unified_spec",
+          "dimension": "composition_pattern",
+          "alignment": "deviates",
+          "title": "기존 confirmed는 통합 사양 1개, 옵션 B는 standard 3개로 분할",
+          "evidence_existing": "`term.smoke-slab.hrplantspec`(confirmed=true) 는 '열연공장별 제품유형에 대한 폭·길이 범위 및 MIN/MAX 단중을 통합 관리하는 사양 기준' 으로 단일 엔티티에 폭/길이/MIN/MAX 단중을 모두 담는 패턴.",
+          "evidence_proposed": "옵션 B는 동일 도메인 영역을 HrSpec(폭/길이) + HrMaxWgt + HrMinWgt 의 3개 자매 standard 로 분할.",
+          "severity": "warn",
+          "suggestion": "기존 confirmed 는 JPO 단위가 아닌 도메인 개념 단위로 통합하는 방향이었습니다. 옵션 B를 그대로 갈지, HrPlantSpec 단일 통합 사양으로 재고할지 사용자 확인이 필요합니다 (JPO 3개를 ontology 1개에 매핑하는 것도 패턴상 허용)."
+        },
+        {
+          "id": "domain_subgrouping",
+          "dimension": "domain_grouping",
+          "alignment": "deviates",
+          "title": "Spec 류는 `scm.spec` 서브도메인에 위치하는 패턴",
+          "evidence_existing": "자동 추천된 `syn*.term.scm.spec.hr_spec`, `syn*.term.scm.spec.cast_spec` 모두 domain='scm.spec' 서브버킷에 배치되어 있음. 반면 `hr_max_wgt`, `hr_min_wgt` 는 domain='scm' 평면.",
+          "evidence_proposed": "옵션 B는 hypothesis.domain 을 명시하지 않았고, HrSpec/HrMaxWgt/HrMinWgt 를 한 그룹으로 묶지만 어느 서브도메인인지 결정하지 않음.",
+          "severity": "warn",
+          "suggestion": "HrSpec 은 `scm.spec` 에 두고 HrMaxWgt/HrMinWgt 는 `scm` 평면에 둘지, 일관되게 한 도메인으로 모을지 cap 8 전에 결정하세요. 기존 confirmed `term.smoke-slab.*` 는 domain='scm' 평면을 사용한다는 점도 참고."
+        },
+        {
+          "id": "root_entity_facet",
+          "dimension": "facet_consistency",
+          "alignment": "matches",
+          "title": "마스터=root_entity, 하위 standard=non-root 패턴 일치",
+          "evidence_existing": "`term.smoke-slab.hrplant` is_root_entity=true, `term.smoke-slab.hrplantspec`/`hr_max_wgt`/`hr_min_wgt` 모두 is_root_entity=false.",
+          "evidence_proposed": "옵션 B 도 HrPlant 를 마스터(root)로, HrSpec/HrMaxWgt/HrMinWgt 를 하위 standard 로 배치.",
+          "severity": "info",
+          "suggestion": "이 facet 패턴은 그대로 두면 됩니다. cap 8에서 HrPlant.is_root_entity=true, 자식들은 false 로 명시하세요."
+        },
+        {
+          "id": "hr_prefix_naming",
+          "dimension": "naming_convention",
+          "alignment": "matches",
+          "title": "Hr* prefix 명명 규약은 기존 패턴과 일관",
+          "evidence_existing": "`hr_max_wgt`(HrMaxWgtEntity), `hr_min_wgt`(HrMinWgtEntity), `hr_spec`(HrSpecEntity), confirmed `hrplant`/`hrplantspec` 모두 'Hr' 접두 PascalCase 사용.",
+          "evidence_proposed": "옵션 B의 HrPlant / HrSpec / HrMaxWgt / HrMinWgt 도 동일 규약.",
+          "severity": "info",
+          "suggestion": "명명 규약은 안전. 다만 HrSpec 의 PK 컬럼 hrPlantCd 와 HrMaxWgt 의 hrCd 컬럼명 불일치는 cap 8 정렬 대상이라는 점을 메모하세요."
+        }
+      ]
+    }
+  }
+}

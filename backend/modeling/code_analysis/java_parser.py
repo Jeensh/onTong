@@ -11,19 +11,25 @@ from tree_sitter import Language, Node, Parser
 from backend.modeling.code_analysis.parser_protocol import (
     CodeEntity,
     CodeRelation,
-    EntityKind,
+    EntityKinds,
     ParseResult,
-    RelationKind,
+    RelationKinds,
 )
+from backend.modeling.code_analysis.spring import SpringAnalyzer
 
 JAVA_LANGUAGE = Language(tsjava.language())
 
 
 class JavaParser:
-    """Parses Java source files into CodeEntity / CodeRelation graphs."""
+    """Parses Java source files into CodeEntity / CodeRelation graphs.
 
-    def __init__(self) -> None:
+    `spring_analyzers` : 선택적 Spring-specific analyzer 리스트 (DIAnalyzer 등).
+    전달된 analyzer 각각의 `analyze` 결과가 ParseResult 에 병합된다.
+    """
+
+    def __init__(self, spring_analyzers: list[SpringAnalyzer] | None = None) -> None:
         self._parser = Parser(JAVA_LANGUAGE)
+        self._spring_analyzers: list[SpringAnalyzer] = list(spring_analyzers or [])
 
     # -- CodeParser protocol ------------------------------------------------
 
@@ -56,7 +62,7 @@ class JavaParser:
                 pkg_name = self._identifier_text(node)
                 entities.append(
                     CodeEntity(
-                        kind=EntityKind.PACKAGE,
+                        kind=EntityKinds.PACKAGE,
                         qualified_name=pkg_name,
                         name=pkg_name.split(".")[-1],
                         file_path=fp,
@@ -91,11 +97,30 @@ class JavaParser:
             if source:
                 relations.append(
                     CodeRelation(
-                        kind=RelationKind.DEPENDS_ON,
+                        kind=RelationKinds.DEPENDS_ON,
                         source=source,
                         target=fqn,
                         file_path=fp,
                     )
+                )
+
+        # 5. Spring analyzers (optional, B5+)
+        for analyzer in self._spring_analyzers:
+            extra_entities, extra_relations = analyzer.analyze(
+                tree=tree,
+                content=content.encode(),
+                file_path=fp,
+                pkg_name=pkg_name,
+            )
+            entities.extend(extra_entities)
+            relations.extend(extra_relations)
+
+        # 6. Post-pass : enrich-capable analyzers (B5-6 ProfileAnalyzer)
+        for analyzer in self._spring_analyzers:
+            enrich = getattr(analyzer, "enrich", None)
+            if callable(enrich):
+                entities, relations = enrich(
+                    entities, relations, tree, pkg_name,
                 )
 
         return ParseResult(
@@ -120,9 +145,9 @@ class JavaParser:
     ) -> None:
         """Extract a class / interface / enum declaration and its members."""
         kind_map = {
-            "class_declaration": EntityKind.CLASS,
-            "interface_declaration": EntityKind.INTERFACE,
-            "enum_declaration": EntityKind.ENUM,
+            "class_declaration": EntityKinds.CLASS,
+            "interface_declaration": EntityKinds.INTERFACE,
+            "enum_declaration": EntityKinds.ENUM,
         }
         kind = kind_map[node.type]
 
@@ -140,6 +165,11 @@ class JavaParser:
             qname = name
 
         modifiers = self._extract_modifiers(node)
+        annotations = self._extract_annotations(node)
+
+        type_attrs: dict[str, object] = {}
+        if annotations:
+            type_attrs["annotations"] = annotations
 
         entities.append(
             CodeEntity(
@@ -151,6 +181,7 @@ class JavaParser:
                 line_end=node.end_point[0] + 1,
                 modifiers=modifiers,
                 parent=parent_qname or pkg_name,
+                attributes=type_attrs,
             )
         )
 
@@ -159,7 +190,7 @@ class JavaParser:
         if container:
             relations.append(
                 CodeRelation(
-                    kind=RelationKind.CONTAINS,
+                    kind=RelationKinds.CONTAINS,
                     source=container,
                     target=qname,
                     file_path=fp,
@@ -175,7 +206,7 @@ class JavaParser:
                     target = self._resolve_type(child.text.decode(), import_map, pkg_name)
                     relations.append(
                         CodeRelation(
-                            kind=RelationKind.EXTENDS,
+                            kind=RelationKinds.EXTENDS,
                             source=qname,
                             target=target,
                             file_path=fp,
@@ -191,7 +222,7 @@ class JavaParser:
                         target = self._resolve_type(desc.text.decode(), import_map, pkg_name)
                         relations.append(
                             CodeRelation(
-                                kind=RelationKind.EXTENDS,
+                                kind=RelationKinds.EXTENDS,
                                 source=qname,
                                 target=target,
                                 file_path=fp,
@@ -207,7 +238,7 @@ class JavaParser:
                     target = self._resolve_type(desc.text.decode(), import_map, pkg_name)
                     relations.append(
                         CodeRelation(
-                            kind=RelationKind.IMPLEMENTS,
+                            kind=RelationKinds.IMPLEMENTS,
                             source=qname,
                             target=target,
                             file_path=fp,
@@ -257,10 +288,110 @@ class JavaParser:
         name = name_node.text.decode()
         qname = f"{class_qname}.{name}"
         modifiers = self._extract_modifiers(node)
+        annotations = self._extract_annotations(node)
+        method_attrs: dict[str, object] = {}
+        if annotations:
+            method_attrs["annotations"] = annotations
+
+        # P23 (2026-04-27) — method source body 캡처 (PythonGenerator + simulation 입력)
+        try:
+            method_attrs["source"] = node.text.decode("utf-8", errors="replace")
+        except Exception:
+            pass
+
+        # P14 (2026-04-26) — body anchor 추출 (param/local/branch/literal/return/field_access)
+        from backend.modeling.code_analysis.method_anchor_extractor import (
+            extract_anchors_from_method,
+        )
+        anchors = extract_anchors_from_method(node, qname)
+        if anchors:
+            method_attrs["anchors"] = [
+                {
+                    "method_fqn": a.method_fqn,
+                    "kind": a.kind.value,
+                    "locator": a.locator,
+                    "line": a.line,
+                    "snippet": a.snippet,
+                    "extra": dict(a.extra),
+                }
+                for a in anchors
+            ]
+
+        # P15 (2026-04-26) — round1 §6-B-1 : method-internal value_flow
+        from backend.modeling.code_analysis.value_flow_extractor import (
+            extract_value_flow,
+        )
+        vf = extract_value_flow(node)
+        if vf:
+            method_attrs["value_flow"] = vf
+
+        # M1a (2026-04-27) — param/field mutation 추적 (포인터처럼 전달된 객체 변경)
+        from backend.modeling.code_analysis.method_mutation_extractor import (
+            extract_mutations,
+        )
+        # param 이름 추출
+        params_node = node.child_by_field_name("parameters")
+        param_names: set[str] = set()
+        if params_node is not None:
+            for p in params_node.children:
+                if p.type == "formal_parameter":
+                    pname = p.child_by_field_name("name")
+                    if pname is not None:
+                        param_names.add(pname.text.decode("utf-8", errors="replace"))
+        mutations = extract_mutations(node, param_names)
+        if mutations:
+            method_attrs["mutations"] = [
+                {
+                    "target": m.target,
+                    "kind": m.kind.value,
+                    "accessor": m.accessor,
+                    "source_var": m.source_var,
+                    "line": m.line,
+                }
+                for m in mutations
+            ]
+        # param 이름 + 타입 (signature builder 가 사용)
+        if params_node is not None:
+            param_specs: list[dict] = []
+            for p in params_node.children:
+                if p.type != "formal_parameter":
+                    continue
+                pname = p.child_by_field_name("name")
+                ptype = p.child_by_field_name("type")
+                param_specs.append({
+                    "name": pname.text.decode() if pname else "",
+                    "type": ptype.text.decode() if ptype else "",
+                })
+            if param_specs:
+                method_attrs["parameters"] = param_specs
+        # return type
+        rtype = node.child_by_field_name("type")
+        if rtype is not None:
+            method_attrs["return_type"] = rtype.text.decode()
+
+        # P16 (2026-04-27) — body-driven BusinessRule 추출 (7 종 visitor)
+        from backend.modeling.code_analysis.body_rule_extractor import (
+            extract_rules_from_method,
+        )
+        extracted = extract_rules_from_method(node, qname)
+        if extracted:
+            method_attrs["extracted_rules"] = [
+                {
+                    "method_fqn": r.method_fqn,
+                    "kind": r.kind.value,
+                    "statement": r.statement,
+                    "line": r.line,
+                    "snippet": r.snippet,
+                    "anchor_locator": r.anchor_locator,
+                    "auto_confirmed": r.auto_confirmed,
+                    "extra": dict(r.extra),
+                }
+                for r in extracted
+            ]
 
         entities.append(
             CodeEntity(
-                kind=EntityKind.METHOD,
+                kind=EntityKinds.METHOD,
                 qualified_name=qname,
                 name=name,
                 file_path=fp,
@@ -268,12 +399,13 @@ class JavaParser:
                 line_end=node.end_point[0] + 1,
                 modifiers=modifiers,
                 parent=class_qname,
+                attributes=method_attrs,
             )
         )
 
         relations.append(
             CodeRelation(
-                kind=RelationKind.CONTAINS,
+                kind=RelationKinds.CONTAINS,
                 source=class_qname,
                 target=qname,
                 file_path=fp,
@@ -305,7 +437,7 @@ class JavaParser:
 
         entities.append(
             CodeEntity(
-                kind=EntityKind.CONSTRUCTOR,
+                kind=EntityKinds.CONSTRUCTOR,
                 qualified_name=qname,
                 name=name,
                 file_path=fp,
@@ -318,7 +450,7 @@ class JavaParser:
 
         relations.append(
             CodeRelation(
-                kind=RelationKind.CONTAINS,
+                kind=RelationKinds.CONTAINS,
                 source=class_qname,
                 target=qname,
                 file_path=fp,
@@ -340,6 +472,13 @@ class JavaParser:
         relations: list[CodeRelation],
     ) -> None:
         modifiers = self._extract_modifiers(node)
+        annotations = self._extract_annotations(node)
+
+        # field_type : declared type text (primitive / reference / generic)
+        type_node = node.child_by_field_name("type")
+        field_type: str | None = (
+            type_node.text.decode() if type_node is not None else None
+        )
 
         # Field name is in variable_declarator -> identifier
         for child in self._walk(node):
@@ -354,9 +493,23 @@ class JavaParser:
                 if id_node:
                     name = id_node.text.decode()
                     qname = f"{class_qname}.{name}"
+
+                    attributes: dict[str, object] = {}
+                    if field_type:
+                        attributes["field_type"] = field_type
+                    if annotations:
+                        attributes["annotations"] = annotations
+
+                    value_node = child.child_by_field_name("value")
+                    if value_node is not None:
+                        attributes["initializer"] = value_node.text.decode()
+                        attributes["initializer_kind"] = (
+                            self._classify_initializer(value_node)
+                        )
+
                     entities.append(
                         CodeEntity(
-                            kind=EntityKind.FIELD,
+                            kind=EntityKinds.FIELD,
                             qualified_name=qname,
                             name=name,
                             file_path=fp,
@@ -364,11 +517,12 @@ class JavaParser:
                             line_end=node.end_point[0] + 1,
                             modifiers=modifiers,
                             parent=class_qname,
+                            attributes=attributes,
                         )
                     )
                     relations.append(
                         CodeRelation(
-                            kind=RelationKind.CONTAINS,
+                            kind=RelationKinds.CONTAINS,
                             source=class_qname,
                             target=qname,
                             file_path=fp,
@@ -376,6 +530,46 @@ class JavaParser:
                         )
                     )
                 break  # one field_declaration = one variable (simplified)
+
+    _NUMERIC_LITERAL_TYPES = frozenset(
+        {
+            "decimal_integer_literal",
+            "hex_integer_literal",
+            "octal_integer_literal",
+            "binary_integer_literal",
+            "decimal_floating_point_literal",
+            "hex_floating_point_literal",
+        }
+    )
+
+    def _classify_initializer(self, node: Node) -> str:
+        """Classify a variable_declarator value node into a literal kind.
+
+        Returns one of: literal_number, literal_string, literal_char,
+        literal_boolean, literal_null, expression.
+        """
+        t = node.type
+        if t in self._NUMERIC_LITERAL_TYPES:
+            return "literal_number"
+        if t == "string_literal":
+            return "literal_string"
+        if t == "character_literal":
+            return "literal_char"
+        if t in ("true", "false"):
+            return "literal_boolean"
+        if t == "null_literal":
+            return "literal_null"
+        if t == "unary_expression":
+            # +N / -N wrapping a numeric literal
+            operand = node.child_by_field_name("operand")
+            if operand is None:
+                # tree-sitter may not always set field name; fall back to scan
+                for ch in node.children:
+                    if ch.type in self._NUMERIC_LITERAL_TYPES:
+                        return "literal_number"
+            elif operand.type in self._NUMERIC_LITERAL_TYPES:
+                return "literal_number"
+        return "expression"
 
     def _extract_calls(
         self,
@@ -407,7 +601,7 @@ class JavaParser:
 
                 relations.append(
                     CodeRelation(
-                        kind=RelationKind.CALLS,
+                        kind=RelationKinds.CALLS,
                         source=method_qname,
                         target=target,
                         file_path=fp,
@@ -427,6 +621,120 @@ class JavaParser:
                         modifiers.append(mod.text.decode())
                 break
         return modifiers
+
+    # -- annotation capture -----------------------------------------------
+    def _extract_annotations(self, node: Node) -> list[dict]:
+        """Walk node's `modifiers` and return list of annotations.
+
+        Each entry: ``{"name": "Column", "arguments": {"name": "X", "length": 4}}``.
+        Marker form (`@Entity`) → arguments={}. Single-value form (`@Table("X")`)
+        → arguments={"value": "X"}. Class literal (`@IdClass(K.class)`) →
+        arguments={"value": "K.class"}.
+        """
+        out: list[dict] = []
+        for child in node.children:
+            if child.type != "modifiers":
+                continue
+            for m in child.children:
+                if m.type == "marker_annotation":
+                    name = self._annotation_name(m)
+                    if name:
+                        out.append({"name": name, "arguments": {}})
+                elif m.type == "annotation":
+                    name = self._annotation_name(m)
+                    if not name:
+                        continue
+                    out.append(
+                        {"name": name, "arguments": self._annotation_arguments(m)}
+                    )
+            break
+        return out
+
+    @staticmethod
+    def _annotation_name(node: Node) -> str:
+        """First identifier / scoped_identifier child = annotation simple name."""
+        for c in node.children:
+            if c.type == "identifier":
+                return c.text.decode()
+            if c.type == "scoped_identifier":
+                # `jakarta.persistence.Column` → "Column"
+                return c.text.decode().rsplit(".", 1)[-1]
+        return ""
+
+    def _annotation_arguments(self, anno_node: Node) -> dict:
+        """Parse `(name="X", length=4)` or `("X")` or `(K.class)` into dict."""
+        # find the argument list child
+        args_node: Node | None = None
+        for c in anno_node.children:
+            if c.type == "annotation_argument_list":
+                args_node = c
+                break
+        if args_node is None:
+            return {}
+
+        result: dict = {}
+        for c in args_node.children:
+            if c.type == "element_value_pair":
+                key, value = self._parse_element_value_pair(c)
+                if key is not None:
+                    result[key] = value
+            elif c.type in ("(", ")", ","):
+                continue
+            elif self._is_value_node(c):
+                # 단일 값 (`@Table("X")`, `@IdClass(K.class)`) → "value" 키.
+                result.setdefault("value", self._parse_annotation_value(c))
+        return result
+
+    def _parse_element_value_pair(self, pair: Node) -> tuple[str | None, object]:
+        key: str | None = None
+        value: object = None
+        for c in pair.children:
+            if c.type == "=":
+                continue
+            if key is None and c.type == "identifier":
+                key = c.text.decode()
+            elif key is not None and value is None and self._is_value_node(c):
+                value = self._parse_annotation_value(c)
+        return key, value
+
+    @staticmethod
+    def _is_value_node(node: Node) -> bool:
+        return node.type in {
+            "string_literal", "character_literal",
+            "decimal_integer_literal", "hex_integer_literal",
+            "octal_integer_literal", "binary_integer_literal",
+            "decimal_floating_point_literal", "hex_floating_point_literal",
+            "true", "false", "null_literal",
+            "class_literal", "identifier", "scoped_identifier",
+            "field_access", "array_initializer", "unary_expression",
+        }
+
+    @staticmethod
+    def _parse_annotation_value(node: Node) -> object:
+        """Convert annotation literal node to Python value."""
+        text = node.text.decode()
+        t = node.type
+        if t == "string_literal" and len(text) >= 2 and text[0] == '"' and text[-1] == '"':
+            return text[1:-1]
+        if t in ("decimal_integer_literal", "hex_integer_literal",
+                 "octal_integer_literal", "binary_integer_literal"):
+            try:
+                return int(text.rstrip("Ll"), 0) if text.startswith(("0x", "0X", "0b", "0B")) else int(text.rstrip("Ll"))
+            except ValueError:
+                return text
+        if t in ("decimal_floating_point_literal", "hex_floating_point_literal"):
+            try:
+                return float(text.rstrip("FfDd"))
+            except ValueError:
+                return text
+        if t == "true":
+            return True
+        if t == "false":
+            return False
+        if t == "null_literal":
+            return None
+        # class_literal, identifier, scoped_identifier, field_access, etc. → raw text
+        return text
 
     def _identifier_text(self, node: Node) -> str:
         """Extract the fully-qualified identifier from a declaration node.
@@ -463,7 +771,7 @@ class JavaParser:
     ) -> str | None:
         """Return the qualified name of the first class/interface/enum."""
         for e in entities:
-            if e.kind in (EntityKind.CLASS, EntityKind.INTERFACE, EntityKind.ENUM):
+            if e.kind in (EntityKinds.CLASS, EntityKinds.INTERFACE, EntityKinds.ENUM):
                 return e.qualified_name
         return pkg_name
 

@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>다음 세션 첫 화면 — Round 5 식 풀 사이클 시작</title>
+<style>
+  :root {
+    --bg: #0f172a; --card: #1e293b; --line: #334155;
+    --fg: #e2e8f0; --muted: #94a3b8;
+    --primary: #38bdf8; --emerald: #10b981; --amber: #f59e0b;
+    --rose: #fb7185; --violet: #a78bfa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:13.5px/1.55 -apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:var(--bg);color:var(--fg)}
+  .wrap{max-width:1024px;margin:0 auto;padding:32px 28px 80px}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:24px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin-bottom:18px}
+  .card h2{font-size:16px;margin:0 0 8px;color:var(--primary)}
+  .card h3{font-size:13px;margin:14px 0 4px;color:var(--violet)}
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12.5px}
+  th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+  th{background:rgba(255,255,255,0.04);color:var(--primary);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.04em}
+  code{font-family:"JetBrains Mono","SF Mono",monospace;font-size:91%;background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px;color:#c4b5fd}
+  ul,ol{margin:6px 0 10px 22px;padding:0}
+  li{margin:3px 0}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:600}
+  .p-paused{background:rgba(245,158,11,0.15);color:var(--amber)}
+  .p-done{background:rgba(16,185,129,0.15);color:var(--emerald)}
+  .p-active{background:rgba(56,189,248,0.15);color:var(--primary)}
+  .quote{background:rgba(167,139,250,0.06);border-left:3px solid var(--violet);padding:10px 14px;border-radius:4px;margin:8px 0;color:var(--fg);font-size:12.5px}
+  .quote .label{font-size:10px;color:var(--violet);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;font-weight:600}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .ask{background:rgba(56,189,248,0.06);border:1px solid var(--primary);border-radius:8px;padding:14px 18px;margin:18px 0}
+  .ask h3{color:var(--primary);font-size:13px;margin:0 0 6px}
+  .ask ol{margin:6px 0 0 22px}
+  .ask li strong{color:var(--fg)}
+  .small{font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>다음 세션 첫 화면 — Round 5 식 풀 사이클 시작</h1>
+<div class="sub">작성: 2026-05-05 종료 시점 · 다음 세션 시작 시 Claude 가 사용자에게 보여줄 자료</div>
+
+<div class="card">
+  <h2>1. 기억 환기 — 우리가 멈춘 곳</h2>
+  <p>
+    Round 5 라이브 인터뷰 (`round5-live-authoring.html`) 에서 사용자와 Claude 가 한 entity 씩
+    HTML 로 대화하며 구체화 → 합의 → archive 했음. 그 흐름이 다음 시점에서 의도적으로 보류됐고,
+    Authoring AI 도구를 먼저 만들기로 함.
+  </p>
+  <table>
+    <tr><th>Phase</th><th>상태</th><th>비고</th></tr>
+    <tr><td>A.1 ~ A.7.6</td><td><span class="pill p-done">완료</span></td><td>알고리즘 / 주문 / slab / HrSpec / CastSpec / 설비 제약 / HrMin·MaxWgt / 단중표 / Edging</td></tr>
+    <tr><td><strong>A.7.7 — Gap Inspector</strong></td><td><span class="pill p-paused">보류</span></td><td>"Authoring AI 후" 표시</td></tr>
+    <tr><td>A.7.8</td><td><span class="pill p-done">완료</span></td><td>학습곡선 진단 + H-3</td></tr>
+    <tr><td><strong>A.8 — Customer / Productivity</strong></td><td><span class="pill p-paused">보류</span></td><td>"Authoring AI 완성 후"</td></tr>
+    <tr><td>B.1 ~ B.5</td><td><span class="pill p-done">완료</span></td><td>Authoring AI 요구사항 / Live Preview / 가성비 / Design / Prototype</td></tr>
+    <tr><td>B.5.1</td><td><span class="pill p-active">진행 중</span></td><td>Codebase 통합 plan + 시작 승인 — 그 후속이 아래</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>2. B.5.1 후속 — 이미 다 해놓음 (요약)</h2>
+  <ul>
+    <li><strong>R6 (graph-aware Authoring AI)</strong> — cap 1, 2, 5, 6, 7, 10 모두 graph + ReAct 로 retro-fit. cap 11 (next-entity), cap 12 (종합 archive) 신규. 23 graph tools (Code 12 + Ontology 6 + Mapping 3 + Operational 2). β 라이브 진행 카드 + γ trace expandable UI.</li>
+    <li><strong>P1a (multi-entity workflow)</strong> — 한 세션 N JPO 처리. CompletedEntities sidebar + 자동 다음 JPO 추천 + cap 7 cross-entity + 종합 archive + 세션 재개 (`?authoring_session=&lt;id&gt;` URL).</li>
+    <li><strong>R6-VAL</strong> — 자바독 strip HrSpecJpo 로 검증. cap 2 confidence 0.50→0.45 (5pt drop only) — graph 가 docs 부재 거의 회복. <code>r6_validation_report.md</code>.</li>
+    <li><strong>P3 폴리싱 6건</strong> — usage_limits cushion / demo_guide P1a / chat 복원 / Sessions picker dropdown / Entity 카운트 / Graph hover preview.</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>3. DB 현재 상태 (큐는 recommend 가 자동 적재, confirm 안 됨)</h2>
+  <table>
+    <tr><th>Layer</th><th>Total</th><th>Confirmed</th><th>Draft (큐)</th></tr>
+    <tr><td>BusinessTerm</td><td>29</td><td>0</td><td>29</td></tr>
+    <tr><td>Action</td><td>36</td><td>1</td><td>35</td></tr>
+    <tr><td>TypeRealization</td><td>34 (29 PRIMARY + 5 PARTIAL ★)</td><td>0</td><td>34</td></tr>
+  </table>
+  <div class="quote">
+    <div class="label">사용자 강조 (2026-05-05 종료 직전)</div>
+    "지금 큐에 있는 애들은 그냥 recommend 로 추가된 애들이야. 우리가 html 로 대화하면서 구체화하고
+    만들어갔던 방식으로 전체 한 사이클이 돌아야해."
+  </div>
+  <p class="small">→ 큐의 29 term 은 코드 분석 + glossary 자동 생성. Round 5 의 사용자-Claude 합의 의미는 큐 row 에 안 들어감.</p>
+</div>
+
+<div class="card">
+  <h2>4. 첫 결정 — 어떤 entity, 어떤 모드?</h2>
+
+  <h3>Entity 후보 (3 갈래)</h3>
+  <table>
+    <tr><th>갈래</th><th>후보</th><th>의의</th></tr>
+    <tr>
+      <td><strong>G1 — 보류 항목 재개</strong></td>
+      <td><code>Customer (A.8)</code> 또는 <code>Productivity (A.8)</code></td>
+      <td>Round 5 미진행 entity. 가장 자연스러운 재개.</td>
+    </tr>
+    <tr>
+      <td><strong>G2 — 비교 시연</strong></td>
+      <td><code>HrSpec</code> 재실시</td>
+      <td>이미 Round 5 에서 정리됨. Authoring AI 도구로 다시 거쳐 결과 비교. 데모 가치 ↑</td>
+    </tr>
+    <tr>
+      <td><strong>G3 — 신규 entity</strong></td>
+      <td><code>SDOrderEntity</code> 등</td>
+      <td>clean slate. 새 도메인 영역</td>
+    </tr>
+  </table>
+
+  <h3>모드 (3 갈래)</h3>
+  <table>
+    <tr><th>모드</th><th>방식</th><th>비용 / 시간</th></tr>
+    <tr>
+      <td><strong>M1 — Round 5 직접 인터뷰</strong></td>
+      <td>Claude 가 HTML 작성 → 사용자 답변 → 다음 step 작성. Authoring AI 도구 안 씀.</td>
+      <td>LLM 비용 0 · 1-2h</td>
+    </tr>
+    <tr>
+      <td><strong>M2 — Authoring AI 도구</strong></td>
+      <td>frontend 에서 「새 세션」→ JPO 선택 → cap 1~12 진행. graph 자동 활용.</td>
+      <td>~$5 / 1 entity · 30분</td>
+    </tr>
+    <tr>
+      <td><strong>M3 — 하이브리드</strong></td>
+      <td>M1 식 HTML 인터뷰 + cap 1~12 병행 호출 (같은 답변 자동 재현 · 비교 자료)</td>
+      <td>M2 비용 + 추가 시간</td>
+    </tr>
+  </table>
+</div>
+
+<div class="ask">
+  <h3>Claude 첫 질문 (다음 세션 시작 시)</h3>
+  <ol>
+    <li><strong>Entity</strong>: G1 / G2 / G3 중 어디?</li>
+    <li><strong>모드</strong>: M1 (직접 인터뷰) / M2 (도구) / M3 (하이브리드) 중 어디?</li>
+    <li><strong>스코프</strong>: 1 entity 까지인지, multi-entity 풀 사이클 (5+ entity) 인지?</li>
+  </ol>
+  <p class="small">기본 추천: <strong>G2 + M3</strong> (HrSpec 재실시 + 하이브리드) — Round 5 결과 baseline 있고 도구 가치 비교 시연 가능. 단, 사용자 의도가 "새 영역 모델링" 이라면 G1 + M1.</p>
+</div>
+
+<div class="card">
+  <h2>5. 시작 직후 Claude 의 행동 순서</h2>
+  <ol>
+    <li><code>HANDOFF.md</code> 의 "🔴 다음 세션 첫 작업" 섹션 읽기 (이 HTML 의 핵심 내용)</li>
+    <li><code>CHANGES.md</code> 의 <code>[ ]</code> 미처리 항목 확인 (현재 없음)</li>
+    <li>backend/frontend 살아있는지 ping (`curl -s http://localhost:8001/openapi.json`)</li>
+    <li>위 질문 1·2·3 사용자에게 묻고 결정 받음</li>
+    <li>결정에 따라 첫 step 진입:
+      <ul>
+        <li><strong>M1</strong>: 새 HTML 파일 작성 (예: <code>round6-live-authoring.html</code>) → Step 0/1 부터</li>
+        <li><strong>M2</strong>: 사용자가 brower 에서 직접 진행. Claude 는 토론·승인 결정 보조</li>
+        <li><strong>M3</strong>: HTML 작성 + 동시에 `scripts/` 에 도구 호출 자동화 스크립트 준비</li>
+      </ul>
+    </li>
+  </ol>
+</div>
+
+<div class="card">
+  <h2>6. 참조 자료</h2>
+  <ul>
+    <li><code>toClaude/modeling/round5-live-authoring.html</code> — 보류된 모델링 인터뷰 원본 (4 archive section + 진행 중 step 들)</li>
+    <li><code>toClaude/modeling/recommend-vs-authoring-deep.html</code> — recommend vs Authoring 흐름 비교</li>
+    <li><code>toClaude/modeling/r6_validation_report.md</code> — R6-VAL 결과 (자바독 strip 검증)</li>
+    <li><code>toClaude/modeling/agent-graph-architecture.html</code> — 23 tool 카탈로그 + per-cap 권한 + ReAct 설계</li>
+    <li><code>toClaude/modeling/demo_guide.md</code> — R6 + P1a 흐름 데모 가이드</li>
+    <li><code>toClaude/modeling/CHANGES.md</code> — 시간순 변경 로그 (가장 최근 작업 순)</li>
+    <li><code>toClaude/modeling/TODO.md</code> — task tracking</li>
+  </ul>
+</div>
+
+<div class="card" style="background:rgba(16,185,129,0.05);border-color:rgba(16,185,129,0.4)">
+  <h2>7. 환경 점검 (시작 직후)</h2>
+  <pre style="font-size:11px;background:#0a0c10;color:#c4b5fd;padding:10px;border-radius:6px;overflow:auto;">
+# Backend 살아있는지
+curl -s -o /dev/null -w "Backend: %{http_code}\n" --max-time 5 http://localhost:8001/openapi.json
+
+# Frontend 살아있는지
+curl -s -o /dev/null -w "Frontend: %{http_code}\n" --max-time 5 http://localhost:3000
+
+# Authoring routes count (24+ 기대)
+curl -s http://localhost:8001/openapi.json | python3 -c "
+import sys,json
+d = json.load(sys.stdin)
+print('routes:', len([p for p in d.get('paths',{}) if 'authoring' in p]))
+"
+
+# 백엔드 죽어있으면 재시작
+pkill -f 'uvicorn backend.main:app' ; sleep 1
+set -a && . ./.env && set +a && ./.venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8001 --log-level info &
+  </pre>
+</div>
+
+</div>
+</body>
+</html>

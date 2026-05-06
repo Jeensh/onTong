@@ -35,6 +35,7 @@ import { fetchSkills, matchSkill } from "@/lib/api/skills";
 import { useAuth } from "@/lib/auth";
 import { ensurePersonaFile } from "@/lib/api/persona";
 import { useWorkspaceStore } from "@/lib/workspace/useWorkspaceStore";
+import { useSearchStore, type FilterSpec } from "@/lib/search/useSearchStore";
 import { toast } from "sonner";
 import type { SkillMeta } from "@/types";
 import { ExternalLink, PanelRightClose } from "lucide-react";
@@ -101,6 +102,7 @@ interface ChatMessage {
   thinkingSteps?: ThinkingStepState[];
   conflictWarning?: ConflictWarning;
   clarification?: ClarificationData;
+  appliedFilters?: Record<string, unknown>;
 }
 
 interface ChatSession {
@@ -441,6 +443,12 @@ export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {
           sources,
         }));
       },
+      onAppliedFilters: (data) => {
+        updateLastAssistant((msg) => ({
+          ...msg,
+          appliedFilters: data.filters,
+        }));
+      },
       onConflictWarning: (data) => {
         updateLastAssistant((msg) => ({
           ...msg,
@@ -587,6 +595,9 @@ export function AICopilot({ onPopout, onDockBack, isPopout }: AICopilotProps = {
       },
       onSources: (sources) => {
         updateLastAssistant((msg) => ({ ...msg, sources }));
+      },
+      onAppliedFilters: (data) => {
+        updateLastAssistant((msg) => ({ ...msg, appliedFilters: data.filters }));
       },
       onConflictWarning: (data) => {
         updateLastAssistant((msg) => ({ ...msg, conflictWarning: data }));
@@ -1251,9 +1262,11 @@ function AssistantBubble({
               <div className="text-[13px] font-semibold text-amber-900 dark:text-amber-300 leading-snug">
                 참고한 문서끼리 내용이 다릅니다
               </div>
-              <p className="mt-0.5 text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                {msg.conflictWarning.details}
-              </p>
+              <div className="mt-1 prose prose-sm dark:prose-invert max-w-none text-xs text-slate-700 dark:text-slate-300 leading-relaxed prose-p:my-1 prose-p:text-xs prose-ul:my-1 prose-ul:pl-4 prose-ol:my-1 prose-ol:pl-4 prose-li:my-0.5 prose-li:text-xs prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-semibold prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:bg-amber-100/60 dark:prose-code:bg-amber-900/30 prose-code:text-[0.9em] prose-code:before:content-none prose-code:after:content-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {msg.conflictWarning.details}
+                </ReactMarkdown>
+              </div>
             </div>
           </div>
           {/* Pair-based comparison UI */}
@@ -1353,6 +1366,11 @@ function AssistantBubble({
         </div>
       )}
 
+      {/* Applied filters (from NL → FilterSpec extraction) */}
+      {msg.appliedFilters && Object.keys(msg.appliedFilters).length > 0 && (
+        <AppliedFiltersRow filters={msg.appliedFilters as FilterSpec} />
+      )}
+
       {/* Sources */}
       {msg.sources && msg.sources.length > 0 && (
         <SourceChips sources={msg.sources} onSourceClick={onSourceClick} />
@@ -1408,6 +1426,74 @@ function AssistantBubble({
           {msg.approval && ` — ${msg.approval.path}`}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Applied Filters Row (NL → FilterSpec handoff) ────────────────────
+
+const TYPE_LABELS: Record<string, string> = {
+  sop: "SOP",
+  spec: "사양",
+  plan: "계획",
+  decision: "결정",
+  incident: "인시던트",
+  postmortem: "포스트모템",
+  meeting: "회의",
+  skill: "스킬",
+};
+
+function AppliedFiltersRow({ filters }: { filters: FilterSpec }) {
+  const openWithFilters = useSearchStore((s) => s.openWithFilters);
+
+  const chips: { key: string; label: string }[] = [];
+  if (filters.folders?.length) {
+    for (const f of filters.folders) chips.push({ key: `folder:${f}`, label: `📁 ${f}` });
+  }
+  if (filters.authors?.length) {
+    for (const a of filters.authors) chips.push({ key: `author:${a}`, label: `👤 ${a}` });
+  }
+  if (filters.types?.length) {
+    for (const t of filters.types) chips.push({ key: `type:${t}`, label: `📄 ${TYPE_LABELS[t] ?? t}` });
+  }
+  if (filters.tags?.include?.length) {
+    for (const t of filters.tags.include) chips.push({ key: `tag:${t}`, label: `#${t}` });
+  }
+  if (filters.mtime_from || filters.mtime_to) {
+    const from = filters.mtime_from ?? "";
+    const to = filters.mtime_to ?? "";
+    const rangeLabel = from && to ? `${from} ~ ${to}` : from ? `${from} 이후` : `${to} 이전`;
+    chips.push({ key: "mtime", label: `📅 ${rangeLabel}` });
+  }
+  if (filters.statuses?.length) {
+    for (const s of filters.statuses) chips.push({ key: `status:${s}`, label: `✓ ${s}` });
+  }
+
+  if (chips.length === 0) return null;
+
+  return (
+    <div
+      className="flex flex-wrap items-center gap-1.5 px-1"
+      role="region"
+      aria-label="에이전트가 적용한 필터"
+    >
+      <span className="text-[10px] text-muted-foreground/80">적용된 필터:</span>
+      {chips.map((c) => (
+        <span
+          key={c.key}
+          className="inline-flex items-center rounded-md border border-primary/20 bg-primary/5 px-1.5 py-0.5 text-[11px] text-primary"
+        >
+          {c.label}
+        </span>
+      ))}
+      <button
+        type="button"
+        onClick={() => openWithFilters(filters)}
+        className="inline-flex items-center gap-1 rounded-md border border-dashed border-primary/40 px-2 py-0.5 text-[11px] text-primary hover:bg-primary/5"
+        aria-label="이 필터로 검색창에서 계속 검색"
+      >
+        🔎 검색창에서 계속
+      </button>
     </div>
   );
 }

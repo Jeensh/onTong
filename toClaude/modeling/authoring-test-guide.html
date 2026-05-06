@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Authoring AI · 브라우저 테스트 가이드</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#111b2e; --line:#1f2a44; --fg:#e6edf7; --muted:#94a3b8;
+    --primary:#38bdf8; --emerald:#10b981; --amber:#f59e0b; --rose:#f43f5e; --violet:#8b5cf6;
+  }
+  body{margin:0;font:13px -apple-system,Pretendard,sans-serif;background:var(--bg);color:var(--fg);padding:24px;line-height:1.55}
+  h1{margin:0 0 6px 0;font-size:20px}
+  h2{font-size:15px;margin:24px 0 8px 0;padding:6px 0;border-bottom:1px solid var(--line)}
+  h3{font-size:13px;margin:14px 0 6px 0;color:var(--primary)}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:16px}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;margin:10px 0}
+  .step .num{display:inline-block;width:22px;height:22px;background:var(--primary);color:#0b1220;border-radius:50%;text-align:center;font-weight:700;margin-right:8px}
+  .step.crit{border-color:var(--rose);background:rgba(244,63,94,0.05)}
+  .step.crit .num{background:var(--rose);color:#fff}
+  .step.ok{border-color:var(--emerald);background:rgba(16,185,129,0.04)}
+  .step.ok .num{background:var(--emerald);color:#fff}
+  pre{background:#0f172a;color:#e6edf7;padding:10px;border-radius:6px;overflow-x:auto;font-size:11.5px;line-height:1.5;border:1px solid var(--line)}
+  code{background:rgba(56,189,248,0.1);color:var(--primary);padding:1px 5px;border-radius:3px;font-size:11.5px}
+  kbd{background:var(--card);border:1px solid var(--line);border-radius:3px;padding:1px 6px;font-size:11px;color:var(--fg)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:10px}
+  .panel-title{font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px}
+  table{border-collapse:collapse;width:100%;margin:8px 0;font-size:12px}
+  th,td{padding:5px 8px;border:1px solid var(--line);text-align:left}
+  th{background:rgba(56,189,248,0.1);color:var(--primary)}
+  .warn{background:rgba(245,158,11,0.05);border-left:3px solid var(--amber);padding:8px 10px;margin:8px 0;font-size:12px}
+  .err{background:rgba(244,63,94,0.05);border-left:3px solid var(--rose);padding:8px 10px;margin:8px 0;font-size:12px}
+  .ok{background:rgba(16,185,129,0.05);border-left:3px solid var(--emerald);padding:8px 10px;margin:8px 0;font-size:12px}
+  .checklist li{margin:4px 0}
+  .ascii{font-family:ui-monospace,Consolas,monospace;background:#0f172a;padding:10px;border-radius:6px;color:#cbd5e1;font-size:11px;white-space:pre;overflow-x:auto;line-height:1.4;border:1px solid var(--line)}
+  .pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:600;margin-right:4px}
+  .pill.violet{background:rgba(139,92,246,0.15);color:var(--violet);border:1px solid rgba(139,92,246,0.4)}
+  .pill.amber{background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.4)}
+  .pill.emerald{background:rgba(16,185,129,0.15);color:var(--emerald);border:1px solid rgba(16,185,129,0.4)}
+</style>
+</head>
+<body>
+
+<h1>✏️ Authoring AI — 브라우저 테스트 가이드</h1>
+<div class="sub">2026-05-05 · 진단 결과 + 정확한 클릭 순서 · http://localhost:3000</div>
+
+<!-- ============================================== -->
+<h2>🩺 진단 결과 (browser 자동화로 직접 확인)</h2>
+
+<div class="ok">
+  <strong>UI 자체는 정상 작동</strong>: ✏️ Authoring 버튼은 Modeling 섹션 상단 mode 토글 4번째에 정상 표시됨. 클릭 시 toolbar (🆕 새 세션 + ① ~ ✓ 8 버튼) 정상 렌더.
+</div>
+
+<div class="warn">
+  <strong>"뭐 누른다고 되는게 없는데" 의 원인</strong>: 거의 확실히 ① <strong>모드 토글을 안 누름</strong> — 기본 진입 시 Detail 모드라서 Authoring UI 가 아예 표시 안 됨, 또는 ② Authoring 모드 안에서 첫 단계 (🆕 새 세션) 를 안 누른 채 다른 ① ~ ⑨ 버튼을 누름 — 모두 disabled 상태라 반응 없음.
+</div>
+
+<h3>현재 정확한 위치</h3>
+<div class="ascii">상단 nav:        [ Wiki ] [ Modeling ]   ← 둘 중 Modeling 클릭
+Modeling 진입 후 우상단 mode toggle:
+                 [ 🔍 Forward ]  [ 🔧 Backward ]
+                 [ Detail ] [ ↕ Split ] [ 🌐 Graph ] [ ✏️ Authoring ]   ← 가장 우측
+                                                          ▲ 여기 클릭
+
+✏️ Authoring 진입 후 좌측 상단 toolbar:
+   ✏️ Authoring  [ 🆕 새 세션 ]  [① 코드 추출] disabled  [② 가설] disabled  ...
+                       ▲ 여기 먼저 클릭해야 모든 ①~✓ 버튼 활성화</div>
+
+<!-- ============================================== -->
+<h2>🚀 추천 테스트 시나리오 (Round 5 재현, 한 entity 사이클)</h2>
+
+<div class="step crit">
+  <span class="num">1</span><strong>모드 진입</strong>
+  <ul>
+    <li><kbd>http://localhost:3000</kbd> 접속</li>
+    <li>상단 nav 의 <strong>Modeling</strong> 클릭</li>
+    <li>우상단 mode toggle 의 <strong>✏️ Authoring</strong> 클릭</li>
+  </ul>
+  <p style="margin-top:6px;color:var(--muted)">→ 화면 중앙이 좌(채팅) + 우(preview) 분할로 바뀜.<br>
+  → toolbar 가 보이고 "🆕 새 세션" 만 활성화, 나머지는 회색 (disabled).</p>
+</div>
+
+<div class="step crit">
+  <span class="num">2</span><strong>세션 시작</strong>
+  <ul>
+    <li>toolbar 의 <strong>🆕 새 세션</strong> 클릭</li>
+  </ul>
+  <p style="margin-top:6px;color:var(--muted)">→ 우측 "현재 세션" 카드에 UUID + cost $0.0000 표시.<br>
+  → 채팅에 "세션 시작 (id=…) — 코드 파일을 추출하면 인터뷰가 시작됩니다." 메시지.<br>
+  → "① 코드 추출" 버튼이 활성화됨.</p>
+</div>
+
+<div class="step">
+  <span class="num">3</span><strong>① 코드 추출 클릭</strong>
+  <span class="pill amber">Sonnet · ~10s</span>
+  <p style="color:var(--muted)">HrSpecJpo.java 가 backend 로 전송됨. Sonnet 이 PK 4축 + 컬럼 4개를 구조화해서 반환.<br>
+  → 채팅에 <code>HrSpecJpo → HR_SPEC, PK 4축 · 컬럼 4개</code> 표시.<br>
+  → 우측 "현재 세션" cost 약 $0.02 로 갱신.</p>
+</div>
+
+<div class="step">
+  <span class="num">4</span><strong>② 가설 클릭</strong>
+  <span class="pill violet">Opus · ~20s</span>
+  <p style="color:var(--muted)">Opus 가 도메인 entity 가설 + confidence + 우려 사항 생성.<br>
+  → 채팅에 "🧠 가설: 열연공장…" 표시.<br>
+  → 우측 "가설" 카드에 한국어 표시명 / 영어 식별자 / domain_role / confidence 표시.</p>
+</div>
+
+<div class="step">
+  <span class="num">5</span><strong>③ 인터뷰 클릭</strong>
+  <span class="pill amber">Sonnet · ~15s</span>
+  <p style="color:var(--muted)">Sonnet 이 5~7개 한국어 질문 생성 (각 1줄 placeholder + my_guess).<br>
+  → 채팅에 "❓ 인터뷰 (N 질문)" + 질문 list 표시.<br>
+  → 하단에 답변 textarea 가 등장.</p>
+</div>
+
+<div class="step crit">
+  <span class="num">6</span><strong>답변 입력 + ④ 답변 흡수</strong>
+  <span class="pill amber">Sonnet · ~10s</span>
+  <p style="margin-top:6px">아래 텍스트를 textarea 에 붙여넣고 <kbd>⌘↵</kbd> (또는 <kbd>Ctrl↵</kbd>) 또는 <strong>④ 답변 흡수</strong> 버튼:</p>
+  <pre>공정계획에서 관리해.
+와일드카드는 PK 에 *를 쓸 수도 있고 LIKE 패턴도 지원해.
+기준값이 NULL 이면 자동 true 로 처리됨.
+룩업 실패하면 후속 로직에서 NPE 가 발생할 거야 — 데이터 결함이지.
+row 는 수십 정도. 공정계획팀 사용자가 갱신해.
+그 외는 모름.</pre>
+  <p style="color:var(--muted)">→ 채팅에 "📥 답변 정리됨 (5/6)" + 가설과 모순된 wildcard 자동 표시.</p>
+</div>
+
+<div class="step">
+  <span class="num">7</span><strong>⑤ 옵션 클릭 → 옵션 카드 클릭</strong>
+  <span class="pill violet">Opus · ~30s</span>
+  <p style="color:var(--muted)">Opus 가 옵션 표 (보통 2~4개) 생성. 각 옵션 카드에 ASCII 구조도 + trade-off + 선택 버튼.<br>
+  ★ 추천 표시된 옵션 (보통 "Plant + Constraint Composition") 의 <strong>선택</strong> 버튼 클릭.</p>
+  <p style="color:var(--muted)">→ 자동으로 ⑦ 명명 capability 호출 (Sonnet, ~10s).<br>
+  → 우측 "엔티티" 카드에 한국어 라벨 + 영어 id + role 표시 (draft 상태).</p>
+</div>
+
+<div class="step">
+  <span class="num">8</span><strong>⑥ 갭 클릭 (선택)</strong>
+  <span class="pill violet">Opus · ~25s</span>
+  <p style="color:var(--muted)">Opus 가 코드 vs 도메인 갭 분석. 와일드카드 모순이 <code>intent</code> 갭으로 검출.<br>
+  → 채팅 + 우측 "갭" 카드에 갭 list (severity 색상).</p>
+</div>
+
+<div class="step">
+  <span class="num">9</span><strong>⑨ Archive 클릭</strong>
+  <span class="pill amber">Sonnet · ~20s</span>
+  <p style="color:var(--muted)">Sonnet 이 archive markdown 자동 생성.<br>
+  → 우측 "Archive (markdown)" 카드에 전체 markdown preview.</p>
+</div>
+
+<div class="step ok">
+  <span class="num">10</span><strong>✓ Confirm 클릭 (최종)</strong>
+  <p style="color:var(--muted)">엔티티가 ontology DB 에 영구 저장됨.<br>
+  → 우측 엔티티 카드의 <code>draft</code> 배지가 <code>✓ saved</code> 로 변경.<br>
+  → 채팅에 "✅ N 개 entity 가 ontology DB 에 저장됨" + FQN 목록.</p>
+</div>
+
+<!-- ============================================== -->
+<h2>🎯 평가 포인트</h2>
+
+<div class="grid">
+<div class="panel">
+  <div class="panel-title">Round 5 와의 비교</div>
+  <ul class="checklist">
+    <li>가설 / 옵션 / 갭 / archive 의 형태가 우리 HTML 작업과 비슷한가?</li>
+    <li>"내 추측" / "★ 추천" / "1-2줄 답변" 패턴이 product UX 로 잘 옮겨졌나?</li>
+    <li>한국어 표시명 + 영어 PascalCase id 컨벤션 유지?</li>
+  </ul>
+</div>
+<div class="panel">
+  <div class="panel-title">Live preview</div>
+  <ul class="checklist">
+    <li>답변 → 우측 카드 즉시 갱신 자연스러운가?</li>
+    <li>cost 가 매 turn 누적되는 게 보이나?</li>
+    <li>draft → saved 전환이 명확한가?</li>
+  </ul>
+</div>
+<div class="panel">
+  <div class="panel-title">속도 / 비용</div>
+  <ul class="checklist">
+    <li>전체 cycle ~3분 / ~$0.5–1.0 — 현장 사용 가능한가?</li>
+    <li>Opus 호출 (가설/옵션/갭) 시 20~30s 대기가 어색하지 않나?</li>
+    <li>streaming 없는 게 큰 문제인가? (현재 batch response)</li>
+  </ul>
+</div>
+<div class="panel">
+  <div class="panel-title">다음 enhancement 후보</div>
+  <ul class="checklist">
+    <li>SSE streaming (응답이 글자 단위로 와야 체감 ↑)</li>
+    <li>file picker (지금은 HrSpecJpo 하드코딩)</li>
+    <li>cap 7 (pattern checker) + cap 10 (next step)</li>
+    <li>Multi-operator (M-2 branch + merge)</li>
+    <li>그래프 시각화 (현재 카드 list — 향후 dagre)</li>
+  </ul>
+</div>
+</div>
+
+<!-- ============================================== -->
+<h2>🐛 막혔을 때 진단 순서</h2>
+
+<table>
+<tr><th>증상</th><th>원인</th><th>확인</th></tr>
+<tr>
+  <td>좌측 toolbar 자체가 안 보임</td>
+  <td>Authoring mode 미진입</td>
+  <td>우상단 4번째 토글 <strong>✏️ Authoring</strong> 색깔 (파란색=활성)</td>
+</tr>
+<tr>
+  <td>모든 ① ~ ✓ 버튼이 회색 (disabled)</td>
+  <td>🆕 새 세션 안 눌렀음</td>
+  <td>우측 "현재 세션" 카드에 UUID 가 표시되는지</td>
+</tr>
+<tr>
+  <td>① 코드 추출 클릭 후 응답 없음</td>
+  <td>backend 다운 또는 ANTHROPIC_API_KEY 미설정</td>
+  <td>채팅 영역 상단의 빨간 ⚠️ 에러 메시지 확인</td>
+</tr>
+<tr>
+  <td>옵션 카드 안에 선택 버튼이 안 눌림</td>
+  <td>이미 선택된 후 → 자동으로 ⑦ 명명 진행 중</td>
+  <td>좌측 status bar 의 ⏳ 진행 중... 아이콘</td>
+</tr>
+<tr>
+  <td>✓ Confirm 클릭 후 saved 표시 안 됨</td>
+  <td>repo_id mismatch (코드는 'smoke-slab' 하드코딩)</td>
+  <td>우측 엔티티 fqn 이 <code>term.smoke-slab.…</code> 형식인지</td>
+</tr>
+</table>
+
+<div class="warn">
+  <strong>backend 로그 모니터링</strong>: 터미널 백엔드 로그에 매 capability 호출 시 다음 라인 떠야 정상:<br>
+  <code>authoring.cost session=… turn=N cap=… tier=… cost=$… db=ok</code>
+</div>
+
+<div class="err">
+  <strong>안 되는 게 있으면</strong> 저에게 화면 캡쳐나 backend 로그 마지막 20줄 정도 알려주세요. 즉시 진단합니다.
+</div>
+
+</body>
+</html>

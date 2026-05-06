@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Authoring Agent — Code+Ontology Graph 아키텍처 깊은 고찰</title>
+<style>
+  :root {
+    --bg: #0e1014;
+    --panel: #161a22;
+    --panel2: #1d2230;
+    --border: #2a3142;
+    --text: #e6e9ef;
+    --muted: #8a93a6;
+    --accent: #7aa2f7;
+    --accent2: #9ece6a;
+    --warn: #e0af68;
+    --danger: #f7768e;
+    --good: #73daca;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Text",
+      "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    line-height: 1.65;
+    padding: 24px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 24px;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  h2 {
+    font-size: 19px;
+    margin: 36px 0 12px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+    color: var(--accent);
+  }
+  h3 {
+    font-size: 15px;
+    margin: 20px 0 8px;
+    color: var(--accent2);
+  }
+  h4 {
+    font-size: 13px;
+    margin: 14px 0 6px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  p { margin: 8px 0; }
+  .subtitle {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+  .quote-box {
+    background: var(--panel);
+    border-left: 3px solid var(--warn);
+    padding: 12px 16px;
+    margin: 12px 0;
+    font-size: 14px;
+    color: #d8dcea;
+    border-radius: 4px;
+  }
+  .quote-box .label {
+    color: var(--warn);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+  .insight-box {
+    background: linear-gradient(135deg, #1a2238 0%, #161a22 100%);
+    border: 1px solid var(--accent);
+    padding: 16px 20px;
+    margin: 16px 0;
+    border-radius: 6px;
+  }
+  .insight-box .label {
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: var(--panel2);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  td.tier-good { background: rgba(115, 218, 202, 0.1); }
+  td.tier-mid { background: rgba(224, 175, 104, 0.1); }
+  td.tier-low { background: rgba(247, 118, 142, 0.1); }
+  code {
+    font-family: "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 13px;
+    color: #c0caf5;
+    background: rgba(122, 162, 247, 0.08);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-family: "JetBrains Mono", Menlo, monospace;
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  pre code { background: none; padding: 0; color: inherit; }
+  .cmt { color: #565f89; }
+  .kw { color: #bb9af7; }
+  .str { color: #9ece6a; }
+  .fn { color: #7dcfff; }
+  .num { color: #ff9e64; }
+  .layer-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 10px 0;
+  }
+  .layer-card .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .layer-card .name {
+    font-weight: 600;
+    color: var(--accent);
+    font-size: 15px;
+  }
+  .pill {
+    display: inline-block;
+    padding: 2px 9px;
+    font-size: 11px;
+    border-radius: 999px;
+    font-weight: 500;
+  }
+  .pill.full { background: rgba(115, 218, 202, 0.18); color: var(--good); }
+  .pill.partial { background: rgba(224, 175, 104, 0.18); color: var(--warn); }
+  .pill.empty { background: rgba(247, 118, 142, 0.18); color: var(--danger); }
+  .pill.opus { background: rgba(187, 154, 247, 0.18); color: #bb9af7; }
+  .pill.sonnet { background: rgba(125, 207, 255, 0.18); color: #7dcfff; }
+  ul, ol { padding-left: 22px; margin: 6px 0; }
+  ul li, ol li { margin: 3px 0; font-size: 14px; }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 12px 0;
+  }
+  .compare-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-size: 13px;
+  }
+  .compare-card.bad { border-left: 3px solid var(--danger); }
+  .compare-card.good { border-left: 3px solid var(--good); }
+  .compare-card .head {
+    font-weight: 600;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+  .compare-card.bad .head { color: var(--danger); }
+  .compare-card.good .head { color: var(--good); }
+  .trace {
+    background: #0a0c10;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    margin: 10px 0;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .trace .step { color: var(--accent); }
+  .trace .tool { color: #bb9af7; }
+  .trace .obs { color: var(--muted); }
+  .trace .think { color: var(--good); font-style: italic; }
+  textarea {
+    width: 100%;
+    min-height: 100px;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.55;
+    resize: vertical;
+  }
+  textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .form-q {
+    margin: 14px 0;
+  }
+  .form-q label {
+    display: block;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 4px;
+    font-size: 13.5px;
+  }
+  .form-q .help {
+    color: var(--muted);
+    font-size: 12.5px;
+    margin-bottom: 6px;
+  }
+  button {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  button:hover { background: #6892e8; }
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--panel2);
+    border: 1px solid var(--good);
+    color: var(--good);
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  details {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 8px 0;
+  }
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--accent2);
+    font-size: 13px;
+  }
+  details[open] summary {
+    margin-bottom: 8px;
+  }
+  .star { color: var(--warn); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Authoring Agent — Code + Ontology Graph 아키텍처 깊은 고찰</h1>
+  <div class="subtitle">
+    "preload metadata" → "agentic exploration" 으로의 패러다임 전환 분석
+    · 작성: 2026-05-05
+  </div>
+</header>
+
+<!-- ============================================================ -->
+<section>
+<h2>0. 사용자 답변 요약</h2>
+
+<div class="quote-box">
+  <div class="label">Q1 — 한계 인지</div>
+  인지됨.
+</div>
+<div class="quote-box">
+  <div class="label">Q2 — 옵션 (G1/G2/G3)</div>
+  지금 AST 만 말했지만, 다 완성하면 <strong>AST 코드 + 온톨로지</strong> 까지 기반이 생긴다.
+  그걸 다 활용해야 진정한 agent 가치가 나올 것 같다. <strong>아주 깊은 고찰 필요. 중요하게 다뤄달라.</strong>
+</div>
+<div class="quote-box">
+  <div class="label">Q4 — metadata 깊이</div>
+  <strong>피드백 루프 (에이전트형)</strong> 으로 필요한 내용을 그때그때 탐색해 가며 확인하는 방식.
+</div>
+<div class="quote-box">
+  <div class="label">Q5 — cap 2 도 graph context</div>
+  <strong>둘 다.</strong>
+</div>
+
+<div class="insight-box">
+  <div class="label">방향 전환의 의미</div>
+  <p style="margin-top: 6px;">
+    G1/G2/G3 (인접 metadata 자동 첨부 / 호출 그래프 traversal / 다중 파일 인터뷰) 는
+    모두 <strong>"필요할 것 같은 정보를 미리 끌어다 prompt 에 박는다"</strong> 는 발상이다.
+    그러나 사용자의 답변은 그 발상 자체를 거부한다 —
+    agent 가 ReAct 루프로 <strong>"Thought → Tool Call → Observation → Thought"</strong>
+    를 반복하며 필요한 deep 만큼만 graph 를 탐색해야 한다.
+    이것이 진짜 "agent 의 가치" 다.
+  </p>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2>1. 자산 inventory — 우리가 가진 것</h2>
+
+<p>
+  Authoring agent 가 호출할 수 있어야 할 자산은 3-layer 로 구성된다.
+  현재 채워짐 상태는 다음과 같다 (백엔드 직접 확인):
+</p>
+
+<div class="layer-card">
+  <div class="head">
+    <span class="name">L1 · Code Layer (AST graph)</span>
+    <span class="pill full">FULL — 100%</span>
+  </div>
+  <p style="font-size: 13.5px; margin: 6px 0;">
+    Java parser 가 빌드한 AST 가 ORM 으로 영속화 됨.
+    `CodeTypeRow` / `CodeMethodRow` / `CodeFieldRow` + 7-anchor.
+  </p>
+  <ul>
+    <li><code>CodeType</code>: <code>extends</code> · <code>implements</code> · <code>extends_interfaces</code>
+      · <code>fields[]</code> · <code>methods[]</code> · <code>annotations</code> · <code>source_file</code></li>
+    <li><code>CodeMethod</code>: <code>params</code> · <code>return_type</code> · <code>body_text</code> ·
+      <code>anchors[]</code> (param/local/return/branch/literal/field/field_access)</li>
+    <li><code>CodeField</code>: <code>type</code> · <code>annotations</code> · <code>is_collection</code> ·
+      <code>element_type</code></li>
+    <li><strong>그래프 edge</strong>: graph endpoint 가 nodes+edges 로 노출
+      (확인된 edge kind: <code>type_realization_primary</code> 등)</li>
+  </ul>
+</div>
+
+<div class="layer-card">
+  <div class="head">
+    <span class="name">L2 · Domain Layer (Ontology)</span>
+    <span class="pill partial">PARTIAL — recommend 기반 29 terms · 36 actions</span>
+  </div>
+  <p style="font-size: 13.5px; margin: 6px 0;">
+    `BusinessTerm` (명사) + `Action` (동사) + facets / 도메인 계층.
+    아직 cold-start 상태이지만 endpoint 는 모두 살아있음 (`/api/ontology/terms`,
+    `/api/ontology/actions`, `/api/ontology/repos/{repo_id}/perspectives`).
+  </p>
+  <ul>
+    <li><code>BusinessTerm</code>: korean / english / domain / facets / inheritance</li>
+    <li><code>Action</code>: realizations[] · code_method_fqn 포함</li>
+    <li>Authoring 자체가 ontology 를 채우는 도구이므로,
+      <strong>agent 사용량이 늘수록 본인이 쓸 수 있는 graph 도 부유해진다</strong> (positive feedback)</li>
+  </ul>
+</div>
+
+<div class="layer-card">
+  <div class="head">
+    <span class="name">L3 · Mapping Layer (AnchorBinding)</span>
+    <span class="pill partial">PARTIAL — 34 realizations</span>
+  </div>
+  <p style="font-size: 13.5px; margin: 6px 0;">
+    `code_method_fqn × anchor_id × business_term_id` 3-tuple 로
+    "이 메서드의 이 파라미터가 어떤 도메인 term 에 해당하는가" 를 기록.
+    `/api/ontology/code-methods/{fqn}/anchor-bindings`,
+    `/api/ontology/actions/{fqn}/anchor-bindings` 등 endpoint 가 이미 존재.
+  </p>
+</div>
+
+<div class="insight-box">
+  <div class="label">함의</div>
+  <p style="margin-top: 6px;">
+    인프라가 <strong>이미 거의 다 있다</strong>. agent 가 새 graph 라이브러리를 부를 필요 없음 —
+    pydantic_ai <code>@agent.tool</code> 데코레이터로 기존 함수를 wrap 만 하면 된다.
+    실제 작업의 본질은 <strong>"어떤 tool 을 어떤 cap 에 어느 예산으로 줄 것인가"</strong>
+    하는 정책 설계와, <strong>"tool call 추적·비용·UI 노출"</strong> 의 운영 문제다.
+  </p>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2>2. Agent Tool Catalog — 구체적 inventory</h2>
+
+<p>
+  pydantic_ai <code>@agent.tool</code> 패턴으로 정의될 함수 집합.
+  각 도구는 graph store 의 read-only 함수를 wrap 하므로 사이드 이펙트 없음.
+</p>
+
+<h3>2.1 Code Layer Tools (12개)</h3>
+<table>
+  <tr>
+    <th style="width: 30%;">Tool</th><th>설명</th><th style="width: 22%;">Backing</th>
+  </tr>
+  <tr>
+    <td><code>code_lookup(fqn)</code></td>
+    <td>FQN 으로 CodeType / CodeMethod / CodeField 단건 조회</td>
+    <td>code_type_store.find</td>
+  </tr>
+  <tr>
+    <td><code>code_search(q, kind?, limit?)</code></td>
+    <td>키워드/한글 검색 → FQN 리스트</td>
+    <td>/api/ontology/search 의 in-process</td>
+  </tr>
+  <tr>
+    <td><code>find_subclasses(type_fqn)</code></td>
+    <td>이 타입을 extends 하는 자식 클래스</td>
+    <td>extends 인덱스 역방향</td>
+  </tr>
+  <tr>
+    <td><code>find_implementations(iface_fqn)</code></td>
+    <td>이 인터페이스를 implements 하는 구현체</td>
+    <td>implements 인덱스 역방향</td>
+  </tr>
+  <tr>
+    <td><code>find_callers(method_fqn)</code></td>
+    <td>이 메서드를 호출하는 곳 (call-site list)</td>
+    <td>/api/ontology/code-methods/{fqn}/call-sites 동등</td>
+  </tr>
+  <tr>
+    <td><code>find_callees(method_fqn)</code></td>
+    <td>이 메서드 body 에서 호출하는 메서드들</td>
+    <td>method.extra.calls 또는 anchor</td>
+  </tr>
+  <tr>
+    <td><code>find_field_readers(field_fqn)</code></td>
+    <td>이 필드를 읽는 메서드</td>
+    <td>field_access anchor 역방향</td>
+  </tr>
+  <tr>
+    <td><code>find_field_writers(field_fqn)</code></td>
+    <td>이 필드를 쓰는 메서드</td>
+    <td>field_access anchor + mutation</td>
+  </tr>
+  <tr>
+    <td><code>get_method_body(fqn)</code></td>
+    <td>raw Java body_text</td>
+    <td>CodeMethodRow.body_text</td>
+  </tr>
+  <tr>
+    <td><code>get_method_anchors(fqn)</code></td>
+    <td>7-kind anchor list (line/snippet 포함)</td>
+    <td>CodeMethodRow.anchors</td>
+  </tr>
+  <tr>
+    <td><code>find_related_jpos(jpo_fqn)</code></td>
+    <td>같은 PK 컬럼을 공유하는 다른 JPO</td>
+    <td>field-level join</td>
+  </tr>
+  <tr>
+    <td><code>find_in_same_package(fqn, kind?)</code></td>
+    <td>같은 패키지의 동종 클래스</td>
+    <td>package prefix 매칭</td>
+  </tr>
+</table>
+
+<h3>2.2 Ontology Layer Tools (6개)</h3>
+<table>
+  <tr><th style="width: 30%;">Tool</th><th>설명</th><th style="width: 22%;">Backing</th></tr>
+  <tr>
+    <td><code>domain_search(q, kind?)</code></td>
+    <td>BusinessTerm/Action 키워드 검색</td>
+    <td>/api/ontology/search (kind=term/action)</td>
+  </tr>
+  <tr>
+    <td><code>term_lookup(term_fqn)</code></td>
+    <td>term 상세 + facets + 부모/자식 + effective-parts</td>
+    <td>/api/ontology/terms/{fqn} + effective-parts</td>
+  </tr>
+  <tr>
+    <td><code>action_lookup(action_fqn)</code></td>
+    <td>action + realizations + anchor-bindings</td>
+    <td>/api/ontology/actions/{fqn}</td>
+  </tr>
+  <tr>
+    <td><code>find_term_realizations(term_fqn)</code></td>
+    <td>이 term 을 구현하는 CodeType list</td>
+    <td>term.realizations</td>
+  </tr>
+  <tr>
+    <td><code>find_action_realizations(action_fqn, input?)</code></td>
+    <td>이 action 의 CodeMethod 구현체 (다형성 포함)</td>
+    <td>/api/ontology/actions/{fqn}/realizations-for-input</td>
+  </tr>
+  <tr>
+    <td><code>find_terms_in_domain(domain_path)</code></td>
+    <td>특정 도메인 (예: scm/plant) 내 모든 term</td>
+    <td>perspective filter</td>
+  </tr>
+</table>
+
+<h3>2.3 Mapping Layer Tools (3개)</h3>
+<table>
+  <tr><th style="width: 30%;">Tool</th><th>설명</th><th style="width: 22%;">Backing</th></tr>
+  <tr>
+    <td><code>find_existing_mapping(code_fqn)</code></td>
+    <td>이 CodeType/Method 가 이미 어떤 term/action 으로 매핑됐는지</td>
+    <td>realization index</td>
+  </tr>
+  <tr>
+    <td><code>lookup_anchor_binding(method_fqn, anchor_id)</code></td>
+    <td>특정 anchor 의 매핑 단건</td>
+    <td>/api/ontology/code-methods/{fqn}/anchor-bindings</td>
+  </tr>
+  <tr>
+    <td><code>find_unmapped_methods_in_class(type_fqn)</code></td>
+    <td>같은 클래스 내 아직 mapping 안 된 method</td>
+    <td>queue/unmapped-methods</td>
+  </tr>
+</table>
+
+<h3>2.4 Operational Tools (2개)</h3>
+<table>
+  <tr><th style="width: 30%;">Tool</th><th>설명</th><th style="width: 22%;">Backing</th></tr>
+  <tr>
+    <td><code>note_observation(text)</code></td>
+    <td>agent 가 발견한 사실을 session decision log 에 기록 (UI 추적용)</td>
+    <td>session.add_decision</td>
+  </tr>
+  <tr>
+    <td><code>request_user_input(question)</code></td>
+    <td>탐색 도중 사용자에게 물어봐야 할 때 — 흐름 일시 중단</td>
+    <td>session.pending_question</td>
+  </tr>
+</table>
+
+<details>
+<summary>예시 — pydantic_ai 정의 형태</summary>
+<pre><code><span class="kw">from</span> pydantic_ai <span class="kw">import</span> Agent, RunContext
+
+<span class="cmt"># Tool registry — 모든 cap 이 공유</span>
+<span class="kw">def</span> <span class="fn">register_graph_tools</span>(agent: Agent, allowed: <span class="fn">set</span>[<span class="fn">str</span>]):
+    <span class="kw">if</span> <span class="str">"code_lookup"</span> <span class="kw">in</span> allowed:
+        <span class="cmt">@agent.tool</span>
+        <span class="kw">def</span> <span class="fn">code_lookup</span>(ctx: RunContext, fqn: <span class="fn">str</span>) -> <span class="fn">dict</span> | <span class="kw">None</span>:
+            <span class="str">"""Look up a CodeType / CodeMethod / CodeField by fully-qualified name."""</span>
+            <span class="kw">return</span> code_layer_store.find_by_fqn(fqn)
+    <span class="kw">if</span> <span class="str">"find_callers"</span> <span class="kw">in</span> allowed:
+        <span class="cmt">@agent.tool</span>
+        <span class="kw">def</span> <span class="fn">find_callers</span>(ctx: RunContext, method_fqn: <span class="fn">str</span>, limit: <span class="fn">int</span> = <span class="num">10</span>) -> <span class="fn">list</span>[<span class="fn">dict</span>]:
+            <span class="str">"""Find which methods call this method. Returns list of caller FQNs with line/snippet."""</span>
+            <span class="kw">return</span> graph_store.callers_of(method_fqn, limit=limit)
+    <span class="cmt"># ... 등등</span></code></pre>
+</details>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2>3. Per-Capability Tool Budget</h2>
+
+<p>
+  각 cap 의 본질에 따라 <strong>허용 tool 집합</strong>과 <strong>최대 호출 횟수</strong> 가 다르다.
+  과한 권한은 비용 폭증·환각 위험; 부족한 권한은 graph 활용 가치가 죽는다.
+</p>
+
+<table>
+  <tr>
+    <th>Cap</th>
+    <th>Tier</th>
+    <th>주요 tool 권한</th>
+    <th style="width: 14%;">Max calls</th>
+    <th style="width: 12%;">예상 비용</th>
+  </tr>
+  <tr>
+    <td>1 · extract</td>
+    <td><span class="pill sonnet">Sonnet</span></td>
+    <td>code_lookup, code_search, find_related_jpos, get_method_body</td>
+    <td>3–5</td>
+    <td class="tier-good">$0.05</td>
+  </tr>
+  <tr>
+    <td>2 · hypothesize</td>
+    <td><span class="pill opus">Opus</span></td>
+    <td>+ find_subclasses, find_implementations, domain_search,
+      find_terms_in_domain, find_existing_mapping</td>
+    <td>5–8</td>
+    <td class="tier-mid">$0.30</td>
+  </tr>
+  <tr>
+    <td>3 · interview</td>
+    <td><span class="pill sonnet">Sonnet</span></td>
+    <td>term_lookup, action_lookup (질문 작성 중 갭 확인용)</td>
+    <td>2–3</td>
+    <td class="tier-good">$0.04</td>
+  </tr>
+  <tr>
+    <td>4 · absorb</td>
+    <td><span class="pill sonnet">Sonnet</span></td>
+    <td>(현재 P3-A 로 우회됨 — tool 불필요)</td>
+    <td>0</td>
+    <td class="tier-good">$0.00</td>
+  </tr>
+  <tr>
+    <td>5 · gaps</td>
+    <td><span class="pill opus">Opus</span></td>
+    <td>전체 — 누락 신호 탐지에 가장 많은 graph 탐색 필요</td>
+    <td>8–12</td>
+    <td class="tier-low">$0.50</td>
+  </tr>
+  <tr>
+    <td>6 · options</td>
+    <td><span class="pill opus">Opus</span></td>
+    <td>전체 — 대안 비교에 유사 case 검색 필요</td>
+    <td>8–10</td>
+    <td class="tier-low">$0.40</td>
+  </tr>
+  <tr>
+    <td>7 · pattern_check (예정)</td>
+    <td><span class="pill opus">Opus</span></td>
+    <td>find_terms_in_domain, find_term_realizations</td>
+    <td>4–6</td>
+    <td class="tier-mid">$0.20</td>
+  </tr>
+  <tr>
+    <td>8 · naming</td>
+    <td><span class="pill sonnet">Sonnet</span></td>
+    <td>domain_search, find_terms_in_domain (중복 회피)</td>
+    <td>2–3</td>
+    <td class="tier-good">$0.04</td>
+  </tr>
+  <tr>
+    <td>9 · archive</td>
+    <td><span class="pill sonnet">Sonnet</span></td>
+    <td>(read-only summary, tool 불필요)</td>
+    <td>0</td>
+    <td class="tier-good">$0.02</td>
+  </tr>
+</table>
+
+<p style="font-size: 13px; color: var(--muted);">
+  세션 1회 (8 cap 풀 사이클) 추정 비용: 약 <strong>$1.55</strong>.
+  현재 raw text 방식(약 $0.40 / session) 대비 ~4배.
+  사람-1 세션 단가이므로 절대값으로는 미미. 100K 문서 batch 가 아닌 점에 주의.
+</p>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2>4. 실전 walkthrough — HrPlantConstraint (자바독 0%)</h2>
+
+<p>
+  <strong>가정</strong>: 클래스 javadoc 없음, 필드 inline comment 없음, 컬럼명만 영문 약어.
+  schema: PK <code>(hrPlantCd, constraintTypeCd)</code>, columns <code>minThk · maxThk · minWid · maxWid · createdAt</code>.
+</p>
+
+<div class="grid-2">
+<div class="compare-card bad">
+<div class="head">현재 방식 — raw text only</div>
+<p style="font-size: 12.5px;">
+  LLM 이 받는 정보: Java 파일 raw text 한 덩어리.<br>
+  추론 가능한 것: "PlantConstraint 라는 이름 + 컬럼 5개" 만.<br>
+  결과 hypothesis:
+</p>
+<pre style="font-size: 11.5px;">candidate_term: "공장 제약" (낮은 confidence)
+domain_role: "rule_table"
+column_notes: 모두 "단순 추측"
+relations_hint: ["HrPlant 와 관련 추정"]
+confidence: 0.45
+concerns: [
+  "javadoc 없음",
+  "Thk/Wid 가 thickness/width 인지 확실치 않음",
+  "constraintTypeCd 의 enum 값을 모름"
+]</pre>
+</div>
+
+<div class="compare-card good">
+<div class="head">Agentic 방식 — ReAct 루프</div>
+<p style="font-size: 12.5px;">
+  LLM 이 graph 를 ReAct 루프로 탐색:
+</p>
+<pre style="font-size: 11.5px;">candidate_term: "공장별 슬랩 규격 제약" (높은 confidence)
+domain_role: "rule_table" (확정)
+column_notes: 모두 "검증 코드 기반 정확"
+relations_hint: [
+  "HrPlant — 공장 마스터 (PK 공유)",
+  "PlantConstraintService.applyConstraint() 가 사용",
+  "HrSlab.validate() chain 의 일부"
+]
+confidence: 0.88
+assumptions: ["Thk=두께(mm), Wid=폭(mm)"]
+concerns: []</pre>
+</div>
+</div>
+
+<h3>ReAct trace (실제 LLM 이 만들 호출 시퀀스)</h3>
+
+<div class="trace">
+<div><span class="step">[Step 1]</span> <span class="think">// 자바독 없고 컬럼명 모호. 같은 PK 가진 다른 JPO 부터 본다.</span></div>
+<div><span class="tool">→ find_related_jpos(<span class="str">"...HrPlantConstraint"</span>)</span></div>
+<div><span class="obs">  ← ["HrPlant", "HrSpec", "HrPlantHist", "HrPlantConstraintHist"]</span></div>
+<br>
+<div><span class="step">[Step 2]</span> <span class="think">// HrPlant 가 가장 단순. 이게 마스터일 확률 높다.</span></div>
+<div><span class="tool">→ code_lookup(<span class="str">"...HrPlant"</span>)</span></div>
+<div><span class="obs">  ← {javadoc: "공장 마스터", PK: hrPlantCd "공장 코드", regular: [plantName, ...]}</span></div>
+<br>
+<div><span class="step">[Step 3]</span> <span class="think">// HrPlantConstraint 가 사용되는 곳을 찾자.</span></div>
+<div><span class="tool">→ code_search(<span class="str">"HrPlantConstraint"</span>, kind=<span class="str">"code_method"</span>)</span></div>
+<div><span class="obs">  ← ["...PlantConstraintService.applyConstraint(slab, plant)",
+      "...HrPlantConstraintRepository.findByPlantCd(...)"]</span></div>
+<br>
+<div><span class="step">[Step 4]</span> <span class="think">// applyConstraint body 가 핵심.</span></div>
+<div><span class="tool">→ get_method_body(<span class="str">"...PlantConstraintService.applyConstraint(...)"</span>)</span></div>
+<div><span class="obs">  ← "if (slab.thk &lt; constraint.minThk || slab.thk &gt; constraint.maxThk) ..."</span></div>
+<br>
+<div><span class="step">[Step 5]</span> <span class="think">// 확정. Thk/Wid 는 thickness/width. constraintTypeCd 는 어떤 종류 enum?</span></div>
+<div><span class="tool">→ get_method_anchors(<span class="str">"...applyConstraint(...)"</span>)</span></div>
+<div><span class="obs">  ← [literal: "HARD" / "SOFT" / "WARNING"], [branch: 3 conditions]</span></div>
+<br>
+<div><span class="step">[Step 6]</span> <span class="think">// 도메인에 이미 비슷한 term 이 있나 확인 (중복 회피).</span></div>
+<div><span class="tool">→ domain_search(<span class="str">"공장 제약"</span>)</span></div>
+<div><span class="obs">  ← [] (없음, 신규 term 으로 추가해도 됨)</span></div>
+<br>
+<div><span class="step">[Step 7]</span> <span class="think">// 충분. 가설 작성.</span></div>
+<div><span class="step">→ Output: EntityHypothesis (위 우측 카드)</span></div>
+</div>
+
+<div class="insight-box">
+  <div class="label">관전 포인트</div>
+  <p style="margin-top: 6px;">
+    Step 4 의 <strong>"if (slab.thk &lt; constraint.minThk || ...)"</strong> 한 줄이 전부다.
+    이 한 줄이 컬럼명·PK 만 있던 raw text 와 비교해 <em>도메인 의미를 결정한다</em>.
+    그리고 이 정보는 <strong>자바독·주석 없이</strong> body 의 코드 자체에서 나왔다.
+    "코드가 ground truth" 라는 시뮬레이션 설계 원칙과 정확히 일치.
+  </p>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2>5. Trade-offs · 위험</h2>
+
+<table>
+  <tr><th style="width: 22%;">차원</th><th>현재 (raw text)</th><th>Agentic (graph + ReAct)</th></tr>
+  <tr>
+    <td>비용 (per session)</td>
+    <td class="tier-good">~$0.40</td>
+    <td class="tier-mid">~$1.55 (4×)</td>
+  </tr>
+  <tr>
+    <td>지연 (per cap)</td>
+    <td class="tier-good">2–4 s</td>
+    <td class="tier-mid">8–25 s (tool turn 당 ~1.5s)</td>
+  </tr>
+  <tr>
+    <td>품질 (자바독 없는 케이스)</td>
+    <td class="tier-low">confidence 0.4 수준</td>
+    <td class="tier-good">confidence 0.85+</td>
+  </tr>
+  <tr>
+    <td>디버깅 복잡도</td>
+    <td class="tier-good">낮음 (1 prompt + 1 output)</td>
+    <td class="tier-mid">중간 (tool trace 필요)</td>
+  </tr>
+  <tr>
+    <td>UX 부담</td>
+    <td class="tier-good">single spinner</td>
+    <td class="tier-mid">tool call 진행률 필요 (없으면 멈춘 듯 보임)</td>
+  </tr>
+  <tr>
+    <td>환각 위험</td>
+    <td class="tier-mid">중간 (prompt 안 정보 제한)</td>
+    <td class="tier-good">낮음 (실제 graph 만 본다)</td>
+  </tr>
+  <tr>
+    <td>오답 시 사후 분석</td>
+    <td class="tier-low">왜 틀렸는지 불투명</td>
+    <td class="tier-good">tool trace 로 정확히 추적 가능</td>
+  </tr>
+  <tr>
+    <td>cold-start 의존성</td>
+    <td class="tier-good">자체 완결</td>
+    <td class="tier-mid">ontology 가 비어있으면 ontology tool 효과 0
+      (code tool 만으로도 동작은 함)</td>
+  </tr>
+</table>
+
+<h3>5.1 위험 · 대비책</h3>
+<ul>
+  <li><strong>Tool call 폭주</strong> — agent 가 graph 를 10+ hop 헤집고 다닐 위험 →
+    cap 별 hard cap (max_calls), 동일 fqn 중복 호출 dedup, 세션당 총 비용 cap</li>
+  <li><strong>긴 latency 로 사용자 이탈</strong> — SSE 로 tool call 진행 (예:
+    "🔍 HrPlant 조회 중…") 노출. 진행률 보이면 25초도 OK</li>
+  <li><strong>잘못된 추적 → 잘못된 가설</strong> — 모든 tool trace 를
+    decision log 에 기록 → cap 9 archive 가 트레이스도 함께 마크다운에 포함</li>
+  <li><strong>재실행 비용</strong> — F3 cascading rerun 시 동일 tool call 캐시 활용
+    (session-level memoization)</li>
+  <li><strong>Ontology 미완 cold-start</strong> — ontology tool 비활성 모드 지원
+    (code tool 만으로도 valuable)</li>
+</ul>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2>6. 아키텍처 결정 사항 (사전 정렬 필요)</h2>
+
+<p>
+  구현 진입 전에 사용자 결정이 필요한 항목들. 작업 단위 승인 원칙에 따라 답을 받고
+  들어간다.
+</p>
+
+<h3>6.1 ReAct 루프 형태</h3>
+<ul>
+  <li><strong>A · 자유 ReAct</strong> — agent 가 결심할 때까지 tool call 무제한 (max_calls 만 cap).
+    가장 유연하지만 latency·비용 변동성 큼.</li>
+  <li><strong>B · 단계별 forced reflection</strong> — N call 마다 강제 "지금까지 알아낸 것 정리" 단계 삽입.
+    품질 안정적.</li>
+  <li><strong>C · Plan-then-execute</strong> — agent 가 먼저 "이런 것들 조사해야 함" 계획 먼저 출력 → 사용자 승인 → 일괄 실행.
+    가장 투명하지만 인터랙션 늘어남.</li>
+</ul>
+
+<h3>6.2 Tool trace UX 노출</h3>
+<ul>
+  <li><strong>α · Full trace</strong> — 모든 tool call 을 진행 중 SSE 로 노출 (개발자 모드 느낌)</li>
+  <li><strong>β · 요약 spinner</strong> — "🔍 관련 코드 5개 조회 중…" 처럼 현재 phase 만 노출</li>
+  <li><strong>γ · 사후 expandable</strong> — 결과 카드에 "🔍 어떻게 알아냈나" 토글로 trace 펼치기</li>
+</ul>
+
+<h3>6.3 Ontology tool 활성 시점</h3>
+<ul>
+  <li><strong>S · 즉시</strong> — recommend bulk 결과 (29 terms) 부터 활용. cold-start 라도 유용.</li>
+  <li><strong>T · 임계 후</strong> — ontology size 가 일정 이상 (예: 50 terms) 될 때까지 비활성</li>
+</ul>
+
+<h3>6.4 Cap 별 권한</h3>
+<p style="font-size: 13.5px;">
+  §3 의 권한 표가 적절한가? 특정 cap 에 권한 더/덜 주고 싶은 항목은?
+</p>
+
+<h3>6.5 비용 cap 정책</h3>
+<ul>
+  <li>세션당 hard cap (예: $5) 도달 시 강제 종료?</li>
+  <li>cap 당 hard cap (예: cap 5 는 max 12 calls) 만 두고 세션 cap 은 부드럽게?</li>
+</ul>
+
+<h3>6.6 새 cap (7 · pattern_checker) — agentic 으로 처음부터 설계?</h3>
+<p style="font-size: 13.5px;">
+  cap 7 (pattern_checker) 는 아직 미구현. 처음부터 ReAct 패턴으로 설계하면 retro-fit 비용 없음.
+  나머지 cap 1, 2, 5, 6 도 같이 ReAct 화할지, 아니면 새 cap 부터 점진 도입할지.
+</p>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2>7. 권장안 — 깊은 고찰의 결론</h2>
+
+<div class="insight-box">
+  <div class="label">★ Recommendation</div>
+  <p style="margin-top: 6px;">
+    <strong>방향성</strong>: agentic graph exploration 으로 전환 — 사용자 답변과 정확히 일치.<br>
+    <strong>형태</strong>: 6.1 의 <strong>B (단계별 forced reflection)</strong> 가 최적 균형 (자유와 통제 사이).<br>
+    <strong>UX</strong>: 6.2 의 <strong>β + γ 혼합</strong> — 진행 중에는 phase 요약, 결과 카드에 trace 토글.<br>
+    <strong>Ontology</strong>: 6.3 의 <strong>S (즉시 활성)</strong> — 29 terms 라도 가치 있음 (중복 회피).<br>
+    <strong>도입 순서</strong>: <em>(우선순위는 사용자 결정 영역이라 제안 보류)</em>
+  </p>
+</div>
+
+<h3>핵심 의의</h3>
+<p>
+  이 전환은 <strong>"AI 가 뭐 하는지 모르겠다"</strong> 라는 가장 큰 사용자 우려를 동시에 해결한다 —
+  agent 가 호출하는 tool 이 그대로 "왜 이렇게 추론했는가" 의 증거 (evidence trail) 가 되기 때문.
+  Round 5 에서 사람과 협업이 잘 됐던 이유는 <strong>"맥락을 같이 추적하는 느낌"</strong> 이었고,
+  ReAct + tool trace 노출은 그 협업감을 product 에 그대로 옮긴다.
+</p>
+<p>
+  부수효과로, <strong>onTong 전체 가치 제안의 차별화 포인트</strong> 가 된다 —
+  단순 RAG agent 가 아니라 "도메인 코드 그래프 위에서 추론하는 agent" 라는 명확한 정체성.
+</p>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2>8. 답변 양식</h2>
+
+<p style="font-size: 13.5px; color: var(--muted);">
+  아래 질문에 답해주시면 그에 맞춰 설계·구현 진입합니다.
+  답변 후 <strong>"답변 복사"</strong> 버튼을 누르거나, 통째로 채팅창에 붙여넣어 주세요.
+</p>
+
+<form id="answer-form">
+<div class="form-q">
+  <label>Q1. ReAct 루프 형태 (§6.1)</label>
+  <div class="help">A · 자유 ReAct &nbsp; / &nbsp; B · 단계별 forced reflection (★) &nbsp; / &nbsp; C · Plan-then-execute</div>
+  <textarea id="q1" placeholder="예: B 로 진행. 또는 C — 사용자가 계획을 먼저 보고 싶은 경우 추가."></textarea>
+</div>
+
+<div class="form-q">
+  <label>Q2. Tool trace UX (§6.2)</label>
+  <div class="help">α · Full trace &nbsp; / &nbsp; β · 요약 spinner (★) &nbsp; / &nbsp; γ · 사후 expandable (★)</div>
+  <textarea id="q2" placeholder="예: β + γ. 진행 중엔 요약, 결과 카드에 토글로 trace."></textarea>
+</div>
+
+<div class="form-q">
+  <label>Q3. Ontology tool 활성 시점 (§6.3)</label>
+  <div class="help">S · 즉시 (★) &nbsp; / &nbsp; T · 임계 후</div>
+  <textarea id="q3" placeholder="예: S — recommend 결과 29 terms 부터 활용."></textarea>
+</div>
+
+<div class="form-q">
+  <label>Q4. Per-cap 권한 (§3 표)</label>
+  <div class="help">표가 적절한가? 권한 추가/제거 요청.</div>
+  <textarea id="q4" placeholder="예: 적절. 또는 cap 1 에 find_subclasses 추가 등."></textarea>
+</div>
+
+<div class="form-q">
+  <label>Q5. 비용 cap 정책 (§6.5)</label>
+  <div class="help">세션 hard cap / cap 당 hard cap / 둘 다 / 보고만</div>
+  <textarea id="q5" placeholder="예: cap 당 hard cap + 세션 알림 (강제 종료 X)."></textarea>
+</div>
+
+<div class="form-q">
+  <label>Q6. 도입 순서 (§6.6)</label>
+  <div class="help">cap 7 부터 신규 ReAct / cap 1+2 retro-fit 우선 / cap 5+6 (graph 효과 가장 큼) 우선 / 다른 의견</div>
+  <textarea id="q6" placeholder="예: cap 5+6 부터. 또는 사용자 정의."></textarea>
+</div>
+
+<div class="form-q">
+  <label>Q7. 추가 의견 / 우려 / 보완</label>
+  <div class="help">자유 입력.</div>
+  <textarea id="q7" placeholder="예: tool 이름 일부 한글로? Sandbox 시 외부 호출 차단?"></textarea>
+</div>
+
+<button type="button" onclick="copyAnswer()">📋 답변 복사</button>
+<span id="fallback-note" style="display:none; margin-left: 12px; color: var(--warn); font-size: 12px;">
+  복사가 안 되면 아래 textarea 의 내용을 직접 선택·복사해 주세요.
+</span>
+<textarea id="fallback-area" style="display:none; margin-top: 10px;"></textarea>
+</form>
+
+<div class="toast" id="toast">복사됨</div>
+</section>
+
+<script>
+function copyAnswer() {
+  const get = (id) => (document.getElementById(id).value || "").trim();
+  const text = [
+    "[Authoring Agent — Code+Ontology Graph 아키텍처 — 사용자 답변]",
+    "",
+    "## Q1. ReAct 루프 형태",
+    get("q1") || "(미입력)",
+    "",
+    "## Q2. Tool trace UX",
+    get("q2") || "(미입력)",
+    "",
+    "## Q3. Ontology tool 활성 시점",
+    get("q3") || "(미입력)",
+    "",
+    "## Q4. Per-cap 권한",
+    get("q4") || "(미입력)",
+    "",
+    "## Q5. 비용 cap 정책",
+    get("q5") || "(미입력)",
+    "",
+    "## Q6. 도입 순서",
+    get("q6") || "(미입력)",
+    "",
+    "## Q7. 추가 의견",
+    get("q7") || "(미입력)",
+  ].join("\n");
+
+  // Try modern API
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(showToast).catch(() => fallback(text));
+  } else {
+    fallback(text);
+  }
+}
+
+function fallback(text) {
+  // textarea + execCommand fallback (file:// 환경 대비)
+  const ta = document.getElementById("fallback-area");
+  ta.value = text;
+  ta.style.display = "block";
+  ta.select();
+  try {
+    document.execCommand("copy");
+    showToast();
+  } catch (e) {
+    document.getElementById("fallback-note").style.display = "inline";
+  }
+}
+
+function showToast() {
+  const t = document.getElementById("toast");
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1500);
+}
+</script>
+
+</body>
+</html>

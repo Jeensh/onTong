@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>onTong Section 2 — 정보 구조(IA) 통합 제안 v1 (2026-04-27)</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif; max-width: 1100px; margin: 32px auto; padding: 0 24px; line-height: 1.65; color: #1f2937; }
+h1 { font-size: 28px; border-bottom: 3px solid #3b82f6; padding-bottom: 8px; }
+h2 { font-size: 20px; margin-top: 36px; color: #1e40af; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
+h3 { font-size: 16px; color: #374151; margin-top: 24px; }
+.callout { padding: 12px 16px; border-radius: 6px; margin: 12px 0; }
+.callout.info { background: #dbeafe; border-left: 4px solid #3b82f6; }
+.callout.warn { background: #fef3c7; border-left: 4px solid #d97706; }
+.callout.success { background: #dcfce7; border-left: 4px solid #16a34a; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; vertical-align: top; }
+th { background: #f3f4f6; font-weight: 600; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+.tag.keep { background: #dcfce7; color: #166534; }
+.tag.merge { background: #fef3c7; color: #92400e; }
+.tag.deprecate { background: #fee2e2; color: #991b1b; }
+.tag.new { background: #dbeafe; color: #1e40af; }
+.flow { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; font-family: monospace; font-size: 13px; white-space: pre; overflow-x: auto; }
+.before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+.before-after > div { padding: 12px; border-radius: 6px; }
+.before { background: #fef2f2; border: 1px solid #fecaca; }
+.after { background: #f0fdf4; border: 1px solid #bbf7d0; }
+.before h4 { color: #b91c1c; margin: 0 0 8px 0; }
+.after h4 { color: #15803d; margin: 0 0 8px 0; }
+ul { margin: 8px 0; padding-left: 24px; }
+li { margin: 4px 0; }
+code { background: #f3f4f6; padding: 1px 6px; border-radius: 3px; font-size: 12px; }
+.phase { background: #ede9fe; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; color: #5b21b6; margin-right: 8px; }
+.dim { color: #6b7280; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>onTong Section 2 — IA 통합 제안 v1</h1>
+<p class="dim">2026-04-27 · P18 (온톨로지 그래프) 완료 시점 · 사용자 검토 요청</p>
+
+<div class="callout info">
+<strong>요약</strong> — 현재 사이드바 10 개 탭 → 핵심 4 + 보조 3 + 진입 3 으로 재편 제안.
+Workbench 가 '단일 작업 화면' 이 되도록 역탐색/영향 분석/갭 큐 일부 기능을 흡수하고, 보조 탭은 deprecate 후보로 표시.
+</div>
+
+<h2>1. 현재 탭 인벤토리</h2>
+
+<table>
+<thead><tr><th>탭</th><th>역할</th><th>쓰임 빈도</th><th>Workbench 와 중복</th><th>제안</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>Workbench</strong> <span class="phase">P20+P21+P17</span></td>
+  <td>메서드 4-패널 (트리 / 코드+anchor / Ontology 카드 / 룰 검토·참고·영향·시뮬)</td>
+  <td>★★★★★ (default)</td>
+  <td>—</td>
+  <td><span class="tag keep">유지·핵심</span></td>
+</tr>
+<tr>
+  <td><strong>온톨로지 그래프</strong> <span class="phase">P18 NEW</span></td>
+  <td>Term/Rule 노드 + 관계 시각화 (xyflow)</td>
+  <td>★★★★ (전체 조감 + 신뢰도 검증)</td>
+  <td>다른 시각 — 메서드 단위 vs 전체</td>
+  <td><span class="tag keep">유지·핵심</span></td>
+</tr>
+<tr>
+  <td><strong>Repository</strong></td>
+  <td>코드 등록 / 12-analyzer 파싱</td>
+  <td>★★★ (1회성 셋업, 이후 가끔)</td>
+  <td>없음 (데이터 진입점)</td>
+  <td><span class="tag keep">유지·필수</span></td>
+</tr>
+<tr>
+  <td><strong>기준서</strong></td>
+  <td>PDF/DOCX/PPTX/이미지/MD 매뉴얼 인제스트</td>
+  <td>★★★ (1회성 셋업)</td>
+  <td>없음 (데이터 진입점)</td>
+  <td><span class="tag keep">유지·필수</span></td>
+</tr>
+<tr>
+  <td><strong>매뉴얼 작성</strong></td>
+  <td>코드 옆 split-view markdown + ontong directive</td>
+  <td>★★ (점진적 추가)</td>
+  <td>매뉴얼 입력의 alt 경로</td>
+  <td><span class="tag keep">유지·필수</span></td>
+</tr>
+<tr>
+  <td><strong>용어 매핑</strong></td>
+  <td>저장소 단위 LLM 일괄 추천 (매뉴얼/코드 → BusinessTerm)</td>
+  <td>★★★ (cold start 진입)</td>
+  <td>Workbench 의 자동 매핑은 메서드 단위 — 저장소 일괄과 보완</td>
+  <td><span class="tag keep">유지·역할 분리</span></td>
+</tr>
+<tr>
+  <td><strong>갭 큐</strong></td>
+  <td>code↔manual 갭 승인 (auto_linker + scanner)</td>
+  <td>★★ (정기 검토)</td>
+  <td>일부 — Workbench 의 미확정 룰 검토와 비슷, 다른 차원</td>
+  <td><span class="tag merge">단기 유지 → P19 후 Workbench R 패널 「갭」 탭 흡수 검토</span></td>
+</tr>
+<tr>
+  <td><strong>역탐색</strong></td>
+  <td>한국어 용어 → 코드 위치 BFS</td>
+  <td>★ (질의 패턴)</td>
+  <td>높음 — Workbench 좌측 트리 검색 + Ontology 그래프 노드 클릭</td>
+  <td><span class="tag merge">P19 후 Workbench Command Palette (⌘K) 로 흡수</span></td>
+</tr>
+<tr>
+  <td><strong>영향 분석</strong></td>
+  <td>코드 위치 → 호출자/의존자 BFS</td>
+  <td>★★ (질의 패턴)</td>
+  <td>높음 — Workbench R 패널 「영향」 탭 (P19 placeholder)</td>
+  <td><span class="tag merge">P19 완료 시 Workbench 흡수, 본 탭은 deprecate</span></td>
+</tr>
+<tr>
+  <td><strong>DI 그래프</strong></td>
+  <td>Spring beans + autowires 시각화</td>
+  <td>★ (탐색 보조)</td>
+  <td>없음 (다른 차원)</td>
+  <td><span class="tag merge">유지하되 Repository 탭 우측 패널로 이동 검토</span></td>
+</tr>
+</tbody>
+</table>
+
+<h2>2. 사용자 멘탈 모델 — 「Workbench First」</h2>
+
+<div class="callout success">
+<strong>제안 원칙</strong> — Workbench 가 <em>모든 작업의 기본 화면</em>. 다른 탭은 (a) 입력 셋업, (b) 전체 조감, (c) 일괄 작업 의 3 역할만 가진다.
+</div>
+
+<h3>핵심 작업 흐름 (사용자 시각)</h3>
+
+<div class="flow">[ 입력 셋업 ]                    [ 핵심 작업 ]                         [ 전체 조감 / 일괄 ]
+  Repository       ─┐
+  기준서            ├─→  Workbench (모든 메서드 단위 작업)  ←─→  온톨로지 그래프
+  매뉴얼 작성       ─┘                                            용어 매핑 (배치)
+                            │
+                            └→  L 트리: 메서드 검색 (역탐색 흡수)
+                                C 코드: anchor highlight
+                                C-R Ontology: 메서드 단위 매핑 + LLM 추천
+                                R 패널: 룰 검토 (P17) | 영향 (P19→흡수) | 시뮬 (P22)</div>
+
+<h3>각 탭의 명확한 역할</h3>
+
+<table>
+<thead><tr><th>역할</th><th>탭</th><th>언제 사용?</th></tr></thead>
+<tbody>
+<tr>
+  <td>① 입력 셋업 (1회성 + 점진적)</td>
+  <td>Repository / 기준서 / 매뉴얼 작성</td>
+  <td>새 코드/매뉴얼 추가 시</td>
+</tr>
+<tr>
+  <td>② 핵심 작업 (매일)</td>
+  <td>Workbench</td>
+  <td>메서드별 매핑/룰 검토/영향 분석/시뮬레이션</td>
+</tr>
+<tr>
+  <td>③ 전체 조감 (검증)</td>
+  <td>온톨로지 그래프</td>
+  <td>관계 구조 점검, 누락된 governs 발견</td>
+</tr>
+<tr>
+  <td>④ 배치 작업 (특수)</td>
+  <td>용어 매핑 / 갭 큐</td>
+  <td>cold start, 정기 갭 검토</td>
+</tr>
+</tbody>
+</table>
+
+<h2>3. 변경 제안 — Before / After</h2>
+
+<div class="before-after">
+<div class="before">
+<h4>Before (현재)</h4>
+<ul>
+  <li>Workbench (default)</li>
+  <li>Repository</li>
+  <li>기준서</li>
+  <li>매뉴얼 작성</li>
+  <li>용어 매핑</li>
+  <li>갭 큐</li>
+  <li>역탐색</li>
+  <li>영향 분석</li>
+  <li>DI 그래프</li>
+  <li>(P18 추가) 온톨로지 그래프</li>
+</ul>
+<p class="dim">총 10 개. 사용자 학습 부담 큼. 어디서 무엇을 하는지 모호.</p>
+</div>
+<div class="after">
+<h4>After (제안 — 단계적 적용)</h4>
+<p><strong>핵심 (4)</strong></p>
+<ul>
+  <li>Workbench</li>
+  <li>온톨로지 그래프</li>
+  <li>Repository (DI 그래프 흡수)</li>
+  <li>기준서 + 매뉴얼 작성 (한 탭으로 통합 검토)</li>
+</ul>
+<p><strong>배치 (2)</strong></p>
+<ul>
+  <li>용어 매핑</li>
+  <li>갭 큐</li>
+</ul>
+<p><strong>흡수/제거 (3)</strong></p>
+<ul>
+  <li><s>역탐색</s> → Workbench Command Palette (⌘K)</li>
+  <li><s>영향 분석</s> → Workbench R 패널 「영향」 (P19)</li>
+  <li><s>DI 그래프</s> → Repository 탭 우측 보조 패널</li>
+</ul>
+<p class="dim">총 6 개. 역할이 명확. 나머지는 기능을 잃지 않고 더 좋은 자리로 이동.</p>
+</div>
+</div>
+
+<h2>4. 적용 단계 (Phase)</h2>
+
+<table>
+<thead><tr><th>단계</th><th>변경</th><th>의존</th><th>난이도</th></tr></thead>
+<tbody>
+<tr>
+  <td><span class="phase">Phase 1 (지금)</span></td>
+  <td>온톨로지 그래프 탭 추가, Workbench 가 default 임을 명확히 (이미 적용)</td>
+  <td>P18 ✓</td>
+  <td>완료</td>
+</tr>
+<tr>
+  <td><span class="phase">Phase 2 (P19 후)</span></td>
+  <td>Workbench R 패널 「영향」 탭 활성화 (multi-layer impact). 영향 분석 탭 deprecation 안내 + 자동 redirect.</td>
+  <td>P19 Multi-Layer ImpactPropagator</td>
+  <td>중</td>
+</tr>
+<tr>
+  <td><span class="phase">Phase 3 (P20 후)</span></td>
+  <td>Workbench Command Palette (⌘K) 에 한국어 용어 검색 → 매서드 jump. 역탐색 탭 deprecate.</td>
+  <td>이미 P14 에서 ⌘K 일부 구현</td>
+  <td>저</td>
+</tr>
+<tr>
+  <td><span class="phase">Phase 4 (P22+ 후)</span></td>
+  <td>갭 큐 → Workbench R 패널 「갭」 탭. 전 저장소 갭 보기는 온톨로지 그래프 의 별도 모드로.</td>
+  <td>P22 시뮬레이션 drawer 와 통합 검토</td>
+  <td>중</td>
+</tr>
+<tr>
+  <td><span class="phase">Phase 5 (선택)</span></td>
+  <td>DI 그래프 → Repository 탭 우측 보조 패널. 기준서 + 매뉴얼 작성 통합.</td>
+  <td>없음 (UI rearrangement)</td>
+  <td>저</td>
+</tr>
+</tbody>
+</table>
+
+<h2>5. Workbench 가 핵심인 이유 (시연 시나리오)</h2>
+
+<div class="callout info">
+실제 사용자가 「<strong>이 메서드 가 정말 이 도메인 룰 을 잘 구현했나?</strong>」 를 확인하는 흐름.
+</div>
+
+<ol>
+  <li><strong>L 패널 트리</strong> — `feature.sd.process.std.service.CastSpecService.lookup()` 클릭
+    <ul><li class="dim">「역탐색」 탭 없이 바로 메서드 도달</li></ul>
+  </li>
+  <li><strong>C 패널 코드</strong> — 메서드 source 표시. param/local/branch/literal 라인 색상 highlight
+    <ul><li class="dim">실제 코드 가 ground truth (사용자 결정)</li></ul>
+  </li>
+  <li><strong>C-R 패널 Ontology 카드</strong> — anchor 4 개 → BusinessTerm 자동 추천 (alias 매칭 + LLM 보강)
+    <ul><li class="dim">「용어 매핑」 탭의 메서드 단위 버전</li></ul>
+  </li>
+  <li><strong>R 패널 「⚖️ 룰 검토」</strong> (P17) — 메서드에서 추출된 BusinessRule 1 개 (lookup 종) 표시
+    <ul><li class="dim">확정 / 편집 / 거부</li></ul>
+  </li>
+  <li><strong>R 패널 「🧬 영향」</strong> (P19 후 활성) — 이 메서드 변경 시 영향받는 다른 메서드/term/rule
+    <ul><li class="dim">「영향 분석」 탭 흡수</li></ul>
+  </li>
+  <li><strong>R 패널 「🔬 시뮬」</strong> (P22~25 후) — Python 자동 생성 → Sandbox 실행 → 변경 전후 diff
+    <ul><li class="dim">시뮬레이션 핵심</li></ul>
+  </li>
+  <li><strong>온톨로지 그래프 탭 으로 점프</strong> — 이 메서드의 rule 이 그래프상 다른 term 과 어떻게 연결되는지 조감
+    <ul><li class="dim">macro 검증</li></ul>
+  </li>
+</ol>
+
+<h2>6. 위험 / 트레이드오프</h2>
+
+<table>
+<thead><tr><th>위험</th><th>완화</th></tr></thead>
+<tbody>
+<tr>
+  <td>역탐색/영향 분석 탭에 익숙한 사용자가 헷갈림</td>
+  <td>탭 deprecation 시 30 일 전환 기간 + redirect + 안내 toast</td>
+</tr>
+<tr>
+  <td>Workbench R 패널이 너무 많은 탭 (룰/영향/시뮬/참고/갭) 으로 비대화</td>
+  <td>각 탭 헤더에 도움말 + 탭 wrap 적용 (이미 P21b)</td>
+</tr>
+<tr>
+  <td>온톨로지 그래프가 100K+ 노드에서 느림</td>
+  <td>「관계 있는 노드만」 default ON + 페이지네이션 + 도메인 필터</td>
+</tr>
+<tr>
+  <td>DI 그래프 흡수 시 spring 전용 사용자 혼동</td>
+  <td>Repository 탭 우측 「인프라」 섹션 분리</td>
+</tr>
+</tbody>
+</table>
+
+<h2>7. 사용자 결정 요청</h2>
+
+<div class="callout warn">
+다음 항목에 대해 한 번에 답변 부탁드립니다 :
+<ol>
+  <li><strong>Phase 1 (현재 상태) 유지</strong> 하시겠습니까? 아니면 <strong>Phase 2~5 적용 시작</strong>?</li>
+  <li>역탐색 / 영향 분석 / DI 그래프 중 <strong>먼저 흡수할 1 개</strong>를 고른다면?</li>
+  <li>온톨로지 그래프 default 로 <strong>「관계 있는 노드만」 ON</strong> 으로 보여드릴까요? (현재는 OFF — 모든 56 rule 노출)</li>
+  <li>기준서 + 매뉴얼 작성 <strong>통합 탭</strong>으로 만들까요? (지금은 별개)</li>
+</ol>
+</div>
+
+<p class="dim">— P18 산출물과 함께 보고드립니다. 계속 P19 (Multi-Layer ImpactPropagator) 로 진행할지도 알려주세요.</p>
+
+</body>
+</html>

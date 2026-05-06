@@ -10,10 +10,16 @@ export interface ThinkingStep {
   detail: string;
 }
 
+export interface AppliedFiltersPayload {
+  filters: Record<string, unknown>;
+  source: string;
+}
+
 export interface SSECallbacks {
   onRouting?: (data: { agent: string; confidence: number }) => void;
   onThinkingStep?: (data: ThinkingStep) => void;
   onContentDelta?: (delta: string) => void;
+  onAppliedFilters?: (data: AppliedFiltersPayload) => void;
   onSources?: (sources: { doc: string; relevance: number; updated?: string; updated_by?: string; status?: string; superseded_by?: string; confidence_score?: number; confidence_tier?: string }[]) => void;
   onApprovalRequest?: (data: {
     action_id: string;
@@ -164,6 +170,9 @@ function dispatchEvent(
       callbacks.onSources?.(
         data.sources as { doc: string; relevance: number; updated?: string; updated_by?: string; status?: string; superseded_by?: string; confidence_score?: number; confidence_tier?: string }[]
       );
+      break;
+    case "applied_filters":
+      callbacks.onAppliedFilters?.(data as unknown as AppliedFiltersPayload);
       break;
     case "conflict_warning":
       callbacks.onConflictWarning?.(

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "ocr_text": "가열로 온도 프로파일 도면\n문서번호: DOC-EQ-2026-0142\n설비ID: DG-320\nHEATING FURNACE TEMPERATURE PROFILE\n개정: 3 승인: @박선우\n200\n승온 1809C\n온도(C)\n(15분)\n(25분 유지)\n150\n(10분)\n시Emin)\n핵심 관리 포인트\n군열 구간 온도 편차 12C 엄수\n변경 시 [[변경관리-절차]] 필수",
+  "description": "",
+  "provider": "none",
+  "ocr_engine": "easyocr",
+  "processed_at": "2026-04-17T04:31:31.757053+00:00",
+  "source": ""
+}

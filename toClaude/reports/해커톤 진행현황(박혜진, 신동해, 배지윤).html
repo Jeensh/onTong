@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>onTong 프로젝트 — 섹션별 진행 현황</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --ink: #0f172a;
+    --ink-soft: #475569;
+    --ink-mute: #64748b;
+    --line: #e2e8f0;
+    --accent: #1d4ed8;
+    --accent-soft: #eff6ff;
+    --ok: #16a34a;
+    --warn: #d97706;
+    --hot: #dc2626;
+    --ok-bg: #ecfdf5;
+    --warn-bg: #fef3c7;
+    --hot-bg: #fee2e2;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Segoe UI", Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+  }
+  header.doc-head {
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 20px;
+    margin-bottom: 32px;
+  }
+  header.doc-head h1 {
+    margin: 0 0 6px;
+    font-size: 26px;
+    letter-spacing: -0.01em;
+  }
+  header.doc-head .meta {
+    color: var(--ink-mute);
+    font-size: 13px;
+  }
+  header.doc-head .meta span + span::before {
+    content: " · ";
+    color: var(--line);
+    padding: 0 4px;
+  }
+  h2 {
+    font-size: 19px;
+    margin: 40px 0 14px;
+    letter-spacing: -0.01em;
+  }
+  h2 .num {
+    display: inline-block;
+    background: var(--ink);
+    color: #fff;
+    font-size: 12px;
+    line-height: 1;
+    padding: 5px 8px;
+    border-radius: 4px;
+    margin-right: 10px;
+    vertical-align: 2px;
+    font-weight: 600;
+  }
+  .lead {
+    color: var(--ink-soft);
+    margin: 0 0 18px;
+    font-size: 14px;
+  }
+
+  /* Traffic light summary */
+  .snapshot {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 12px;
+  }
+  .snap-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 18px 16px;
+    position: relative;
+  }
+  .snap-card .badge {
+    display: inline-block;
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .b-ok { background: var(--ok-bg); color: var(--ok); }
+  .b-warn { background: var(--warn-bg); color: var(--warn); }
+  .b-hot { background: var(--hot-bg); color: var(--hot); }
+  .snap-card h3 {
+    margin: 10px 0 6px;
+    font-size: 16px;
+  }
+  .snap-card p {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  /* Main table */
+  .tbl {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    font-size: 14.5px;
+    table-layout: fixed;
+  }
+  .tbl th, .tbl td {
+    vertical-align: top;
+    padding: 18px 18px;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+  .tbl thead th {
+    background: #f1f5f9;
+    font-size: 13px;
+    color: var(--ink-soft);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+  .tbl tbody tr:last-child td { border-bottom: none; }
+  .tbl .sec {
+    width: 10%;
+    background: #fafbfc;
+    font-weight: 600;
+    border-right: 1px solid var(--line);
+  }
+  .tbl .sec .sec-title {
+    font-size: 15px;
+    color: var(--ink);
+    margin-bottom: 2px;
+  }
+  .tbl .sec .sec-sub {
+    font-size: 12px;
+    color: var(--ink-mute);
+    font-weight: 400;
+    line-height: 1.4;
+  }
+  .tbl td ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+  .tbl td ul li {
+    margin-bottom: 7px;
+    line-height: 1.6;
+  }
+  .tbl td ul li:last-child { margin-bottom: 0; }
+  .tbl td ol {
+    margin: 0;
+    padding-left: 20px;
+  }
+  .tbl td ol li {
+    margin-bottom: 6px;
+  }
+  .tbl td ol li:last-child { margin-bottom: 0; }
+  .tbl td.goal {
+    font-size: 14px;
+    line-height: 1.65;
+  }
+  .tbl td.goal strong {
+    background: #fff3bf;
+    padding: 1px 3px;
+    border-radius: 2px;
+    font-weight: 600;
+  }
+  .tbl td.goal p { margin: 0 0 10px; }
+  .tbl td.goal p:last-child { margin: 0; }
+  .tbl td.empty-note {
+    color: var(--ink-mute);
+    font-style: italic;
+    font-size: 13.5px;
+  }
+  .tbl td .sub-note {
+    display: block;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--line);
+    color: var(--ink-mute);
+    font-size: 12.5px;
+    line-height: 1.5;
+    font-style: italic;
+  }
+  .tbl td .feat-head {
+    font-weight: 600;
+    color: var(--ink);
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  /* Priority section */
+  .priority {
+    background: var(--accent-soft);
+    border: 1px solid #c7d7f5;
+    border-left: 4px solid var(--accent);
+    padding: 18px 22px;
+    border-radius: 8px;
+  }
+  .priority ol {
+    margin: 8px 0 0;
+    padding-left: 22px;
+  }
+  .priority li {
+    margin-bottom: 8px;
+    color: var(--ink);
+  }
+  .priority li:last-child { margin-bottom: 0; }
+
+  /* Technical appendix */
+  details.tech {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  details.tech summary {
+    padding: 14px 18px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    list-style: none;
+    background: #fafbfc;
+    border-bottom: 1px solid transparent;
+  }
+  details.tech summary::-webkit-details-marker { display: none; }
+  details.tech summary::before {
+    content: "+";
+    display: inline-block;
+    width: 18px;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  details.tech[open] summary::before { content: "−"; }
+  details.tech[open] summary {
+    border-bottom-color: var(--line);
+  }
+  details.tech .body {
+    padding: 14px 20px 18px;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+  }
+  details.tech .body h4 {
+    margin: 10px 0 4px;
+    font-size: 13px;
+    color: var(--ink);
+  }
+  details.tech .body ul {
+    margin: 4px 0 10px;
+    padding-left: 18px;
+  }
+  details.tech .body code {
+    background: #f1f5f9;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: "SFMono-Regular", ui-monospace, Menlo, monospace;
+    font-size: 12.5px;
+    color: #334155;
+  }
+
+  footer.foot {
+    margin-top: 50px;
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+    color: var(--ink-mute);
+    font-size: 12.5px;
+  }
+  footer.foot code {
+    background: #eef1f5;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: "SFMono-Regular", ui-monospace, Menlo, monospace;
+    font-size: 12px;
+    color: #334155;
+  }
+
+  @media (max-width: 860px) {
+    .snapshot { grid-template-columns: 1fr; }
+    .tbl .sec { width: auto; }
+    .wrap { padding: 24px 16px 60px; }
+  }
+  @media print {
+    body { background: #fff; }
+    .wrap { max-width: none; }
+    details.tech { break-inside: avoid; }
+    details.tech[open] summary::before { content: ""; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc-head">
+  <h1>onTong 프로젝트 — 섹션별 진행 현황</h1>
+  <div class="meta">
+    <span>보고용 초안</span>
+    <span>2026-04-20</span>
+    <span>담당: @donghae</span>
+  </div>
+</header>
+
+<!-- ───────── 한눈에 보기 ───────── -->
+<h2><span class="num">A</span>한눈에 보기</h2>
+<p class="lead">세 섹션은 <b>지식 정리 (위키)</b> → <b>코드 기반 온톨로지 구축 (모델링 · 빌더 툴)</b> → <b>그 온톨로지를 활용한 기능 에이전트 (시뮬레이션)</b> 의 흐름입니다. <b>위키는 발표 기준 완료</b>, <b>모델링·시뮬레이션은 서로 피드백하며 연구·개발 중</b> 입니다.</p>
+
+<div class="snapshot">
+  <div class="snap-card">
+    <span class="badge b-ok">발표 준비 완료</span>
+    <h3>Section 1 · 위키</h3>
+    <p>전사에 흩어진 개인 암묵지를 한 시스템에 통합 + 중복 문서를 자동으로 정리하는 <b>자정 작용 가능한 위키</b>. 발표 데모 준비 완료.</p>
+  </div>
+  <div class="snap-card">
+    <span class="badge b-warn">빌더 툴 개발 중</span>
+    <h3>Section 2 · 모델링</h3>
+    <p>Java/Spring 코드에서 <b>온톨로지를 자동 추출 + 사람 검증으로 보완</b>하는 빌더 툴. 방향 확정 후 기반 엔진 공사 중.</p>
+  </div>
+  <div class="snap-card">
+    <span class="badge b-hot">연구·탐색 단계</span>
+    <h3>Section 3 · 시뮬레이션</h3>
+    <p>완성된 온톨로지 위에서 <b>탐색·시뮬레이션·테스트 데이터</b>를 제공하는 에이전트. <b>완성된 구성물은 아직 없음</b>, 역방향 연구 진행 중.</p>
+  </div>
+</div>
+
+<!-- ───────── 섹션별 표 ───────── -->
+<h2><span class="num">B</span>섹션별 상세</h2>
+<p class="lead">표는 "무엇을 하는지 / 어디까지 왔는지 / 어려웠던 점"을 일상 언어로 정리했습니다. 기술 용어는 하단 <b>C. 기술 참고</b>에 접어 두었습니다.</p>
+
+<table class="tbl">
+  <thead>
+    <tr>
+      <th>섹션</th>
+      <th style="width:26%">① 하려는 것</th>
+      <th style="width:22%">② 현재 완성된 것</th>
+      <th style="width:18%">③ 남은 것</th>
+      <th style="width:24%">④ 어려웠던 점</th>
+    </tr>
+  </thead>
+  <tbody>
+
+    <!-- Section 1 -->
+    <tr>
+      <td class="sec">
+        <div class="sec-title">Section 1</div>
+        <div class="sec-title">위키</div>
+        <div class="sec-sub">자정 작용 가능한 전사 지식 시스템</div>
+      </td>
+      <td class="goal">
+        <p>전사 개인이 <strong>로컬(메모장·옵시디언 등)에 따로 쌓아 두던 암묵지</strong>를 한 시스템 안으로 통합한다.</p>
+        <p>같은 목적의 중복 문서들 중 <strong>대표 문서를 지정</strong>하고, 안 쓰는 문서는 <strong>deprecated 처리</strong>해 자동으로 정리되는 — <strong>자정 작용 가능한 파일 시스템</strong>.</p>
+        <p>여기에 AI 에이전트를 결합해 문서 접근·관리를 쉽게 한다. 대표 문서 외 필요한 <strong>개인 참고 메모</strong>도 외부 툴에 흩뿌리지 말고 이 시스템 안에서 처리.</p>
+      </td>
+      <td>
+        <ul>
+          <li><b>중복 문서 자동 탐지</b> — 유사도 스캔 + LLM 의미 분석</li>
+          <li><b>충돌 해결 4 액션</b> — 무시 / 버전체인화(대표 지정) / 범위 구분 / 병합</li>
+          <li><b>대표 지정 & deprecated 체인</b> — 순환·자기참조 자동 차단</li>
+          <li><b>AI 에이전트 문서 관리</b> — 읽기·검색·편집·작성·충돌 감지·자동 태깅</li>
+          <li><b>개인 작업 공간</b> — 외부 툴 흩뿌림 방지</li>
+          <li><b>이미지 내 텍스트 검색</b> — 설비 명판·도면 + 문의 메일·메신저 대화 캡처 OCR</li>
+          <li><b>이미지 중복 자동 통합</b></li>
+          <li><b>통합 검색</b> — 키워드 + 의미 + 한국어 자연어 조건</li>
+          <li><b>권한 제어</b> — 사용자/그룹별</li>
+          <li><b>문서 관계 그래프</b> — 참조·계보 시각화</li>
+        </ul>
+      </td>
+      <td class="empty-note">
+        발표 기준 개발 완료. 현재 상태를 최종 상태로 본다.
+      </td>
+      <td>
+        <ul>
+          <li><b>중복 판정 임계값 튜닝</b> — 점수만으로는 한계가 있어 LLM 의미 분석을 더해 보완</li>
+          <li><b>자정 작용 아이디어 도출 자체</b> — 선례가 없고, 실 도입 전이라 놓친 부분이 남아 있을 수 있음</li>
+          <li><b>다용도 위키의 UI/UX 편의성 설계</b></li>
+          <li>문서가 많아져도 <b>사용자 체감 속도를 유지</b>하는 처리 방법 고민</li>
+          <li>에이전트가 적절히 <b>검색·답변하는 RAG 구조</b> 설계</li>
+        </ul>
+      </td>
+    </tr>
+
+    <!-- Section 2 -->
+    <tr>
+      <td class="sec">
+        <div class="sec-title">Section 2</div>
+        <div class="sec-title">모델링</div>
+        <div class="sec-sub">코드 기반 온톨로지 빌더 툴</div>
+      </td>
+      <td class="goal">
+        <p>Section 3의 세 가지 기능이 동작하려면 <strong>코드의 구조·의미·관계를 담은 온톨로지</strong>가 먼저 있어야 한다. <strong>문서로 완벽히 관리되지 않고, 여러 개발자가 오랜 기간 손대면서 표준화되기 어려운</strong> Java/Spring 코드베이스에서 이 온톨로지를 사람이 손으로 전부 만들 수는 없다.</p>
+        <p>Section 2는 이 온톨로지를 <strong>자동 추출 + 사람 검증·보완</strong>으로 쌓아 갈 수 있게 하는 <strong>빌더 툴</strong>을 만든다.</p>
+        <p>초기엔 업무처리기준서(매뉴얼)를 1차 소스로 두고 LLM이 온톨로지로 변환하는 방향을 시도했는데, 검토 결과 <strong>"정확한 현행 내용은 코드에 있고, 매뉴얼은 이미 코드와 어긋나 있더라"</strong> 가 확인돼 <strong>코드를 1차 소스로 두는 방향으로 전환</strong>. 지금은 이 방향 위에서 빌더 툴을 만들고 있다.</p>
+      </td>
+      <td>
+        <ul>
+          <li><b>코드 → 온톨로지 자동 추출 엔진</b>
+            <ul style="margin-top:4px;">
+              <li>Java/Spring 파서</li>
+              <li>Spring 특수 패턴 <b>7종 분석기</b></li>
+              <li>동적 매핑 라이브러리 <b>3종 추적</b></li>
+              <li>영향도 그래프 탐색 코어</li>
+            </ul>
+          </li>
+        </ul>
+        <span class="sub-note">단, <b>백엔드 테스트 수준에서 동작</b>하는 단계. 외부 API 노출 전이며, 프론트엔드는 아직 이전 매뉴얼 빌더 UI 상태.</span>
+      </td>
+      <td>
+        <ul>
+          <li>자동 추출 엔진의 <b>API 노출 + 빌더 UI 재설계</b></li>
+          <li>자동 추출 결과를 <b>사람이 검증·보완하는 UX</b></li>
+          <li>실제 코드베이스 샘플로 <b>E2E 검증</b></li>
+          <li>Section 3 연구 결과에 맞춘 <b>온톨로지 스키마 보강</b></li>
+        </ul>
+      </td>
+      <td>
+        <ul>
+          <li><b>방향 자체를 찾는 어려움</b> — 매뉴얼 1차 빌더로 가 본 뒤에야 "이게 팀 목적이 아니다"가 드러남. 이전에 쌓은 UI/API 상당 부분을 버리고 새로 쌓아야 함</li>
+          <li>Spring 코드는 <b>정적 분석만으로 안 잡히는 패턴이 많음</b> (의존성 주입·AOP·Reflection·JPA 메서드 파생·이벤트·스케줄러·프로파일) → 각각 <b>전용 분석기를 따로 만듦</b></li>
+          <li><b>동적 매핑 라이브러리 3종</b> (MapStruct · BeanUtils · SQL) 추적 — 자동 추출 <b>신뢰도 설계</b>가 까다로움</li>
+          <li>코드 하나가 <b>여러 비즈니스 개념에 걸쳐 있음</b> — 1:N 매핑 모델 재설계 필요</li>
+          <li>자동 추출 결과를 <b>사람이 검증·보완하는 UI</b> 설계 (아직 구상 단계)</li>
+          <li><span style="background:#fff3bf;padding:1px 3px;border-radius:2px;"><b>근본 난제</b></span> — 실제 소스로부터 Section 3의 3대 기능을 제대로 동작시킬 <b>온톨로지 구조 자체를 설계</b>하는 것. 지금도 풀어 나가는 중.</li>
+        </ul>
+      </td>
+    </tr>
+
+    <!-- Section 3 -->
+    <tr>
+      <td class="sec">
+        <div class="sec-title">Section 3</div>
+        <div class="sec-title">시뮬레이션</div>
+        <div class="sec-sub">온톨로지 기반 3대 기능 에이전트</div>
+      </td>
+      <td class="goal">
+        <p>Section 2에서 만든 <strong>코드 기반 온톨로지를 활용</strong>해, 코드를 쉽게 이해하고 안전하게 바꿀 수 있게 돕는 <strong>세 가지 기능</strong>을 제공한다.</p>
+        <ol>
+          <li><span class="feat-head">비즈니스 용어로 대상 코드 탐색 + 영향도 분석</span>"'<strong>폭가변 계산 로직</strong>' 건드리려는데 어느 코드인지, 이 변경이 어디까지 영향 가는지" 한 번에 풀기</li>
+          <li><span class="feat-head">코드 수정 후 시뮬레이션</span>수정된 로직이 전체 흐름에서 어떻게 동작하는지 실제로 돌려 봄</li>
+          <li><span class="feat-head">테스트 데이터 자동 생성</span>그 변경을 검증할 입력값·기대값을 자동으로 만듦</li>
+        </ol>
+      </td>
+      <td class="empty-note">
+        현재 완성된 구성물 <b>없음</b>.
+        <span class="sub-note" style="font-style:normal;color:var(--ink-soft);">
+          현 Slab 도메인 에이전트 샘플은 <b>목표 기능의 구현체가 아니라</b>, "어떤 온톨로지 구조가 있어야 에이전트가 제대로 동작할까?" 를 <b>역으로 탐색하기 위한 연구 도구</b>.
+        </span>
+      </td>
+      <td>
+        <ol>
+          <li><b>각 기능의 에이전트 아키텍처 설계</b></li>
+          <li><b>각 기능의 UI/UX 설계</b></li>
+        </ol>
+      </td>
+      <td>
+        <p style="margin:0 0 10px;color:var(--ink-mute);font-size:13px;">연구 단계 난제 상당 부분은 <b>Section 2와 공유</b> — 역방향 설계, 빌더와의 양방향 검토 등은 두 섹션이 함께 풀어 나가는 중.</p>
+        <p style="margin:0 0 6px;"><b>Section 3 고유의 어려움</b> — 온톨로지가 준비됐다고 쳐도 <b>3가지 기능을 UI/UX로 어떻게 풀지</b>:</p>
+        <ul>
+          <li><b>탐색 + 영향도</b> — 어느 코드인지 + 어디까지 영향 가는지를 <b>한 화면에 어떻게 담아</b> 사용자가 빠르게 판단할 수 있게 할지</li>
+          <li><b>시뮬레이션</b> — 결과를 어떤 형태로 보여줘야 사용자가 <b>실제 결정에 쓸 수 있는지</b></li>
+          <li><b>테스트 데이터 생성</b> — 어떻게 제공해야 현장에서 <b>신뢰하고 쓸 수 있는지</b></li>
+        </ul>
+      </td>
+    </tr>
+
+  </tbody>
+</table>
+
+<!-- ───────── 기술 참고 ───────── -->
+<h2><span class="num">C</span>기술 참고 (접힌 상세)</h2>
+<p class="lead">본 표에는 넣지 않은 기술 근거입니다. 궁금하신 부분만 펼쳐 보시면 됩니다.</p>
+
+<details class="tech">
+  <summary>Section 1 — 위키 기술 상세</summary>
+  <div class="body">
+    <h4>핵심 구성 기술</h4>
+    <ul>
+      <li>하이브리드 검색 : <b>BM25 + 벡터 임베딩 + Cross-encoder 재정렬</b></li>
+      <li>이미지 OCR : <b>EasyOCR</b> (한국어+영어), 비동기 백필 + 재인덱싱</li>
+      <li>벡터 DB : <b>ChromaDB</b> (access_scope 메타데이터로 ACL 사전 필터)</li>
+      <li>이미지 중복 제거 : <b>SHA-256 해시</b> + 문서별 ref counting</li>
+      <li>중복 문서 감지 : 유사도 임계값 스캔 → LLM 의미 분석(<code>ConflictCheckSkill</code> / <code>/api/conflict/analyze-pair</code>)</li>
+      <li>대표 지정·deprecated : <code>supersedes</code> / <code>superseded_by</code> 체인 + <code>lineage_validator</code> 로 순환·자기참조 차단</li>
+      <li>에이전트 스킬 : <code>wiki_read · wiki_search · wiki_edit · wiki_write · conflict_check · auto_tag</code></li>
+    </ul>
+  </div>
+</details>
+
+<details class="tech">
+  <summary>Section 2 — 모델링(빌더 툴) 기술 상세</summary>
+  <div class="body">
+    <h4>방향 전환 배경</h4>
+    <ul>
+      <li>이전 : <b>매뉴얼 1차 빌더</b> — 기준서를 LLM으로 YAML 온톨로지화</li>
+      <li>현재 : <b>코드 1차 빌더</b> — 기준서는 검증 파트너로 강등, 코드가 1차 소스</li>
+      <li>이전 시도 산출물 중 매뉴얼 빌더 UI·관련 API는 <b>deprecated</b> 처리 예정. 코드 분석 인프라는 복원·확장하여 재사용.</li>
+    </ul>
+    <h4>자동 추출 엔진 구성 요소</h4>
+    <ul>
+      <li>파서 플러그인 프로토콜 (<b>EntityKind 17 / RelationKind 18</b>)</li>
+      <li><code>java_parser</code> + <code>graph_writer</code></li>
+      <li>Spring 특수 패턴 <b>7 분석기</b> — DI · AOP · HTTP · Events · Scheduled · Profile · Reflection (JPA는 차후)</li>
+      <li>동적 매핑 <b>3 분석기</b> — MapStruct · BeanUtils · NativeSQL + <code>CrossFileEnricher</code></li>
+      <li>Reflection Literal Resolver + Runtime Collector Protocol</li>
+      <li>영향도 BFS 엔진 + 3-mode 필터 (SAFE · OBSERVED · POTENTIAL) + 자율 축소 + 타임아웃</li>
+      <li>역매핑 스텁 (direction=outgoing)</li>
+    </ul>
+    <h4>남은 공사</h4>
+    <ul>
+      <li>REST API 노출 (신규 엔진)</li>
+      <li>빌더 UI 재설계 (매뉴얼 빌더 UI 치환)</li>
+      <li>사람 검증·보완 UX (미착수)</li>
+      <li>실 코드베이스 sample repo 수령 후 E2E</li>
+      <li>비즈니스 개념 브릿지(Round 2) · 기준서 갭 탐지(Round 3)</li>
+    </ul>
+    <h4>Spring 정적 분석으로 안 잡히는 8 패턴</h4>
+    <ul>
+      <li><code>@Autowired</code> DI · AOP 프록시 (<code>@Transactional</code> 등) · Reflection · Spring Data JPA 메서드 파생 · <code>@Bean Configuration</code> · <code>ApplicationEventPublisher</code> · <code>@Scheduled</code>/Kafka Listener · <code>@ConditionalOnProperty</code>/프로파일</li>
+    </ul>
+  </div>
+</details>
+
+<details class="tech">
+  <summary>Section 3 — 시뮬레이션 기술 상세</summary>
+  <div class="body">
+    <h4>현 상태 (연구 단계)</h4>
+    <ul>
+      <li>완성된 구성물 없음. <b>역방향 연구</b> 진행 — "3대 기능이 원활하게 동작하려면 온톨로지가 어떤 모양이어야 하는가?"</li>
+      <li>Slab 도메인 에이전트 샘플은 <b>탐색 도구</b>로만 사용 중 (목표 기능의 구현체가 아님)</li>
+    </ul>
+    <h4>탐색 도구(Slab 에이전트)의 현 구성</h4>
+    <ul>
+      <li><code>/api/simulation/slab/*</code> (FastAPI)</li>
+      <li>시나리오 3종 agent + ontology tool (Pydantic AI)</li>
+      <li>Mock 데이터 : <code>backend/simulation/data/mock_ontology.json</code></li>
+      <li>프론트엔드 : <code>frontend/src/components/simulation/</code>, SSE 스트리밍</li>
+      <li>최근 안정성 수정 : <code>networkx</code> 의존성 명시 (<code>pyproject.toml ^3.2</code>)</li>
+    </ul>
+    <h4>연구 출구 (다음 단계 목표)</h4>
+    <ul>
+      <li>3대 기능 각각에 대한 <b>에이전트 아키텍처</b> 설계</li>
+      <li>3대 기능 각각에 대한 <b>UI/UX</b> 설계</li>
+    </ul>
+    <h4>주의점</h4>
+    <ul>
+      <li>Python 환경 분리 : Section 2는 <code>.venv/</code>, Section 3는 <code>venv/</code> — 의존성 각각 관리</li>
+    </ul>
+  </div>
+</details>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>onTong × Palantir Foundry — Round 4 심층 비교 보고서</title>
+<style>
+  :root {
+    --bg: #0f172a; --card: #1e293b; --line: #334155;
+    --fg: #e2e8f0; --muted: #94a3b8;
+    --primary: #38bdf8; --emerald: #10b981; --amber: #f59e0b;
+    --rose: #fb7185; --violet: #a78bfa; --orange: #fb923c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.6 -apple-system,"Pretendard","Apple SD Gothic Neo",sans-serif;background:var(--bg);color:var(--fg)}
+  .wrap{max-width:1100px;margin:0 auto;padding:40px 28px 80px}
+  .hero{margin-bottom:40px;border-bottom:1px solid var(--line);padding-bottom:24px}
+  .hero h1{font-size:28px;margin:0 0 8px;letter-spacing:-0.015em}
+  .hero .sub{color:var(--muted);font-size:13px}
+  .hero .stage{display:inline-block;font-size:10px;color:var(--primary);font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px}
+  h2{font-size:20px;margin:48px 0 12px;letter-spacing:-0.005em}
+  h3{font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin:28px 0 8px;font-weight:600}
+  h4{font-size:14px;margin:18px 0 6px;color:var(--fg)}
+  p{margin:8px 0 12px}
+  code{font-family:"JetBrains Mono","SF Mono",monospace;font-size:90%;background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px}
+  ul{margin:8px 0 12px 20px;padding:0}
+  li{padding:2px 0}
+  .toc{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 24px;margin-bottom:32px}
+  .toc h3{margin-top:0}
+  .toc ol{margin:0;padding-left:24px}
+  .toc li{padding:3px 0}
+  .toc a{color:var(--primary);text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0 16px}
+  th,td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:rgba(255,255,255,0.02);font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.04em}
+  tr:hover td{background:rgba(255,255,255,0.02)}
+
+  .yes{color:var(--emerald);font-weight:600}
+  .no{color:var(--rose)}
+  .partial{color:var(--amber)}
+  .star{color:var(--amber);letter-spacing:1px}
+
+  .callout{background:rgba(56,189,248,0.06);border-left:3px solid var(--primary);padding:14px 18px;border-radius:4px;margin:14px 0}
+  .callout.win{background:rgba(16,185,129,0.06);border-color:var(--emerald)}
+  .callout.gap{background:rgba(245,158,11,0.06);border-color:var(--amber)}
+  .callout .label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--primary);font-weight:700;margin-bottom:6px}
+  .callout.win .label{color:var(--emerald)}
+  .callout.gap .label{color:var(--amber)}
+
+  .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;font-weight:600}
+  .b-yes{background:rgba(16,185,129,0.15);color:var(--emerald)}
+  .b-partial{background:rgba(245,158,11,0.15);color:var(--amber)}
+  .b-no{background:rgba(251,113,133,0.15);color:var(--rose)}
+  .b-info{background:rgba(56,189,248,0.15);color:var(--primary)}
+
+  .track-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 20px;margin:14px 0}
+  .track-card.t1{border-left:4px solid var(--orange)}
+  .track-card.t2{border-left:4px solid var(--violet)}
+  .track-card.t3{border-left:4px solid var(--emerald)}
+  .track-card h4{margin-top:0}
+  .track-card ol{margin-left:18px}
+
+  .meta-row{display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--muted);margin-top:8px}
+  .meta-row span strong{color:var(--fg)}
+
+  hr{border:none;border-top:1px solid var(--line);margin:36px 0}
+  blockquote{margin:8px 0;padding:8px 14px;border-left:3px solid var(--line);color:var(--muted);font-style:italic;font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="stage">Round 4 · Stage 1~4 종합 보고</div>
+  <h1>onTong × Palantir Foundry — 심층 비교 보고서</h1>
+  <p class="sub">
+    사용자 피드백 7번 ("우리가 만든 기능들이 실제 오픈소스나 중요사례가 있다면 잘 탐색해서 가져다 쓰거나 차용했으면 좋겠는데, 너와 별도 깊은 고찰 및 조사를 했으면 좋겠음") 의 결과물.
+    Foundry Ontology / AIP / UX 화면을 4-stage 깊이로 조사하고 우리 schema·UX 와 side-by-side 비교 후 7 안건 결정.
+  </p>
+  <div class="meta-row">
+    <span><strong>완료:</strong> 2026-05-02</span>
+    <span><strong>산출:</strong> sources / raw notes / schema-vs-ontong / ux-catalog / graph-viz-patterns / 결정 회의 / 본 보고서</span>
+    <span><strong>실행 완료:</strong> 11/12 task (다음 phase: T1.4 Spring 검증)</span>
+  </div>
+</header>
+
+<div class="toc">
+  <h3>목차</h3>
+  <ol>
+    <li><a href="#summary">한 페이지 요약</a></li>
+    <li><a href="#why">왜 Palantir 가 1순위 reference 인가</a></li>
+    <li><a href="#stage1">Stage 1 — Sweep 결과</a></li>
+    <li><a href="#stage2">Stage 2 — Schema 비교</a></li>
+    <li><a href="#stage3">Stage 3 — UX 패턴 + Graph viz</a></li>
+    <li><a href="#stage4">Stage 4 — 7 안건 결정</a></li>
+    <li><a href="#diff">우리만의 차별 강점 vs 빠뜨린 facet</a></li>
+    <li><a href="#tracks">3-track 실행 backlog</a></li>
+    <li><a href="#execution">3-track 실행 결과 (11/12 완료) ★</a></li>
+    <li><a href="#deferred">미적용 / 다음 phase 보류</a></li>
+    <li><a href="#refs">산출물 인덱스</a></li>
+  </ol>
+</div>
+
+<!-- ====================================================================== -->
+<section id="summary">
+  <h2>1. 한 페이지 요약</h2>
+
+  <div class="callout">
+    <div class="label">핵심 발견</div>
+    <ul>
+      <li><strong>Foundry Ontology 는 우리에 가장 가까운 prior art.</strong> ObjectType/ActionType/LinkType/FunctionType 4-종 모델이 우리 BusinessTerm/Action/TypeRealization/Realization 과 직접 매핑.</li>
+      <li><strong>우리가 더 발전된 영역 3종</strong>: ① <code>TypeRealization.scope=PARTIAL</code> (1 entity ⊃ N sub-term), ② <code>Realization.dispatch_source 9-enum + AnchorBinding fragment-level</code> (Foundry 는 코드 layer 자체 없음), ③ <code>VerificationLevel 6단계</code> (SemVer 와 직교).</li>
+      <li><strong>우리 약점 = "그래프 못 그린다" 가 아니라 "작업 환경으로서 graph 가 빈약"</strong>. 알고리즘은 동등, lens/state/detail context/compound expand/hover preview 5 종 부재.</li>
+      <li><strong>차용 필수 top 3</strong>: ① Schema migration framework (Foundry 의 8-option 우리에 매핑), ② Action SemVer + 자동 호환성 검사, ③ Action description → LLM tool spec 자동 변환.</li>
+      <li><strong>차용 필수 UX 3 묶음</strong>: ① Bottom preview panel + right-click menu (Quiver/Lineage 패턴), ② Perspective (Bloom 의 named view, 우리도 backend 1급), ③ Compound expand-in-place (cytoscape + ELK).</li>
+    </ul>
+  </div>
+
+  <h3>해결된 사용자 피드백 (누적)</h3>
+  <table>
+    <tr><th>#</th><th>피드백</th><th>해결 위치</th><th>상태</th></tr>
+    <tr><td>1</td><td>SCM 4 도메인 chaos</td><td>V7 IA — Java 패키지 계층 사용</td><td><span class="badge b-yes">해결</span></td></tr>
+    <tr><td>2</td><td>hops cap 한계</td><td>V7 graph_api mode 3종 + n_max</td><td><span class="badge b-yes">해결</span></td></tr>
+    <tr><td>3</td><td>탭 wiring 부재</td><td>V7 — 삭제, breadcrumb 으로 대체</td><td><span class="badge b-yes">해결</span></td></tr>
+    <tr><td>4</td><td>Esc 후 길 잃음</td><td>V7 breadcrumb + 안건 3 Bottom panel</td><td><span class="badge b-yes">해결</span></td></tr>
+    <tr><td>5</td><td>stale 단축키/예시</td><td>store.ts cleanup + GraphFilters 삭제</td><td><span class="badge b-yes">해결</span></td></tr>
+    <tr><td>6</td><td>패키지 hierarchy</td><td>좌측 ModuleTree + nodeSubtitle 패키지 표시 + 안건 4 Domain compound</td><td><span class="badge b-yes">해결</span></td></tr>
+    <tr><td>7</td><td>prior art 리서치</td><td><strong>본 보고서</strong></td><td><span class="badge b-yes">해결</span></td></tr>
+  </table>
+</section>
+
+<!-- ====================================================================== -->
+<section id="why">
+  <h2>2. 왜 Palantir 가 1순위 reference 인가</h2>
+  <p>
+    Foundry Ontology 는 onTong 비전과 가장 가까운 상용 product. 매핑이 직접:
+  </p>
+  <table>
+    <tr><th>Foundry</th><th>onTong 대응</th><th>비고</th></tr>
+    <tr><td>Object Type</td><td>BusinessTerm + (TypeRealization 으로) CodeType</td><td>우리는 Term ↔ Code 분리</td></tr>
+    <tr><td>Property (regular/derived/edit-only/...)</td><td>Composition + atomic value 면 BusinessTerm.value_type</td><td>우리 facet 단순함</td></tr>
+    <tr><td>Action Type</td><td>Action (kind=pure_function/effectful/workflow)</td><td>Foundry 는 pure 만 Function 별도 type</td></tr>
+    <tr><td>Link Type</td><td>Inheritance + Composition + TypeRealization + Realization (4종)</td><td>우리 분해도 더 세분</td></tr>
+    <tr><td>Function Type</td><td>(Action.kind=pure_function 으로 통합)</td><td>Foundry 는 분리, 우리는 통합</td></tr>
+    <tr><td>Workshop</td><td>Workbench (우리 Detail 모드)</td><td>app builder 기능 X</td></tr>
+    <tr><td>Quiver</td><td>OntologyGraph (그래프 모드)</td><td>Quiver 가 더 풍부</td></tr>
+    <tr><td>AIP Logic</td><td>(향후) A2 Simulation Agent</td><td>우리 미구현</td></tr>
+    <tr><td>Pipeline Builder</td><td>(없음 — 우리는 Java repo import 가 그 역할)</td><td>data → ontology vs code → ontology</td></tr>
+    <tr><td>Branching</td><td>(없음 — 1차 main 만)</td><td>다음 phase</td></tr>
+  </table>
+  <p>
+    다른 reference (Backstage, Sourcegraph, Atlas, Bloom, Linkurious, Cytoscape) 는 부분 prior art 로
+    Stage 3 의 graph viz 비교에서 추가로 활용. 그러나 schema 모델 비교는 Foundry 가 압도적으로 가까움.
+  </p>
+</section>
+
+<!-- ====================================================================== -->
+<section id="stage1">
+  <h2>3. Stage 1 — Sweep 결과 요약</h2>
+  <p>40 sources 인덱싱 (24 직접 fetch + 12 검색 발췌 + 4 Medium 인증 차단). 7 영역별 raw 노트.</p>
+
+  <h3>단단히 답해진 영역</h3>
+  <ul>
+    <li>Object Type 의 모든 facet (Reserved name 9개)</li>
+    <li>Base property type 21종 카탈로그</li>
+    <li>Property kind 8종 (regular/derived/edit-only/required/shared/title key/primary key/mandatory control)</li>
+    <li>Link cardinality × backing 매트릭스 (1-1/1-many/many-many × FK/Join/Backing Object)</li>
+    <li>Action 5 facet + scale 한계 (50 types, 10K objects, 32KB/3MB edits)</li>
+    <li>Function 의 3 edit decorator 패턴 (TS v1/v2/Python)</li>
+    <li>AIP Logic block 6종 + tool 4종, AIP Agent tool 6종</li>
+    <li>Branching 5 stage + Proposal=PR</li>
+    <li>OSv2 architecture (Funnel + OSS, "tens of billions of objects per type", 2000 props/type)</li>
+  </ul>
+
+  <h3>의외 발견 (우리 가정 흔드는 것)</h3>
+  <table>
+    <tr><th>발견</th><th>우리 영향</th></tr>
+    <tr><td><strong>Property mapping 에 confidence 없음</strong> — Foundry 는 binary (mapped/unmapped)</td><td>우리 PRIMARY/PARTIAL + confidence 가 더 발전 가능성. 차별 강점.</td></tr>
+    <tr><td><strong>Submission Criteria 표현력 제한</strong> — attachment / object set 은 validation 불가. 단순 conditions+operators tree</td><td>우리 BusinessRule.statement free-text 더 유연 (단 trade-off: machine-checkable X)</td></tr>
+    <tr><td><strong>LLM 보안 — invoking user permission</strong></td><td>우리 ACL 방향과 동일 — 안심</td></tr>
+    <tr><td><strong>Many-many link table 이 linear cost</strong></td><td>우리 Action.realizations 다대다 모델링 비용 인지</td></tr>
+    <tr><td><strong>Merge 가 transactional history 보존 안 함</strong></td><td>Git mental model 과 다름. 우리 ontology branching 설계 시 명심</td></tr>
+  </table>
+</section>
+
+<!-- ====================================================================== -->
+<section id="stage2">
+  <h2>4. Stage 2 — Schema 비교 결과</h2>
+  <p>11 섹션 side-by-side 표 (~480 줄, <code>palantir-schema-vs-ontong.md</code>). 5 의문점 중 3 개 완전, 2 개 부분 답.</p>
+
+  <h3>5 의문점 처리</h3>
+  <table>
+    <tr><th>#</th><th>의문</th><th>결과</th></tr>
+    <tr><td>1</td><td>Interface property declaration 가능?</td><td><span class="badge b-yes">완전</span> local + shared property, required/optional, multi-impl + chaining</td></tr>
+    <tr><td>2</td><td>AIP Agent tool description mechanics</td><td><span class="badge b-partial">부분</span> "system prompt 로 compile" 까지만 docs. 자동/수동 mechanics 미공개</td></tr>
+    <tr><td>3</td><td>Action lifecycle / versioning</td><td><span class="badge b-partial">부분</span> Function 만 SemVer + immutable + range pin 확인. Action 자체 versioning 미언급</td></tr>
+    <tr><td>4</td><td>Schema evolution / migration</td><td><span class="badge b-yes">완전</span> OSv2 의 8종 predefined migration option (drop/move/cast × property/struct + revert)</td></tr>
+    <tr><td>5</td><td>Multi-source conflict 처리</td><td><span class="badge b-yes">완전</span> column-wise MDO 만, <strong>property multiplicity 금지</strong>, Always-Apply / Timestamp 2 strategy</td></tr>
+  </table>
+
+  <h3>차용 필수 Top 3 (Schema)</h3>
+  <div class="callout">
+    <ol>
+      <li><strong>Schema migration framework</strong> — Foundry 의 8-option set 을 Java refactoring → ontology 맥락에 매핑. 가장 큰 빈 영역. 다음 phase 우선.</li>
+      <li><strong>Action SemVer + 자동 호환성 검사</strong> — Function versioning 메커니즘을 Action 에. param 추가/output type 변경 자동 경고.</li>
+      <li><strong>Action description → LLM tool spec 자동 변환</strong> — Pydantic Action schema → JSON Schema → Anthropic tool spec. 비용 낮고 효과 큼. A2 Simulation Agent 의 입력.</li>
+    </ol>
+  </div>
+
+  <h3>우리만의 강점 (Schema 차원)</h3>
+  <div class="callout win">
+    <div class="label">차별 강점 ★</div>
+    <ul>
+      <li><strong>TypeRealization.scope = PARTIAL</strong> (1 클래스 → N sub-term 부분 매핑). slab-design <code>SDOrderEntity ⊃ {OS, OM, Chemical, QD}</code> 시나리오는 Foundry MDO 로 표현 <strong>불가</strong> — multiplicity 금지가 정반대 방향.</li>
+      <li><strong>Realization.dispatch_source 9-enum + AnchorBinding fragment-level path</strong>. Foundry 는 코드 layer 자체가 없어 비교 불가 영역.</li>
+      <li><strong>VerificationLevel 6단계 신뢰도 axis</strong>. Foundry SemVer 는 release axis 라 직교. 양립 가능.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<section id="stage3">
+  <h2>5. Stage 3 — UX 패턴 + Graph Viz 깊이</h2>
+  <p>2 산출물: <code>palantir-ux-catalog.md</code> (Foundry 11 화면) + <code>graph-viz-patterns.md</code> (6 섹션, adoption matrix 38행).</p>
+
+  <h3>가설 검증 — "그래프 viz 가 우리 약점"</h3>
+  <div class="callout gap">
+    <div class="label">검증됨 — 단 "기능적 약함" 아니라 "lens/state 부재"</div>
+    <p>
+      알고리즘 (dagre + 3 mode + importance pruning + path BFS + cluster collapse) 은 prior art 와 동등.
+      빠진 것은 <strong>작업 환경</strong>으로서의 graph:
+    </p>
+    <table>
+      <tr><th>부재</th><th>영향</th><th>해소 안건</th></tr>
+      <tr><td>Lens (named bundle 동시 토글)</td><td>도메인 전문가/PM/시뮬 검증자 다른 view 못 만듦</td><td>안건 2 (Perspective)</td></tr>
+      <tr><td>State (save/share/export)</td><td>매번 stateless rebuild — 협업 / 데모 가치 손실</td><td>안건 2 + 5</td></tr>
+      <tr><td>Detail context (graph 안 detail)</td><td>노드 클릭 → graph 떠나야 함</td><td>안건 3 (Bottom panel)</td></tr>
+      <tr><td>Compound expand-in-place</td><td>cluster mode 통째 전환 — drill-down 단절</td><td>안건 1 (ELK) + 안건 4 (Domain)</td></tr>
+      <tr><td>Hover/preview</td><td>탐색 비용 큼</td><td>다음 phase</td></tr>
+    </table>
+  </div>
+
+  <h3>외부 reference 5종 차용 후보</h3>
+  <table>
+    <tr><th>도구</th><th>핵심 패턴</th><th>차용 가치</th></tr>
+    <tr><td>Neo4j Bloom</td><td>Perspective + search-driven exploration</td><td>★★★★★ 우리 약점 1순위 해소</td></tr>
+    <tr><td>Cambridge Intelligence (KeyLines/ReGraph)</td><td>5-step funnel (overview → filter → focus → expand → save)</td><td>★★★★ 인터랙션 패턴</td></tr>
+    <tr><td>DataHub</td><td>column-level lineage, faceted toggle</td><td>★★★ data lineage 패턴</td></tr>
+    <tr><td>Sourcegraph</td><td>code intel (def/ref) — graph 1급 아님</td><td>★★ 차용 후보 적음</td></tr>
+    <tr><td>Cytoscape.js + ELK</td><td>compound expand-in-place</td><td>★★★★★ 안건 1 의 기술 기반</td></tr>
+  </table>
+
+  <h3>Code-aware 영역 — 우리 고유 자리</h3>
+  <p>
+    4 차원 (코드 분석 + 도메인 매핑 + 패키지+relational + method-level) 동시 보유한 도구는 <strong>사실상 부재</strong>.
+    가장 가까운 CAST Imaging 도 mapping 이 ISO 5055 / cloud-readiness 같은 고정 카테고리 — 자유 도메인 매핑 부재.
+  </p>
+  <table>
+    <tr><th>도구</th><th>가까움</th><th>차용 vocabulary</th></tr>
+    <tr><td>CAST Imaging</td><td>가장 가까움</td><td>mapping 이 고정 카테고리 — 차용 적음</td></tr>
+    <tr><td>IntelliJ Diagram</td><td>toggle</td><td>facet toggle 정확도</td></tr>
+    <tr><td>Structurizr</td><td>4-level (System/Container/Component/Code)</td><td>multi-level view 구조 (안건 4 의 영감)</td></tr>
+    <tr><td>Backstage</td><td>catalog-info.yaml 코드 옆</td><td>"코드 주변 metadata" 위치</td></tr>
+    <tr><td>AppMap</td><td>runtime trace 시각</td><td>dynamic vs static 구분 (다음 phase)</td></tr>
+  </table>
+</section>
+
+<!-- ====================================================================== -->
+<section id="stage4">
+  <h2>6. Stage 4 — 7 안건 결정</h2>
+  <p>토의 회의 (<code>round4/decisions.html</code>) 에서 7 안건 모두 결정 완료.</p>
+  <table>
+    <tr><th>#</th><th>안건</th><th>결정</th><th>핵심 작업</th><th>관련 사용자 피드백</th></tr>
+    <tr><td>1</td><td>dagre → ELK 마이그레이션</td><td><span class="badge b-info">C</span> spike + 결정</td><td>PoC + 풀/hybrid/dagre 결정</td><td>2, 6</td></tr>
+    <tr><td>2</td><td>Perspective 1급 노드화</td><td><span class="badge b-info">B</span> backend entity</td><td>새 layer + ORM + REST CRUD</td><td>(신규 — Lens 본질)</td></tr>
+    <tr><td>3</td><td>3-pane workspace IA</td><td><span class="badge b-info">B</span> Bottom overlay (graph 전용)</td><td>NodePreviewPanel.tsx</td><td>4</td></tr>
+    <tr><td>4</td><td>노드 종류 확장</td><td><span class="badge b-info">C</span> 5 kinds</td><td>Domain + Term split, graph_api 확장</td><td>1, 6</td></tr>
+    <tr><td>5</td><td>Save / Share URL</td><td><span class="badge b-info">B</span> Saved + ad-hoc</td><td>useSearchParams ↔ store sync</td><td>(신규 — 협업 가치)</td></tr>
+    <tr><td>6</td><td>5K class 검증</td><td><span class="badge b-info">D</span> 인공 + Spring</td><td>가공 generator + Spring import</td><td>(스케일 가정 검증)</td></tr>
+    <tr><td>7</td><td>실행 순서</td><td><span class="badge b-info">D</span> 3-track parallel</td><td>인프라 / UX / 통합 병렬</td><td>(메타)</td></tr>
+  </table>
+</section>
+
+<!-- ====================================================================== -->
+<section id="diff">
+  <h2>7. 우리만의 차별 강점 vs 빠뜨린 facet</h2>
+
+  <div class="callout win">
+    <div class="label">차별 강점 (Foundry 도 못 하는 것) ★</div>
+    <table>
+      <tr><th>강점</th><th>schema 위치</th><th>용도</th></tr>
+      <tr><td>1 클래스 → N 도메인 sub-term 부분 매핑 (PARTIAL)</td><td><code>TypeRealization.scope</code></td><td>평탄화 흡수 패턴 (slab-design SDOrderEntity ⊃ 4 Jpo)</td></tr>
+      <tr><td>9-case dispatch 분류 (호출 사이트 추적)</td><td><code>Realization.dispatch_source</code></td><td>polymorphic / annotation / factory / strategy / reflection 정확 추적</td></tr>
+      <tr><td>method body fragment-level anchor</td><td><code>AnchorBinding</code></td><td>ConceptBinding x MethodAnchor — 시뮬 결정론화</td></tr>
+      <tr><td>VerificationLevel 6단계 axis</td><td><code>Action.verification_level</code></td><td>매핑 신뢰도 점진적 강화 — Foundry SemVer 와 직교</td></tr>
+      <tr><td>매핑 confidence (PRIMARY/PARTIAL + 0~1 score)</td><td><code>TypeRealization.confidence</code></td><td>Foundry binary mapped/unmapped 보다 발전</td></tr>
+    </table>
+  </div>
+
+  <div class="callout gap">
+    <div class="label">우리가 빠뜨린 facet (Foundry 가짐)</div>
+    <table>
+      <tr><th>빠뜨린 facet</th><th>Foundry 위치</th><th>차용 우선순위</th></tr>
+      <tr><td>Schema migration framework (drop/move/cast × property/struct)</td><td>OSv2 8 option</td><td>★★★★ 다음 phase</td></tr>
+      <tr><td>Action SemVer + 자동 호환성 검사</td><td>Function versioning</td><td>★★★ A2 Agent 시작 전</td></tr>
+      <tr><td>Tool description 자동 spec (LLM)</td><td>AIP Agent</td><td>★★★ A2 Agent</td></tr>
+      <tr><td>Submission Criteria validation tree</td><td>Action validation</td><td>★★ 표현력 trade-off</td></tr>
+      <tr><td>Branching 5-stage workflow</td><td>Proposal flow</td><td>★ 다음 phase</td></tr>
+      <tr><td>Interface property declaration</td><td>Interface</td><td>★★ BusinessTerm 인터페이스 도입 시</td></tr>
+      <tr><td>Permission model (owner/editor/viewer)</td><td>ACL</td><td>★ 안건 5 다음 phase</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<section id="tracks">
+  <h2>8. 3-track 실행 backlog (안건 7 D)</h2>
+
+  <div class="track-card t1">
+    <h4>🟠 트랙 1 — 인프라 검증</h4>
+    <p>실측 evidence 확보. 5K class 가정 검증.</p>
+    <ol>
+      <li><strong>R4-T1.1 — 117 → 5K 인공 가공 generator script</strong>
+        <ul>
+          <li>현 slab-design 데이터 기반 패키지/edge 분포 prior 으로 합성</li>
+          <li>출력: <code>scripts/synthesize_5k_repo.py</code> + <code>data/synthetic-5k.json</code></li>
+          <li>backlog: 안건 1 ELK spike 데이터로 직접 활용</li>
+        </ul>
+      </li>
+      <li><strong>R4-T1.2 — ELK PoC (xyflow + ELK 통합)</strong>
+        <ul>
+          <li>xyflow 공식 ELK example 기반 작은 page (별도 route <code>/elk-spike</code>)</li>
+          <li>117 노드 + 합성 5K layout 시간 측정 (Web Worker 포함/미포함 둘 다)</li>
+          <li>compound expand-in-place 정상성 확인</li>
+        </ul>
+      </li>
+      <li><strong>R4-T1.3 — micro-decision (안건 1 follow-up)</strong>
+        <ul>
+          <li>spike 결과 따라 풀 마이그 / hybrid (dagre default + ELK on-demand) / dagre 유지 결정</li>
+        </ul>
+      </li>
+      <li><strong>R4-T1.4 — Spring Framework 정식 검증 (안건 6C)</strong>
+        <ul>
+          <li>spring-projects/spring-framework clone → import → 6 metric 측정 (import 시간 / DB 크기 / graph_api p50/p99 / layout 시간 / 메모리 / UX frame drop)</li>
+          <li>발견된 bottleneck 따라 follow-up (pagination / caching / virtualization)</li>
+          <li>특이: 우리 Spring analyzer 가 자기 자신 분석 (self-referential)</li>
+        </ul>
+      </li>
+    </ol>
+  </div>
+
+  <div class="track-card t2">
+    <h4>🟣 트랙 2 — UX 빠른 가치 출현</h4>
+    <p>가시 가치 큰 UX. 인프라 결과와 무관 진행.</p>
+    <ol>
+      <li><strong>R4-T2.1 — NodePreviewPanel.tsx (안건 3 B)</strong>
+        <ul>
+          <li>그래프 모드의 노드 클릭 → 화면 하단 슬라이드업 240px 패널</li>
+          <li>kind 별 미리보기 (Term/CodeType/Action — 안건 4 의 5 kind 적용)</li>
+          <li>quick action 버튼 (focus / Detail 모드 열기 / 큐 confirm/reject)</li>
+          <li>pin / 닫기 / 다음 노드 클릭 시 자동 갈아치움</li>
+        </ul>
+      </li>
+      <li><strong>R4-T2.2 — Perspective backend entity (안건 2 B)</strong>
+        <ul>
+          <li>새 layer (<code>backend/modeling/view_layer/</code> 또는 mapping_layer 안에)</li>
+          <li>Pydantic + ORM (id / name / repo_id / owner_id / perspective_json / created_at / updated_at)</li>
+          <li>REST <code>GET/POST/PUT/DELETE /api/ontology/repos/{id}/perspectives</code></li>
+          <li>1차 read-only public — owner_id 는 future ACL prep</li>
+        </ul>
+      </li>
+      <li><strong>R4-T2.3 — URL state sync (안건 5 B)</strong>
+        <ul>
+          <li>Next.js <code>useSearchParams</code> ↔ zustand store 양방향 sync 훅</li>
+          <li>Saved (<code>?p=42</code>) + ad-hoc (<code>?mode=...&focus=...&n_max=...</code>) 둘 다</li>
+          <li>"URL 복사" 버튼 (현 view 즉시 share)</li>
+          <li>새로고침 / 뒤로가기 자연스러움 부수효과</li>
+        </ul>
+      </li>
+    </ol>
+  </div>
+
+  <div class="track-card t3">
+    <h4>🟢 트랙 3 — 통합 마무리</h4>
+    <p>트랙 1 + 2 결과 합류. 5-kind 노드 + Domain compound.</p>
+    <ol>
+      <li><strong>R4-T3.1 — graph_api 5-kind 확장 (안건 4 C)</strong>
+        <ul>
+          <li>backend Domain 노드 emit (Java 패키지) + CONTAINS edge</li>
+          <li>Term split — TermKind composite/atomic 시각 차이 반영</li>
+          <li>도메인 1차 정의: Java 패키지. 향후 비즈니스 도메인 grouping 도입 시 같은 kind 재사용</li>
+        </ul>
+      </li>
+      <li><strong>R4-T3.2 — frontend 5-kind 시각 컴포넌트</strong>
+        <ul>
+          <li>kind 별 모양/색/크기 spec (Domain 둥근 사각, CompositeTerm 모서리 둥근, AtomicTerm pill, CodeType 사각, Action 화살표)</li>
+          <li>NodePreviewPanel 도 5 kind 별 렌더링</li>
+        </ul>
+      </li>
+      <li><strong>R4-T3.3 — Domain compound (트랙 1 ELK 결과 OK 시)</strong>
+        <ul>
+          <li>패키지 box 가 자식 클래스 노드 감쌈</li>
+          <li>클릭 → expand-in-place (cluster mode 통째 전환 X)</li>
+          <li>ELK 결과 안 OK 면 fallback: 일반 Domain 노드 + 묶음 라인</li>
+        </ul>
+      </li>
+      <li><strong>R4-T3.4 — Perspective ↔ 5 kind 통합</strong>
+        <ul>
+          <li>Perspective 가 visible kinds (5 종) + visible edge kinds (6 종) + lens / filter / layout 모드 / saved focus 묶어 저장</li>
+          <li>Perspective 토글 UI (저장된 view 목록 + 활성화)</li>
+        </ul>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<section id="execution">
+  <h2>8.5 3-track 실행 결과 (11/12 완료) ★</h2>
+  <p>
+    Stage 4 의 7 안건 결정 후 3-track 실행. 12 task 중 11 완료. 마지막 1 (R4-T1.4 Spring 정식 검증) 은 backend
+    perf 가 sub-200ms 달성한 후 가치 낮아져 다음 phase 로 미룸.
+  </p>
+
+  <div class="callout win">
+    <div class="label">데모 highlight ★</div>
+    <p>
+      <code>http://localhost:3000?section=modeling&view=graph&p=1</code> 한 link 로:
+    </p>
+    <ul>
+      <li>Modeling 섹션 + Graph 모드 자동 진입</li>
+      <li>저장된 perspective <strong>"드라마 DNA 시연 (compound)"</strong> 자동 적용</li>
+      <li>focus=주문, compound mode, 5-kind 시각화</li>
+      <li>2 dashed slate group box (📦 entity + 📦 jpo) 안에 자식 CodeType nest</li>
+      <li><strong>PARTIAL 매핑이 cross-package edges 로 시각화</strong> — SDOrderEntity ⊃ {OS, OM, Chemical, QD} 평탄화 흡수가 한 화면에</li>
+    </ul>
+  </div>
+
+  <h3>Track 1 — 인프라 검증</h3>
+  <table>
+    <tr><th>#</th><th>Task</th><th>상태</th><th>핵심 결과</th></tr>
+    <tr><td>T1.1</td><td>117 → 5K synthetic generator + perf 측정</td><td><span class="badge b-yes">✅</span></td>
+      <td>5043 CodeType in 5.7s. <strong>bottleneck 3종 fix</strong>: modules N+1 (15s→1.7s), list_actions N+1, list_types_summary (1.7s→180ms). 최종: <strong>108x 개선</strong></td></tr>
+    <tr><td>T1.2</td><td>ELK PoC (xyflow + ELK 통합)</td><td><span class="badge b-yes">✅</span></td>
+      <td><code>/elk-spike</code> 비교 페이지. 측정: 117@dagre 13ms / 117@elk-layered+compound 142ms / 5K@dagre 24ms / 5K@elk+compound 88ms — <strong>모두 sub-200ms</strong></td></tr>
+    <tr><td>T1.3</td><td>안건 1 micro-decision</td><td><span class="badge b-yes">✅</span></td>
+      <td>사용자 결정 = <strong>B 풀 ELK</strong>. production OntologyGraph dagre→ELK 마이그 (async useEffect, dynamic import elkjs/lib/elk-api.js, public/elk-worker.min.js)</td></tr>
+    <tr><td>T1.4</td><td>Spring Framework 정식 검증</td><td><span class="badge b-partial">⏸ 다음 phase</span></td>
+      <td>backend perf 가 sub-200ms 달성 후 가치 낮아짐. Spring 5K 도 같은 cap 600 적용 받음 → spike 결과로 충분</td></tr>
+  </table>
+
+  <h3>Track 2 — UX 빠른 가치</h3>
+  <table>
+    <tr><th>#</th><th>Task</th><th>상태</th><th>핵심 결과</th></tr>
+    <tr><td>T2.1</td><td>NodePreviewPanel (graph 노드 클릭 → bottom slide-up)</td><td><span class="badge b-yes">✅</span></td>
+      <td>240px 슬라이드업 패널. 좌 (FQN/role/domain/verification/confirmed) + 우 (1-hop neighbors + 엣지 종류 + kind detail) + footer (이 노드 중심 / Detail 모드 열기 / Term/Action 큐 확정·거절). pin / 닫기 / 큐 mutation 시 graph reload</td></tr>
+    <tr><td>T2.2</td><td>Perspective backend entity</td><td><span class="badge b-yes">✅</span></td>
+      <td>새 layer <code>backend/modeling/view_layer/</code> (Pydantic + ORM + REST CRUD 5 endpoint). 5/5 pytest PASS. owner_id future ACL prep</td></tr>
+    <tr><td>T2.3</td><td>URL state sync (Saved + ad-hoc)</td><td><span class="badge b-yes">✅</span></td>
+      <td><code>useUrlSync</code> 훅 — workspace section + repo + graph mode/focus/target/n_max/compound + perspective_id 양방향 sync (200ms debounce, router.replace history 안 쌓음). 「URL」 복사 버튼</td></tr>
+  </table>
+
+  <h3>Track 3 — 5-kind / Domain compound 통합</h3>
+  <table>
+    <tr><th>#</th><th>Task</th><th>상태</th><th>핵심 결과</th></tr>
+    <tr><td>T3.1</td><td>graph_api 5-kind (Domain) + CONTAINS edge</td><td><span class="badge b-yes">✅</span></td>
+      <td>GraphNodeKind +"domain", GraphEdgeKind +"contains". Domain 노드: 직접 클래스 가진 패키지만 (id <code>pkg::{path}</code>, extra: class_count + members). slab-design-real → 222 nodes (123+29+36+34) + 192 edges (incl 123 contains)</td></tr>
+    <tr><td>T3.2</td><td>frontend 5-kind 시각</td><td><span class="badge b-yes">✅</span></td>
+      <td>OntologyNode 5-kind 분기: composite term=사각, atomic term=pill, domain=dashed border + 📦 prefix, code_type=사각, action=화살표. nodeSubtitle 5-kind, edgeKindColor +contains. NodeBadge Pkg 토바 추가</td></tr>
+    <tr><td>T3.3</td><td>Domain compound (ELK nest)</td><td><span class="badge b-yes">✅</span></td>
+      <td><code>graphCompound</code> store state. <code>buildLayout</code> compound 분기 — Domain = ELK compound parent, contains edge 제외 (nesting 으로 표현). DomainGroupNode 컴포넌트. toolbar 「패키지 묶음」 토글. URL <code>?compound=1</code> sync</td></tr>
+    <tr><td>T3.4</td><td>Perspective ↔ 5-kind 통합</td><td><span class="badge b-yes">✅</span></td>
+      <td>PerspectiveSpec +compound +5-kind defaults. PerspectiveDropdown UI: 적용 / 「현 view 저장」 / 행 hover 삭제 / active 해제. mount + activeId 변경 시 자동 reload. <code>?p=1</code> 적용 시 spec 의 compound 도 자동 set</td></tr>
+  </table>
+
+  <h3>주요 산출 파일</h3>
+  <table>
+    <tr><th>경로</th><th>역할</th><th>track</th></tr>
+    <tr><td><code>scripts/synthesize_5k_repo.py</code></td><td>117 → 5K cloning generator</td><td>T1.1</td></tr>
+    <tr><td><code>backend/modeling/api/graph_api.py</code></td><td>5-kind + CONTAINS + compound input + perf summary</td><td>T1.1, T3.1</td></tr>
+    <tr><td><code>backend/modeling/api/modules_api.py</code></td><td>패키지 트리 + N+1 fix</td><td>T1.1</td></tr>
+    <tr><td><code>backend/modeling/code_layer/store.py</code></td><td><code>list_types_summary</code> (method body 안 로드, ~10x faster)</td><td>T1.1</td></tr>
+    <tr><td><code>backend/modeling/mapping_layer/store.py</code></td><td><code>list_actions</code> N+1 fix (in_() group)</td><td>T1.1</td></tr>
+    <tr><td><code>backend/modeling/view_layer/{__init__,schema,orm,store}.py</code></td><td>Perspective 신규 layer</td><td>T2.2</td></tr>
+    <tr><td><code>backend/modeling/api/perspective_api.py</code></td><td>Perspective REST CRUD 5 endpoint</td><td>T2.2</td></tr>
+    <tr><td><code>tests/view_layer/test_store.py</code></td><td>Perspective CRUD pytest 5/5</td><td>T2.2</td></tr>
+    <tr><td><code>frontend/src/app/elk-spike/page.tsx</code></td><td>ELK PoC 비교 페이지 (dagre / ELK Layered/Box/Force × compound)</td><td>T1.2</td></tr>
+    <tr><td><code>frontend/src/components/sections/modeling/OntologyGraph.tsx</code></td><td>핵심 그래프 — ELK 풀 마이그 + compound + 5-kind 시각</td><td>T1.3, T3.2, T3.3</td></tr>
+    <tr><td><code>frontend/src/components/sections/modeling/NodePreviewPanel.tsx</code></td><td>bottom slide-up panel</td><td>T2.1</td></tr>
+    <tr><td><code>frontend/src/components/sections/modeling/PerspectiveDropdown.tsx</code></td><td>저장 view dropdown</td><td>T3.4</td></tr>
+    <tr><td><code>frontend/src/components/sections/modeling/useUrlSync.ts</code></td><td>URL ↔ store 양방향 sync</td><td>T2.3</td></tr>
+  </table>
+
+  <h3>해결된 사용자 피드백 (누적)</h3>
+  <p>1, 2, 3, 4, 5, 6, 7 모두. R4 가 피드백 7번 (prior art) 의 결과물이지만 다른 영역도 함께 정산.</p>
+</section>
+
+<!-- ====================================================================== -->
+<section id="deferred">
+  <h2>9. 미적용 / 다음 phase 보류</h2>
+  <table>
+    <tr><th>항목</th><th>이유</th><th>다음 phase 위치</th></tr>
+    <tr><td>Schema migration framework (8-option)</td><td>현재 Java refactoring 시 ontology 자동 evolution 미구현 — 큰 작업</td><td>다음 phase 1순위</td></tr>
+    <tr><td>Action SemVer + 자동 호환성 검사</td><td>A2 Simulation Agent 의 입력으로 자연스럽게 등장</td><td>A2 Agent</td></tr>
+    <tr><td>Action description → LLM tool spec</td><td>A2 Agent 에서 tool 정의 시</td><td>A2 Agent</td></tr>
+    <tr><td>6번째 노드 kind: Method (zoom-in mode)</td><td>5K class × N method = 50K+ — default 무리</td><td>method-level 분석 phase</td></tr>
+    <tr><td>Perspective 권한 (ACL)</td><td>1차 read-only public 충분</td><td>다음 phase</td></tr>
+    <tr><td>Share token (read-only link)</td><td>repo 권한으로 충분</td><td>ACL 도입 시 같이</td></tr>
+    <tr><td>Branching / Proposal 흐름</td><td>1차 main only</td><td>v2</td></tr>
+    <tr><td>Hover preview / mini-graph</td><td>Bottom panel 로 우선 충분</td><td>다음 polish phase</td></tr>
+    <tr><td>Cluster mode 의 smooth zoom + in-cluster breadcrumb</td><td>안건 1 ELK 가 OK 면 compound expand 로 대체. 안 OK 면 fallback 으로 작업</td><td>안건 1 결과 보고 결정</td></tr>
+    <tr><td>Time-travel / graph diff</td><td>VerificationLevel 변화 추적은 가치 있으나 별도 큰 작업</td><td>다음 phase</td></tr>
+  </table>
+</section>
+
+<!-- ====================================================================== -->
+<section id="refs">
+  <h2>10. 산출물 인덱스</h2>
+  <ul>
+    <li><code>round4/palantir-sources.md</code> — Stage 1 source 인덱스 (40 sources, 신뢰도 ⭐ 등급)</li>
+    <li><code>round4/palantir-raw-notes.md</code> — Stage 1 영역 별 raw 노트 (538 줄)</li>
+    <li><code>round4/palantir-schema-vs-ontong.md</code> — Stage 2 schema 비교 (11 섹션, ~480 줄)</li>
+    <li><code>round4/palantir-ux-catalog.md</code> — Stage 3 UX 화면 catalog (Foundry 11 화면)</li>
+    <li><code>round4/graph-viz-patterns.md</code> — Stage 3 graph viz 깊이 (6 섹션, adoption matrix 38행)</li>
+    <li><code>round4/decisions.html</code> — Stage 4 7 안건 토의 회의록</li>
+    <li><strong><code>round4-palantir-deep-dive.html</code> (본 보고서)</strong> — Stage 1~4 종합</li>
+  </ul>
+</section>
+
+<hr>
+<p style="color:var(--muted);font-size:11.5px;text-align:center">
+  onTong / Round 4 — Palantir 심층 조사 완료 · 7 안건 결정 · 3-track 실행 시작
+</p>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>onTong Section 2 — 사용자 가이드 v4 (2026-05-01)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "SF Pro Korean", "Apple SD Gothic Neo", "Pretendard", sans-serif;
+    color: #0f172a;
+    background: #f8fafc;
+    line-height: 1.7;
+    margin: 0;
+    padding: 0;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 36px 28px 96px; }
+  h1 {
+    font-size: 30px;
+    font-weight: 800;
+    border-bottom: 4px solid #1e40af;
+    padding-bottom: 12px;
+    margin-bottom: 8px;
+  }
+  .subtitle { color: #475569; font-size: 14px; margin-bottom: 32px; }
+  h2 {
+    font-size: 22px;
+    margin-top: 44px;
+    padding: 12px 16px;
+    background: linear-gradient(90deg, #1e40af, #3b82f6);
+    color: white;
+    border-radius: 6px;
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 17px;
+    margin-top: 28px;
+    padding-left: 12px;
+    border-left: 4px solid #3b82f6;
+    color: #1e3a8a;
+    font-weight: 700;
+  }
+  h4 { font-size: 15px; margin: 22px 0 8px; color: #334155; }
+  .step {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 14px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .step-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .step-num {
+    background: #1e40af;
+    color: white;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .step-title { font-size: 16px; font-weight: 700; color: #0f172a; }
+  .step-tab {
+    margin-left: auto;
+    padding: 3px 10px;
+    border-radius: 6px;
+    background: #dbeafe;
+    color: #1e40af;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .step-body { padding-left: 44px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 13px;
+    background: white;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  th, td {
+    border: 1px solid #e2e8f0;
+    padding: 9px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #f1f5f9;
+    font-weight: 600;
+    color: #1e293b;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 14px 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: "SF Mono", "JetBrains Mono", monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+  code {
+    background: #f1f5f9;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: "SF Mono", "JetBrains Mono", monospace;
+    font-size: 12px;
+  }
+  .new-badge {
+    display: inline-block;
+    background: linear-gradient(90deg, #16a34a, #22c55e);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .tip {
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    padding: 12px 16px;
+    margin: 14px 0;
+    border-radius: 4px;
+    font-size: 13.5px;
+  }
+  .warn {
+    background: #fef3c7;
+    border-left: 4px solid #f59e0b;
+    padding: 12px 16px;
+    margin: 14px 0;
+    border-radius: 4px;
+    font-size: 13.5px;
+  }
+  .highlight {
+    background: linear-gradient(135deg, #faf5ff, #f3e8ff);
+    border: 2px solid #a855f7;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 18px 0;
+  }
+  .highlight .head { color: #7c3aed; font-weight: 700; margin-bottom: 8px; }
+  .toc {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0 30px;
+  }
+  .toc ol { margin: 0; padding-left: 22px; }
+  .toc li { margin: 4px 0; font-size: 13.5px; }
+  .toc a { color: #1e40af; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .small { font-size: 11px; color: #64748b; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>onTong Section 2 — 사용자 가이드 v4</h1>
+<div class="subtitle">2026-05-01 기준 · 모든 새 기능 (Domain Map, Binding Health, ⌘K 통합 검색) 반영</div>
+
+<div class="toc">
+  <strong>목차</strong>
+  <ol>
+    <li><a href="#start">시작 — 데모 데이터 1-click 로드</a></li>
+    <li><a href="#repository">① Repository — 코드 등록 + 12-analyzer 파싱</a></li>
+    <li><a href="#manual">② 매뉴얼 — 업무 PDF/MD 자동 인제스트</a></li>
+    <li><a href="#term-mapping">③ 용어 매핑 — 한국어 BusinessTerm ↔ 코드 자동 후보</a></li>
+    <li><a href="#ontology">④ 온톨로지 그래프 — Top-down 도메인 흐름 + Subgraph 탐색 <span class="new-badge">NEW v4</span></a></li>
+    <li><a href="#workbench">⑤ Workbench — 메서드 단위 5-mode 작업대</a></li>
+    <li><a href="#binding-health">⑥ 매핑 상태 — 코드 변경 후 깨진 매핑 자동 진단 <span class="new-badge">NEW v4</span></a></li>
+    <li><a href="#simulation">⑦ 시뮬레이션 — Java→한국어 Python 변환 + Sandbox</a></li>
+    <li><a href="#tips">⌘K 단축키 + 작업 팁</a></li>
+  </ol>
+</div>
+
+<h2 id="start">시작 — 데모 데이터 1-click 로드</h2>
+
+<div class="step">
+  <div class="step-head">
+    <div class="step-num">0</div>
+    <div class="step-title">사이드바 좌측 하단 「데모 데이터 로드」 (amber CTA)</div>
+  </div>
+  <div class="step-body">
+    슬랩 설계 (slab-design-real) 매뉴얼 2개 + 한국어 BusinessTerm 59개 + 199개 confirmed binding 이 한 번에 적재됩니다 (10초~30초).
+    <br/>
+    <code>LOADED</code> 녹색 배지가 켜지면 모든 탭이 즉시 시연 가능 상태가 됩니다.
+
+    <div class="tip">
+      💡 <strong>대형 repo 직접 등록 시</strong> Repository 탭에서 「슬라브설계 (real)」 빠른 등록 카드 클릭 → 5초 안에 12-analyzer 분석 완료.
+    </div>
+  </div>
+</div>
+
+<h2 id="repository">① Repository — 코드 등록 + 12-analyzer 파싱</h2>
+
+<div class="step">
+  <div class="step-head">
+    <div class="step-num">1</div>
+    <div class="step-title">사이드바 「Repository」</div>
+    <span class="step-tab">탭 #1</span>
+  </div>
+  <div class="step-body">
+    <table>
+      <tr><th style="width:30%">기능</th><th>설명</th></tr>
+      <tr><td>등록된 Repository</td><td>현재 분석 중인 repo 리스트. <code>ACTIVE</code> 진한 파란 배지 + 좌측 굵은 border 로 활성 repo 명확 표시 <span class="new-badge">NEW v4</span></td></tr>
+      <tr><td>빠른 등록</td><td>sample-repos 폴더의 대표 데모들 1-click 등록 (slab-design-real / engine / SCM 등)</td></tr>
+      <tr><td>새 Repository 등록</td><td><code>repo_id</code> + 절대경로 또는 project-root 상대경로</td></tr>
+      <tr><td>DI 그래프 sub-tab</td><td>Spring beans + autowires 시각화 (xyflow, Repository 탭 내부)</td></tr>
+    </table>
+  </div>
+</div>
+
+<h2 id="manual">② 매뉴얼 — 업무 PDF/MD 자동 인제스트</h2>
+
+<div class="step">
+  <div class="step-head">
+    <div class="step-num">2</div>
+    <div class="step-title">사이드바 「매뉴얼」 → 업로드/작성 sub-tab</div>
+    <span class="step-tab">탭 #2</span>
+  </div>
+  <div class="step-body">
+    <table>
+      <tr><th style="width:30%">단계</th><th>동작</th></tr>
+      <tr><td>업로드</td><td>PDF/DOCX/MD/이미지 드롭. 자동 파싱 → 섹션 + fragment 분리</td></tr>
+      <tr><td>확인</td><td>「등록된 매뉴얼」 행 클릭 → fragment 본문 미리보기</td></tr>
+      <tr><td>활용</td><td>Workbench R 「📚 참고」 탭에서 메서드 룰 ↔ fragment 자동 매핑 (임베딩 + LLM)</td></tr>
+      <tr><td>directive (선택)</td><td>Markdown 본문에 <code>&lt;!-- ontong: term=... --&gt;</code> 주석 → confidence 1.0 으로 즉시 binding</td></tr>
+    </table>
+    <div class="tip">
+      💡 <strong>가이드 박스가 한 줄로 접혀 있음</strong> — 클릭하면 펼쳐서 4-step 프로세스 확인 <span class="new-badge">NEW v4</span>
+    </div>
+  </div>
+</div>
+
+<h2 id="term-mapping">③ 용어 매핑 — 한국어 BusinessTerm ↔ 코드 자동 후보</h2>
+
+<div class="step">
+  <div class="step-head">
+    <div class="step-num">3</div>
+    <div class="step-title">사이드바 「용어 매핑」</div>
+    <span class="step-tab">탭 #3</span>
+  </div>
+  <div class="step-body">
+    <h4>좌: 등록된 BusinessTerm</h4>
+    <ul>
+      <li>「+ 용어 추가」 + 인라인 편집 (canonical_label / aliases / domain)</li>
+      <li>「LLM 추천」 버튼 — 코드의 JPA <code>@Column</code> + 매뉴얼 fragment 에서 자동 추출</li>
+    </ul>
+    <h4>우: 매핑 후보 (binding) 테이블</h4>
+    <ul>
+      <li><strong>검색 박스</strong> (term/code/scope/source 부분 일치) <span class="new-badge">NEW v4</span></li>
+      <li><strong>100건 페이지 + 「+200건 더보기」</strong> — 5000+ binding 환경 가정</li>
+      <li>status filter (proposed / confirmed / rejected)</li>
+      <li>각 행: confirm / reject / 「왜 이 매칭?」 evidence panel</li>
+    </ul>
+    <h4>수동 매핑 (자동 추천 우회)</h4>
+    <ul>
+      <li>「수동 매핑」 토글 → term + 코드 검색 (자동완성 + score 정렬) → primary/partial scope → 즉시 confirmed</li>
+    </ul>
+  </div>
+</div>
+
+<h2 id="ontology">④ 온톨로지 그래프 — Top-down 도메인 흐름 + Subgraph 탐색 <span class="new-badge">NEW v4</span></h2>
+
+<div class="step">
+  <div class="step-head">
+    <div class="step-num">4</div>
+    <div class="step-title">사이드바 「온톨로지 그래프」</div>
+    <span class="step-tab">탭 #4</span>
+  </div>
+  <div class="step-body">
+    <div class="highlight">
+      <div class="head">v4 의 가장 큰 변경 — 평면 노드 폐기, Top-down 도메인 흐름</div>
+      처음 진입 시 9 단계 카테고리 카드가 가로 흐름으로 표시:
+      <strong>주문 정보 → 화학 성분 → Slab 사양 → 공정 설비 → 주조·열연 사양 → 공정 매칭 → 설계 기준 → 일정·마감 → 상태·진도</strong>
+      <br/><br/>
+      카드는 viewport 에 맞춰 <strong>자동 줄바꿈</strong> (4-4-1 또는 5-4 등). 짤림 0.
+    </div>
+    <h4>탐색 흐름</h4>
+    <ol>
+      <li><strong>카테고리 카드 클릭</strong> → 그 단계의 BusinessTerm 들이 펼쳐짐</li>
+      <li><strong>Term 클릭</strong> → 그 노드 중심 1~3 hop subgraph 시각화 (xyflow + dagre LR)</li>
+      <li><strong>노드 더블클릭</strong> → 그 노드를 새 focus 로 (탐색 확장)</li>
+      <li><strong>focus picker</strong> (상단 칩) — 직접 검색해서 특정 term 시작점 선택</li>
+    </ol>
+    <h4>우측 detail 패널</h4>
+    <ul>
+      <li>선택 노드의 연결 관계 (governs / part_of / related_to)</li>
+      <li><strong>매핑된 코드 위치 리스트</strong> — confirmed ConceptBinding 자동 노출</li>
+      <li>새 관계 추가 (term ↔ term / term ↔ rule)</li>
+    </ul>
+    <div class="tip">
+      💡 <strong>5000+ class 가정</strong> — 항상 ~80 노드 cap. truncated 시 「깊이 3 → 2」 토글 권장.
+    </div>
+  </div>
+</div>
+
+<h2 id="workbench">⑤ Workbench — 메서드 단위 5-mode 작업대</h2>
+
+<div class="step">
+  <div class="step-head">
+    <div class="step-num">5</div>
+    <div class="step-title">사이드바 「Workbench」</div>
+    <span class="step-tab">탭 #5</span>
+  </div>
+  <div class="step-body">
+    <h4>4 패널 layout</h4>
+    <table>
+      <tr><th style="width:18%">패널</th><th>내용</th></tr>
+      <tr><td>L 메서드 트리</td><td>패키지 → 클래스 → 메서드. 작은 repo 면 자동 펼침. 대형 repo 는 「⊞ 전체 펼침」 버튼 사용 <span class="new-badge">NEW v4</span></td></tr>
+      <tr><td>C-L 본문 코드</td><td>선택 메서드 source. anchor 라인 색상 (param 보라 / return 청록 / literal 녹색)</td></tr>
+      <tr><td>C-R Ontology</td><td>매칭된 BusinessTerm + alias + 즉시 매핑 추가</td></tr>
+      <tr><td>R 5-mode rail</td><td>📝 노드 / ⚖️ 룰 / 📚 참고 / 🧬 영향 / ✅ 갭 / 🔬 시뮬</td></tr>
+    </table>
+    <h4>메서드 선택 안 되었을 때</h4>
+    <ul>
+      <li>중앙: 친절한 ← 화살표 + "메서드를 선택하세요" 안내 + ⌘K 단축키 hint <span class="new-badge">NEW v4</span></li>
+    </ul>
+    <h4>R 패널 5 모드 (모두 한국어 tooltip 제공)</h4>
+    <table>
+      <tr><th style="width:14%">모드</th><th>설명</th></tr>
+      <tr><td>📝 노드</td><td>메서드/클래스 자체의 비즈니스 description, 매핑 요약, signature 표시</td></tr>
+      <tr><td>⚖️ 룰</td><td>이 메서드에서 추출된 BusinessRule + 사용자 confirm 큐</td></tr>
+      <tr><td>📚 참고</td><td>매뉴얼 fragment 자동 link (임베딩 + LLM)</td></tr>
+      <tr><td>🧬 영향</td><td>코드/온톨로지/매뉴얼 3 layer BFS</td></tr>
+      <tr><td>✅ 갭</td><td>이 메서드 관련 코드↔기준서 갭 (severity 별)</td></tr>
+      <tr><td>🔬 시뮬</td><td>「+ 새 시뮬레이션」 → bottom drawer 3-step wizard</td></tr>
+    </table>
+  </div>
+</div>
+
+<h2 id="binding-health">⑥ 매핑 상태 — 코드 변경 후 깨진 매핑 자동 진단 <span class="new-badge">NEW v4</span></h2>
+
+<div class="step">
+  <div class="step-head">
+    <div class="step-num">6</div>
+    <div class="step-title">사이드바 「🛡️ 매핑 상태」</div>
+    <span class="step-tab">탭 #6 (신규)</span>
+  </div>
+  <div class="step-body">
+    <div class="highlight">
+      <div class="head">왜 만들어졌나 — Phase 1 silent corruption 차단</div>
+      자바 코드를 리네임하면 (예: <code>productTypeCd</code> → <code>productKindCd</code>) 기존 confirmed binding 199개 중 일부가 <strong>존재하지 않는 위치를 가리키게</strong> 됨. 시뮬레이션 결과가 거짓이 됨. 사용자가 모르는 사이에.
+      <br/><br/>
+      이 탭은 코드 변경 → re-index → stale binding 자동 감지 → 새 위치 1-click rematch 까지 닫힌 루프.
+    </div>
+    <h4>화면 구성</h4>
+    <ol>
+      <li><strong>매핑 건강도 막대</strong> — 100% (emerald) / 70~95% (amber) / &lt;70% (red). healthy/stale/total grid</li>
+      <li><strong>마지막 재파싱 diff</strong> — <code>+N -M</code> + 추가/삭제 fqn detail</li>
+      <li><strong>「재파싱 + 진단」 CTA</strong> (blue-600) — 12-analyzer 재실행 + sweep + diff 일괄 (slab demo 약 2초)</li>
+      <li><strong>깨진 매핑 (N) 카드</strong>
+        <ul>
+          <li>term + 존재하지 않는 위치 (red highlight)</li>
+          <li>새 위치 추천 — alias 정규화 (camel ↔ snake) + 단순 이름 + 부모 보존 3 tier</li>
+          <li>각 후보: confidence (95% emerald / 70% amber / 40% slate) + 「적용」 1-click</li>
+        </ul>
+      </li>
+    </ol>
+    <h4>비파괴 원칙</h4>
+    <div class="warn">
+      자동으로 binding 을 갱신하지 않습니다. <strong>운영자가 「적용」 클릭해야</strong> 새 binding 이 confirmed + 옛 binding 이 rejected 됩니다 (audit log 자동 기록).
+    </div>
+    <h4>API (CLI 사용도 가능)</h4>
+    <pre>GET  /api/modeling/repos/{repo_id}/stale-bindings
+POST /api/modeling/repos/{repo_id}/reindex
+POST /api/modeling/bindings/{proposal_id}/rematch</pre>
+  </div>
+</div>
+
+<h2 id="simulation">⑦ 시뮬레이션 — Java→한국어 Python 변환 + Sandbox</h2>
+
+<div class="step">
+  <div class="step-head">
+    <div class="step-num">7</div>
+    <div class="step-title">Workbench R 「🔬 시뮬」 → 「+ 새 시뮬레이션」</div>
+    <span class="step-tab">bottom drawer</span>
+  </div>
+  <div class="step-body">
+    <h4>3-step wizard</h4>
+    <ol>
+      <li><strong>변경 정의</strong> — kind: <code>method_body</code> / <code>anchor_value</code> / <code>rule_severity</code> / <code>rule_statement</code> / <code>term_binding</code>. multi-method 도 가능 (related_methods up to 5)</li>
+      <li><strong>Sandbox 실행</strong> — Claude 가 Java 본문을 한국어 변수명 Python 으로 변환 (예: <code>slabWgt</code> → <code>슬랩단중</code>) → <strong>RestrictedPython sandbox</strong> 에서 실행 (NetworkPolicy + MemoryLimit). SyntheticInputGenerator 가 자동 input case 생성.</li>
+      <li><strong>Diff 검토 + Apply</strong> — before/after mutation diff (예: <code>finalLengthLow: 8000 → 0.34 (-99.99%)</code>) + 영향받는 BusinessRule 매칭 + severity (regression / minor / major). 「Apply」 → Java patch draft + 「GitHub PR 만들기」</li>
+    </ol>
+    <h4>시뮬레이션 기록 (history)</h4>
+    <ul>
+      <li>R 「🔬 시뮬」 탭 안 「📋 시뮬레이션 기록」 — 이전 spec 들 status badge + kind + description</li>
+      <li>「↻ 다시 실행」 — cache hit 으로 즉시</li>
+    </ul>
+  </div>
+</div>
+
+<h2 id="tips">⌘K 단축키 + 작업 팁</h2>
+
+<div class="step">
+  <div class="step-head">
+    <div class="step-num">⌘K</div>
+    <div class="step-title">Workbench 어디서든 ⌘K (Mac) / Ctrl+K (Win) — 통합 검색</div>
+  </div>
+  <div class="step-body">
+    <table>
+      <tr><th style="width:18%">모드</th><th>입력</th><th>결과</th></tr>
+      <tr><td>「코드」</td><td>FQN 또는 simple name (예: <code>SdLength</code>, <code>productTypeCd</code>)</td><td>종류별 그룹 (용어 / 클래스 / 메서드 / 필드 / 규칙) + 매핑 카운트 배지 (T1 = 1 term 매핑, R3 = 3 rule 적용) <span class="new-badge">NEW v4</span></td></tr>
+      <tr><td>「용어」</td><td>한국어 BusinessTerm (예: <code>품종코드</code>, <code>슬래브 길이</code>)</td><td>매칭된 term + 영향받는 코드 위치 (역탐색)</td></tr>
+    </table>
+    <h4>키보드 단축</h4>
+    <ul>
+      <li><kbd>⌘K</kbd> 모달 열림 / 모달 안에서 모드 토글</li>
+      <li><kbd>↑</kbd> <kbd>↓</kbd> 결과 이동</li>
+      <li><kbd>Enter</kbd> 선택 → Workbench 가 자동으로 그 메서드/term 으로 jump</li>
+      <li><kbd>Esc</kbd> 닫기</li>
+    </ul>
+    <h4>작업 권장 흐름 (slab demo 기준 5분 데모)</h4>
+    <ol>
+      <li><strong>온톨로지 그래프 탭</strong> 진입 → 도메인 흐름 9 단계 한 눈에 → 「3단계 Slab 사양」 클릭 → 「Slab 길이」 term 클릭 → 주변 관계 확인</li>
+      <li><strong>Workbench</strong> → ⌘K → "FinalLengthRange" → <code>SdFinalLengthRangeAction.execute</code> 선택 → 본문 확인</li>
+      <li>R 「🔬 시뮬」 → 새 시뮬 → method_body 변경 → 결과 diff 확인 (mutation_diff: <code>finalLengthLow</code> -99.99%)</li>
+      <li>「🛡️ 매핑 상태」 탭 → 「재파싱 + 진단」 → 100% 건강도 확인. (시연 중 일부러 코드 리네임 시 stale 즉시 감지 시연 가능)</li>
+    </ol>
+  </div>
+</div>
+
+<hr/>
+
+<div class="highlight" style="margin-top:48px;">
+  <div class="head">v4 변경 요약 (2026-04-27 ~ 2026-05-01)</div>
+  <ul>
+    <li><strong>S1</strong> 백엔드 entity FTS5 인덱스 — 1786 entities 50ms 검색</li>
+    <li><strong>S2</strong> 온톨로지 그래프 subgraph navigation — 5000+ scale 대응</li>
+    <li><strong>S3</strong> TermMapping 가상 페이지 + 검색 박스</li>
+    <li><strong>S4</strong> Workbench 메서드 트리 적응형 expand</li>
+    <li><strong>S5</strong> ⌘K 통합 검색 종류별 그룹 + 매핑 카운트 배지</li>
+    <li><strong>S6</strong> 도메인 맵 (Top-down 진입점) — LLM 카테고리 자동 분류</li>
+    <li><strong>S7</strong> Phase 1 — Stale binding sweeper + reindex + diff snapshot</li>
+    <li><strong>U1~U9</strong> UX polish 9건 (loading state / 데모 prominence / placeholder / tooltip / ACTIVE indicator 등)</li>
+  </ul>
+</div>
+
+<p class="small" style="margin-top:36px;text-align:center;">
+  생성: 2026-05-01 · onTong Section 2 · <code>toClaude/modeling/사용자-가이드-v4.html</code>
+</p>
+
+</div>
+</body>
+</html>

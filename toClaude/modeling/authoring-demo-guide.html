@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>✏️ Authoring AI · 데모 가이드 (따라하기)</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#111b2e; --line:#1f2a44; --fg:#e6edf7; --muted:#94a3b8;
+    --primary:#38bdf8; --emerald:#10b981; --amber:#f59e0b; --rose:#f43f5e; --violet:#8b5cf6;
+  }
+  body{margin:0;font:13px -apple-system,Pretendard,sans-serif;background:var(--bg);color:var(--fg);line-height:1.55}
+  main{max-width:980px;margin:0 auto;padding:24px;padding-bottom:120px}
+  h1{margin:0 0 6px 0;font-size:22px}
+  h2{font-size:15px;margin:24px 0 10px 0;padding:8px 12px;background:var(--card);border:1px solid var(--line);border-radius:6px;display:flex;align-items:center;gap:8px}
+  h3{font-size:13px;margin:14px 0 6px 0;color:var(--violet)}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:16px}
+  code{background:rgba(56,189,248,0.1);color:var(--primary);padding:1px 6px;border-radius:3px;font-size:11.5px;font-family:ui-monospace,Consolas,monospace}
+  kbd{background:var(--card);border:1px solid var(--line);border-radius:3px;padding:1px 6px;font-size:11px;color:var(--fg);font-family:ui-monospace,Consolas,monospace}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0;display:grid;grid-template-columns:32px 1fr;gap:12px;transition:all 0.2s}
+  .step.checked{background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)}
+  .step .num{width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--muted)}
+  .step.checked .num{background:var(--emerald);border-color:var(--emerald);color:#0b1220}
+  .step .body{display:flex;flex-direction:column;gap:6px}
+  .step h4{margin:0;font-size:13px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+  .step h4 input[type=checkbox]{margin:0;width:14px;height:14px;cursor:pointer}
+  .action{font-size:12px;color:var(--fg);background:rgba(56,189,248,0.06);padding:6px 10px;border-radius:4px;border-left:3px solid var(--primary)}
+  .expect{font-size:11.5px;color:var(--muted);background:rgba(139,92,246,0.04);padding:6px 10px;border-radius:4px;border-left:3px solid var(--violet)}
+  .expect strong{color:var(--violet)}
+  .tip{font-size:11px;color:var(--muted);font-style:italic;padding:0 10px}
+  textarea.note{width:100%;box-sizing:border-box;background:#0f172a;color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-size:11.5px;font-family:inherit;line-height:1.4;min-height:32px;resize:vertical}
+  textarea.note:focus{outline:none;border-color:var(--primary)}
+  .pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:600;margin-right:4px;vertical-align:middle}
+  .pill.violet{background:rgba(139,92,246,0.15);color:var(--violet);border:1px solid rgba(139,92,246,0.4)}
+  .pill.amber{background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.4)}
+  .pill.emerald{background:rgba(16,185,129,0.15);color:var(--emerald);border:1px solid rgba(16,185,129,0.4)}
+  .pill.rose{background:rgba(244,63,94,0.15);color:var(--rose);border:1px solid rgba(244,63,94,0.4)}
+  .pill.primary{background:rgba(56,189,248,0.15);color:var(--primary);border:1px solid rgba(56,189,248,0.4)}
+  .pill.muted{background:rgba(148,163,184,0.1);color:var(--muted);border:1px solid rgba(148,163,184,0.3)}
+  pre{background:#0f172a;color:#e6edf7;padding:10px;border-radius:6px;overflow-x:auto;font-size:11.5px;line-height:1.5;border:1px solid var(--line);margin:6px 0}
+  .progress-bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 24px;display:flex;align-items:center;gap:12px;z-index:10;backdrop-filter:blur(8px);background:rgba(17,27,46,0.95)}
+  .progress-fill{flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden;position:relative}
+  .progress-fill .bar{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--primary),var(--emerald));border-radius:3px;transition:width 0.3s}
+  .progress-text{font-size:11.5px;color:var(--muted);min-width:120px;text-align:right;font-family:ui-monospace,Consolas,monospace}
+  .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .btn{background:var(--primary);color:#0b1220;border:none;border-radius:4px;padding:5px 10px;font-size:11.5px;font-weight:600;cursor:pointer}
+  .btn:hover{opacity:0.9}
+  .btn.outline{background:transparent;border:1px solid var(--line);color:var(--fg)}
+  .btn.copied{background:var(--emerald);color:#fff}
+  .btn.danger{background:transparent;border:1px solid rgba(244,63,94,0.4);color:var(--rose)}
+  .preview{display:none;background:#0f172a;border:1px solid var(--line);border-radius:6px;padding:10px;margin-top:8px;font-family:ui-monospace,Consolas,monospace;font-size:11px;white-space:pre-wrap;user-select:all;cursor:text}
+  .preview.visible{display:block}
+  .ascii{font-family:ui-monospace,Consolas,monospace;background:#0f172a;padding:10px;border-radius:6px;color:#cbd5e1;font-size:11px;white-space:pre;overflow-x:auto;line-height:1.5;border:1px solid var(--line)}
+  .feedback{background:rgba(56,189,248,0.04);border:1px solid rgba(56,189,248,0.2);border-radius:8px;padding:14px;margin:24px 0}
+  .feedback h4{margin:0 0 8px 0;color:var(--primary)}
+  .feedback textarea{width:100%;box-sizing:border-box;min-height:60px}
+  .copy-status{font-size:10.5px;color:var(--muted);margin-left:8px}
+  .copy-status.ok{color:var(--emerald)}
+  .copy-status.err{color:var(--rose)}
+  .nb{background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.4);border-radius:6px;padding:8px 12px;font-size:12px;margin:8px 0}
+  .nb strong{color:var(--amber)}
+  .skip-section{font-size:11px;color:var(--muted);text-align:center;padding:8px;border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);margin:8px 0}
+</style>
+</head>
+<body>
+<main>
+
+<h1>✏️ Authoring AI — 데모 따라하기 가이드</h1>
+<div class="sub">2026-05-05 · 체크박스로 진행 상태 저장 (localStorage). 새로고침해도 진행 유지. 한 cycle ~5분 / ~$1.</div>
+
+<div class="nb">
+  <strong>한 흐름의 큰 그림:</strong> 모드 진입 → 클래스 선택 → 세션 시작 → ① 코드 추출 → ② 가설 → ③ 인터뷰 → 답변 → ⑤ 옵션 → 옵션 선택 (자동 ⑦ 명명) → ⑥ 갭 → ⑨ Archive → ✓ Confirm. 중간에 <span class="pill violet">✏ 수정 / 🔄 다시</span> 시험.
+</div>
+
+<!-- ============================================== -->
+<h2>📋 Phase 0 — 시작 전 점검</h2>
+
+<div class="step" data-id="0-1">
+  <div class="num">0.1</div>
+  <div class="body">
+    <h4><input type="checkbox"> 두 서버 살아있는지</h4>
+    <div class="action">터미널 또는 brower 에서:<br>
+      <code>http://127.0.0.1:3000/</code> ← frontend / <code>http://127.0.0.1:8001/api/authoring/sessions</code> ← backend</div>
+    <div class="expect">둘 다 응답 OK 면 진행. 안 되면 사용자에게 보고하세요.</div>
+    <textarea class="note" placeholder="문제 있으면 메모 (예: backend 500 등)"></textarea>
+  </div>
+</div>
+
+<div class="step" data-id="0-2">
+  <div class="num">0.2</div>
+  <div class="body">
+    <h4><input type="checkbox"> 페이지 강제 새로고침</h4>
+    <div class="action"><kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd> (Mac) — 모든 변경된 코드 hot-load</div>
+    <div class="expect">localhost:3000 의 캐시 비우고 최신 코드 적용</div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<h2>📂 Phase A — 모드 진입 + 클래스 선택</h2>
+
+<div class="step" data-id="A-1">
+  <div class="num">A.1</div>
+  <div class="body">
+    <h4><input type="checkbox"> Modeling section 진입</h4>
+    <div class="action">상단 nav 의 <strong>Modeling</strong> 클릭</div>
+    <div class="expect">화면 좌측: 패키지 트리 (com / example / slabdesign / boot, facade, feature, store)</div>
+  </div>
+</div>
+
+<div class="step" data-id="A-2">
+  <div class="num">A.2</div>
+  <div class="body">
+    <h4><input type="checkbox"> ✏️ Authoring 모드</h4>
+    <div class="action">우상단 mode toggle 의 4번째 <strong>✏️ Authoring</strong> 클릭</div>
+    <div class="expect">
+      <strong>가운데 영역</strong>이 좌우 분할로 변함:<br>
+      • 좌측 (채팅): toolbar (🆕 새 세션 / ① 코드 추출 ... / ✓ Confirm)<br>
+      • 우측 (preview): "현재 세션 / 가설 / 채택 옵션 / 엔티티 / 갭 / Archive" collapsible 섹션
+    </div>
+    <div class="tip">우측 RightPanel (📄 코드 / 📖 매뉴얼 등 4-tab) 은 Authoring 모드에선 <strong>의도적으로 숨김</strong></div>
+  </div>
+</div>
+
+<div class="step" data-id="A-3">
+  <div class="num">A.3</div>
+  <div class="body">
+    <h4><input type="checkbox"> 좌측 트리 drill 하여 jpo 패키지로</h4>
+    <div class="action">좌측에서 차례로 클릭: <strong>store</strong> → <strong>sd</strong> → <strong>std</strong> → <strong>oracle</strong> → <strong>jpo</strong></div>
+    <div class="expect">
+      <strong>jpo</strong> 클릭 시 그 안의 8개 클래스가 트리 inline 으로:<br>
+      <span class="pill primary">CastSpecJpo</span> <span class="pill primary">CustomerStdJpo</span> <span class="pill primary">EdgingGroupJpo</span> <span class="pill primary">EdgingSpecJpo</span><br>
+      <span class="pill primary">HrMaxWgtJpo</span> <span class="pill primary">HrMinWgtJpo</span> <span class="pill primary">HrSpecJpo</span> <span class="pill primary">SdProductivityStdJpo</span>
+    </div>
+    <textarea class="note" placeholder="트리 못 펼치면 메모"></textarea>
+  </div>
+</div>
+
+<div class="step" data-id="A-4">
+  <div class="num">A.4</div>
+  <div class="body">
+    <h4><input type="checkbox"> HrSpecJpo 클릭하여 선택</h4>
+    <div class="action"><strong>HrSpecJpo</strong> 클릭 (트리 inline 의 클래스 leaf)</div>
+    <div class="expect">
+      • 클릭 시 highlight (primary 배경)<br>
+      • 우측 메인 영역 toolbar 의 ① 버튼 텍스트가 <code>① 코드 추출 (HrSpecJpo)</code> 로 변경<br>
+      • <span class="pill amber">amber banner</span> 가 채팅 영역 상단에: "📂 좌측에서 JPO 클래스 선택"
+    </div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<h2>🆕 Phase B — 세션 시작 + 코드 추출 + 가설</h2>
+
+<div class="step" data-id="B-1">
+  <div class="num">B.1</div>
+  <div class="body">
+    <h4><input type="checkbox"> 🆕 새 세션 클릭</h4>
+    <div class="action">toolbar 의 <strong>🆕 새 세션</strong> 클릭</div>
+    <div class="expect">
+      • 우측 "현재 세션" 카드: UUID + cost $0.0000 + operator default<br>
+      • 채팅에 "세션 시작 (id=...)" 시스템 메시지<br>
+      • banner 가 amber → emerald 로 변경: "✓ 선택됨: HrSpecJpo"<br>
+      • ① 코드 추출 버튼 활성화 (회색 → 정상)
+    </div>
+  </div>
+</div>
+
+<div class="step" data-id="B-2">
+  <div class="num">B.2</div>
+  <div class="body">
+    <h4><input type="checkbox"> ① 코드 추출 (HrSpecJpo) 클릭</h4>
+    <div class="action">toolbar 의 <strong>① 코드 추출 (HrSpecJpo)</strong> 클릭. 약 <span class="pill amber">10초</span> 대기 (Sonnet)</div>
+    <div class="expect">
+      • 채팅에 추출 결과 카드: <strong>HrSpecJpo → HR_SPEC, PK 4축 · 컬럼 4개</strong><br>
+      • cost 가 $0.02 정도 누적<br>
+      • banner 가 사라짐 (jpo 추출 후 다음 단계 안내 자동)
+    </div>
+    <textarea class="note" placeholder="추출 결과 이상하면 메모"></textarea>
+  </div>
+</div>
+
+<div class="step" data-id="B-3">
+  <div class="num">B.3</div>
+  <div class="body">
+    <h4><input type="checkbox"> ② 가설 클릭</h4>
+    <div class="action">toolbar 의 <strong>② 가설</strong> 클릭. 약 <span class="pill violet">20-25초</span> 대기 (Opus)</div>
+    <div class="expect">
+      • 채팅에 가설 카드: <strong>🧠 가설: 열연공장 표준?</strong> (Korean term + English id) + confidence 0.30~0.55<br>
+      • <span class="pill amber">중요</span>: <strong>"표준?"</strong> 같은 hedging (?) 또는 "추정" 표현 — humble prompt 적용 검증<br>
+      • 우측 "가설" 카드 등장 — Korean 라벨, English id, role, confidence, PK 의미 요약
+    </div>
+    <div class="tip">★ 평가 포인트 — 이전엔 "HrPlant" 같은 specific 이름을 처음부터 dump 했던 것이 R2-W1 P1-B 후 더 humble 해졌는지 확인</div>
+    <textarea class="note" placeholder="가설 이름 / confidence / 어색함 메모"></textarea>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<h2>❓ Phase C — 인터뷰 (Q 별 textarea)</h2>
+
+<div class="step" data-id="C-1">
+  <div class="num">C.1</div>
+  <div class="body">
+    <h4><input type="checkbox"> ③ 인터뷰 클릭</h4>
+    <div class="action">toolbar 의 <strong>③ 인터뷰</strong> 클릭. 약 <span class="pill amber">15-20초</span> 대기</div>
+    <div class="expect">
+      • 채팅에 인터뷰 카드 + 5~7개 한국어 질문 list<br>
+      • 각 질문 별로 <strong>별개 textarea + my_guess hint + skip 체크박스 + 옵션 select</strong><br>
+      • 마지막에 "추가 의견 (자유)" freeform textarea<br>
+      • 하단에 "④ 답변 제출 (Q 별 정리)" 버튼
+    </div>
+    <div class="tip">★ R2-W1 P3-A — Round 5 form 패턴 복원. 이전엔 단일 textarea 였음.</div>
+  </div>
+</div>
+
+<div class="step" data-id="C-2">
+  <div class="num">C.2</div>
+  <div class="body">
+    <h4><input type="checkbox"> 답변 입력 (Round 5 정답 시나리오)</h4>
+    <div class="action">각 textarea 에 한 줄씩 답변 (전체 한꺼번에 가능):</div>
+    <pre>1. owner 또는 관리: 공정계획
+2. wildcard: *를 쓸 수도 있고 LIKE 패턴도 지원
+3. miss / 매칭 실패: NPE — 데이터 결함
+4. row_size: 수십~백
+5. maintenance: 공정계획 사용자
+6. (그 외) 추가 의견: NULL PK 컬럼은 자동 true</pre>
+    <div class="expect">제출 전엔 textarea 만 채워진 상태</div>
+  </div>
+</div>
+
+<div class="step" data-id="C-3">
+  <div class="num">C.3</div>
+  <div class="body">
+    <h4><input type="checkbox"> ④ 답변 제출 클릭</h4>
+    <div class="action">하단 <strong>④ 답변 제출 (Q 별 정리)</strong> 버튼 클릭</div>
+    <div class="expect">
+      • 채팅 사용자 메시지: 답변 transcript (• owner: 공정계획 ...)<br>
+      • 채팅 assistant 메시지: <strong>📥 답변 정리됨</strong> 카드<br>
+      • 우측 가설 카드에 <span class="pill violet">🔄 가설 다시 보기</span> 버튼 새로 등장 (P2-B)<br>
+      • cost 변동 X (frontend 가 직접 build, LLM 호출 안 함 — R2-W1 절감)
+    </div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<h2>🎯 Phase D — 옵션 + ★ 피드백 루프 시도</h2>
+
+<div class="step" data-id="D-1">
+  <div class="num">D.1</div>
+  <div class="body">
+    <h4><input type="checkbox"> ⑤ 옵션 클릭</h4>
+    <div class="action">toolbar 의 <strong>⑤ 옵션</strong> 클릭. 약 <span class="pill violet">25-35초</span> 대기 (Opus, 가장 큼)</div>
+    <div class="expect">
+      • 채팅에 옵션 표 카드: <strong>🎯 HrSpec 모델링 옵션</strong> + 2~4개 옵션<br>
+      • 각 옵션: name + 구조도 (ASCII) + trade-off 한 줄 + 선택 버튼<br>
+      • ★ 표시 추천 옵션 (보통 emerald 강조 — Plant + Constraint Composition)
+    </div>
+    <textarea class="note" placeholder="옵션 개수 / 추천 / 어색함 메모"></textarea>
+  </div>
+</div>
+
+<div class="step" data-id="D-2">
+  <div class="num">D.2</div>
+  <div class="body">
+    <h4><input type="checkbox"> ✨ <strong>F3 시도 #1</strong>: 옵션 카드의 ✏ 수정</h4>
+    <div class="action">옵션 카드 하단의 <strong>✏ 수정</strong> 버튼 클릭. inline textarea 에 입력:
+      <pre>이 옵션들이 다 비슷해 보여 — Plant 와 Spec 의 차이를 명확히 하고, 와일드카드 case 를 별도 옵션으로 추가해줘</pre>
+      그리고 <strong>✏ 정정 후 재실행</strong> 클릭
+    </div>
+    <div class="expect">
+      • 채팅 사용자 메시지: "🔄 options 재실행 (코멘트: ...)"<br>
+      • 약 25-35초 대기 (Opus 재호출)<br>
+      • 새 옵션 표가 정정 코멘트 반영해서 다시 (와일드카드 case 강조 등)<br>
+      • 우측의 채택 옵션 / 명명 / archive 가 cleared (cascading)
+    </div>
+    <div class="tip">★ <strong>이게 R2-W2 의 핵심 — Round 5 의 "사용자 정정 → AI 재검토" 흐름 복원</strong></div>
+    <textarea class="note" placeholder="새 옵션이 코멘트 반영했나? 어색한 부분?"></textarea>
+  </div>
+</div>
+
+<div class="step" data-id="D-3">
+  <div class="num">D.3</div>
+  <div class="body">
+    <h4><input type="checkbox"> 옵션 선택 (자동 ⑦ 명명)</h4>
+    <div class="action">★ 추천 옵션 (보통 Plant + Constraint Composition) 의 <strong>선택</strong> 버튼 클릭</div>
+    <div class="expect">
+      • 채팅 사용자 메시지: "옵션 채택: 옵션 C — Plant + Constraint ..."<br>
+      • 자동으로 ⑦ 명명 capability 호출 (Sonnet, ~10초)<br>
+      • 채팅에 명명 카드: <strong>🏷 명명 (2 entities)</strong> — 한국어 + English id (예: 열연공장 / HrPlant + 열연공장제약 / HrPlantConstraint)<br>
+      • 우측 "엔티티" 카드 등장 — 각 entity 의 role / parent / 한국어 라벨
+    </div>
+  </div>
+</div>
+
+<div class="step" data-id="D-4">
+  <div class="num">D.4</div>
+  <div class="body">
+    <h4><input type="checkbox"> ⑥ 갭 클릭 (선택)</h4>
+    <div class="action">toolbar 의 <strong>⑥ 갭</strong> 클릭. 약 <span class="pill violet">25-30초</span> 대기 (Opus)</div>
+    <div class="expect">
+      • 채팅에 갭 분석 카드: <strong>🔍 갭 탐지 (N gaps, severity_summary)</strong><br>
+      • 와일드카드 모순이 <code>intent</code> 갭으로 검출 (사용자가 "*+LIKE" 라고 했는데 코드는 정확매칭만)<br>
+      • 우측 "갭" 카드에 severity 별 색상 (high=rose, medium=amber, low=muted)
+    </div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<h2>📦 Phase E — Archive + Confirm</h2>
+
+<div class="step" data-id="E-1">
+  <div class="num">E.1</div>
+  <div class="body">
+    <h4><input type="checkbox"> ⑨ Archive 클릭</h4>
+    <div class="action">toolbar 의 <strong>⑨ Archive</strong> 클릭. 약 <span class="pill amber">15-20초</span> 대기</div>
+    <div class="expect">
+      • 채팅에 archive 카드: <strong>📦 Step 1 — 열연공장 entity 결정 ✓</strong><br>
+      • 우측 "Archive" 섹션이 새로 등장 — markdown 으로 렌더된 풍부한 글 (글자 잘 읽힘 — R2-W2-Now X1 fix)<br>
+      • 우측 상단에 <strong>⬇ .md 내려받기</strong> 버튼
+    </div>
+    <textarea class="note" placeholder="Archive markdown 가독성 어떤지"></textarea>
+  </div>
+</div>
+
+<div class="step" data-id="E-2">
+  <div class="num">E.2</div>
+  <div class="body">
+    <h4><input type="checkbox"> ⬇ .md 내려받기 (선택)</h4>
+    <div class="action">우측 Archive 섹션의 <strong>⬇ .md 내려받기</strong> 클릭</div>
+    <div class="expect">
+      파일 다운로드 — 파일명 예: <code>step-1-열연공장-entity-결정.md</code><br>
+      열어보면 markdown 으로 archive 내용
+    </div>
+  </div>
+</div>
+
+<div class="step" data-id="E-3">
+  <div class="num">E.3</div>
+  <div class="body">
+    <h4><input type="checkbox"> ✓ Confirm 클릭 — entity 영구 저장</h4>
+    <div class="action">toolbar 의 <strong>✓ Confirm</strong> 클릭 (emerald 색상)</div>
+    <div class="expect">
+      • 채팅에 confirmed 카드: <strong>✅ N 개 entity 가 ontology DB 에 저장됨</strong><br>
+      • FQN 목록 (예: term.smoke-slab.hrplant, term.smoke-slab.hrplantconstraint)<br>
+      • 우측 "엔티티" 카드의 각 entity badge 가 <code>draft</code> → <code>✓ saved</code> 로 변경
+    </div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<h2>🧪 Phase F — 추가 시도 (선택)</h2>
+
+<div class="step" data-id="F-1">
+  <div class="num">F.1</div>
+  <div class="body">
+    <h4><input type="checkbox"> 우측 섹션 collapsible 시도</h4>
+    <div class="action">우측 "현재 세션" / "가설" / "채택 옵션" 등 섹션 헤더의 <strong>▾ 또는 ▸</strong> 클릭</div>
+    <div class="expect">
+      • 클릭 시 펼침/접기. ▾ ↔ ▸ 변경<br>
+      • hover 시 "접기" / "펼치기" 텍스트 표시<br>
+      • 닫혀있을 때 헤더 흐림, 펼쳐있을 때 primary 색
+    </div>
+    <div class="tip">★ R2-W2-Now X3 — 사용자가 토글 인지 못했다고 한 부분 fix</div>
+  </div>
+</div>
+
+<div class="step" data-id="F-2">
+  <div class="num">F.2</div>
+  <div class="body">
+    <h4><input type="checkbox"> ✨ <strong>F3 시도 #2</strong>: 가설 카드의 🔄 다시</h4>
+    <div class="action">채팅 thread 위쪽의 <strong>가설 카드</strong> 하단에서 <strong>🔄 다시</strong> 클릭 (코멘트 없이)</div>
+    <div class="expect">
+      • "🔄 hypothesis 단순 재실행" 시스템 메시지<br>
+      • 가설 재호출 (Opus, 20초)<br>
+      • <strong>모든 후속 단계 (인터뷰 / 답변 / 옵션 / 명명 / archive / confirmed FQNs) 자동 cleared</strong><br>
+      • 우측 카드들이 모두 빈 상태로 되돌림 (cascading)<br>
+      • 새 가설 카드 + 다시 ③ 인터뷰 클릭 가능
+    </div>
+    <textarea class="note" placeholder="cascading 잘 작동하나?"></textarea>
+  </div>
+</div>
+
+<div class="step" data-id="F-3">
+  <div class="num">F.3</div>
+  <div class="body">
+    <h4><input type="checkbox"> 우측 가설 카드의 🔄 가설 다시 보기 (P2-B)</h4>
+    <div class="action">우측 preview 의 <strong>가설</strong> 섹션에서 <strong>🔄 가설 다시 보기</strong> 클릭 (답변이 있을 때만 등장)</div>
+    <div class="expect">
+      F.2 와 비슷 — 가설 + 후속 cleared. 이건 Round 5 Step 14 §B 의 P2-B 패턴 (refresh 버튼)<br>
+      F3 의 ✏/🔄 와의 차이: P2-B 는 답변을 항상 반영, F3 는 사용자 코멘트도 받음
+    </div>
+  </div>
+</div>
+
+<div class="step" data-id="F-4">
+  <div class="num">F.4</div>
+  <div class="body">
+    <h4><input type="checkbox"> 📥 큐 탭 visit (recommend 결과 보기)</h4>
+    <div class="action">좌측 패널 상단의 <strong>📥 큐</strong> 탭 클릭</div>
+    <div class="expect">
+      29 BusinessTerm + 36 Action + 34 realization 후보 list (recommend 가 자동 생성한 것)<br>
+      각 row 에 ✓ Confirm / ✗ Reject 버튼<br>
+      이건 onTong 의 기존 흐름 (자동 recommend 후 큐 confirm/reject)
+    </div>
+    <textarea class="note" placeholder="큐 UI 어색한 부분 / 개선 점"></textarea>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<h2>📝 전체 평가</h2>
+
+<div class="feedback">
+  <h4>전체 cycle 끝낸 후 평가 (한 줄씩 OK)</h4>
+
+  <div style="margin:8px 0">
+    <label style="font-size:12px;display:block;margin-bottom:3px">만족감 1.5/5 (이전) → 지금 ?/5</label>
+    <textarea class="note" name="satisfaction" placeholder="예: 3.5/5 — 가설 humble + ✏수정 좋음. 매 turn 30s 대기는 여전한 부담"></textarea>
+  </div>
+
+  <div style="margin:8px 0">
+    <label style="font-size:12px;display:block;margin-bottom:3px">가장 좋았던 변화 1~2개</label>
+    <textarea class="note" name="best" placeholder="예: F3 ✏ 수정 / cascading"></textarea>
+  </div>
+
+  <div style="margin:8px 0">
+    <label style="font-size:12px;display:block;margin-bottom:3px">아직 어색하거나 부족한 1~2개</label>
+    <textarea class="note" name="rough" placeholder="예: 큐 탭 UX / 매 turn 대기 / ..."></textarea>
+  </div>
+
+  <div style="margin:8px 0">
+    <label style="font-size:12px;display:block;margin-bottom:3px">다음 우선순위 (R2-W3 streaming / R2-W4 multi-entity / 큐 UX / 다른)</label>
+    <textarea class="note" name="next" placeholder="예: streaming 가장 시급"></textarea>
+  </div>
+
+  <div class="actions" style="margin-top:12px">
+    <button class="btn" data-action="copy">📋 답변 복사</button>
+    <button class="btn outline" data-action="preview">미리보기</button>
+    <button class="btn danger" data-action="reset">⟲ 진행 초기화</button>
+    <span class="copy-status" id="copyStatus"></span>
+  </div>
+
+  <div class="preview" id="preview"></div>
+</div>
+
+</main>
+
+<!-- Sticky progress bar at bottom -->
+<div class="progress-bar">
+  <div class="progress-fill"><div class="bar" id="progBar" style="width:0%"></div></div>
+  <div class="progress-text" id="progText">0 / 0 단계</div>
+</div>
+
+<script>
+const STORAGE_KEY = "authoring-demo-progress-v1";
+
+// ── Restore checkbox state from localStorage ──
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
+  catch { return {}; }
+}
+function saveState(state) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch {}
+}
+
+let state = loadState();
+
+document.querySelectorAll(".step").forEach((el) => {
+  const id = el.dataset.id;
+  const cb = el.querySelector('input[type="checkbox"]');
+  if (state[id]?.checked) {
+    cb.checked = true;
+    el.classList.add("checked");
+  }
+  const note = el.querySelector("textarea.note");
+  if (note && state[id]?.note) note.value = state[id].note;
+
+  cb.addEventListener("change", () => {
+    state[id] = state[id] || {};
+    state[id].checked = cb.checked;
+    el.classList.toggle("checked", cb.checked);
+    saveState(state);
+    updateProgress();
+  });
+  if (note) {
+    note.addEventListener("input", () => {
+      state[id] = state[id] || {};
+      state[id].note = note.value;
+      saveState(state);
+    });
+  }
+  // Header click toggles checkbox
+  el.querySelector("h4").addEventListener("click", (e) => {
+    if (e.target.tagName === "INPUT") return;
+    cb.checked = !cb.checked;
+    cb.dispatchEvent(new Event("change"));
+  });
+});
+
+// ── Feedback fields persistence ──
+document.querySelectorAll(".feedback textarea[name]").forEach((ta) => {
+  const key = "feedback:" + ta.name;
+  if (state[key]) ta.value = state[key];
+  ta.addEventListener("input", () => {
+    state[key] = ta.value;
+    saveState(state);
+  });
+});
+
+// ── Progress bar ──
+function updateProgress() {
+  const all = document.querySelectorAll(".step");
+  const done = Array.from(all).filter((s) => s.querySelector('input[type="checkbox"]').checked);
+  const pct = all.length === 0 ? 0 : (done.length / all.length) * 100;
+  document.getElementById("progBar").style.width = pct + "%";
+  document.getElementById("progText").textContent = `${done.length} / ${all.length} 단계 (${pct.toFixed(0)}%)`;
+}
+updateProgress();
+
+// ── Build feedback text ──
+function buildFeedback() {
+  const fields = [
+    ["satisfaction", "만족감 (1.5/5 이전 → 지금)"],
+    ["best",         "가장 좋았던 변화"],
+    ["rough",        "어색하거나 부족"],
+    ["next",         "다음 우선순위"],
+  ];
+  const out = ["[Authoring 데모 가이드 — 사용자 답변]"];
+
+  // Per-step notes (only ones with notes filled in)
+  const stepNotes = [];
+  document.querySelectorAll(".step").forEach((el) => {
+    const id = el.dataset.id;
+    const note = el.querySelector("textarea.note")?.value?.trim();
+    const cb = el.querySelector('input[type="checkbox"]').checked;
+    if (note) stepNotes.push(`${id} ${cb ? "✓" : "·"} ${note}`);
+  });
+  if (stepNotes.length > 0) {
+    out.push("\n## Step 노트\n" + stepNotes.join("\n"));
+  }
+
+  // Feedback fields
+  for (const [k, label] of fields) {
+    const v = (document.querySelector(`textarea[name="${k}"]`)?.value ?? "").trim();
+    if (v) out.push(`\n## ${label}\n${v}`);
+  }
+  return out.join("\n");
+}
+
+// ── Clipboard with fallback ──
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return "modern";
+    }
+  } catch {}
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;opacity:0;left:-9999px;top:0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok ? "fallback" : "failed";
+  } catch {
+    return "failed";
+  }
+}
+
+function showPreview(text) {
+  const slot = document.getElementById("preview");
+  slot.textContent = text;
+  slot.classList.add("visible");
+}
+
+document.querySelector('[data-action="preview"]').addEventListener("click", () => {
+  showPreview(buildFeedback());
+});
+document.querySelector('[data-action="copy"]').addEventListener("click", async (e) => {
+  const txt = buildFeedback();
+  showPreview(txt);
+  const result = await copyText(txt);
+  const btn = e.currentTarget;
+  const status = document.getElementById("copyStatus");
+  if (result === "modern" || result === "fallback") {
+    const orig = btn.textContent;
+    btn.textContent = `✓ 복사됨 (${result})`;
+    btn.classList.add("copied");
+    status.textContent = "";
+    status.classList.remove("err");
+    status.classList.add("ok");
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove("copied"); }, 2000);
+  } else {
+    status.textContent = "✕ 복사 실패 — 아래 미리보기 클릭하면 전체 선택";
+    status.classList.remove("ok");
+    status.classList.add("err");
+  }
+});
+document.querySelector('[data-action="reset"]').addEventListener("click", () => {
+  if (!confirm("진행 상태 초기화? 모든 체크박스/메모 삭제됩니다.")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  location.reload();
+});
+
+document.getElementById("preview").addEventListener("click", () => {
+  const slot = document.getElementById("preview");
+  const range = document.createRange();
+  range.selectNodeContents(slot);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+});
+</script>
+
+</body>
+</html>

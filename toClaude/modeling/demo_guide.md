@@ -1,4 +1,6 @@
-# onTong 데모 가이드 (Wiki 완성 + Section 2 Modeling MVP + ACL Domain Scoping + Image Search + Image Management)
+# onTong 데모 가이드 (Wiki + Section 2 Ontology Builder + ACL + Image Search/Management)
+
+> **주의**: Section 2의 코드 분석 / 매핑 워크벤치 / 시뮬레이션 / 영향 분석 기능은 2026-04-18 Legacy Cleanup(OD-10)으로 제거됨. 현재는 매뉴얼 빌더(D-OD-05~08)와 SCOR 온톨로지 트리만 유지. 3 agents(WhatIf/WhyTrace/Diagnostic)는 Section 3에서 재구축 예정.
 
 ---
 
@@ -156,65 +158,6 @@ cd /Users/donghae/workspace/ai/onTong
 
 ---
 
-## Mapping Workbench (2026-04-16)
-
-> 소스 코드 뷰어 + 도메인 그래프 캔버스 + 분할 패널 워크벤치.
-> **브랜치**: `main`
-
-### 사전 준비
-```bash
-# Backend
-cd /Users/donghae/workspace/ai/onTong
-source .venv/bin/activate && set -a && source .env && set +a
-uvicorn backend.main:app --host 0.0.0.0 --port 8001
-
-# Frontend (별도 터미널)
-cd frontend && npm run dev
-
-# 데모 데이터 시드
-curl -s -X POST http://localhost:8001/api/modeling/seed/scm-demo | python3 -m json.tool
-```
-
-### 시나리오 1: 소스 파일 트리 탐색
-1. `http://localhost:3000` → Modeling 탭 → "SCM 데모 프로젝트 로드"
-2. 사이드바에서 **"매핑 워크벤치"** 클릭
-3. 오른쪽 패널에 파일 트리 표시됨
-4. Java 파일 클릭 → Monaco 에디터에 구문 강조 소스 표시
-5. **확인**: 파일 검색 필터로 "Safety" 입력 → 해당 파일만 표시
-
-### 시나리오 2: 도메인 그래프 탐색
-1. 왼쪽 패널에 SCOR 도메인 그래프 표시 (React Flow)
-2. 초록색 노드 = 코드 매핑 있음, 회색 = 매핑 없음
-3. 노드 클릭 → 하단 엔티티 패널에 연결된 코드 엔티티 표시
-
-### 시나리오 3: 양방향 연동
-1. 왼쪽 캔버스에서 도메인 노드 클릭 → 오른쪽 뷰어가 해당 엔티티 파일 열고 스크롤
-2. 오른쪽 뷰어에서 엔티티 라인 클릭 → 왼쪽 캔버스에서 도메인 노드 하이라이트
-
-### 시나리오 4: 드래그-드롭 매핑 생성
-1. 하단 엔티티 패널에서 빨간 점(미매핑) 엔티티를 도메인 노드로 드래그
-2. 매핑 생성 후 노드 색상 변경 확인
-
-### API 직접 테스트
-```bash
-# 파일 트리
-curl -s http://localhost:8001/api/modeling/source/tree/scm-demo | python3 -m json.tool
-
-# 파일 내용 + 엔티티 위치
-curl -s "http://localhost:8001/api/modeling/source/file/scm-demo?path=src/main/java/com/ontong/scm/inventory/SafetyStockCalculator.java" | python3 -m json.tool
-
-# 엔티티 위치 조회
-curl -s http://localhost:8001/api/modeling/source/entity/scm-demo/com.ontong.scm.inventory.SafetyStockCalculator | python3 -m json.tool
-```
-
-### 트러블슈팅
-- **워크벤치 빈 화면**: SCM 데모 프로젝트가 로드되었는지 확인 (시드 API 호출)
-- **파일 트리 에러**: sample-repos/scm-demo 디렉토리 존재 확인
-- **그래프 노드 없음**: 온톨로지 트리가 시드되었는지 확인
-- **드래그 매핑 실패**: Neo4j 연결 상태 확인
-
----
-
 ## ACL Domain Scoping (2026-04-14)
 
 > 기업용 접근 권한 시스템. 개인 공간, 세밀한 ACL, ChromaDB access_scope, 사이드바 구조화.  
@@ -290,50 +233,6 @@ curl -X POST http://localhost:8001/api/wiki/reindex  # access_scope 반영
 - **ChromaDB 검색에서 권한 필터 미적용**: `curl -X POST http://localhost:8001/api/wiki/reindex` 실행
 
 ---
-
-## Section 2: Modeling MVP (2026-04-12)
-
-> Section 2는 코드 분석 → 도메인 매핑 → 영향분석 도구입니다. 아래 시나리오는 Neo4j가 실행 중이어야 합니다.
-
-### 사전 준비
-```bash
-docker compose up -d neo4j   # Neo4j 시작 (7474/7687 포트)
-# 백엔드/프론트엔드 시작 (기존과 동일)
-```
-
-### 시나리오 1: Java 프로젝트 파싱
-1. 왼쪽 SectionNav에서 "Modeling" 클릭
-2. "Code Graph" 탭 선택
-3. Git URL 입력 (Java 프로젝트) → "Parse" 클릭
-4. **확인**: 클래스, 메서드, 필드, 호출관계가 그래프로 표시
-
-### 시나리오 2: SCOR 도메인 온톨로지 로드
-1. "Domain Ontology" 탭 선택
-2. "Load SCOR Template" 클릭
-3. **확인**: Plan/Source/Make/Deliver/Return L1 프로세스 + L2 하위 프로세스 트리 표시
-4. 노드 추가: Name/Kind/Parent 입력 → "Add" 클릭 → 트리에 반영
-
-### 시나리오 3: 코드↔도메인 매핑
-1. "Mapping" 탭 선택 → 3컬럼 뷰 (Code | Mappings | Domain)
-2. Code entity + Domain node 선택 → "Add Mapping" 클릭
-3. **확인**: 매핑 목록에 새 항목 (status: draft)
-4. "Gaps" 클릭 → 매핑되지 않은 코드 엔티티 목록 표시
-
-### 시나리오 4: 영향 분석 (Impact Analysis)
-1. "Impact Analysis" 탭 선택
-2. 검색어 입력 (예: "SafetyStockCalculator" 또는 "InventoryPlanning")
-3. **확인**: 영향받는 도메인 프로세스 목록 + BFS 깊이 + 미매핑 엔티티 수 표시
-4. 미매핑 용어 입력 → "매핑되지 않은 용어입니다" 메시지 표시
-
-### 시나리오 5: 승인 워크플로우
-1. "Approval" 탭 선택
-2. 매핑 제출 (mapping code + domain 입력) → Pending 목록에 표시
-3. Approve/Reject 클릭 → 상태 변경 확인
-
-### 트러블슈팅
-- Neo4j 연결 실패: `docker compose logs neo4j` 확인, 7687 포트 열려 있는지 체크
-- "No module named 'neo4j'": `uv pip install neo4j tree-sitter tree-sitter-java`
-- 프론트엔드에서 API 에러: Next.js proxy가 `/api/modeling/*`를 백엔드로 전달하는지 확인
 
 ---
 
@@ -4380,3 +4279,3458 @@ curl -s "http://localhost:8001/api/wiki/digest?user_filter=admin" | python3 -m j
 - `tests/test_p2b2_status_field.py` (18), `tests/test_metadata_index_enriched.py` (17)
 - `tests/test_lineage_validation.py` (14), `tests/test_deprecation_side_effects.py` (6)
 - `tests/test_version_chain.py` (5), `tests/test_reference_integrity.py` (7)
+
+---
+
+## Ontology-First Redesign — Week 1 DSL Lock 검증 (2026-04-18)
+
+Week 1의 Primary Layer DSL(Pydantic schema + 서브-DSL AST 파서 + YAML loader/dumper)은 현재 백엔드 전용이므로 브라우저 데모가 없다. 아래 명령으로 터미널에서 직접 검증한다.
+
+### D-OD-01 — pytest 전체 (39 tests)
+
+```bash
+source venv/bin/activate
+pytest tests/test_ontology_schema.py tests/test_ontology_validator.py tests/test_ontology_loader.py -v
+```
+
+**예상 결과**: `39 passed in 0.1s` 수준. 실패 시 `backend/modeling/ontology/` 해당 모듈 확인.
+
+### D-OD-02 — 샘플 온톨로지 로드 (Python REPL)
+
+```bash
+source venv/bin/activate && python -c "
+from backend.modeling.ontology.loader import load_ontology
+ont = load_ontology('ontologies/safety_stock_v1.yaml')
+print(f'id={ont.ontology.id}, processes={len(ont.processes)}, terms={len(ont.terms)}, bindings={len(ont.code_bindings)}')
+for p in ont.processes:
+    print(f'  {p.id}: inputs={len(p.inputs)}, outputs={len(p.outputs)}, rules={len(p.rules)}')
+"
+```
+
+**예상 결과**:
+```
+id=safety-stock-v1, processes=2, terms=3, bindings=2
+  SafetyStockCalculation: inputs=3, outputs=1, rules=3
+  ReorderPointCalculation: inputs=3, outputs=1, rules=1
+```
+
+### D-OD-03 — 잘못된 온톨로지 검증 에러 확인
+
+```bash
+source venv/bin/activate && python -c "
+from backend.modeling.ontology.validator import parse_arithmetic, parse_boolean
+try:
+    parse_arithmetic('a + undefined_var')
+except Exception as e:
+    print(f'arithmetic reject: {e}')
+try:
+    parse_boolean('demand > 100 AND unknown_flag')
+except Exception as e:
+    print(f'boolean reject: {e}')
+"
+```
+
+**예상 결과**: 두 경우 모두 `식별자 '...' 는 허용되지 않음` 에러 출력 (whitelist 기반 parser 동작 확인).
+
+### D-OD-04 — Roundtrip dump/load
+
+```bash
+source venv/bin/activate && python -c "
+from backend.modeling.ontology.loader import load_ontology, dump_ontology
+from pathlib import Path
+import tempfile
+ont = load_ontology('ontologies/safety_stock_v1.yaml')
+with tempfile.NamedTemporaryFile(suffix='.yaml', delete=False) as tmp:
+    dump_ontology(ont, tmp.name)
+    reloaded = load_ontology(tmp.name)
+    print(f'roundtrip equal: {ont == reloaded}')
+"
+```
+
+**예상 결과**: `roundtrip equal: True`.
+
+### Troubleshooting (Ontology DSL)
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| `ModuleNotFoundError: backend.modeling.ontology` | venv 활성화 누락 | `source venv/bin/activate` |
+| `ValidationError: Extra inputs are not permitted` | YAML에 정의 안 된 필드 포함 | `schema.py`의 해당 모델 필드명과 대조 |
+| `AST 노드 'X' 는 허용되지 않음` | 서브-DSL whitelist 위반 | `validator.py`의 `ALLOWED_*` 상수 확인, 필요 시 확장 검토 |
+| `YAML 루트는 매핑(dict)이어야 함` | YAML이 리스트/스칼라로 시작 | 최상위를 `ontology:` 매핑으로 시작 |
+| `OntologyValidationError: cycle detected` | `depends_on`에 순환 참조 | YAML 그래프 재설계, 의존 방향 일관화 |
+| `refers_to '...' 경로를 찾을 수 없음` | `Term.refers_to`의 `ProcessId.{inputs,outputs}.portId` 오타 | 프로세스/포트 id 재확인 (점 3단 경로 필수) |
+
+### 샘플 YAML 주요 구조 (`ontologies/safety_stock_v1.yaml`)
+
+```yaml
+ontology:
+  id: safety-stock-v1
+processes:
+  - id: SafetyStockCalculation
+    inputs: [{id: z, type: float}, {id: demand_variability, type: float}, {id: lead_time_days, type: float}]
+    outputs: [{id: safety_stock, type: float}]
+    formula:
+      expression: "z * demand_variability * sqrt(lead_time_days)"
+    rules:
+      - {id: SSR-001, condition: "z < 1.0", action_type: warning, action_message: "서비스 수준 낮음"}
+      - {id: SSR-002, condition: "lead_time_days > 30", action_type: assign, target: safety_stock, expression: "safety_stock * 1.1"}
+  - id: ReorderPointCalculation
+    depends_on: [SafetyStockCalculation]
+    ...
+terms:
+  - {canonical: 안전재고, aliases: [safety stock, SS], refers_to: "SafetyStockCalculation.outputs.safety_stock"}
+code_bindings:
+  SafetyStockCalculation:
+    implementations:
+      - {language: java, file_path: "src/SafetyStockCalculator.java", function: "calculate"}
+```
+
+---
+
+## Ontology-First Redesign — Week 2 OD-7/8 매뉴얼 빌더 검증 (2026-04-18)
+
+> 110→119 modeling tests pass. TS 0 error. 새 UI 탭 "매뉴얼 빌더" + 백엔드 4개 엔드포인트.
+
+### D-OD-05: 백엔드 pytest (builder_service 17건 포함)
+
+```bash
+cd /Users/donghae/workspace/ai/onTong
+./venv/bin/pytest tests/test_ontology_builder_service.py -v
+./venv/bin/pytest tests/test_ontology_*.py tests/test_modeling_e2e.py
+```
+
+기대: `17 passed` + 전체 `119 passed`.
+
+### D-OD-06: 매뉴얼 목록 / 단건 조회 API
+
+```bash
+# 백엔드 기동 후 (uvicorn 또는 기존 dev 서버)
+curl -s http://localhost:8000/api/modeling/ontology/manuals | jq
+# 기대: [{name: "crack-quality-standard.md", size: ...}, {name: "heating-process-sop.md", size: ...}]
+
+curl -s http://localhost:8000/api/modeling/ontology/manuals/heating-process-sop.md | jq .name
+# 기대: "heating-process-sop.md"
+```
+
+### D-OD-07: LLM 드래프트 + validate 엔드포인트
+
+```bash
+# 매뉴얼 샘플 → 드래프트
+curl -s -X POST http://localhost:8000/api/modeling/ontology/draft \
+  -H "Content-Type: application/json" \
+  -d '{"markdown":"# 가열공정\n예열 120℃/10분, 균열 165℃±2℃"}' | jq
+# 기대: {yaml: "ontology:...", errors: []}
+
+# YAML validate
+curl -s -X POST http://localhost:8000/api/modeling/ontology/validate \
+  -H "Content-Type: application/json" \
+  -d '{"yaml":"ontology:\n  id: test-v1\n"}' | jq
+# 기대: {valid: true, errors: []}
+
+# 스키마 위반
+curl -s -X POST http://localhost:8000/api/modeling/ontology/validate \
+  -H "Content-Type: application/json" \
+  -d '{"yaml":"processes:\n  - name: nopq"}' | jq
+# 기대: {valid: false, errors: ["..."]}
+```
+
+### D-OD-08: UI 시나리오 — Modeling 섹션 > "매뉴얼 빌더" 탭
+
+1. 헤더 아래 상단 탭 중 "매뉴얼 빌더" 선택 (사이드바 MAIN_NAV 최상단)
+2. 툴바의 "샘플 매뉴얼" 드롭다운에서 `heating-process-sop.md` 선택 → 좌측 markdown 에디터에 내용 채워짐
+3. "LLM Draft" 버튼 클릭 → 우측 YAML 에디터에 드래프트 YAML 생성. 상단 우측 상태 pill에 "유효" (초록) 또는 "오류 N건" (앰버)
+4. 우측 YAML 편집 시 500ms 디바운스 후 자동 validate — 잘못 수정하면 하단 오류 패널에 에러 목록
+5. 파일명 입력란에 `heating_sop_v1.yaml` 입력 → "저장" 버튼 활성화 → 클릭 → "저장 완료: ontologies/heating_sop_v1.yaml" 초록 패널
+
+### Troubleshooting
+
+| 증상 | 원인 | 조치 |
+|------|------|------|
+| `LLM 호출 실패: ...` 에러 | `LITELLM_MODEL` env 누락 또는 API 키 없음 | `.env` 확인 (`OPENAI_API_KEY` 등) |
+| `저장` 버튼이 disabled | 파일명이 `.yaml` 로 끝나지 않거나 YAML invalid | validation pill이 "유효"인지 먼저 확인 후 파일명 `.yaml` 입력 |
+| `filename은 경로 문자를 포함할 수 없습니다` | `/`, `\\`, `..` 포함 | 단순 파일명만 입력 |
+| 샘플 드롭다운이 비어있음 | `ontologies/manuals/` 폴더 없음 | OD-7 샘플 복사 재확인 (README.md 제외) |
+| 매뉴얼 빌더 탭이 안 보임 | 프론트 빌드 캐시 | `rm -rf frontend/.next && npm run dev` |
+
+---
+
+## D-OD-11-B6-4 — CrossFileEnricher repo-level 스모크 테스트 (2026-04-19)
+
+> B6-1/2/3 분석기가 남긴 marker/엣지를 repo-level 후처리로 구체화. JavaParser 외부 헬퍼이므로 현재 UI 없이 pytest 로 검증.
+
+### 사전 준비
+```bash
+cd /Users/donghae/workspace/ai/onTong
+source venv/bin/activate
+```
+
+### 1. B6-4 단위 테스트 실행
+```bash
+pytest tests/test_cross_file_enricher.py -v
+# 기대: 10 passed in ~0.02s
+```
+
+확인 포인트:
+- MapStruct implicit FIELD 교집합이 `PROPAGATES_TO{implicit:true, confidence:0.9}` 엣지로 등장
+- BeanUtils 엣지는 `{confidence:0.7, library, via_methods}` 속성 포함
+- NativeSQL `READS_TABLE` → `DB_COLUMN` 노드 + `READS` 엣지 생성
+- 2 개 파일에서 같은 `orders` 테이블을 참조해도 synthetic `ParseResult(file_path="<db_schema>")` 에 `DB_TABLE` 1 개만 emit
+
+### 2. B6 누적 범위 회귀
+```bash
+pytest tests/ -k "spring or java_parser or code_analysis or modeling or graph or cross_file" -v --tb=short
+# 기대: 272 passed, 768 deselected, 0 failed
+```
+
+`test_lineage_validation::test_new_file_superseding_unknown` 은 Wiki 영역 선행 실패 (B6-4 무관) — 그대로 유지.
+
+### 3. 수동 확인 (선택)
+```python
+from backend.modeling.code_analysis.cross_file_enricher import enrich_repo, build_indices
+from backend.modeling.code_analysis.java_parser import JavaParser
+from pathlib import Path
+
+# 실제 Java 레포에서 BeanUtils/MapStruct/Native SQL 샘플 파싱 후
+parser = JavaParser()
+parse_results = [parser.parse(Path(f).read_text(), str(f)) for f in java_files]
+
+class_index, field_index = build_indices(parse_results)
+enriched = enrich_repo(parse_results, class_index, field_index)
+
+# 마지막 엔트리는 synthetic "<db_schema>" ParseResult
+db_schema_pr = enriched[-1]
+assert db_schema_pr.file_path == "<db_schema>"
+print("DB_TABLE count :", len([e for e in db_schema_pr.entities if e.kind == "db_table"]))
+print("DB_COLUMN count:", len([e for e in db_schema_pr.entities if e.kind == "db_column"]))
+
+# 각 원본 ParseResult 에 in-place 로 추가된 PROPAGATES_TO / READS / WRITES 엣지도 확인
+for pr in enriched[:-1]:
+    propagates = [r for r in pr.relations if r.kind == "propagates_to"]
+    reads = [r for r in pr.relations if r.kind == "reads"]
+    writes = [r for r in pr.relations if r.kind == "writes"]
+    print(pr.file_path, len(propagates), len(reads), len(writes))
+```
+
+### Troubleshooting
+
+| 증상 | 원인 | 조치 |
+|------|------|------|
+| `AttributeError: 'CodeEntity' object has no attribute ...` | frozen dataclass 에 직접 대입 시도 | `entity.attributes[key] = value` 로 `.attributes` dict 를 통해서만 수정. edge target 재작성은 `dataclasses.replace(rel, target=new)` |
+| `jpa_table` 이 `None` 으로 나옴 | `@Table` 어노테이션 없거나 `build_indices` 를 거치지 않은 class entity | `JpaAnnotationExtractor().merge_into(...)` 가 `enrich_repo` 내부 `build_indices` 에서 호출되는지 확인. `@Table` 이 없으면 `jpa_entity_name` 은 simple name fallback, `jpa_table=None` 상태 → JPQL target rewrite 가 skip 됨 |
+| JPQL edge target 이 rewrite 되지 않음 | `jpa_entity_name.lower()` 매칭 실패 | B6-3 엣지 target 이 lowercase 인지 (`"order"`), class_index 의 `jpa_entity_name` 이 맞게 채워졌는지 확인. `@Entity(name="Order")` 명시가 없으면 class simple name 사용 |
+| BeanUtils `beanutils_ambiguous_types` 만 남고 `PROPAGATES_TO` 엣지가 없음 | class_index 에서 simple name 후보가 2개 이상 | 정상. import 추가해 FQN 해소 가능하도록 유도하거나 B7 런타임 calibration 대기 |
+| Dynamic SQL (`<dynamic>`) 에 대해 DB_TABLE 이 생성됨 | B6-3 marker 가 `target != "<dynamic>"` 으로 들어옴 | B6-3 `NativeSqlAnalyzer` 의 dynamic 판정 로직 회귀 확인. 정상 동작 시 `_resolve_native_sql` 루프가 skip |
+
+---
+
+## D-OD-11-B7-0 : Reflection `arg_kind` 필드 확장
+
+### 목적
+B5-8 `ReflectionAnalyzer` marker 에 `arg_kind` taxonomy 를 추가해 B7-1 literal resolver / B7-2 runtime collector 가 3-tier routing 가능하도록 한다.
+
+### 범위
+- Marker schema 변경: `arg` 는 이제 항상 소스 텍스트. `<dynamic>` sentinel 제거.
+- 새 필드 `arg_kind` ∈ {`"literal"`, `"variable"`, `"concat"`, `"type"`, `"other"`}.
+
+### 자동 검증
+```bash
+cd /Users/donghae/workspace/ai/onTong
+.venv/bin/python -m pytest tests/test_spring_reflection_analyzer.py -v
+# 기대: 25 passed, 0 failed
+```
+
+### Python 사용 예
+```python
+from pathlib import Path
+from backend.modeling.code_analysis.java_parser import JavaParser
+from backend.modeling.code_analysis.spring import ReflectionAnalyzer
+
+parser = JavaParser(spring_analyzers=[ReflectionAnalyzer()])
+result = parser.parse_file(Path("Loader.java"), '''
+package com.x;
+public class Loader {
+    public void load(String suffix) throws Exception {
+        Class.forName("com.acme.Foo");         // literal
+        Class.forName(suffix);                  // variable
+        Class.forName("com.acme." + suffix);   // concat
+        ctx.getBean(Foo.class);                 // type
+        ctx.getBean(resolve());                 // other
+    }
+}
+''')
+method = next(
+    e for e in result.entities
+    if e.qualified_name == "com.x.Loader.load"
+)
+for call in method.attributes["reflection_calls"]:
+    print(call["api"], call["arg_kind"], "→", call["arg"])
+# Class.forName literal  → com.acme.Foo
+# Class.forName variable → suffix
+# Class.forName concat   → "com.acme." + suffix
+# getBean        type    → Foo
+# getBean        other   → resolve()
+```
+
+### Troubleshooting
+
+| 증상 | 원인 | 조치 |
+|------|------|------|
+| `KeyError: 'arg_kind'` (기존 코드) | pre-B7-0 marker 소비 코드 | B7-0 이후 모든 `reflection_calls` 엔트리에 `arg_kind` 포함. 소비자가 읽기 전에 `.get("arg_kind", "other")` 로 defensive read 권장 |
+| `arg_kind == "other"` 가 예상보다 많음 | method invocation / ternary / cast 등 non-trivial expression | 정상. B7-2 runtime collector 가 trace 로 보강 |
+| `concat` 인데 `"+"` 가 numeric add | Java `a + b` 의 타입 추론 없이 `+` 만 보면 concat 판정 | reflection 첫 인자 context 에서 numeric `+` 는 실질적으로 불가능. 발견 시 소스가 의심스러운 case — 수동 확인 |
+| `class_literal` 에서 `com.x.Foo.class` → `"com.x.Foo"` | scoped class literal 의 정상 동작 | 문제 아님. B7-1 resolver 가 FQN 으로 class_index lookup |
+| `<dynamic>` 문자열이 여전히 보임 | 캐시된 인덱스 / 이전 DB | 인덱스를 재생성 (`build_indices` 다시 호출) |
+
+---
+
+## D-OD-11-B7-1 : Reflection literal resolver
+
+### 목적
+B5-8/B7-0 가 남긴 `reflection_calls` marker 중 `arg_kind == "literal"` 케이스를 `class_index`·`bean_index` 로 정적 해소해 `CALLS{source:static_literal}` / `CALLS{source:static_unresolved}` 엣지를 emit.
+
+### 범위
+- `getBean("name")` → bean_index 매칭 → 성공 시 bean FQN 타깃, 실패 시 `<reflection-site>` sentinel.
+- `Class.forName("FQN")` → class_index 매칭 → 동일 규칙.
+- `getMethod`/`getField`/`Proxy.newProxyInstance` : 수신자 타입 추적이 필요 → B7-1 에서 skip.
+- `arg_kind != "literal"` (variable/concat/type/other) : B7-2 런타임 collector 대상 → skip.
+
+### 자동 검증
+```bash
+cd /Users/donghae/workspace/ai/onTong
+.venv/bin/python -m pytest tests/test_reflection_literal_resolver.py -v
+# 기대: 15 passed, 0 failed
+.venv/bin/python -m pytest tests/test_spring_di_analyzer.py tests/test_spring_reflection_analyzer.py tests/test_cross_file_enricher.py tests/test_reflection_literal_resolver.py -q
+# 기대: 73 passed, 0 failed
+```
+
+### Python 사용 예
+```python
+from pathlib import Path
+from backend.modeling.code_analysis.java_parser import JavaParser
+from backend.modeling.code_analysis.spring import DIAnalyzer, ReflectionAnalyzer
+from backend.modeling.code_analysis.reflection_literal_resolver import (
+    build_bean_index, resolve_reflection_literals,
+)
+from backend.modeling.code_analysis.cross_file_enricher import build_indices
+
+parser = JavaParser(spring_analyzers=[DIAnalyzer(), ReflectionAnalyzer()])
+prs = [
+    parser.parse_file(Path("FooShipper.java"), """
+        package com.acme;
+        @org.springframework.stereotype.Component("fooShipper")
+        public class FooShipper {}
+    """),
+    parser.parse_file(Path("Orders.java"), """
+        package com.x;
+        public class Orders {
+            public void dispatch() {
+                ctx.getBean("fooShipper");
+                Class.forName("com.acme.FooShipper");
+                Class.forName("invalid.Nope");
+            }
+        }
+    """),
+]
+
+class_index, _ = build_indices(prs)
+bean_index = build_bean_index(prs)
+resolve_reflection_literals(prs, class_index, bean_index)
+
+for pr in prs:
+    for r in pr.relations:
+        if r.kind == "calls":
+            print(r.source, "→", r.target, r.attributes["source"], r.attributes["confidence"])
+# com.x.Orders.dispatch → com.acme.FooShipper static_literal    0.9
+# com.x.Orders.dispatch → com.acme.FooShipper static_literal    0.9
+# com.x.Orders.dispatch → <reflection-site>    static_unresolved 0.4
+```
+
+### Troubleshooting
+
+| 증상 | 원인 | 조치 |
+|------|------|------|
+| 매칭되는 bean 이 있는데 `<reflection-site>` 로 떨어짐 | `SPRING_BEAN.attributes["bean_name"]` 가 누락 | DIAnalyzer 가 같은 파일을 파싱했는지 확인. `@Component` 이 아닌 class 는 SPRING_BEAN 이 아님 |
+| camelCase fallback 안 함 (`OrderService` → match 실패) | class simple name 의 첫 두 글자가 uppercase (예 `URLHandler` → `URLHandler` 유지) | Spring 의 `Introspector.decapitalize` 규칙. 의도된 동작 |
+| `Class.forName` 매칭 실패 | class_index 는 FQN key. `simple_name` 로 호출 시 miss | 소스에서 `Class.forName("com.acme.Foo")` 처럼 FQN 사용하도록 유도. simple name 해소는 deferred |
+| `getMethod("x")` 에 대해 엣지 없음 | B7-1 에서 deferred (receiver-type 추적 필요) | 의도된 skip. B7-2 런타임 trace 또는 future 서브스텝에서 처리 |
+| 엣지 `target == "<reflection-site>"` 가 그래프에 그대로 남음 | sentinel 은 생성 의도 | Impact Analysis 쿼리에서 `WHERE r.source IN ["static_literal"]` 로 필터하거나 `<reflection-site>` 노드 자체를 렌더링 단계에서 hide |
+
+
+---
+
+## D-OD-11-B7-2 — Runtime trace collector (`runtime_collector.py`)
+
+### 자동 테스트
+
+```bash
+# 14 케이스 유닛
+python -m pytest tests/test_runtime_collector.py -v
+
+# 통합 (B6-4 + B7 전체 + graph_writer + registry, 117 케이스)
+python -m pytest tests/test_runtime_collector.py tests/test_reflection_literal_resolver.py \
+  tests/test_spring_reflection_analyzer.py tests/test_cross_file_enricher.py \
+  tests/test_spring_di_analyzer.py tests/test_graph_writer_edges.py \
+  tests/test_code_analysis_registry.py
+
+# 모델링 스코프 회귀
+python -m pytest tests/ -k "spring or java_parser or code_analysis or modeling or graph or cross_file or reflection or runtime"
+```
+
+### 수동 확인 (JSON fixture → synthetic runtime ParseResult)
+
+```python
+import json, tempfile
+from pathlib import Path
+
+from backend.modeling.code_analysis.parser_protocol import (
+    CodeEntity, EntityKinds, ParseResult, RelationKinds,
+)
+from backend.modeling.code_analysis.runtime_collector import (
+    JsonFileCollector, merge_runtime_traces,
+)
+
+# (1) 파싱 결과 fixture — 실제로는 JavaParser 출력을 사용
+orders_cls = CodeEntity(
+    kind=EntityKinds.CLASS, qualified_name="com.x.Orders", name="Orders",
+    file_path="Orders.java", line_start=1, line_end=1,
+)
+dispatch_m = CodeEntity(
+    kind=EntityKinds.METHOD, qualified_name="com.x.Orders.dispatch", name="dispatch",
+    file_path="Orders.java", line_start=10, line_end=40,
+)
+foo_cls = CodeEntity(
+    kind=EntityKinds.CLASS, qualified_name="com.x.FooShipper", name="FooShipper",
+    file_path="FooShipper.java", line_start=1, line_end=1,
+)
+calc_m = CodeEntity(
+    kind=EntityKinds.METHOD, qualified_name="com.x.FooShipper.calc", name="calc",
+    file_path="FooShipper.java", line_start=5, line_end=15,
+)
+parse_results = [
+    ParseResult(entities=[orders_cls, dispatch_m], relations=[],
+                file_path="Orders.java", language="java"),
+    ParseResult(entities=[foo_cls, calc_m], relations=[],
+                file_path="FooShipper.java", language="java"),
+]
+class_index = {"com.x.Orders": orders_cls, "com.x.FooShipper": foo_cls}
+
+# (2) JVM Agent 출력 JSON (SPEC §6.2 스키마)
+payload = {
+    "version": "1.0",
+    "repo_id": "demo",
+    "reflection_traces": [
+        {
+            "method_fqn": "com.x.Orders.dispatch",
+            "api": "getBean",
+            "line": 15,
+            "resolved_target": "com.x.FooShipper",
+            "sample_count": 120,
+        },
+        {
+            "method_fqn": "com.x.Orders.dispatch",
+            "api": "getMethod",
+            "line": 20,
+            "resolved_target": "com.x.FooShipper.calc",
+            "sample_count": 120,
+        },
+    ],
+    "call_traces": [],
+}
+with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+    json.dump(payload, f)
+    trace_path = Path(f.name)
+
+# (3) collect + merge → synthetic ParseResult("<runtime>") 가 append 됨
+merged = merge_runtime_traces(parse_results, JsonFileCollector(trace_path), class_index)
+runtime_pr = next(pr for pr in merged if pr.file_path == "<runtime>")
+
+for r in runtime_pr.relations:
+    print(r.kind, r.source, "→", r.target, r.attributes)
+# 출력 예:
+#   calls         com.x.Orders.dispatch → com.x.FooShipper      {'source': 'runtime', 'confidence': 0.95, 'api': 'getBean', 'sample_count': 120}
+#   calls         com.x.Orders.dispatch → com.x.FooShipper      {'source': 'runtime', 'confidence': 0.95, 'api': 'getMethod', 'sample_count': 120}
+#   reflects_as   com.x.Orders.dispatch → com.x.FooShipper.calc {'source': 'runtime', 'confidence': 0.95, 'api': 'getMethod', 'sample_count': 120}
+```
+
+### Coexist 3-way 확인 (static_literal / static_unresolved / runtime)
+
+```python
+from backend.modeling.code_analysis.reflection_literal_resolver import (
+    build_bean_index, resolve_reflection_literals,
+)
+
+# B7-1 → static_literal 또는 static_unresolved 엣지 먼저 emit
+bean_index = build_bean_index(parse_results)
+resolve_reflection_literals(parse_results, class_index, bean_index)
+
+# B7-2 → runtime 엣지는 synthetic "<runtime>" PR 에 추가
+merge_runtime_traces(parse_results, JsonFileCollector(trace_path), class_index)
+
+# 쿼리 단에서 confidence threshold 로 3-way 분기
+all_edges = [r for pr in parse_results for r in pr.relations if r.kind == "calls"]
+safe = [e for e in all_edges if e.attributes.get("confidence", 0) >= 0.9]
+observed = [e for e in all_edges if e.attributes.get("source") in ("runtime", "static_literal")]
+all_potential = all_edges
+```
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| `ValueError: reflection_trace missing required field(s): resolved_target` | JVM Agent 출력 JSON 에서 필수 필드 누락 | B9 agent 출력 측 수정. `JsonFileCollector` 는 fail-fast 로 규격 이탈 즉시 차단 |
+| `<runtime>` ParseResult 에 엣지 0 개 | trace 의 `method_fqn` 이 parse_results 의 METHOD entity qualified_name 과 불일치 | B9 agent 가 emit 하는 FQN 포맷 확인. synthetic lambda / inner class 는 Java bytecode 명(`Outer$1`) vs 소스 명 차이 주의 |
+| `getMethod` trace 에 CALLS 엣지가 없음 | `resolved_target` 에 `.` 이 없어 class FQN 도출 불가 | malformed trace. 정상 JVM agent 출력은 반드시 class-prefixed FQN |
+| static_unresolved 엣지가 runtime 엣지로 덮여쓰임 | 덮어쓰기 발생하지 않아야 함 | 덮어쓰지 않는다 (Coexist 3-way). 둘 다 있으면 정상 — 쿼리 단 필터링 |
+| Impact Analysis 에 runtime 엣지가 안 잡힘 | BFS 가 `<runtime>` synthetic PR 을 무시 | Impact 쿼리가 모든 ParseResult 의 relations 를 로드하는지 확인. graph_writer 는 synthetic PR 도 동일 경로로 Neo4j 에 기록 |
+
+
+## D-OD-11-B8-0 — Query DTO + GraphView Protocol + InMemoryGraphView
+
+**목표** : B8 Impact 엔진의 기초 뼈대(DTO + 그래프 뷰 추상화) 검증. BFS 로직은 B8-1 이후.
+
+### 사전 준비
+
+```bash
+source venv/bin/activate
+python -m pytest tests/test_query_models.py tests/test_in_memory_graph_view.py -v
+```
+
+기대 결과 : `25 passed`.
+
+### 스모크 예시 — ParseResult → InMemoryGraphView → EdgeRow
+
+```python
+from backend.modeling.code_analysis.parser_protocol import (
+    CodeEntity, CodeRelation, EntityKinds, ParseResult, RelationKinds,
+)
+from backend.modeling.query.graph_view import InMemoryGraphView
+from backend.modeling.query.query_models import ImpactConfig, ImpactMode, ImpactQuery
+
+def _m(fqn): return CodeEntity(
+    kind=EntityKinds.METHOD, qualified_name=fqn, name=fqn.split(".")[-1],
+    file_path="X.java", line_start=1, line_end=1,
+)
+
+pr = ParseResult(
+    entities=[_m("com.acme.Service.run"), _m("com.acme.Repo.save"), _m("com.acme.Ctrl.post")],
+    relations=[
+        # static_literal : B7-1 리터럴 해소
+        CodeRelation(kind=RelationKinds.CALLS, source="com.acme.Service.run", target="com.acme.Repo.save",
+                     attributes={"source": "static_literal", "confidence": 0.9}),
+        # runtime : B7-2 트레이스
+        CodeRelation(kind=RelationKinds.CALLS, source="com.acme.Ctrl.post", target="com.acme.Service.run",
+                     attributes={"source": "runtime", "confidence": 0.95}),
+        # source 없음 → 일반 정적 엣지 (OBSERVED 기본 포함)
+        CodeRelation(kind=RelationKinds.CALLS, source="com.acme.Ctrl.post", target="com.acme.Repo.save"),
+    ],
+    file_path="Service.java", language="java",
+)
+
+view = InMemoryGraphView([pr])
+
+# 누가 Service.run 을 부르는가? (Impact 에서 쓸 역방향 조회)
+for edge in view.incoming("com.acme.Service.run"):
+    print(edge.source, edge.kind, edge.edge_source, edge.confidence)
+# → com.acme.Ctrl.post calls runtime 0.95
+
+# 엔티티 메타
+print(view.entity("com.acme.Repo.save"))
+# → EntityRow(qualified_name='com.acme.Repo.save', kind='method', attributes={})
+
+# ImpactConfig 기본값 확인
+cfg = ImpactConfig()
+print(cfg.observed_sources)
+# → frozenset({None, 'static_literal', 'runtime'}) — static_unresolved 제외
+```
+
+### 핵심 확인 포인트
+
+- `EdgeRow.edge_source` 가 `None` 으로도 남는다 (JavaParser 기본 엣지 보존)
+- `EdgeRow.confidence` 기본값 1.0 (source 없는 엣지는 정적 확정으로 간주)
+- `ImpactMode.OBSERVED` 필터 값 = `{None, static_literal, runtime}` → 일반 정적 엣지 + B7 해소 엣지 전부 포함, `static_unresolved` 만 제외
+- `ImpactQuery(target_fqn="...", direction="outgoing")` 로 정방향 지정 가능 (B8-3 Reverse Lookup 용)
+- `Protocol` 이 `@runtime_checkable` 이라 `isinstance(view, GraphView)` 가능
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| `ValueError: value is not a valid dict` on ImpactQuery | pydantic v2 strict 모드에서 잘못된 타입 | `mode=ImpactMode.SAFE` 인스턴스 전달 또는 문자열 `mode="safe"` |
+| `ValidationError: direction` | direction 에 `"both"` 같은 허용 외 리터럴 | B8 범위는 `"incoming"|"outgoing"` 만. 양방향은 B9+ |
+| `max_hops` ValidationError | `ge=1, le=20` 초과 | 20 초과 시 자율 축소로 의미 없음. 범위 내에서 재조정 |
+| `outgoing(fqn)` 가 빈 리스트 | `CodeRelation.source` 가 정확한 fqn 아님 | 상위 파서가 emit 한 FQN 포맷 확인 — dot-separated full package 경로 |
+| Protocol isinstance False | 다른 클래스에 `outgoing`/`incoming`/`entity` 시그니처 불일치 | 세 메서드 모두 필요. 반환 타입도 `list[EdgeRow]`/`EntityRow | None` 맞춰야 함 |
+
+
+## D-OD-11-B8-1 — `QueryEngine.impact` BFS 코어
+
+**목표** : 3-mode confidence filter + BFS 역방향 탐색 검증. auto-shrink 는 B8-2 에서.
+
+### 사전 준비
+
+```bash
+source venv/bin/activate
+python -m pytest tests/test_query_engine_impact.py -v
+```
+
+기대 결과 : `14 passed`.
+
+### 스모크 예시 — 3-mode 차이
+
+```python
+from backend.modeling.code_analysis.parser_protocol import (
+    CodeEntity, CodeRelation, EntityKinds, ParseResult, RelationKinds,
+)
+from backend.modeling.query.graph_view import InMemoryGraphView
+from backend.modeling.query.query_engine import QueryEngine
+from backend.modeling.query.query_models import ImpactMode, ImpactQuery
+
+def _m(fqn):
+    return CodeEntity(kind=EntityKinds.METHOD, qualified_name=fqn, name=fqn.split(".")[-1],
+                      file_path="X.java", line_start=1, line_end=1)
+
+pr = ParseResult(
+    entities=[_m("Target.run"), _m("ACaller.a"), _m("BCaller.b"), _m("CCaller.c")],
+    relations=[
+        # 정적 확정 (source 없음, confidence 1.0) → OBSERVED + SAFE 통과
+        CodeRelation(kind=RelationKinds.CALLS, source="ACaller.a", target="Target.run"),
+        # static_literal (B7-1) → SAFE 통과 (≥0.9), OBSERVED 통과
+        CodeRelation(kind=RelationKinds.CALLS, source="BCaller.b", target="Target.run",
+                     attributes={"source": "static_literal", "confidence": 0.9}),
+        # static_unresolved → SAFE/OBSERVED 모두 제외, POTENTIAL 만 포함
+        CodeRelation(kind=RelationKinds.CALLS, source="CCaller.c", target="Target.run",
+                     attributes={"source": "static_unresolved", "confidence": 0.4}),
+    ],
+    file_path="pr.java", language="java",
+)
+
+engine = QueryEngine(InMemoryGraphView([pr]))
+
+for mode in (ImpactMode.SAFE, ImpactMode.OBSERVED, ImpactMode.POTENTIAL):
+    q = ImpactQuery(target_fqn="Target.run", mode=mode, auto_hops=False)
+    r = engine.impact(q)
+    hits = sorted(a.qualified_name for a in r.affected)
+    print(f"{mode.value:10s} → {hits}")
+
+# SAFE       → ['ACaller.a', 'BCaller.b']
+# OBSERVED   → ['ACaller.a', 'BCaller.b']
+# POTENTIAL  → ['ACaller.a', 'BCaller.b', 'CCaller.c']
+```
+
+### 스모크 예시 — 경로 + 병목 confidence
+
+```python
+pr = ParseResult(
+    entities=[_m("A"), _m("B"), _m("C")],
+    relations=[
+        CodeRelation(kind=RelationKinds.CALLS, source="B", target="A",
+                     attributes={"source": "runtime", "confidence": 0.5}),   # 병목
+        CodeRelation(kind=RelationKinds.CALLS, source="C", target="B",
+                     attributes={"source": "runtime", "confidence": 0.95}),
+    ],
+    file_path="pr.java", language="java",
+)
+
+engine = QueryEngine(InMemoryGraphView([pr]))
+r = engine.impact(ImpactQuery(target_fqn="A", mode=ImpactMode.POTENTIAL,
+                              max_hops=3, auto_hops=False))
+for a in r.affected:
+    print(a.qualified_name, a.distance, a.confidence_min, a.path, a.reasons)
+
+# B 1 0.5  ['A', 'B'] ['calls (runtime)']
+# C 2 0.5  ['A', 'B', 'C'] ['calls (runtime)', 'calls (runtime)']
+# confidence_min 은 전 경로의 min → C 에도 0.5 가 누적
+```
+
+### 스모크 예시 — `<reflection-site>` 진단 질의
+
+```python
+# B7-1 이 해소 실패 시 emit 한 엣지
+pr = ParseResult(
+    entities=[_m("X.caller"), _m("Y.caller")],
+    relations=[
+        CodeRelation(kind=RelationKinds.CALLS, source="X.caller", target="<reflection-site>",
+                     attributes={"source": "static_unresolved", "confidence": 0.4}),
+        CodeRelation(kind=RelationKinds.CALLS, source="Y.caller", target="<reflection-site>",
+                     attributes={"source": "static_unresolved", "confidence": 0.4}),
+    ],
+    file_path="pr.java", language="java",
+)
+engine = QueryEngine(InMemoryGraphView([pr]))
+r = engine.impact(ImpactQuery(target_fqn="<reflection-site>", mode=ImpactMode.POTENTIAL))
+print(r.affected)            # []
+print(r.unresolved_sources)  # ['X.caller', 'Y.caller']
+print(r.message)             # '2 callers reached <reflection-site> (unresolved at static time)'
+```
+
+### 핵심 확인 포인트
+
+- `ImpactMode.SAFE` → `confidence >= cfg.safe_min_confidence` (기본 0.9). `static_unresolved` 제외.
+- `ImpactMode.OBSERVED` → `edge.edge_source in cfg.observed_sources` (기본 `{None, static_literal, runtime}`). source 없는 정적 엣지 포함.
+- `ImpactMode.POTENTIAL` → 전부. 진단·감사·리팩토링 계획 용도.
+- `direction="incoming"` 기본 → Impact Analysis. `direction="outgoing"` 은 B8-3 Reverse Lookup 에서 활용.
+- `edge_kinds` 지정 시 해당 relation 만, `entity_kinds` 기본은 `{method, constructor, http_endpoint, event_type, db_table, scheduled_task}` (class noise 제거).
+- `confidence_min` 은 경로 전 구간 min. 병목 엣지가 후단에 있어도 최소치 유지.
+- `auto_hops=False` 시 `max_hops` 까지 완주. `auto_hops=True` 는 B8-2 에서 축소 연동.
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| `affected=[]` + message "target not found" | 질의한 FQN 이 `graph.entity` 에 없음 | parser 가 emit 한 정확한 qualified_name 사용. Spring bean 은 클래스 FQN, method 는 `<class>.<method>` |
+| SAFE 결과가 OBSERVED 와 동일 | 엣지 confidence 가 전부 ≥0.9 | B7 이전 엣지는 source 없이 confidence 없음 → 기본 1.0. 실 데이터로 차이 보이려면 B7-1/B7-2 해소 실패 엣지 필요 |
+| OBSERVED 결과에 runtime 엣지 안 잡힘 | `attributes["source"]` 키가 다른 문자열 | 반드시 `"runtime"` / `"static_literal"` / `"static_unresolved"` 중 하나 |
+| `confidence_min` 이 1.0 으로만 찍힘 | 모든 엣지가 source 없음 → 기본 confidence 1.0 | B7 단계 엣지(0.9/0.4/0.95) 가 실제 들어가야 분산 |
+| `<reflection-site>` 질의 결과 빈 리스트만 | 엣지 `target="<reflection-site>"` emit 안 됨 | B7-1 `reflection_literal_resolver` 실행 여부 확인. `arg_kind=literal` 이면서 class/bean 매치 실패한 경우만 emit |
+
+---
+
+## D-OD-11-B8-2 — hops 자율 축소 + 타임아웃 + frontier 경고
+
+**대상**: 대규모 그래프에서 BFS 가 폭발적으로 커지는 상황을 안전하게 제한.
+
+### 시나리오 A — result_too_large 축소
+
+```python
+from backend.modeling.query.query_engine import QueryEngine
+from backend.modeling.query.query_models import ImpactConfig, ImpactMode, ImpactQuery
+
+# 가령 hop1 에 caller 300 명 + hop2 에 수천 명 → 2 hop 까지 가면 5000+ affected
+cfg = ImpactConfig(shrink_result_threshold=200)
+engine = QueryEngine(view, cfg)
+r = engine.impact(ImpactQuery(
+    target_fqn="com.acme.core.Service.run",
+    mode=ImpactMode.POTENTIAL,
+    max_hops=5,
+    auto_hops=True,
+))
+print(r.hops_used)              # 1 (hop2 는 처리 안 함)
+print(r.hops_shrunk_reason)     # 'result_too_large'
+print(len(r.affected))          # 300 — hop1 결과는 보존
+print(r.message)
+# '300 entity affected (hops=1) — auto-shrunk: result_too_large'
+```
+
+### 시나리오 B — timeout 축소
+
+```python
+# 실측에서 BFS 가 2s 를 넘으면 다음 hop 중단.
+cfg = ImpactConfig(timeout_seconds=2.0)
+engine = QueryEngine(view, cfg)
+r = engine.impact(ImpactQuery(target_fqn="...", mode=ImpactMode.POTENTIAL, auto_hops=True))
+if r.hops_shrunk_reason == "timeout":
+    # UI: "2 초를 초과해 {hops_used} hop 까지만 탐색했습니다. mode 를 safe 로 좁히세요."
+    ...
+```
+
+### 시나리오 C — frontier 경고 (탐색은 계속)
+
+```python
+import logging
+logging.basicConfig(level=logging.WARNING)
+
+cfg = ImpactConfig(frontier_warn_threshold=500)   # 500+ 탐색 노드 = 경고
+engine = QueryEngine(view, cfg)
+r = engine.impact(ImpactQuery(target_fqn="...", mode=ImpactMode.POTENTIAL, auto_hops=True))
+# WARNING:backend.modeling.query.query_engine:QueryEngine frontier size 780 exceeds warn threshold 500 at hop 2 (target=...)
+print(r.hops_shrunk_reason)     # None — 경고만, hops_used 는 max_hops 까지
+```
+
+### 시나리오 D — 감사 모드 (`auto_hops=False`)
+
+```python
+# 테스트·감사 시나리오: 모든 축소 휴리스틱 끄고 끝까지 탐색.
+r = engine.impact(ImpactQuery(target_fqn="...", mode=ImpactMode.POTENTIAL, auto_hops=False))
+assert r.hops_shrunk_reason is None
+# 단, frontier 경고 로그는 여전히 찍힘 (진단용).
+```
+
+### 핵심 확인 포인트
+
+- `hops_shrunk_reason` ∈ {None, "result_too_large", "timeout"}. `None` = 정상 종료 (max_hops 또는 frontier 소진).
+- 축소 시에도 `affected` / `unresolved_sources` 는 지금까지 수집한 값 보존 — 부분 결과 리턴.
+- `frontier_warn_threshold` 초과는 로그만 찍힘. `hops_shrunk_reason` 영향 없음. 사용자가 `max_hops` 를 낮추도록 유도.
+- `auto_hops=False` 는 result 축소/timeout 모두 비활성화. frontier 경고는 독립 동작.
+- 타임아웃은 **현재 hop 완료 후** 체크 — 중간 hop 결과가 반쪽으로 남지 않음.
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| `hops_shrunk_reason=None` 인데 결과가 적음 | max_hops 에 도달 또는 frontier 소진 | `max_hops` 를 늘리거나 `mode=POTENTIAL` 로 교체. `hops_used` 로 실제 진행 확인 |
+| 항상 `"result_too_large"` | `shrink_result_threshold` 가 너무 낮음 | `ImpactConfig(shrink_result_threshold=1000)` 등 상향. Slab 샘플 측정 후 튜닝 |
+| 축소 안 걸리고 끝까지 감 | `auto_hops=False` 로 호출 | 프로덕션 쿼리는 `auto_hops=True` 가 기본 — 테스트 fixture 에서만 off |
+| `timeout` 이 너무 자주 발생 | `timeout_seconds` 가 너무 짧거나 그래프 규모 큼 | `ImpactConfig(timeout_seconds=5.0)` 등 상향. B9 측정 후 기본값 재조정 |
+| frontier 경고 안 뜸 | 로그 레벨 미설정 | `logging.basicConfig(level=logging.WARNING)` 또는 `caplog.at_level(WARNING, "backend.modeling.query.query_engine")` |
+| 축소 순간 `affected` 가 비어 있음 | hop1 에서 이미 threshold 초과 + entity_kind 필터로 전부 제외 | 그래프/설정 확인. `entity_kinds=None` 일 때 default 6 kind 중 어느 것도 매치 못 하면 빈 결과 |
+
+---
+
+## D-OD-11-B8-3 — Reverse Lookup + direction-aware `<reflection-site>` 진단 (2026-04-19)
+
+**배경**: OD-11-B8-2 완료로 Impact 방향(incoming)은 완결. B8-3 에서 Reverse Lookup(outgoing)을 공용 BFS 에 얹고, `<reflection-site>` 직접 질의 시 direction 에 따라 진단 메시지가 분기되도록 확장.
+
+**SPEC**: `toClaude/modeling/OD-11-B8-SPEC.md` §2.2, §3.3, §5.2
+
+### 시나리오 A — Reverse Lookup 기본 outgoing 탐색
+
+```python
+from backend.modeling.query.graph_view import InMemoryGraphView
+from backend.modeling.query.query_engine import QueryEngine
+
+engine = QueryEngine(InMemoryGraphView(parse_results))
+result = engine.reverse_lookup("com.example.OrderService.placeOrder", max_hops=3)
+
+# "placeOrder 가 호출하거나 접근하는 엔티티는?"
+print(result.affected)          # method/field/table 등 outgoing 방향 도달
+print(result.hops_used)         # 실제 탐색한 hop 수
+print(result.hops_shrunk_reason) # auto_hops 축소 사유 (기본 자동)
+```
+
+**기대 동작**:
+- `ImpactQuery(direction="outgoing")` 로 `impact()` 위임 → shrink/timeout/frontier 경고 자동 적용
+- `entity_kinds=None` 이면 기본 6 종 (method/class/field/endpoint/dto/table) 필터링
+- `unresolved_sources` 는 outgoing 경로에서 만난 `<reflection-site>` 의 `source` (reflection 을 호출한 메서드)
+
+### 시나리오 B — Mid-traversal `<reflection-site>` 진단 수집
+
+```java
+// Spring @Controller 의 reflection 호출 예시
+public Object invoke(String beanName, String methodName) {
+    Object bean = ctx.getBean(beanName);
+    Method m = bean.getClass().getMethod(methodName);  // B7-1 이 정적 미해소로 수집
+    return m.invoke(bean);
+}
+```
+
+```python
+result = engine.reverse_lookup(
+    "com.example.InvokerService.invoke",
+    mode=ImpactMode.POTENTIAL,
+    max_hops=3,
+)
+
+# affected 에는 정상 메서드 호출만 (reflection-site 는 실제 엔티티 아님)
+assert "<reflection-site>" not in [a.qualified_name for a in result.affected]
+
+# unresolved_sources 에 reflection 을 부른 메서드(들)
+assert "com.example.InvokerService.invoke" in result.unresolved_sources
+print(result.message)
+# → "{N} entity affected (hops={H})" + reflection 이 유실된 경로 힌트
+```
+
+### 시나리오 C — `<reflection-site>` 직접 질의 direction 분기
+
+```python
+# outgoing → sentinel sink 진단 (유용한 결과 없음 + 방향 힌트)
+r_out = engine.impact(
+    ImpactQuery(target_fqn="<reflection-site>", direction="outgoing", auto_hops=False)
+)
+assert r_out.affected == []
+assert r_out.unresolved_sources == []
+assert "sentinel sink" in r_out.message
+# → "<reflection-site> is a sentinel sink with no outgoing edges;
+#    use direction='incoming' to list callers that reached it"
+
+# incoming → callers 덤프 (B8-1 기본 동작 보존)
+r_in = engine.impact(
+    ImpactQuery(target_fqn="<reflection-site>", direction="incoming", auto_hops=False)
+)
+assert r_in.unresolved_sources  # reflection 을 부른 모든 메서드
+# → "{N} callers reached <reflection-site> (unresolved at static time)"
+```
+
+### 시나리오 D — auto_hops=False 감사 모드
+
+```python
+# Slab sample 에서 정확히 몇 hop 에 몇 개 도달하는지 측정할 때.
+# shrink/timeout 꺼짐 → 끝까지 탐색. frontier 경고는 여전히 찍힘.
+result = engine.reverse_lookup("...", max_hops=10, auto_hops=False)
+assert result.hops_shrunk_reason is None
+```
+
+### 핵심 확인 포인트
+
+- `reverse_lookup(term)` 은 `impact(ImpactQuery(direction="outgoing"))` 과 정확히 동일. 결과가 어긋나면 버그.
+- outgoing 방향에서도 mid-traversal `<reflection-site>` 는 `unresolved_sources` 로 수집 후 skip — B7-1 이 정적 미해소 엣지를 양방향으로 만들 수 있음에 대한 방어.
+- `<reflection-site>` 직접 질의는 direction 으로 의미가 갈림: incoming=callers 덤프 / outgoing=sentinel sink 안내.
+- B8-3 스텁: `term` 은 FQN 직접 매칭. 비즈니스 용어 해소 (영문/한글 alias, 임베딩) 는 Phase C `term_resolver.py`.
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| `reverse_lookup("결제")` 빈 결과 | B8-3 은 FQN 직접 매칭 스텁. "결제" 는 비즈니스 용어 | Phase C `term_resolver` 배포 후 사용. 지금은 `com.example.PaymentService.pay` 같은 FQN 직접 전달 |
+| outgoing 결과에 `<reflection-site>` 가 섞임 | 구버전 캐시 — B8-3 이전엔 엔티티로 간주 | QueryEngine 재임포트. 재현되면 버그 리포트 |
+| `unresolved_sources` 에 나와야 할 caller 가 없음 | B7-1 이 해당 reflection 을 해소 성공했거나, edge 자체가 `<reflection-site>` 로 안 연결 | `mode=POTENTIAL` 확인 + B7-1 conservative reflection 재파싱 |
+| incoming 질의했는데 sentinel sink 메시지 나옴 | `ImpactQuery` 에 `direction="outgoing"` 이 박혀 있음 | `direction` 기본값은 `"incoming"`. 명시적으로 쓰면 제거 |
+| `hops_used=0` + "not found" | target_fqn 이 GraphView 에 없음 | `graph.entity(fqn)` 로 존재 확인. 타이핑 오류 또는 파서 누락 |
+
+---
+
+## D-OD-11-C2 — `mapping_models.py` Pydantic DTO (Round 2 concept-bridge)
+
+**대상**: `backend/modeling/mapping/mapping_models.py` — BusinessTerm/BusinessRule/ConceptBinding/ConceptBindingSet/ResolutionAuditLog Pydantic v2 DTO 레이어. Round 1 code schema 위에 얹는 Round 2 개념 브릿지 자료구조. `frozen=True` (불변) + `@model_validator` 로 primary 유일성 집합 단위 강제.
+
+### 시나리오 A — BusinessTerm 생성 + alias 중복 방어
+
+```python
+from datetime import datetime, timezone
+from backend.modeling.mapping import BusinessTerm, BusinessTermSource
+
+now = datetime.now(timezone.utc)
+
+t = BusinessTerm(
+    qualified_name="inventory.safety_stock",
+    canonical_label="안전재고",
+    aliases=["Safety Stock", "SS"],  # case-insensitive 유일성
+    domain="inventory",
+    description="재고 하한선",
+    source=BusinessTermSource.MANUAL,
+    confirmed=True,
+    created_at=now,
+)
+# → OK. model_dump_json() ↔ model_validate_json() round-trip 보존.
+```
+
+### 시나리오 B — ConceptBindingSet primary 유일성 invariant (Q3 B)
+
+```python
+from backend.modeling.mapping import (
+    BindingScope, BindingSource, ConceptBinding, ConceptBindingSet,
+)
+
+code = "com.acme.order.OrderService.place"
+s = ConceptBindingSet(bindings=[
+    ConceptBinding(
+        term_fqn="order.placement", code_fqn=code,
+        scope=BindingScope.PRIMARY, confidence=1.0,
+        source=BindingSource.MANUAL, confirmed=True,
+        confirmed_by="leader@acme", created_at=now,
+    ),
+    # partial 은 같은 code_fqn 에 N 개 허용
+    ConceptBinding(
+        term_fqn="credit.check", code_fqn=code,
+        scope=BindingScope.PARTIAL, confidence=0.88,
+        source=BindingSource.EMBEDDING, confirmed=True,
+        confirmed_by="leader@acme", created_at=now,
+    ),
+    ConceptBinding(
+        term_fqn="inventory.allocation", code_fqn=code,
+        scope=BindingScope.PARTIAL, confidence=0.82,
+        source=BindingSource.EMBEDDING, confirmed=True,
+        confirmed_by="leader@acme", created_at=now,
+    ),
+])
+# → OK. primary 1 + partial 2.
+```
+
+### 시나리오 C — primary 유일성 위반 → ValidationError
+
+```python
+from pydantic import ValidationError
+
+try:
+    ConceptBindingSet(bindings=[
+        ConceptBinding(
+            term_fqn="order.placement", code_fqn=code,
+            scope=BindingScope.PRIMARY, confidence=1.0,
+            source=BindingSource.MANUAL, confirmed=True,
+            confirmed_by="leader@acme", created_at=now,
+        ),
+        ConceptBinding(
+            term_fqn="credit.check", code_fqn=code,
+            scope=BindingScope.PRIMARY, confidence=0.9,  # 두 번째 primary → 거부
+            source=BindingSource.LLM, confirmed=False,
+            confirmed_by=None, created_at=now,
+        ),
+    ])
+except ValidationError as e:
+    assert "primary" in str(e).lower()
+    # → "primary uniqueness violated for code_fqn=...: already bound to 'order.placement'"
+```
+
+### 시나리오 D — JSON round-trip 이 invariant 보존
+
+```python
+raw = s.model_dump_json()
+restored = ConceptBindingSet.model_validate_json(raw)
+assert restored == s  # frozen DTO 는 equality 비교 가능
+```
+
+### 시나리오 E — ResolutionAuditLog MISS (resolved_term_fqn=None 허용)
+
+```python
+from backend.modeling.mapping import ResolutionAuditLog, ResolutionSource
+
+log = ResolutionAuditLog(
+    query_term="슬랩 폭 조정",
+    resolved_term_fqn=None,  # MISS 만 None 허용
+    resolution_source=ResolutionSource.MISS,
+    confidence=0.0,
+    confirmed=False,
+    timestamp=now,
+)
+```
+
+### 핵심 확인 포인트
+
+- **primary 1 + partial N** (Q3 B) : `ConceptBindingSet` 이 `code_fqn` 당 `primary` 최대 1 을 강제. 위반 시 `ValidationError`.
+- **(term_fqn, code_fqn) pair 유일** : 같은 pair 2번 (scope 무관) 거부. replace 의미는 삭제→재삽입으로 명시.
+- **alias case-insensitive 유일** : `"SS"` 와 `"ss"` 동시 등록 불가 (`@field_validator("aliases")`).
+- **confidence ∈ [0, 1]** : 양극 포함. 범위 밖 → `ValidationError`.
+- **frozen DTO** : mutation 시도 시 `ValidationError`. 변경은 `model_copy(update=...)` 로.
+- **BusinessRule.terms_ref=[]** : draft 단계 허용 — 참조 integrity 는 C3 resolver 책임.
+
+### 테스트 실행
+
+```bash
+./venv/bin/pytest tests/test_mapping_models.py -v
+# → 28 passed in 0.08s
+
+# 모델링 스코프 회귀
+./venv/bin/pytest tests/ -k "mapping_models or query_models or in_memory_graph_view or query_engine or code_analysis_registry or cross_file_enricher or graph_writer or java_parser or spring or reflection_literal or runtime_collector"
+# → 365 passed, 791 deselected, 1 warning in 3.57s
+```
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| `ValidationError: duplicate alias (case-insensitive): 'ss'` | `aliases=["SS", "ss"]` | 하나로 통일하거나 제거 |
+| `ValidationError: primary uniqueness violated for code_fqn=...` | 같은 `code_fqn` 에 PRIMARY 2개 | 하나만 PRIMARY, 나머지 `BindingScope.PARTIAL` |
+| `ValidationError: duplicate (term_fqn=..., code_fqn=...) binding` | 동일 pair 2번 등장 | 중복 제거. 업데이트는 기존 set 파기 후 재구성 |
+| `ValidationError: Input should be less than or equal to 1` | `confidence=1.5` 등 범위 밖 | `[0.0, 1.0]` 로 clamp |
+| `ValidationError: ... is not a valid ...Source/Scope/Severity` | enum 대신 오타 문자열 전달 | `BindingScope.PRIMARY` 처럼 enum 심볼 직접 사용 |
+| frozen instance mutate 시도 → `ValidationError` | `frozen=True` 정책 | `term.model_copy(update={"confirmed": True})` 로 새 객체 |
+| `resolved_term_fqn=None` 인데 `resolution_source=EXACT` | EXACT/ALIAS/EMBEDDING/LLM 은 matched 결과 전제 | `resolution_source=ResolutionSource.MISS` 로 변경 또는 실제 FQN 기입 |
+
+---
+
+## D-OD-11-C3 — `term_resolver.py` 4-stage Term Resolution Chain
+
+**대상**: `backend/modeling/query/term_resolver.py` — 사용자 쿼리 ("안전재고") → `BusinessTerm` FQN ("inventory.safety_stock") 매칭. 4-stage chain : exact → alias → embedding ≥ 0.78 → LLM ≥ 0.6 → MISS. `EmbeddingProvider` / `LLMResolver` Protocol 로 저장소 / LLM 추상화 — 테스트는 in-memory stub, 프로덕션은 OpenAI + chromadb (Q6 A).
+
+### 시나리오 A — 단일 용어 exact 매칭
+
+```python
+from datetime import datetime, timezone
+from backend.modeling.mapping import BusinessTerm, BusinessTermSource, ResolutionSource
+from backend.modeling.query.term_resolver import TermResolver
+
+now = datetime.now(timezone.utc)
+safety = BusinessTerm(
+    qualified_name="inventory.safety_stock",
+    canonical_label="안전재고",
+    aliases=["Safety Stock", "SS", "안전 재고"],
+    domain="inventory",
+    description="재고 하한선",
+    source=BusinessTermSource.MANUAL,
+    confirmed=True,
+    created_at=now,
+)
+
+resolver = TermResolver(terms=[safety])
+result = resolver.resolve("안전재고")
+
+assert result.matched_term_fqn == "inventory.safety_stock"
+assert result.resolution_source is ResolutionSource.EXACT
+assert result.confidence == 1.0
+assert result.confirmed is True  # exact/alias 만 즉시 confirmed
+```
+
+### 시나리오 B — alias + 공백·대소문자 정규화
+
+```python
+# "safety stock" (lowercase, with space) → "Safety Stock" alias 에 매칭
+r = resolver.resolve("safety stock")
+assert r.resolution_source is ResolutionSource.ALIAS
+# "ss" (lowercase) → "SS" alias 에 매칭
+assert resolver.resolve("ss").matched_term_fqn == "inventory.safety_stock"
+# "안전  재고" (중복 공백) → normalize 후 "안전재고" canonical 에 매칭
+assert resolver.resolve("안전  재고").resolution_source is ResolutionSource.EXACT
+```
+
+### 시나리오 C — embedding fallback (§8-2 "재고 부족 경고")
+
+```python
+from backend.modeling.query.term_resolver import (
+    InMemoryEmbeddingProvider, ResolutionCutoffs,
+)
+
+alert = BusinessTerm(
+    qualified_name="inventory.stock_alert", canonical_label="재고경고",
+    aliases=[], domain="inventory", description="재고 부족 경고",
+    embedding=[0.9, 0.4, 0.0],
+    source=BusinessTermSource.MANUAL, confirmed=True, created_at=now,
+)
+safety_emb = safety.model_copy(update={"embedding": [1.0, 0.0, 0.0]})
+
+def embed(text: str) -> list[float]:
+    table = {"재고 부족 경고": [0.9, 0.4, 0.0]}
+    return table.get(text, [0.0, 0.0, 1.0])
+
+provider = InMemoryEmbeddingProvider(
+    embeddings={
+        "inventory.safety_stock": safety_emb.embedding,
+        "inventory.stock_alert": alert.embedding,
+    },
+    embed_fn=embed,
+)
+resolver = TermResolver(terms=[safety_emb, alert], embedding_provider=provider)
+
+r = resolver.resolve("재고 부족 경고")
+assert r.resolution_source is ResolutionSource.EMBEDDING
+assert r.matched_term_fqn == "inventory.stock_alert"
+assert r.confirmed is False  # embedding 매칭 → 사람 승인 대기
+assert len(r.candidates) == 2  # top-K 후보 보존 (UI "근사 후보")
+```
+
+### 시나리오 D — embedding cutoff 미만 → MISS, candidates 보존
+
+```python
+def embed_weak(text: str) -> list[float]:
+    return [0.5, 0.5, 0.0]  # vs safety [1,0,0] cosine ~0.707 < 0.78
+
+provider2 = InMemoryEmbeddingProvider(
+    embeddings={"inventory.safety_stock": [1.0, 0.0, 0.0]},
+    embed_fn=embed_weak,
+)
+r = TermResolver(terms=[safety_emb], embedding_provider=provider2).resolve("애매")
+assert r.resolution_source is ResolutionSource.MISS
+assert r.matched_term_fqn is None
+assert len(r.candidates) == 1  # < cutoff 이지만 UI 참고용 후보
+```
+
+### 시나리오 E — LLM fallback (§8-3 "슬랩 폭 조정")
+
+```python
+from backend.modeling.query.term_resolver import LLMProposal
+
+class FakeLLM:
+    def propose(self, query, terms):
+        return LLMProposal(
+            term_fqn="inventory.safety_stock",
+            confidence=0.75,
+            reasoning="semantic overlap with 재고",
+        )
+
+resolver_llm = TermResolver(
+    terms=[safety_emb],
+    embedding_provider=provider2,  # embedding 미스
+    llm_resolver=FakeLLM(),
+)
+r = resolver_llm.resolve("슬랩 폭 조정")
+assert r.resolution_source is ResolutionSource.LLM
+assert r.confidence == 0.75
+assert r.confirmed is False  # LLM 제안도 사람 승인 필요
+```
+
+### 시나리오 F — `ResolutionAuditLog` 1회/쿼리, 원본 보존
+
+```python
+r = resolver.resolve("  안전 재고  ")  # 공백 많음
+assert r.audit_log.query_term == "  안전 재고  "  # normalize 전 보존
+assert r.audit_log.resolved_term_fqn == "inventory.safety_stock"
+assert r.audit_log.resolution_source is ResolutionSource.EXACT
+assert r.audit_log.confirmed is True
+```
+
+### 핵심 확인 포인트
+
+- **4단 우선순위** : exact → alias → embedding → LLM → MISS. 상위 단계 히트 시 하위 provider 호출 금지 (비용 절감).
+- **confirmed 정책** (§7-1 승인 큐) : exact/alias `True`, embedding/LLM `False`. C4 Reverse Lookup API 가 기본은 `confirmed=True` 만 사용, `include_unconfirmed=true` 로 확장.
+- **Normalization** : 공백 strip + casefold. "안전 재고" / "안전재고" / "SAFETY STOCK" / "  안전재고  " 한 키.
+- **Cutoff Q2 B** : embedding ≥ 0.78, LLM ≥ 0.6. `ResolutionCutoffs` 로 override 가능.
+- **LLM 환각 방어** : `LLMProposal.term_fqn` 이 등록된 terms 에 없으면 MISS.
+- **Candidates 는 미스 시에도 보존** — UI 에서 "이거 아니셨나요?" 후보 제시.
+
+### 테스트 실행
+
+```bash
+./venv/bin/pytest tests/test_term_resolver.py -v
+# → 35 passed in 0.09s
+
+# 모델링 스코프 회귀
+./venv/bin/pytest tests/ -k "term_resolver or mapping_models or query_models or in_memory_graph_view or query_engine or code_analysis_registry or cross_file_enricher or graph_writer or java_parser or spring or reflection_literal or runtime_collector"
+# → 400 passed, 791 deselected, 1 warning in 3.57s
+```
+
+### 프로덕션 provider 연결 (`OpenAIChromaProvider`)
+
+```python
+from openai import OpenAI
+import chromadb
+from backend.modeling.query.term_resolver import OpenAIChromaProvider, TermResolver
+
+client = OpenAI()  # OPENAI_API_KEY 환경변수
+chroma = chromadb.PersistentClient(path="./data/chroma").get_or_create_collection("business_terms")
+
+provider = OpenAIChromaProvider(openai_client=client, chroma_collection=chroma)
+# seed 단계에서 한 번 index
+for t in seed_terms:
+    provider.index(t)
+
+resolver = TermResolver(terms=seed_terms, embedding_provider=provider, llm_resolver=None)
+```
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| exact/alias 인데 `confirmed=False` | 다른 단계(embedding/LLM) 에서 히트했을 가능성 | `resolution_source` 확인. 진짜 canonical/alias 라면 normalize 후 키 일치 확인 |
+| `resolution_source=MISS` 인데 candidates 있음 | embedding top-1 이 cutoff(0.78) 미만 | cutoff 완화 또는 BusinessTerm 추가. UI 는 candidates 를 "이거 아니세요?" 로 제시 |
+| LLM 제안했는데 MISS | `proposal.term_fqn` 이 등록되지 않았거나, `confidence < 0.6` | LLM 프롬프트에 available_terms FQN 리스트 명시. 신규 term 제안은 별도 등록 플로우 (Q1 A manual seed) |
+| 같은 alias 인데 다른 term 으로 연결됨 | 두 BusinessTerm 이 동일 normalized alias 공유 | first-registered 가 이김. seed CLI 로 중복 감지 후 alias 재구성 |
+| embedding provider 호출 안 됨 | exact/alias 히트 → 짧은 회로 (의도된 동작) | 새 쿼리로 단계 확인 |
+| `top_k` 를 초과하는 candidates | provider 가 top_k 초과 반환 | `ResolutionCutoffs(top_k=5)` 로 증가, 또는 provider 구현 확인 |
+| `OpenAIChromaProvider` import 오류 | openai / chromadb 미설치 | `poetry install` 또는 해당 패키지 설치. 테스트는 `InMemoryEmbeddingProvider` 사용 |
+| 영벡터 임베딩 → 모든 similarity 0 | BusinessTerm.embedding 이 `[0,0,...]` | seed 단계에서 `provider.index(term)` 로 재계산. `embed_fn` 이 의미 있는 벡터 반환하는지 확인 |
+
+## D-OD-11-C4 — `reverse_lookup_api.py` REST + SSE (비즈니스 용어 → 코드 위치)
+
+**대상**: `backend/modeling/api/reverse_lookup_api.py` — C3 `TermResolver` 로 비즈니스 용어를 FQN 으로 해소 → C2 `ConceptBindingStore` 에서 REALIZES 바인딩 조회 → 요청마다 tiny `InMemoryGraphView` 합성 → B8-3 `QueryEngine.reverse_lookup(edge_kinds={REALIZES})` 로 BFS 위임. 옵션 `include_unconfirmed` (자동 제안 매핑 드러내기) + `scope_filter` (primary / partial / all) + 표준 `mode`/`max_hops`. 모든 쿼리(히트 / 미스 / 게이트)는 `AuditLogStore` 에 1건 append.
+
+### Endpoints
+
+```
+GET /api/modeling/reverse_lookup           → JSON ReverseLookupResponse
+GET /api/modeling/reverse_lookup/stream    → SSE (resolving → resolved → complete)
+```
+
+### Query options
+
+| 파라미터 | 기본값 | 의미 |
+|----------|--------|------|
+| `term` (required) | — | 비즈니스 용어 (정규화 전 원문) |
+| `mode` | `potential` | safe / observed / potential (엔진 ImpactMode) |
+| `max_hops` | 5 | BFS 최대 hop (1..20) |
+| `include_unconfirmed` | `false` | true 면 embedding/LLM 해소 + confirmed=False binding 도 포함 |
+| `scope_filter` | `all` | primary / partial / all (ConceptBinding.scope) |
+
+### 시나리오 A — exact 히트 (canonical label)
+
+```python
+# main.py startup 이 resolver+store 를 와이어링한 뒤
+# (InMemory 기본: BusinessTerm "inventory.safety_stock" 등 seed 후)
+# 브라우저/curl
+# GET /api/modeling/reverse_lookup?term=안전재고&scope_filter=primary
+{
+  "query_term": "안전재고",
+  "resolution": {
+    "matched_term_fqn": "inventory.safety_stock",
+    "resolution_source": "exact",
+    "confidence": 1.0,
+    "confirmed": true,
+    "candidates": [...]
+  },
+  "scope_filter": "primary",
+  "include_unconfirmed": false,
+  "impact": {
+    "target_fqn": "inventory.safety_stock",
+    "mode": "potential",
+    "max_hops_used": 5,
+    "affected": [
+      {"fqn": "com.example.inventory.SafetyStockService.calc", "hops": 1, "kind": "method"}
+    ],
+    "unresolved_sources": [],
+    "messages": []
+  }
+}
+```
+
+### 시나리오 B — alias 히트 + `scope_filter=all`
+
+```bash
+curl "http://localhost:8000/api/modeling/reverse_lookup?term=Safety%20Stock&scope_filter=all"
+# resolution.resolution_source == "alias", confidence=1.0, confirmed=true
+# impact.affected 에 primary + partial bindings 전부 포함
+```
+
+### 시나리오 C — embedding 매칭 숨김/드러내기 (`include_unconfirmed`)
+
+```bash
+# 기본 (false) → confirmed=False resolution 은 impact=None
+curl "http://localhost:8000/api/modeling/reverse_lookup?term=재고%20부족%20경고"
+# → resolution.resolution_source=="embedding", confirmed=false
+# → impact is null (승인 전 매칭 차단)
+
+# 드러내기
+curl "http://localhost:8000/api/modeling/reverse_lookup?term=재고%20부족%20경고&include_unconfirmed=true"
+# → impact 정상 반환, affected + confidence 포함
+```
+
+### 시나리오 D — scope_filter 차등 (`primary` vs `partial` vs `all`)
+
+```bash
+# primary 만 (동일 code_fqn 에 PRIMARY 는 유일)
+curl "http://localhost:8000/api/modeling/reverse_lookup?term=안전재고&scope_filter=primary"
+# → affected 는 PRIMARY binding 으로 연결된 메서드만
+
+# partial
+curl "http://localhost:8000/api/modeling/reverse_lookup?term=안전재고&scope_filter=partial"
+# → affected 는 PARTIAL binding 경유 메서드만
+
+# all (기본)
+curl "http://localhost:8000/api/modeling/reverse_lookup?term=안전재고"
+# → primary + partial 양쪽 합집합
+```
+
+### 시나리오 E — SAFE 모드 (confidence ≥ 0.9 컷오프)
+
+```bash
+curl "http://localhost:8000/api/modeling/reverse_lookup?term=안전재고&mode=safe"
+# 엔진 safe_min_confidence=0.9. binding.confidence < 0.9 인 엣지는 BFS drop.
+# → affected 에 수동 (confidence=1.0) 과 강한 name_match 만 남음
+```
+
+### 시나리오 F — SSE 이벤트 시퀀스
+
+```bash
+curl -N "http://localhost:8000/api/modeling/reverse_lookup/stream?term=안전재고"
+# event: resolving
+# data: {"query_term": "안전재고"}
+#
+# event: resolved
+# data: {"query_term": "안전재고", "matched_term_fqn": "inventory.safety_stock",
+#        "resolution_source": "exact", "confidence": 1.0, "confirmed": true}
+#
+# event: complete
+# data: {<entire ReverseLookupResponse JSON>}
+```
+
+미스 시나리오는 `resolving → resolved (matched_term_fqn=null) → complete (impact=null)` 순.
+
+### 시나리오 G — 감사 로그 확인
+
+```python
+# 테스트 코드 예시
+from backend.modeling.api import reverse_lookup_api
+# ... init with InMemoryAuditLogStore ...
+client.get("/api/modeling/reverse_lookup?term=안전재고")
+client.get("/api/modeling/reverse_lookup?term=없는용어")
+audit_store = reverse_lookup_api._audit_store
+recent = audit_store.recent(limit=10)
+assert len(recent) == 2
+assert recent[0].resolution_source.value == "exact"
+assert recent[1].resolution_source.value == "miss"
+assert recent[1].resolved_term_fqn is None
+```
+
+### 핵심 확인 포인트
+
+- **Gate 2-stage** : ① `matched_term_fqn is None` → impact=None ② `resolution.confirmed=False + include_unconfirmed=False` → impact=None. 두 gate 모두 **audit 는 먼저** append.
+- **Binding 필터는 engine 전에 수행** : `binding_store.list_by_term(fqn, scope_filter)` + `if not include_unconfirmed: [b for b in bindings if b.confirmed]`. engine 은 필터된 binding 으로 tiny view 를 받고 BFS.
+- **Tiny InMemoryGraphView 합성** : term 은 `business_term` 엔티티, code 는 `method` 엔티티, edge 는 `realizes` + `attributes={source, confidence, scope, confirmed}`. mode (SAFE/POTENTIAL/OBSERVED) 필터가 attributes 위에서 동작.
+- **기본 mode=potential** : binding.source 값이 parser observed_sources 도메인과 불일치하므로 OBSERVED 는 항상 drop. POTENTIAL 이 UX 직관.
+- **edge_kinds={REALIZES} 고정** (이번 스텝) : VALIDATES / DERIVED_FROM 은 Phase D 에서 파라미터화.
+
+### 테스트 실행
+
+```bash
+./venv/bin/pytest tests/test_reverse_lookup_api.py -v
+# → 22 passed in 0.33s
+
+# 모델링 스코프 회귀
+./venv/bin/pytest tests/ -k "reverse_lookup_api or term_resolver or mapping_models or query_models or in_memory_graph_view or query_engine or code_analysis_registry or cross_file_enricher or graph_writer or java_parser or spring or reflection_literal or runtime_collector"
+# → 422 passed, 791 deselected, 1 warning in 1.07s
+
+# 앱 로드 확인 (route 수)
+./venv/bin/python -c "from backend.main import app; print(len(app.routes))"
+# → 147 (이전 145 + 새 /api/modeling/reverse_lookup + /api/modeling/reverse_lookup/stream)
+```
+
+### 환경변수 — 프로덕션 embedding provider
+
+```bash
+# 기본 (환경변수 없음) → InMemoryEmbeddingProvider (embeddings={}, embed_fn=lambda _: [])
+# → embedding 단계는 항상 MISS, exact/alias 만 히트
+uvicorn backend.main:app
+
+# OpenAI + chromadb 사용
+export ONTONG_EMBEDDING=openai
+export OPENAI_API_KEY=sk-...
+uvicorn backend.main:app
+# → main.py 가 chroma._client 에서 "modeling_terms" collection 생성 후
+#   OpenAIChromaProvider(openai, coll) 로 resolver 구성
+```
+
+Fallback : 환경변수가 openai 지만 key/chroma 준비 안 된 경우 warning 로그 + InMemoryEmbeddingProvider 로 자동 전환.
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| 503 `reverse_lookup_api not initialized` | startup 이전에 호출되었거나 `init()` 누락 | `backend/main.py` lifespan 에서 `reverse_lookup_api.init(resolver=..., binding_store=..., audit_store=...)` 호출 확인 |
+| 422 `term` query 필수 | `term` 파라미터 누락 | `?term=안전재고` 형태로 비어있지 않은 문자열 필수 |
+| 422 `scope_filter` | 오탈자 (예: `primaryy`) | `primary` / `partial` / `all` 중 하나 |
+| `impact == null` 인데 resolution 은 히트 | resolution.confirmed=False (embedding/LLM) + `include_unconfirmed=False` | `&include_unconfirmed=true` 추가, 또는 사람 승인으로 BusinessTerm 에 alias 등록해 EXACT/ALIAS 로 승격 |
+| `affected` 가 비어 있음 | binding 없음 혹은 mode SAFE 가 low-confidence drop | `scope_filter=all&include_unconfirmed=true` 로 확인, SAFE 라면 POTENTIAL 로 바꿔서 디버그 |
+| `resolution.confirmed=true` 인데 `impact=null` | binding_store 가 term_fqn 에 대한 binding 0건 반환 | ConceptBinding seed 확인. InMemoryConceptBindingStore 재시작 시 휘발 |
+| SSE 이벤트 수신 불가 | 프록시 (nginx 등) 가 stream 버퍼링 | `proxy_buffering off` 또는 직접 `curl -N` 으로 확인 |
+| 같은 쿼리인데 audit 에 여러 건 쌓임 | 히트/미스 관계없이 쿼리마다 1건 append (설계 의도) | `audit_store.recent(limit=...)` 로 확인. Neo4j 전환 후 `GET /api/modeling/audit` 노출 예정 |
+| SAFE 모드에서 예상보다 많이 drop | engine `safe_min_confidence=0.9` | 사용자 설정 `ImpactConfig(safe_min_confidence=0.85)` 로 완화 |
+| `matched_term_fqn` 은 있는데 `confirmed=false` | embedding/LLM 해소 (승인 대기 큐 대상) | `include_unconfirmed=true` 로 확인, 승인 후 BusinessTerm alias/canonical 로 등록 |
+
+
+## D-OD-11-D1 — Round 3 HTML rev.2 (2026-04-20)
+
+**대상**: `toClaude/modeling/round3-manual-gap.html` — Round 3 "기준서 × 조직 + 갭 탐지" 설계 문서 (Q1~Q9 사용자 합의 반영, rev.2). HTML 열람만. 코드 산출물 없음 (DTO/파이프라인은 D1.5 이후).
+
+### 시연 시나리오
+
+**목표**: 팀원/리뷰어가 Round 3 의 스키마 (노드 5종 + 엣지 6종) / 갭 탐지 로직 / 인제스트 파이프라인 / 운영 알림 흐름을 1페이지 HTML 에서 즉시 이해.
+
+1. 브라우저로 `toClaude/modeling/round3-manual-gap.html` 열기 (더블클릭 or `open` 명령).
+2. 헤더 callout 의 "rev.2 — Q1~Q9 합의 반영" 블록에서 핵심 결정 9개 한눈에 확인 (Q1=C / Q2=A / Q3=C / Q4=C+A / Q5=A / Q6=A / Q7=E / Q8=B / Q9=D).
+3. TOC 의 목차 10개 섹션 중 관심 영역 점프 :
+   - §2 노드 5종 (BusinessProcess / Role team-only / ManualDocument / Section / Fragment) — 필드 정의 직접 보기.
+   - §3 엣지 6종 (PART_OF / RESPONSIBLE_FOR / DESCRIBED_IN / CONFLICTS_WITH / MISSING_IN / PARENT_PROCESS) — 테이블.
+   - §4 4-Layer 아키텍처 SVG (Code × Concept × Manual × Organization).
+   - §5 워크스텝 7단 "안전재고 변경 → 누구에게 알리나" — 실제 흐름 확인.
+   - §7 Gap Detection 3 케이스 + Cypher 예시 + `gap_mode` 모드 전환 섹션.
+   - §9 Q1~Q9 결정 블록 — 추천 옆에 ✅ 결정 박스로 반영 내용 명시.
+4. §10 Next Steps 에서 D1.5 → D1.6 → D2 → D3 → D4 → Phase E 진행 순서 확인.
+
+### 검증 포인트 (시연 Q&A 대응)
+
+| 질문 | 답변 위치 |
+|------|-----------|
+| "계층 프로세스는 어떻게 표현?" | §2-1 계층 관계 필드 설명 + §3 PARENT_PROCESS 엣지 행. Q1=C 결정 박스. |
+| "책임자가 개인이면?" | §2-2 Role 섹션 + Q2=A 결정 박스 ("team 단위 고정, title/person 은 Phase E+ 확장"). |
+| "Section 말고 Fragment 에도 DESCRIBED_IN 걸 수 있나?" | §3 DESCRIBED_IN 행 + §2-5 Fragment 의 callout + Q3=C 결정. |
+| "Gap 탐지에 LLM 만 쓰고 싶으면?" | §7-3 모드 전환 섹션 : `gap_mode=llm_only` 파라미터 (Q4=C+A 결정). |
+| "conflict severity 는 누가 정함?" | §7-3 엣지 속성 + §9 Q5=A 결정 박스 (LLM 제안 + 사람 승인 큐). |
+| "기준서 업로드 방법?" | §6-2 트리거 3종 (UI + watch folder + git hook) + Q7=E 결정. |
+| "PDF/Word 지원?" | §6 Ingest 카드 + Q9=D 결정 (pypdf + pdfplumber + python-docx + OCR 이미지). |
+| "여러 문서가 같은 Term 설명?" | §2-3 ManualDocument `authoritative` 필드 + Q8=B 결정. |
+
+### 다음 시연 (D1.5 이후 예정)
+
+- **D1.5 시연** : `python -c "from backend.modeling.mapping import BusinessProcess, Role; ..."` 로 DTO 인스턴스 생성 + 유효성 에러 케이스 (PARENT_PROCESS 자기 참조 / Role kind != "team").
+- **D2 시연** : 테스트 PDF/PPT/MD 1개씩 업로드 → `ManualDocument` + `ManualSection` + `ManualFragment` 생성 결과 확인 + watch folder 에 파일 drop → 5분 후 자동 인입 확인.
+- **D3 시연** : 실제 SafetyStockService 예제 + SOP-안전재고.pdf 를 로드 → Gap Detector 실행 (hierarchical 모드) → CONFLICTS_WITH 1건 생성 + LLM 모드로 재실행해 차이 확인.
+- **D4 시연** : Frontend 승인 큐 UI 에서 severity 조정 + confirm 버튼 → `CONFLICTS_WITH.confirmed=true` 반영.
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| HTML SVG 4-Layer 다이어그램 겹침 | 작은 화면 (&lt;800px) 에서 viewBox 리플로우 | 브라우저 확대/축소 조정, 또는 저장본을 PDF 로 export |
+| "rev.1 draft" 가 남아있음 | 캐시된 이전 파일 | 브라우저 하드 리프레시 (Cmd+Shift+R), 파일 SHA 로 rev.2 확인 (`shasum round3-manual-gap.html`) |
+| Q1~Q9 결정 박스가 추천 박스와 색상 구분 안 됨 | CSS `.decision` 미로드 (오래된 파일) | 파일 재열기 |
+| §10 의 RelationKinds 가 5종 | rev.1 잔재 | rev.2 에서 6종 (PARENT_PROCESS 추가). 파일 재열기 필요 |
+
+## D-OD-11-D1.5 — Round 3 DTO 확장 (2026-04-20)
+
+HTML 확정본을 Pydantic v2 타입 레이어로 구체화. Phase D 의 모든 후속 코드가 이 13개 DTO 위에 세워진다.
+
+### 시연 시나리오
+
+```bash
+# 1. 단위 테스트 전체 Green
+source .venv/bin/activate
+python -m pytest tests/test_manual_models.py tests/test_mapping_models.py -v | tail -40
+
+# 2. 모델링 회귀
+python -m pytest tests/ -k "mapping_models or manual_models or concept_store or term_resolver or reverse_lookup or audit_store or ontology or modeling" -q | tail -10
+
+# 3. DTO 인스턴스 REPL 체크 — BusinessProcess (parent 필드 없음)
+python -c "
+from datetime import datetime, timezone
+from backend.modeling.mapping import BusinessProcess
+
+p = BusinessProcess(
+    qualified_name='proc.inventory.safety_stock_management',
+    canonical_label='안전재고 관리',
+    created_at=datetime.now(timezone.utc),
+)
+print('OK:', p.qualified_name, '|', p.canonical_label)
+assert not hasattr(p, 'parent_process_fqn')  # Q1=C : parent 필드 없음
+print('confirmed: BusinessProcess has no parent field (Q1=C)')
+"
+
+# 4. Role 팀-전용 강제 (Q2=A)
+python -c "
+from datetime import datetime, timezone
+from backend.modeling.mapping import Role
+
+try:
+    Role(
+        qualified_name='person.hong',   # team. 로 시작 안 함
+        canonical_label='홍길동',
+        created_at=datetime.now(timezone.utc),
+    )
+    print('FAIL: should have raised ValidationError')
+except Exception as e:
+    print('OK: Role rejected person.*, accepts only team.* (Q2=A)')
+"
+
+# 5. ParentProcessBinding 자기 참조 / 사이클 거부
+python -c "
+from datetime import datetime, timezone
+from backend.modeling.mapping import ParentProcessBinding, ParentProcessBindingSet
+
+now = datetime.now(timezone.utc)
+# 자기 참조 거부
+try:
+    ParentProcessBinding(parent_fqn='proc.a', child_fqn='proc.a', created_at=now)
+    print('FAIL self-ref')
+except Exception:
+    print('OK: self-reference rejected')
+
+# 간접 사이클 A→B→C→A 거부
+try:
+    ParentProcessBindingSet(bindings=[
+        ParentProcessBinding(parent_fqn='proc.A', child_fqn='proc.B', created_at=now),
+        ParentProcessBinding(parent_fqn='proc.B', child_fqn='proc.C', created_at=now),
+        ParentProcessBinding(parent_fqn='proc.C', child_fqn='proc.A', created_at=now),
+    ])
+    print('FAIL cycle')
+except Exception as e:
+    print('OK: cycle detected (three-color DFS):', str(e).split()[-1][:30])
+"
+
+# 6. Gap 모드 전환 (Q4=C+A) 확인
+python -c "
+from datetime import datetime, timezone
+from backend.modeling.manuals import ConflictBinding, GapSeverity, GapDetectedBy, GapMode
+
+now = datetime.now(timezone.utc)
+# hierarchical 모드
+c1 = ConflictBinding(
+    code_fqn='com.acme.X.compute', manual_section_fqn='manual.x#3.2',
+    severity=GapSeverity.HARD, detected_by=GapDetectedBy.HIERARCHICAL,
+    gap_mode=GapMode.HIERARCHICAL, description='...', confidence=0.8, created_at=now,
+)
+# llm_only 모드 (Q4=A 경로)
+c2 = ConflictBinding(
+    code_fqn='com.acme.X.compute', manual_section_fqn='manual.x#3.2',
+    severity=GapSeverity.SOFT, detected_by=GapDetectedBy.LLM_ONLY,
+    gap_mode=GapMode.LLM_ONLY, description='...', confidence=0.7, created_at=now,
+)
+print('OK: gap_mode =', c1.gap_mode.value, '|', c2.gap_mode.value)
+"
+```
+
+### 검증 포인트
+
+| 점검 항목 | 기대 결과 | 확인 방법 |
+|-----------|-----------|-----------|
+| 104 단위 PASS | `104 passed in 0.07s` | pytest 출력 마지막 줄 |
+| 246 모델링 회귀 PASS | `246 passed, 1043 deselected` | pytest -k 출력 |
+| BusinessProcess parent 필드 없음 (Q1=C) | `hasattr(p, 'parent_process_fqn') == False` | REPL assert |
+| Role team-only (Q2=A) | `person.*` / `title.*` ValidationError | REPL try/except |
+| PARENT_PROCESS self-ref 거부 | ValidationError | REPL try/except |
+| 사이클 거부 (A→B→C→A) | ValidationError("cycle detected") | REPL try/except |
+| ManualDocument authoritative=False 기본 (Q8=B) | `doc.authoritative is False` | REPL assert |
+| gap_mode 두 모드 수용 (Q4=C+A) | hierarchical / llm_only 모두 정상 | REPL 인스턴스화 |
+
+### 다음 시연 (D1.6 이후)
+
+- **D1.6** : `parser_protocol.py` EntityKinds/RelationKinds 확장 후 `EntityKinds.BUSINESS_PROCESS` 등 참조해 `EntityKindRegistry.get()` 성공 확인.
+- **D2** : 샘플 PDF/PPTX/DOCX 하나씩 업로드 → `ManualDocument` + `ManualSection` + `ManualFragment` 실제 생성 확인 + authoritative 승급 체크.
+- **D3** : 샘플 코드×기준서 → Gap Detector 실행 (hierarchical) → CONFLICTS_WITH 생성 + llm_only 재실행 대비.
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| `ModuleNotFoundError: backend.modeling.manuals` | `backend/modeling/manuals/__init__.py` 누락 | 재-export 파일 생성 확인 |
+| `ImportError: cannot import name 'BusinessProcess'` | `mapping/__init__.py` 재-export 미갱신 | `__all__` 에 신규 심볼 18종 포함 확인 |
+| 사이클 탐지가 false negative | DFS 방문 상태 잘못 초기화 | `_has_parent_process_cycle` WHITE 초기화 확인 (`dict.fromkeys`) |
+| Role 인스턴스화 시 ValidationError 불참 | `team.` 접두어 누락 | qualified_name 은 반드시 `team.{slug}` 형식 (Q2=A) |
+| `pydantic_core._pydantic_core.ValidationError: 1 validation error ... team-only per Q2=A` | 정상. Role 이 팀이 아닌 FQN 거부 | 메시지 확인 후 qualified_name 을 `team.*` 로 수정 |
+
+---
+
+## D-OD-11-D1.6 : parser_protocol Round 3 EntityKinds/RelationKinds 확장 검증 (2026-04-20)
+
+**목적**: D1.5 에서 만든 13 DTO 중 그래프 기록 대상인 5 엔티티 + 6 관계가 `parser_protocol.py` 레지스트리에 category="concept" 로 실제 등록됐는지, `EntityKinds`/`RelationKinds` 편의 상수로 접근 가능한지 REPL 에서 확인한다.
+
+### 시연 시나리오 1 — Entity 레지스트리 등록 확인
+
+```bash
+source .venv/bin/activate
+python - <<'PY'
+from backend.modeling.code_analysis.parser_protocol import EntityKindRegistry, EntityKinds
+
+# Round 3 신규 5종
+for kind_str in [
+    EntityKinds.BUSINESS_PROCESS,
+    EntityKinds.ROLE,
+    EntityKinds.MANUAL_DOCUMENT,
+    EntityKinds.MANUAL_SECTION,
+    EntityKinds.MANUAL_FRAGMENT,
+]:
+    spec = EntityKindRegistry.get(kind_str)
+    assert spec is not None
+    assert spec.category == "concept"
+    print(f"  {kind_str:<20} category={spec.category}  desc={spec.description[:40]}...")
+
+# concept 카테고리 누적
+concept_entities = set(EntityKindRegistry.of_category("concept"))
+print(f"\nconcept entities total = {len(concept_entities)}: {sorted(concept_entities)}")
+# Round 2 (2) + Round 3 (5) = 7 이상
+assert concept_entities >= {
+    "business_term", "business_rule",
+    "business_process", "role",
+    "manual_document", "manual_section", "manual_fragment",
+}
+print("OK — entity 등록 검증 통과")
+PY
+```
+
+**기대 출력** : 5종 각각 category="concept" 출력, concept 카테고리에 7종 이상 포함, "OK" 마지막 라인.
+
+---
+
+### 시연 시나리오 2 — Relation 레지스트리 등록 확인
+
+```bash
+python - <<'PY'
+from backend.modeling.code_analysis.parser_protocol import RelationKindRegistry, RelationKinds
+
+# Round 3 신규 6종
+for kind_str in [
+    RelationKinds.PART_OF,
+    RelationKinds.RESPONSIBLE_FOR,
+    RelationKinds.PARENT_PROCESS,
+    RelationKinds.DESCRIBED_IN,
+    RelationKinds.CONFLICTS_WITH,
+    RelationKinds.MISSING_IN,
+]:
+    spec = RelationKindRegistry.get(kind_str)
+    assert spec is not None
+    assert spec.category == "concept"
+    print(f"  {kind_str:<18} category={spec.category}")
+
+# concept 카테고리 누적
+concept_relations = set(RelationKindRegistry.of_category("concept"))
+print(f"\nconcept relations total = {len(concept_relations)}: {sorted(concept_relations)}")
+assert concept_relations >= {
+    "realizes", "validates", "derived_from",
+    "part_of", "responsible_for", "parent_process",
+    "described_in", "conflicts_with", "missing_in",
+}
+print("OK — relation 등록 검증 통과")
+PY
+```
+
+**기대 출력** : 6종 각각 category="concept" 출력, concept 카테고리에 9종 이상 포함, "OK" 마지막 라인.
+
+---
+
+### 시연 시나리오 3 — CodeEntity / CodeRelation 인스턴스화 (Phase D kinds)
+
+```bash
+python - <<'PY'
+from backend.modeling.code_analysis.parser_protocol import (
+    CodeEntity, CodeRelation, EntityKinds, RelationKinds,
+)
+
+# 5 entity 인스턴스화
+bp = CodeEntity(
+    kind=EntityKinds.BUSINESS_PROCESS,
+    qualified_name="proc.inventory.safety_stock_management",
+    name="safety_stock_management",
+    file_path="<concept>",
+    line_start=0, line_end=0,
+)
+role = CodeEntity(
+    kind=EntityKinds.ROLE,
+    qualified_name="team.inventory_mgmt",
+    name="inventory_mgmt",
+    file_path="<concept>",
+    line_start=0, line_end=0,
+)
+doc = CodeEntity(
+    kind=EntityKinds.MANUAL_DOCUMENT,
+    qualified_name="manual.inventory.safety_stock_policy",
+    name="safety_stock_policy",
+    file_path="/manuals/inventory/safety_stock_policy.md",
+    line_start=0, line_end=0,
+)
+sec = CodeEntity(
+    kind=EntityKinds.MANUAL_SECTION,
+    qualified_name="manual.inventory.safety_stock_policy#3.2",
+    name="3.2",
+    file_path="/manuals/inventory/safety_stock_policy.md",
+    line_start=0, line_end=0,
+)
+frag = CodeEntity(
+    kind=EntityKinds.MANUAL_FRAGMENT,
+    qualified_name="manual.inventory.safety_stock_policy#3.2:f0",
+    name="f0",
+    file_path="/manuals/inventory/safety_stock_policy.md",
+    line_start=0, line_end=0,
+)
+
+# 6 relation 인스턴스화
+rels = [
+    CodeRelation(kind=RelationKinds.PART_OF,         source="code.x",  target="proc.y"),
+    CodeRelation(kind=RelationKinds.RESPONSIBLE_FOR, source="team.x",  target="proc.y"),
+    CodeRelation(kind=RelationKinds.PARENT_PROCESS,  source="proc.p",  target="proc.c"),
+    CodeRelation(kind=RelationKinds.DESCRIBED_IN,    source="code.x",  target="manual.y#3.2"),
+    CodeRelation(kind=RelationKinds.CONFLICTS_WITH,  source="code.x",  target="manual.y#3.2"),
+    CodeRelation(kind=RelationKinds.MISSING_IN,      source="code.x",  target="<code-only>"),
+]
+
+for e in [bp, role, doc, sec, frag]:
+    print(f"  entity:   {e.kind:<20} qn={e.qualified_name}")
+for r in rels:
+    print(f"  relation: {r.kind:<18} {r.source} → {r.target}")
+
+print("\nOK — Round 3 엔티티/관계 인스턴스화 검증 통과")
+PY
+```
+
+**기대 출력** : 5 entity + 6 relation 정상 인스턴스화, "OK" 마지막 라인.
+
+---
+
+### 시연 시나리오 4 — 단위 + 회귀 pytest
+
+```bash
+# D1.6 단위 테스트
+pytest tests/test_parser_protocol_phase_d.py -v
+
+# 모델링 광역 회귀 (D1.5 + D1.6 + 전체 Phase B/C 레지스트리)
+pytest tests/ -k "modeling or parser_protocol or java_parser or code_analysis or graph_writer or ontology or mapping_models or manual_models or reverse_lookup or term_resolver or cross_file or spring" -q
+```
+
+**기대 출력** :
+- 첫 번째 : `24 passed in 0.02s`
+- 두 번째 : `524 passed, 789 deselected in ~3s`
+
+---
+
+### 체크리스트
+
+| 항목 | 기대 결과 | 확인 방법 |
+|------|-----------|-----------|
+| 24 단위 PASS | `24 passed in 0.02s` | pytest 출력 마지막 줄 |
+| 524 회귀 PASS | `524 passed, 789 deselected` | 회귀 pytest 출력 |
+| Entity 5종 등록 (concept) | `EntityKindRegistry.get(...)` non-None + category="concept" | REPL 시나리오 1 |
+| Relation 6종 등록 (concept) | `RelationKindRegistry.get(...)` non-None + category="concept" | REPL 시나리오 2 |
+| 편의 상수 일치 | `EntityKinds.BUSINESS_PROCESS == "business_process"` 등 | pytest test_phase_d_entity_constants_match_registry |
+| concept 카테고리 누적 | entity ≥ 7 / relation ≥ 9 | REPL 세트 비교 |
+| 인스턴스화 E2E | 5 CodeEntity + 6 CodeRelation 생성 성공 | REPL 시나리오 3 |
+| ontology_validator 무영향 | modeling 회귀 524 안에 `test_ontology_*` 포함 통과 | 회귀 pytest |
+| graph_writer 화이트리스트 자동 | Phase D relation 들 `RelationKindRegistry.is_registered()` True | REPL `is_registered("part_of") == True` |
+
+### 다음 시연 (D2 이후)
+
+- **D2** : 샘플 PDF/PPTX/DOCX 파일 하나씩 업로드 → `ManualDocument` + `ManualSection` + `ManualFragment` 실제 생성 확인 + checksum 중복 검출 + authoritative 수동 토글.
+- **D3** : 샘플 코드×기준서 → Gap Detector 실행 (hierarchical) → CONFLICTS_WITH 생성 + llm_only 재실행 대비.
+- **D4** : CONFLICTS_WITH 승인 큐 UI + Role team 관리 + Manual 업로드 폼 + authoritative 토글.
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| `EntityKindRegistry.get("business_process") is None` | `_DEFAULT_ENTITY_KINDS` 에 spec 추가 누락 | parser_protocol.py 142~147 라인 확인 |
+| `AttributeError: type object 'EntityKinds' has no attribute 'BUSINESS_PROCESS'` | 편의 상수 블록 미갱신 | parser_protocol.py 218~222 라인 확인 |
+| `CodeRelation.__post_init__` 검증 실패 | kind 가 registry 에 없음 | `RelationKindRegistry.is_registered(kind)` 먼저 확인 |
+| ontology_validator 관련 테스트 실패 | `ontology/schema.py` 의 `RelationKind` Literal 수정 시도 | 해당 파일은 YAML 빌더 전용 — 건드리지 말 것. 이름 겹쳐도 모듈 경계 분리로 충돌 없음 |
+| graph_writer 화이트리스트 에러 | 신규 kind 에 대문자 규칙 위반 | `EntityKinds.X` 상수는 소문자 문자열, `rel.kind.upper()` 변환 시 `^[A-Z_]+$` 규칙 자동 만족 |
+
+---
+
+## D-OD-11-D2-1 — Manual Ingest 5-Format Parsers (2026-04-20)
+
+**목적** : `backend/modeling/manual_ingest/` 패키지의 `ManualParser` Protocol + 5 포맷 파서 (md/pdf/docx/pptx/image) 가 결정적으로 `ManualParseResult(document, sections, fragments, warnings)` 를 반환하는지 검증.
+
+**범위** : D2-1 은 **파서만**. pipeline(checksum dedup → 임베딩 → graph 쓰기) 은 D2-2, 트리거(UI+watch+git hook) 는 D2-3.
+
+### 사전 준비
+
+```bash
+# (이미 설치되어 있을 경우 스킵)
+.venv/bin/python -m pip install "pypdf>=5.0" "pdfplumber>=0.11" "python-docx>=1.2" "python-pptx>=1.0"
+```
+
+### REPL 시나리오 1 — Markdown 파서 (heading path + TEXT/TABLE 분리)
+
+```bash
+.venv/bin/python -c '
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+from backend.modeling.manual_ingest.md_parser import MarkdownParser
+
+md = """# 안전재고 정책
+
+정책 개요 단락.
+
+## 1. 수식
+
+SS = z * sigma * sqrt(L)
+
+## 2. 파라미터
+
+| 기호 | 의미 |
+|---|---|
+| z | 서비스수준 |
+| sigma | 수요 표준편차 |
+
+### 2.1 비고
+
+안전재고는 반올림함.
+"""
+
+with NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+    f.write(md)
+    path = Path(f.name)
+
+result = MarkdownParser().parse(path)
+print(f"doc fqn = {result.document.qualified_name}")
+print(f"title = {result.document.title}")
+print(f"checksum[:12] = {result.document.checksum[:12]}")
+print(f"sections = {len(result.sections)}")
+for s in result.sections:
+    print(f"  • [{s.order_index}] {s.qualified_name}  heading_path={s.heading_path}")
+print(f"fragments = {len(result.fragments)}")
+for f in result.fragments:
+    print(f"  • [{f.order_index}] {f.kind}  section={f.section_fqn[-40:]}  text[:30]={f.text[:30]!r}")
+'
+```
+
+**기대 출력** :
+- `doc fqn = manual.<임시파일 slug>`
+- `sections = 4` (h1 "안전재고 정책", h2 "1. 수식", h2 "2. 파라미터", h3 "2.1 비고")
+- "2. 파라미터" 섹션 안에 `text` + `table` 2개 프래그먼트 (table 은 `|` 파이프 유지)
+
+### REPL 시나리오 2 — PDF 파서 (pypdf 페이지 = Section)
+
+```bash
+.venv/bin/python -c '
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+from tests._manual_ingest_fixtures import make_pdf
+from backend.modeling.manual_ingest.pdf_parser import PdfParser
+
+with NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+    path = Path(f.name)
+make_pdf(path, ["Safety Stock Policy", "Formula: SS = z * sigma * sqrt L", "Parameters and notes"])
+
+result = PdfParser().parse(path)
+print(f"format = {result.document.format}")
+print(f"sections = {len(result.sections)}")
+for s in result.sections:
+    print(f"  • [{s.order_index}] title={s.title}  fqn={s.qualified_name}")
+print(f"fragments = {len(result.fragments)}")
+for f in result.fragments:
+    print(f"  • kind={f.kind} text[:40]={f.text[:40]!r}")
+print(f"warnings = {result.warnings}")
+'
+```
+
+**기대 출력** :
+- `sections = 3` (Page 1/2/3)
+- `fragments = 3` (TEXT 각 페이지별)
+- `warnings = []`
+
+### REPL 시나리오 3 — DOCX 파서 (`Heading N` 계층)
+
+```bash
+.venv/bin/python -c '
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+from tests._manual_ingest_fixtures import make_docx
+from backend.modeling.manual_ingest.docx_parser import DocxParser
+
+with NamedTemporaryFile(suffix=".docx", delete=False) as f:
+    path = Path(f.name)
+make_docx(path, title="Quality Manual", headings=[
+    (2, "1. Scope", "scope body text."),
+    (2, "2. Safety Stock", "formula below."),
+    (3, "2.1 Variables", "z sigma L explained."),
+    (2, "3. Notes", "note body."),
+])
+
+result = DocxParser().parse(path)
+print(f"title = {result.document.title}")
+print(f"sections = {len(result.sections)}")
+for s in result.sections:
+    print(f"  • heading_path={s.heading_path}")
+print(f"TEXT fragments = {sum(1 for f in result.fragments if f.kind == \"text\")}")
+'
+```
+
+**기대 출력** :
+- `title = Quality Manual`
+- `sections = 5` (Quality Manual / 1./ 2./ 2.1/ 3.)
+- `2.1 Variables` 의 `heading_path` 에 상위 제목 "2. Safety Stock" 포함
+
+### REPL 시나리오 4 — PPTX 파서 (슬라이드 = Section)
+
+```bash
+.venv/bin/python -c '
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+from tests._manual_ingest_fixtures import make_pptx
+from backend.modeling.manual_ingest.pptx_parser import PptxParser
+
+with NamedTemporaryFile(suffix=".pptx", delete=False) as f:
+    path = Path(f.name)
+make_pptx(path, [
+    ("Introduction", "overview of safety stock policy"),
+    ("Formula", "SS = z * sigma * sqrt(L)"),
+    ("Summary", "watch lead time variability"),
+])
+
+result = PptxParser().parse(path)
+print(f"sections = {[s.title for s in result.sections]}")
+print(f"fragments = {len(result.fragments)}")
+for f in result.fragments:
+    print(f"  • {f.section_fqn[-30:]} → {f.text[:40]!r}")
+'
+```
+
+**기대 출력** :
+- `sections = ['Introduction', 'Formula', 'Summary']`
+- `fragments = 3` (각 슬라이드 body)
+
+### REPL 시나리오 5 — ImageParser (OCREngine 주입 + 실패 경로)
+
+```bash
+.venv/bin/python -c '
+import asyncio
+from dataclasses import dataclass
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+from backend.modeling.manual_ingest.image_parser import ImageParser
+
+@dataclass
+class FakeOCR:
+    text: str = ""
+    fail: bool = False
+    async def extract_text(self, path):
+        if self.fail:
+            raise RuntimeError("tesseract unavailable")
+        return {"text": self.text, "confidence": 0.85, "language": "ko", "backend": "tesseract"}
+
+with NamedTemporaryFile(suffix=".png", delete=False) as f:
+    path = Path(f.name)
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 32)
+
+# 성공 경로
+ok = ImageParser(ocr_engine=FakeOCR(text="SS = z * sigma * sqrt(L)")).parse(path)
+print("SUCCESS:", ok.fragments[0].kind, ok.fragments[0].text)
+
+# 실패 경로
+err = ImageParser(ocr_engine=FakeOCR(fail=True)).parse(path)
+print(f"FAIL: fragments={len(err.fragments)} warnings={err.warnings}")
+
+# 기본 OCREngine constructor
+p = ImageParser()
+print(f"DEFAULT OCREngine: {type(p.ocr_engine).__name__}")
+'
+```
+
+**기대 출력** :
+- `SUCCESS: ocr_text SS = z * sigma * sqrt(L)`
+- `FAIL: fragments=0 warnings=['OCR failed for ...: tesseract unavailable']`
+- `DEFAULT OCREngine: OCREngine`
+
+### pytest 명령
+
+```bash
+# D2-1 범위 (6 파일, 48 tests)
+.venv/bin/python -m pytest tests/test_manual_ingest_parser_protocol.py \
+    tests/test_manual_ingest_md_parser.py \
+    tests/test_manual_ingest_pdf_parser.py \
+    tests/test_manual_ingest_docx_parser.py \
+    tests/test_manual_ingest_pptx_parser.py \
+    tests/test_manual_ingest_image_parser.py -v
+
+# 모델링 회귀 (251 tests)
+.venv/bin/python -m pytest tests/ -k "modeling or manual or concept_resolver or parser or ontology or graph_writer or neo4j_adapter or business_term or business_rule or domain_rule" -q
+```
+
+**기대 출력** : 첫 번째 `48 passed in ~0.4s`, 두 번째 `251 passed, 1110 deselected in ~4s`.
+
+### 체크리스트
+
+| 항목 | 기대 결과 | 확인 방법 |
+|------|-----------|-----------|
+| 48 단위 PASS | `48 passed in ~0.4s` | 첫 번째 pytest |
+| 251 회귀 PASS | `251 passed, 1110 deselected` | 두 번째 pytest |
+| Protocol runtime_checkable | `isinstance(MarkdownParser(), ManualParser) == True` | REPL |
+| FQN 결정성 | 같은 내용 → 같은 checksum | `compute_checksum` 2회 비교 |
+| MD 테이블 분리 | `kind="table"` 프래그먼트 존재 | REPL 시나리오 1 |
+| MD 코드펜스 TEXT | 코드펜스 내부가 1 TEXT 프래그먼트 | REPL 시나리오 1 |
+| DOCX heading_path | 계층 구조 보존 | REPL 시나리오 3 |
+| PPTX 순서 | `order_index == slide index` | REPL 시나리오 4 |
+| Image 실패 warning | `"OCR failed for ..."` 메시지 누적 | REPL 시나리오 5 (FAIL) |
+| Image 빈 텍스트 → frag 존재 | OCR 성공 + text="" → fragment 여전히 1개 | `test_image_parser_empty_text_still_produces_section` |
+
+### 다음 시연 (D2-2 / D2-3 이후)
+
+- **D2-2** : `POST /api/modeling/manuals/upload` 로 실제 파일 업로드 → checksum 중복 검출 + chromadb 임베딩 + Neo4j graph 기록 확인. SSE stream 으로 단계별 진행률 수신.
+- **D2-3** : watch folder (`/var/ontong/manuals/`) 에 파일 떨어뜨리면 자동 ingest. git push 시 webhook 으로 변경된 `.md` 재-ingest.
+
+### 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| `ModuleNotFoundError: No module named 'pypdf'` | venv 에 미설치 (시스템 Python 과 혼선) | `.venv/bin/python -m ensurepip --default-pip && .venv/bin/python -m pip install pypdf pdfplumber python-docx python-pptx` |
+| PDF 테스트만 실패 (`extract_text` 빈 문자열) | fixture content stream 이 잘못 작성됨 | `tests/_manual_ingest_fixtures.make_pdf` 의 `BT /F1 12 Tf 72 720 Td (text) Tj ET` + Helvetica font ref 확인 |
+| DOCX heading 하나도 인식 안 됨 | 스타일 이름이 `Heading 2` 가 아니라 `heading 2` 등 변형 | `_HEADING_STYLE_RE = re.compile(r"^Heading\s+(\d+)$")` 는 대소문자 구분. make_docx 는 정상 생성이므로 fixture 오염 의심 |
+| ImageParser Test 가 `RuntimeError: asyncio.run() cannot be called from a running event loop` | 이미 이벤트 루프가 돌고 있는 환경 (e.g. pytest-asyncio 외부 fixture) | `ImageParser.parse()` 는 sync 호출 가정. 비동기 컨텍스트면 D2-2 pipeline 에서 `asyncio.to_thread` 로 감싸기 |
+| `TypeError: __init__() got unexpected keyword argument 'ocr_engine'` | 옛 버전 import 캐시 | 파이썬 프로세스 재시작 |
+
+## D-OD-11-D2-2 — Manual Ingest Pipeline + Upload API (2026-04-20)
+
+### 목적
+D2-1 파서 5종 위에 Ingest 파이프라인 + 메타 레지스트리 + REST/SSE 업로드 API 를 얹어
+"파일 하나가 들어오면 끝까지 등록되는" 흐름을 완성한다. 3 트리거 (UI + watch + git hook)
+가 전부 이 엔트리포인트를 공유.
+
+### 전제
+- `.venv/bin/python` 가상환경 활성.
+- `pyproject.toml` 의 manual 계열 deps (pypdf/pdfplumber/python-docx/python-pptx) 설치 완료.
+- ChromaDB 는 **없어도 됨** — InMemory fallback 자동 활성.
+- Neo4j 도 **없어도 됨** — graph_writer=None.
+
+### 시나리오 1 : 단위 테스트
+```bash
+cd /Users/donghae/workspace/ai/onTong
+.venv/bin/python -m pytest tests/test_manual_registry.py \
+  tests/test_manual_ingest_pipeline.py tests/test_manuals_api.py -v
+```
+예상 : **36 passed in ~0.2s**.
+
+### 시나리오 2 : REPL 파이프라인
+```bash
+.venv/bin/python
+```
+```python
+from pathlib import Path
+from backend.modeling.manual_ingest.manual_registry import InMemoryManualRegistry
+from backend.modeling.manual_ingest.md_parser import MarkdownParser
+from backend.modeling.manual_ingest.pipeline import ManualIngestPipeline, IngestMode
+from backend.modeling.manuals.manual_models import ManualFormat
+
+Path("/tmp/spec.md").write_text("# Spec\n\nBody.\n", encoding="utf-8")
+pipe = ManualIngestPipeline(
+    parsers={ManualFormat.MARKDOWN: MarkdownParser()},
+    registry=InMemoryManualRegistry(),
+)
+out = pipe.ingest("/tmp/spec.md", repo_id="demo", mode=IngestMode.SKIP)
+print(out.outcome, out.document.qualified_name)
+# IngestOutcome.INGESTED manual.spec
+
+# 재호출 : checksum 일치 → SKIPPED
+out2 = pipe.ingest("/tmp/spec.md", repo_id="demo", mode=IngestMode.SKIP)
+print(out2.outcome)   # IngestOutcome.SKIPPED
+
+# 내용 변경 + UPDATE → UPDATED
+Path("/tmp/spec.md").write_text("# Spec\n\nUpdated body.\n", encoding="utf-8")
+out3 = pipe.ingest("/tmp/spec.md", repo_id="demo", mode=IngestMode.UPDATE)
+print(out3.outcome)   # IngestOutcome.UPDATED
+```
+
+### 시나리오 3 : REST API (서버 기동)
+```bash
+.venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
+```
+다른 터미널에서:
+```bash
+# 1. 업로드 (첫 번째)
+echo "# Demo\n\nBody." > /tmp/demo.md
+curl -F "file=@/tmp/demo.md" http://localhost:8000/api/modeling/manuals/upload
+# {"outcome":"ingested", "document":{...qualified_name:"manual.demo"...}, "warnings":[]}
+
+# 2. 중복 업로드 → SKIPPED
+curl -F "file=@/tmp/demo.md" http://localhost:8000/api/modeling/manuals/upload
+# {"outcome":"skipped", ...}
+
+# 3. force 모드 → 강제 ingest
+curl -F "file=@/tmp/demo.md" "http://localhost:8000/api/modeling/manuals/upload?mode=force"
+# {"outcome":"ingested", ...}
+
+# 4. 목록
+curl http://localhost:8000/api/modeling/manuals
+# {"total":1, "items":[{"qualified_name":"manual.demo", ...}]}
+
+# 5. authoritative 토글 (Q8=B)
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"authoritative":true}' \
+  http://localhost:8000/api/modeling/manuals/manual.demo/authoritative
+# {"qualified_name":"manual.demo", "authoritative":true}
+
+# 6. 지원 안 하는 확장자 → 415
+curl -i -F "file=@/tmp/x.xyz" http://localhost:8000/api/modeling/manuals/upload
+# HTTP/1.1 415 Unsupported Media Type
+```
+
+### 시나리오 4 : SSE 스트림
+```bash
+curl -N -F "file=@/tmp/demo.md" \
+  http://localhost:8000/api/modeling/manuals/upload/stream
+# event: detecting
+# data: {"format":"markdown","path":"/tmp/.../demo.md"}
+#
+# event: parsing
+# data: {"fqn":"manual.demo","format":"markdown"}
+#
+# event: persisting
+# data: {"fqn":"manual.demo"}
+#
+# event: complete
+# data: {"fqn":"manual.demo","outcome":"ingested","warnings":[]}
+```
+중복 파일이면 `event: skipped` 후 종료.
+
+### 시나리오 5 : 다른 포맷 (docx/pptx/pdf)
+```bash
+# PDF
+curl -F "file=@/path/to/spec.pdf" http://localhost:8000/api/modeling/manuals/upload
+
+# DOCX
+curl -F "file=@/path/to/spec.docx" http://localhost:8000/api/modeling/manuals/upload
+
+# PPTX
+curl -F "file=@/path/to/slides.pptx" http://localhost:8000/api/modeling/manuals/upload
+
+# IMAGE (OCR 경유, 실패 시 warnings 배열에 메시지)
+curl -F "file=@/path/to/diagram.png" http://localhost:8000/api/modeling/manuals/upload
+```
+
+### 체크리스트
+- [ ] `pytest tests/test_manual_registry.py tests/test_manual_ingest_pipeline.py tests/test_manuals_api.py` → 36 PASS.
+- [ ] 서버 기동 후 `curl POST /manuals/upload` → `outcome:ingested`.
+- [ ] 같은 파일 재업로드 → `outcome:skipped`.
+- [ ] `?mode=force` → 강제 `ingested`.
+- [ ] `GET /manuals` → total 수 증가 + items 배열.
+- [ ] `POST /{fqn}/authoritative` → `{authoritative:true}` 반영 후 `GET /manuals` 에서 변경 확인.
+- [ ] SSE : `curl -N POST /manuals/upload/stream` → `event: complete` frame 수신.
+- [ ] 잘못된 확장자 업로드 → 415.
+- [ ] 존재하지 않는 fqn 토글 → 404.
+- [ ] 초기화 전 (`reset()` 직후) 라우트 접근 → 503.
+
+### Troubleshooting
+- **"manuals_api not initialized" (503)** : lifespan 이 아직 안 돌았거나 reset 이 호출된 상태.
+  `backend/main.py` 의 lifespan 내 `manuals_api.init(...)` 가 실행되는지 로그로 확인.
+- **두 번째 업로드가 `ingested` 로 나옴** : 파일명을 바꿨거나 내용이 변경됐을 가능성. 같은 stem + 같은 checksum 이어야 SKIP.
+- **Chroma 경고 "manual_fragments collection setup failed"** : 무시 가능. InMemory fallback 으로 동작 (임베딩은 있지만 검색엔 미반영 — 영구 저장 필요 시 Chroma 기동).
+- **SSE 프레임이 한 번에 뭉쳐 도착** : curl 의 버퍼링. `-N` (no-buffer) 옵션 필수. 프런트는 `EventSource` 가 자동 프레임 분리.
+- **업로드가 500 으로 실패** : stderr 에 traceback 출력. 파서별 (pypdf/python-docx/python-pptx/OCR) 의존성 미설치 / 파일 손상 가능성.
+
+
+## D-OD-11-D2-3 — 3 트리거 wiring (watch + git hook + 프런트 업로드 UI)
+
+### 시나리오 1 — 폴더 감시자 단위 (Python REPL)
+```python
+.venv/bin/python
+>>> from pathlib import Path
+>>> from backend.modeling.manual_ingest.manual_registry import InMemoryManualRegistry
+>>> from backend.modeling.manual_ingest.md_parser import MarkdownParser
+>>> from backend.modeling.manual_ingest.pipeline import ManualIngestPipeline
+>>> from backend.modeling.manual_ingest.watch_folder import ManualFolderWatcher
+>>> from backend.modeling.manuals.manual_models import ManualFormat
+>>> reg = InMemoryManualRegistry()
+>>> pipe = ManualIngestPipeline(parsers={ManualFormat.MARKDOWN: MarkdownParser()}, registry=reg)
+>>> w = ManualFolderWatcher(pipeline=pipe, folder="/tmp/demo-manuals", repo_id="demo")
+>>> # 외부에서 mkdir -p /tmp/demo-manuals && echo '# Hello' > /tmp/demo-manuals/a.md
+>>> w.scan_once()
+# WatchScanResult(ingested=[...], removed=[], skipped_unchanged=0, errors=[])
+>>> # echo '# Hello\n\nUPDATED' > /tmp/demo-manuals/a.md
+>>> w.scan_once()
+# ingested[0].outcome == "updated"
+>>> # rm /tmp/demo-manuals/a.md
+>>> w.scan_once()
+# WatchScanResult(ingested=[], removed=[PosixPath('/tmp/demo-manuals/a.md')], ...)
+```
+
+### 시나리오 2 — git hook REST
+```bash
+uvicorn backend.main:app --port 8001 &
+mkdir -p /tmp/demo-repo && echo '# Spec v1' > /tmp/demo-repo/spec.md
+
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"repo_root":"/tmp/demo-repo","added":["spec.md"],"modified":[],"removed":[]}' \
+  http://localhost:8001/api/modeling/manuals/git-hook
+# {"ingested":[{"outcome":"ingested","document":{"qualified_name":"manual.spec",...},"warnings":[]}],"skipped":[],"removed":[],"errors":[]}
+
+echo '# Spec v2 changed' > /tmp/demo-repo/spec.md
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"repo_root":"/tmp/demo-repo","added":[],"modified":["spec.md"],"removed":[]}' \
+  http://localhost:8001/api/modeling/manuals/git-hook
+# ingested[0].outcome == "updated"
+
+# unsupported 확장자
+echo 'plain' > /tmp/demo-repo/note.txt
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"repo_root":"/tmp/demo-repo","added":["note.txt"],"modified":[],"removed":[]}' \
+  http://localhost:8001/api/modeling/manuals/git-hook
+# {"ingested":[], "skipped":["/tmp/demo-repo/note.txt"], "removed":[], "errors":[]}
+
+# repo_root escape
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"repo_root":"/tmp/demo-repo","added":["/etc/passwd"],"modified":[],"removed":[]}' \
+  http://localhost:8001/api/modeling/manuals/git-hook
+# errors[0] 에 "outside repo_root" 메시지
+```
+
+### 시나리오 3 — 프런트엔드 업로드 UI (브라우저)
+```bash
+# 백엔드
+uvicorn backend.main:app --port 8001 &
+# 프런트
+cd frontend && npm run dev
+# http://localhost:3000 → Section 2 → "매뉴얼 업로드" 탭
+```
+UI 검증 :
+1. **모드 pill 동작** : SKIP(기본)/UPDATE/FORCE 클릭 시 선택 상태 표시.
+2. **드롭존** : 클릭 → 파일 선택 → 업로드 시작.
+3. **SSE 라이브 이벤트** : `[detecting]` → `[parsing]` → `[persisting]` → `[complete]` 순서로 라이브 렌더.
+4. **완료 배너** : 성공 시 emerald 배너에 "ingested — manual.<stem>".
+5. **목록** : 자동 새로고침으로 방금 업로드한 매뉴얼 나타남. format/version/fqn 메타 표시.
+6. **authoritative 토글** : 스위치 ON → 배지가 Draft(회색) → Authoritative(앰버) 로 전환. `curl GET /manuals` 로 서버측 반영 확인 가능.
+7. **에러 경로** : 지원 안 되는 확장자 업로드 → `[error]` 이벤트 → 빨간 배너 "415 Unsupported ...".
+
+### 시나리오 4 — 실 매뉴얼 (wiki/ 폴더)
+```bash
+# 현재 wiki/ERP/ 에 실제 매뉴얼 여러 개 있음
+curl -X POST -H "Content-Type: application/json" \
+  -d "{\"repo_root\":\"$(pwd)\",\"added\":[\"wiki/ERP/마스터데이터-관리-지침.md\"],\"modified\":[],\"removed\":[]}" \
+  http://localhost:8001/api/modeling/manuals/git-hook
+# ingested[0].document.qualified_name = "manual.마스터데이터-관리-지침"
+curl http://localhost:8001/api/modeling/manuals
+# total:1 이상
+```
+
+### 체크리스트
+- [ ] `pytest tests/test_manual_watch_folder.py tests/test_manual_git_hook_webhook.py tests/test_manuals_api_git_hook.py` → 30/30 PASS.
+- [ ] REPL 에서 `ManualFolderWatcher.scan_once()` 신규/변경/삭제 모두 동작.
+- [ ] `POST /api/modeling/manuals/git-hook` JSON 페이로드 → ingested/skipped/removed/errors 필드 채워짐.
+- [ ] unsupported 확장자 → errors 아닌 `skipped` 에 포함 (경로 문자열).
+- [ ] repo_root 밖 경로 → `errors` 에 escape 메시지.
+- [ ] 빈 페이로드 → 모든 필드 빈 배열.
+- [ ] `{"added":[...]}` 만 보내고 `repo_root` 누락 → 400.
+- [ ] 미초기화 API (reset 직후) → 503.
+- [ ] 프런트 드롭존 업로드 → SSE 이벤트 4종 라이브 렌더.
+- [ ] 프런트 authoritative 토글 → 서버 `GET /manuals` 반영.
+- [ ] 모드 pill FORCE 선택 후 동일 파일 재업로드 → `ingested` (SKIP 이 아닌).
+- [ ] `cd frontend && npx tsc --noEmit` 0 errors.
+
+### Troubleshooting
+- **"repo_root missing" (400)** : git hook 페이로드에 `repo_root` 키 누락. post-receive hook 에서 `git rev-parse --show-toplevel` 결과를 반드시 포함.
+- **"path outside repo_root"** : 절대 경로가 `repo_root` 밖임. repo_root 를 프로젝트 상위 경로로 설정했는지 확인.
+- **`scan_once()` 가 이미 있는 파일을 계속 ingest** : mtime 이 매번 바뀌는지 확인 (복사/rsync 가 mtime 갱신). 같은 파일이면 스냅샷 동일해서 skip 돼야 함.
+- **`seed_existing=False` 로 시작했는데 새 파일이 안 잡힘** : `rglob("*")` 로 재귀 scan 하므로 서브폴더 문제는 아님. `detect_format` 이 지원하는 확장자인지 확인.
+- **SSE 이벤트가 `[message]` 로만 나옴** : 백엔드가 `event: <name>\n` 헤더 없이 보낸 경우. `_sse()` 헬퍼 사용 확인.
+- **프런트 업로드 중 `AbortError`** : 탭 전환/닫기. `AbortController` 정상 동작 — 취소하고 다시 업로드하면 됨.
+- **authoritative 토글이 서버에 안 반영** : `POST /manuals/{fqn}/authoritative` 의 fqn 경로 인코딩. 한글/특수문자 fqn 은 `encodeURIComponent` 필수 (api/modeling.ts 는 이미 처리).
+- **프런트 UI 가 "매뉴얼 업로드" 탭이 안 보임** : `ModelingSection.tsx` 에 `"manual-upload"` NAV_ITEM 이 들어갔는지 확인.
+
+---
+
+## D-OD-11-D3-1 — MISSING_IN 양방향 탐지기 (Python REPL)
+
+D3-1 은 API 미노출. 검증은 pytest + Python REPL 로 진행.
+
+### 시나리오 1 — 단위 테스트
+```bash
+.venv/bin/python -m pytest tests/test_gap_store.py tests/test_missing_in_detector.py -v
+# 28/28 PASS (0.06s)
+```
+
+### 시나리오 2 — REPL 스캔 (code_only)
+```python
+>>> from datetime import datetime, timezone
+>>> from backend.modeling.gap_detection import (
+...     MissingInDetector, InMemoryGapStore, ScanConfig,
+... )
+>>> from backend.modeling.mapping.mapping_models import (
+...     BusinessTerm, BusinessTermSource,
+... )
+>>> from backend.modeling.manuals.manual_models import GapDirection, GapMode
+>>>
+>>> # BusinessTerm 은 confirmed 인데 DescribedInBinding 이 없음 → code_only 후보
+>>> term = BusinessTerm(
+...     qualified_name="inventory.safety_stock",
+...     canonical_label="안전재고",
+...     aliases=["Safety Stock", "SS"],
+...     domain="inventory",
+...     description="기준 재고 수준",
+...     source=BusinessTermSource.CODE,
+...     confirmed=True,
+...     created_at=datetime.now(timezone.utc),
+... )
+>>>
+>>> store = InMemoryGapStore()
+>>> detector = MissingInDetector(gap_store=store)
+>>> result = detector.scan(
+...     business_terms=[term],
+...     business_rules=[],
+...     fragments=[],
+...     described_in=[],   # 기준서 바인딩 없음
+...     config=ScanConfig(repo_id="demo", gap_mode=GapMode.HIERARCHICAL),
+... )
+>>> len(result.code_only), len(result.manual_only)
+(1, 0)
+>>> gap = result.code_only[0]
+>>> gap.direction, gap.severity.value, gap.target_fqn
+(<GapDirection.CODE_ONLY: 'code_only'>, 'soft', 'inventory.safety_stock')
+>>> gap.description
+"term '안전재고' has no DESCRIBED_IN binding"
+```
+
+### 시나리오 3 — REPL 스캔 (manual_only)
+```python
+>>> from backend.modeling.manuals.manual_models import (
+...     ManualFragment, ManualFragmentKind,
+... )
+>>> # Fragment 2 건에서 강조 phrase 가 등장했으나 BusinessTerm 매칭 실패
+>>> frags = [
+...     ManualFragment(
+...         qualified_name="manual.spec#frag-1",
+...         section_fqn="manual.spec#sec-1",
+...         kind=ManualFragmentKind.PARAGRAPH,
+...         ordinal=0,
+...         text="제품은 **ISO-9001** 기준을 준수해야 한다.",
+...         checksum="aa" * 16,
+...         page=None,
+...         heading_path=None,
+...     ),
+...     ManualFragment(
+...         qualified_name="manual.spec#frag-2",
+...         section_fqn="manual.spec#sec-2",
+...         kind=ManualFragmentKind.PARAGRAPH,
+...         ordinal=1,
+...         text="감사 시 **ISO-9001** 재확인.",
+...         checksum="bb" * 16,
+...         page=None,
+...         heading_path=None,
+...     ),
+... ]
+>>>
+>>> store2 = InMemoryGapStore()
+>>> result2 = MissingInDetector(gap_store=store2).scan(
+...     business_terms=[term],          # "안전재고" 만 알고 있음
+...     business_rules=[],
+...     fragments=frags,
+...     described_in=[],
+...     config=ScanConfig(
+...         repo_id="demo",
+...         gap_mode=GapMode.HIERARCHICAL,
+...         min_occurrence_for_manual_only=2,   # 2건 이상 등장해야 후보
+...     ),
+... )
+>>> [g.target_fqn for g in result2.manual_only]
+['ISO-9001']
+>>> result2.manual_only[0].severity.value, result2.manual_only[0].direction.value
+('hard', 'manual_only')
+```
+
+### 시나리오 4 — 사람 승인 큐
+```python
+>>> pending = store2.list_pending()
+>>> [g.target_fqn for g in pending]
+['ISO-9001']
+>>> # 검토 후 승인
+>>> confirmed = store2.confirm(pending[0].id)
+>>> confirmed.confirmed
+True
+>>> store2.list_pending()   # 승인된 건은 pending 에서 사라짐
+[]
+>>>
+>>> # 재스캔 — 동일 입력이면 동일 id, confirmed 보존
+>>> _ = MissingInDetector(gap_store=store2).scan(
+...     business_terms=[term], business_rules=[], fragments=frags,
+...     described_in=[],
+...     config=ScanConfig(
+...         repo_id="demo", gap_mode=GapMode.HIERARCHICAL,
+...         min_occurrence_for_manual_only=2,
+...     ),
+... )
+>>> store2.get(confirmed.id).confirmed   # 여전히 True
+True
+```
+
+### 시나리오 5 — direction 별 조회
+```python
+>>> # 두 종류 gap 이 혼재한 store 예
+>>> store3 = InMemoryGapStore()
+>>> _ = MissingInDetector(gap_store=store3).scan(
+...     business_terms=[term], business_rules=[], fragments=frags,
+...     described_in=[],
+...     config=ScanConfig(
+...         repo_id="demo", gap_mode=GapMode.HIERARCHICAL,
+...         min_occurrence_for_manual_only=2,
+...     ),
+... )
+>>> [g.target_fqn for g in store3.list_by_direction(GapDirection.CODE_ONLY)]
+['inventory.safety_stock']
+>>> [g.target_fqn for g in store3.list_by_direction(GapDirection.MANUAL_ONLY)]
+['ISO-9001']
+```
+
+### 체크리스트
+- [ ] `pytest tests/test_gap_store.py tests/test_missing_in_detector.py` → 28/28 PASS.
+- [ ] 시나리오 2 : confirmed=True BusinessTerm 이 described_in 없을 때 code_only 1건 생성, severity=soft.
+- [ ] 시나리오 3 : 2 건 이상 강조된 phrase 가 BusinessTerm.name/aliases 에 없으면 manual_only 1건, severity=hard.
+- [ ] 시나리오 3 확인 : alias "Safety Stock" 을 fragment 에 넣으면 → manual_only 0건 (case-insensitive 매칭).
+- [ ] 시나리오 4 : 승인 후 `list_pending()` 에서 빠짐 + 재스캔이 confirmed 를 건드리지 않음.
+- [ ] 시나리오 5 : direction 필터가 각 1건씩 반환.
+- [ ] `min_occurrence_for_manual_only=1` 로 낮추면 1 건 등장 phrase 도 후보로 잡힘.
+- [ ] `include_unconfirmed_terms=True` 로 바꾸면 `confirmed=False` term 도 code_only 탐지 대상.
+- [ ] IMAGE kind ManualFragment 는 추출기에서 스킵 → manual_only 0건.
+
+### Troubleshooting
+- **`manual_only` 에 canonical_label 이 그대로 잡힘** : BusinessTerm.confirmed=False 여서 lexicon 에서 제외됨. `include_unconfirmed_terms=True` 또는 term 을 confirmed 로 세팅.
+- **같은 입력 재스캔인데 gap.id 가 달라짐** : direction/target_fqn/counterpart_fqn 중 하나가 달라졌을 가능성. `_stable_id` 는 `sha1(direction|target|counterpart)[:16]`.
+- **승인한 gap 이 재스캔 후 pending 으로 되돌아감** : `InMemoryGapStore.upsert` 가 confirmed 보호를 하는지 확인 (pytest `test_upsert_does_not_overwrite_confirmed`). 커스텀 store 구현이면 직접 가드 추가.
+- **code_only 가 rule 도 감지 안 함** : BusinessRule.confirmed 필드 확인. 기본은 unconfirmed 제외.
+- **manual_only 추출기가 한국어 인용 『』 브래킷을 못 잡음** : 현재는 홑 브래킷 「」만. 필요시 `SimpleHeuristicExtractor._PATTERNS` 에 패턴 추가 또는 D3-2 에서 resolver-backed extractor 로 교체.
+- **REST API 가 없음** : D3-1 은 의도적으로 in-process API 만. REST/SSE 는 D3-3 예정 (`POST /api/modeling/gaps/scan` + `GET /gaps` + `POST /gaps/{id}/confirm`).
+
+---
+
+## D-OD-11-D3-2-a — CONFLICTS_WITH deterministic (rule_ast + drift + engine skeleton)
+
+D3-2-a 도 API 미노출. 검증은 pytest + Python REPL 로 진행. LLM comparator 는 D3-2-b 전까지 `None` 으로 돌리거나 Fake 로 치환.
+
+### 시나리오 1 — 단위 테스트
+```bash
+.venv/bin/python -m pytest \
+  tests/test_rule_ast_differ.py \
+  tests/test_embedding_drifter.py \
+  tests/test_gap_engine_conflicts.py \
+  tests/test_manual_models.py::test_gap_enum_values -v
+# 30/30 PASS (0.08s)
+```
+
+### 시나리오 2 — 수량 토큰 추출 (rule_ast 핵심)
+```python
+>>> from backend.modeling.gap_detection import extract_quantities
+>>> t = extract_quantities("안전재고는 100개 이상 확보한다")
+>>> t.numbers, t.comparators, t.units
+(('100',), ('이상',), ('개',))
+>>> # canonical 동치 확인 — ≥ / >= / 이상 모두 "ge" 로 정규화
+>>> from backend.modeling.gap_detection.rule_ast_differ import _canonical_comparator
+>>> _canonical_comparator("≥"), _canonical_comparator(">="), _canonical_comparator("이상")
+('ge', 'ge', 'ge')
+>>> # 순수 산문은 빈 토큰 → rule_ast 스킵, drift/LLM 담당
+>>> extract_quantities("제품은 표준을 준수한다").is_empty
+True
+```
+
+### 시나리오 3 — rule_ast hit (수량 불일치)
+```python
+>>> from datetime import datetime, timezone
+>>> from backend.modeling.gap_detection import RuleASTDiffer, ScanConfig
+>>> from backend.modeling.mapping.mapping_models import BusinessRule, BusinessRuleSource
+>>> from backend.modeling.manuals.manual_models import (
+...     DescribedInBinding, GapMode, ManualFragment, ManualFragmentKind,
+... )
+>>>
+>>> rule = BusinessRule(
+...     qualified_name="inventory.rule.safety_stock",
+...     statement="안전재고는 100개 이상 확보한다",
+...     domain="inventory",
+...     source=BusinessRuleSource.CODE,
+...     confirmed=True,
+...     created_at=datetime.now(timezone.utc),
+... )
+>>> frag = ManualFragment(
+...     qualified_name="manual.spec#frag-1",
+...     section_fqn="manual.spec#sec-1",
+...     kind=ManualFragmentKind.PARAGRAPH,
+...     ordinal=0,
+...     text="안전재고는 50개 이상 확보한다",   # 100 vs 50 — 수량 mismatch
+...     checksum="aa" * 16,
+...     page=None,
+...     heading_path=None,
+... )
+>>> bind = DescribedInBinding(
+...     rule_fqn=rule.qualified_name,
+...     fragment_fqn=frag.qualified_name,
+...     confidence=0.9,
+...     created_at=datetime.now(timezone.utc),
+... )
+>>>
+>>> differ = RuleASTDiffer()
+>>> conflicts = differ.find_conflicts(
+...     rules=[rule], fragments=[frag], described_in=[bind],
+...     config=ScanConfig(repo_id="demo", gap_mode=GapMode.HIERARCHICAL),
+... )
+>>> len(conflicts), conflicts[0].severity.value
+(1, 'high')
+>>> conflicts[0].description
+"rule_ast mismatch: numbers='100' vs '50'"
+```
+
+### 시나리오 4 — Embedding drift (순수 산문 충돌)
+```python
+>>> from backend.modeling.gap_detection import CosineDrifter
+>>>
+>>> # 직교 벡터를 주는 테스트용 embedder
+>>> class ControlledEmbedder:
+...     def embed(self, text: str) -> list[float]:
+...         if "100개" in text:
+...             return [1.0, 0.0, 0.0]
+...         return [0.0, 1.0, 0.0]   # 직교 → cos=0
+...
+>>> drifter = CosineDrifter(embedder=ControlledEmbedder(), cutoff=0.65)
+>>> drift_hits = drifter.find_drift(
+...     rules=[rule], fragments=[frag], described_in=[bind],
+...     config=ScanConfig(repo_id="demo", gap_mode=GapMode.HIERARCHICAL),
+... )
+>>> len(drift_hits), drift_hits[0].severity.value
+(1, 'medium')
+>>> "cosine" in drift_hits[0].description
+True
+```
+
+### 시나리오 5 — HierarchicalGapEngine dedup (rule_ast 가 drift 선점)
+```python
+>>> from backend.modeling.gap_detection import HierarchicalGapEngine, InMemoryGapStore
+>>>
+>>> store = InMemoryGapStore()
+>>> engine = HierarchicalGapEngine(
+...     rule_differ=RuleASTDiffer(),
+...     drifter=CosineDrifter(embedder=ControlledEmbedder(), cutoff=0.65),
+...     llm_comparator=None,      # D3-2-b 까지 None 으로 운영 가능
+...     gap_store=store,
+... )
+>>> result = engine.detect_conflicts(
+...     rules=[rule], fragments=[frag], described_in=[bind],
+...     config=ScanConfig(repo_id="demo", gap_mode=GapMode.HIERARCHICAL),
+... )
+>>> len(result)   # rule_ast 가 선점해 drift stage 는 스킵 (중복 방지)
+1
+>>> result[0].id.startswith("") and len(result[0].id)
+16
+>>> store.list_pending()[0].severity.value   # store 에도 upsert 됨
+'high'
+```
+
+### 시나리오 6 — Fake LLM comparator 로 severity 재평가
+```python
+>>> from backend.modeling.manuals.manual_models import GapSeverity
+>>>
+>>> class FakeComparator:
+...     def compare(self, *, rule, fragment, prior_severity, config):
+...         # deterministic 단계가 HIGH 로 찍었지만 실제로는 CRITICAL 이라고 판단
+...         return GapSeverity.CRITICAL, "regulatory clause detected"
+...
+>>> engine2 = HierarchicalGapEngine(
+...     rule_differ=RuleASTDiffer(),
+...     drifter=CosineDrifter(embedder=ControlledEmbedder(), cutoff=0.65),
+...     llm_comparator=FakeComparator(),
+...     gap_store=None,   # store 주입 없이 directly 반환만
+... )
+>>> upgraded = engine2.detect_conflicts(
+...     rules=[rule], fragments=[frag], described_in=[bind],
+...     config=ScanConfig(repo_id="demo", gap_mode=GapMode.HIERARCHICAL),
+... )
+>>> upgraded[0].severity.value
+'critical'
+>>> "regulatory clause detected" in upgraded[0].description
+True
+```
+
+### 시나리오 7 — create_gap_engine 팩토리 + LLM_ONLY 모드
+```python
+>>> from backend.modeling.gap_detection import create_gap_engine, LLMOnlyGapEngine
+>>>
+>>> h = create_gap_engine(
+...     mode=GapMode.HIERARCHICAL,
+...     rule_differ=RuleASTDiffer(),
+...     drifter=CosineDrifter(embedder=ControlledEmbedder()),
+...     llm_comparator=None,
+... )
+>>> type(h).__name__
+'HierarchicalGapEngine'
+>>>
+>>> l = create_gap_engine(
+...     mode=GapMode.LLM_ONLY,
+...     llm_comparator=FakeComparator(),
+... )
+>>> type(l).__name__
+'LLMOnlyGapEngine'
+>>> hits = l.detect_conflicts(
+...     rules=[rule], fragments=[frag], described_in=[bind],
+...     config=ScanConfig(repo_id="demo", gap_mode=GapMode.LLM_ONLY),
+... )
+>>> len(hits), hits[0].severity.value
+(1, 'critical')
+```
+
+### 체크리스트
+- [ ] 30/30 PASS (rule_ast 14 + drift 7 + engine 9 + enum 1).
+- [ ] 시나리오 2 : `extract_quantities` 가 숫자/비교/단위 3 셋을 뽑아냄. `≥/>=/이상` canonical 동치.
+- [ ] 시나리오 3 : 100 vs 50 → `GapSeverity.HIGH` + `description="rule_ast mismatch: numbers='100' vs '50'"`.
+- [ ] 시나리오 4 : 직교 벡터 → `GapSeverity.MEDIUM` + description 에 "cosine" 포함.
+- [ ] 시나리오 5 : rule_ast hit 쌍은 drift stage 에서 skip → 후보 1건만 배출 (dedup).
+- [ ] 시나리오 6 : Fake comparator 가 severity 를 HIGH → CRITICAL 로 덮어씀 + reasoning 이 description 에 append.
+- [ ] 시나리오 7 : `create_gap_engine(mode=HIERARCHICAL)` → HierarchicalGapEngine, `mode=LLM_ONLY` → LLMOnlyGapEngine.
+- [ ] IMAGE kind ManualFragment 는 rule_ast / drift 모두 스킵.
+- [ ] `llm_comparator=None` 인 HierarchicalGapEngine 도 정상 동작 (2 stage 만 돌림 — D3-2-b 전 사용 가능).
+- [ ] `LLMOnlyGapEngine(llm_comparator=None)` 은 `[]` + warning 로그.
+- [ ] 재스캔 시 동일 id — `sha1("rule_ast|…")[:16]` / `sha1("drift|…")[:16]` / `sha1("llm_only|…")[:16]` prefix 별.
+
+### Troubleshooting
+- **rule_ast 가 안 잡힘** : 양쪽 statement 에 숫자·비교·단위가 있어야 함. 둘 다 순수 산문이면 stage 1 은 침묵 (drift stage 가 받아야 함).
+- **"이상 vs ≥" 이 mismatch 로 찍힘** : `_canonical_comparator` 가 동의어로 처리해야 함. `"이상"` / `"≥"` / `">="` → `"ge"`. alias 맵 업데이트 필요 시 `rule_ast_differ.py::_COMPARATOR_ALIAS`.
+- **drift 가 너무 많이 잡힘** : `cutoff` 를 0.65 → 0.55 로 낮추거나 embedder 품질 검토. OpenAI `text-embedding-3-small` 기준 cutoff 0.65 가 경험값.
+- **HierarchicalGapEngine 결과가 2배** : rule_ast stage 에서 `locked_pairs` 가 채워졌는지 확인 — `(rule.fqn, fragment.fqn)` 튜플. 빈 채로 넘어가면 drift 가 중복 방출.
+- **LLM comparator 호출 안 됨** : HierarchicalGapEngine 은 stage 1/2 가 hit 한 쌍에 대해서만 comparator 호출. hit 없음 → comparator 호출 없음. LLMOnlyGapEngine 은 described_in 전체를 훑음.
+- **severity 가 엉뚱한 값으로 찍힘** : LLM comparator 가 Enum 이 아닌 string 반환 시 방어 로직 필요 (D3-2-b 에서 `try: GapSeverity(value) except ValueError: GapSeverity.MEDIUM`).
+- **REST API 가 없음** : D3-2-a 는 의도적으로 in-process 엔진만. REST/SSE + 승인 큐 UI 는 D3-3 예정.
+
+---
+
+## D-OD-11-D3-2-b — LLM Comparator (pydantic-ai Agent)
+
+D3-2-b 도 API 미노출. 검증은 pytest + Python REPL 로 진행. 실 LLM 호출은
+`ONTONG_LLM_INTEGRATION=1` + `@pytest.mark.integration` 이중 게이트로 격리.
+
+### 시나리오 1 — 단위 테스트 (기본 스위트, Fake agent)
+```bash
+.venv/bin/python -m pytest tests/test_llm_comparator.py -v
+# 12 passed, 1 skipped (integration) in 0.05s
+```
+
+### 시나리오 2 — Literal 로 4값 강제 확인
+```python
+>>> from pydantic import ValidationError
+>>> from backend.modeling.gap_detection import LLMComparisonResult
+>>> LLMComparisonResult(severity="high", reasoning="quantity diverges")
+LLMComparisonResult(severity='high', reasoning='quantity diverges')
+>>> try:
+...     LLMComparisonResult(severity="apocalyptic", reasoning="bad")
+... except ValidationError as e:
+...     print("✓ rejected:", e.errors()[0]["type"])
+✓ rejected: literal_error
+```
+
+### 시나리오 3 — Fake Agent 로 compare() 동작 검증
+```python
+>>> from unittest.mock import MagicMock
+>>> from backend.modeling.gap_detection import (
+...     LLMComparisonResult, PydanticAILLMComparator
+... )
+>>> from backend.modeling.gap_detection.gap_models import ScanConfig
+>>> from backend.modeling.manuals.manual_models import (
+...     GapMode, GapSeverity, ManualFragment, ManualFragmentKind,
+... )
+>>> from backend.modeling.mapping.mapping_models import BusinessRule, RuleSeverity
+>>> from datetime import datetime, timezone
+>>> now = datetime(2026, 4, 21, tzinfo=timezone.utc)
+>>> rule = BusinessRule(qualified_name="inv.rule.safety_stock",
+...     statement="안전재고는 100개 이상 확보한다", terms_ref=["safety_stock"],
+...     severity=RuleSeverity.HARD, source="code", confirmed=True, created_at=now)
+>>> frag = ManualFragment(qualified_name="manual.spec#frag-1",
+...     section_fqn="manual.spec#sec-1", kind=ManualFragmentKind.TEXT,
+...     text="안전재고는 50개 이상 확보한다", order_index=0, created_at=now)
+>>> config = ScanConfig(repo_id="demo", gap_mode=GapMode.HIERARCHICAL)
+>>> # Fake agent: pydantic-ai import 없이 출력만 흉내
+>>> class _FakeAgent:
+...     def run_sync(self, msg):
+...         r = MagicMock()
+...         r.output = LLMComparisonResult(severity="high",
+...             reasoning="quantity diverges: 100 vs 50")
+...         return r
+>>> comp = PydanticAILLMComparator(agent_factory=lambda: _FakeAgent())
+>>> comp.compare(rule=rule, fragment=frag,
+...     prior_severity=GapSeverity.HIGH, config=config)
+(<GapSeverity.HIGH: 'high'>, 'quantity diverges: 100 vs 50')
+```
+
+### 시나리오 4 — Graceful degrade (어떤 예외도 재발생 안 함)
+```python
+>>> class _BoomAgent:
+...     def run_sync(self, msg): raise RuntimeError("network down")
+>>> comp = PydanticAILLMComparator(agent_factory=lambda: _BoomAgent())
+>>> sev, reason = comp.compare(rule=rule, fragment=frag,
+...     prior_severity=GapSeverity.MEDIUM, config=config)
+>>> sev  # prior severity 유지
+<GapSeverity.MEDIUM: 'medium'>
+>>> reason
+'LLM error: RuntimeError: network down'
+```
+
+### 시나리오 5 — Belt-and-suspenders (Literal 우회 시 MEDIUM 폴백)
+```python
+>>> from dataclasses import dataclass
+>>> @dataclass
+... class _RawOut:
+...     severity: str
+...     reasoning: str
+>>> class _WrongCategoryAgent:
+...     """'hard' 는 GapSeverity Enum 엔 있지만 MISSING_IN 카테고리 — CONFLICTS_WITH 결과엔 부적절."""
+...     def run_sync(self, msg):
+...         r = MagicMock()
+...         r.output = _RawOut(severity="hard", reasoning="wrong category")
+...         return r
+>>> comp = PydanticAILLMComparator(agent_factory=lambda: _WrongCategoryAgent())
+>>> sev, reason = comp.compare(rule=rule, fragment=frag,
+...     prior_severity=GapSeverity.HIGH, config=config)
+>>> sev  # MEDIUM 폴백
+<GapSeverity.MEDIUM: 'medium'>
+>>> "invalid" in reason.lower()
+True
+```
+
+### 시나리오 6 — HierarchicalGapEngine stage 3 통합 (Fake comparator)
+```python
+>>> from backend.modeling.gap_detection import (
+...     HierarchicalGapEngine, RuleASTDiffer, CosineDrifter
+... )
+>>> # stage 1 이 HIGH 로 hit 한 뒤 LLM 이 CRITICAL 로 재평가
+>>> class _BumpAgent:
+...     def run_sync(self, msg):
+...         r = MagicMock()
+...         r.output = LLMComparisonResult(severity="critical",
+...             reasoning="financial impact: inventory cost overrun")
+...         return r
+>>> class _ZeroEmb:
+...     def embed(self, text): return [0.0]
+>>> engine = HierarchicalGapEngine(
+...     rule_differ=RuleASTDiffer(),
+...     drifter=CosineDrifter(embedder=_ZeroEmb(), cutoff=0.65),
+...     llm_comparator=PydanticAILLMComparator(agent_factory=lambda: _BumpAgent()),
+... )
+>>> gaps = engine.detect_conflicts(
+...     rules=[rule], fragments=[frag],
+...     described_in=[(rule.qualified_name, frag.qualified_name)],
+...     config=config,
+... )
+>>> gaps[0].severity  # HIGH → CRITICAL 로 재평가됨
+<GapSeverity.CRITICAL: 'critical'>
+>>> "financial impact" in gaps[0].description
+True
+```
+
+### 시나리오 7 — 실 LLM smoke (opt-in, 환경 변수 게이트)
+```bash
+# 기본은 SKIP. 수동 회귀시에만 실행.
+export ONTONG_LLM_INTEGRATION=1
+export OPENAI_API_KEY=sk-...
+.venv/bin/python -m pytest tests/test_llm_comparator.py -m integration -v
+# test_real_llm_returns_valid_severity PASSED
+# severity ∈ {LOW, MEDIUM, HIGH, CRITICAL}, reasoning non-empty
+```
+
+### 시나리오 8 — main.py startup 분기 (ONTONG_LLM_COMPARATOR=openai)
+```bash
+# 기본: 변수 미지정 → _llm_comparator=None, 로그 없음
+.venv/bin/python -m uvicorn backend.main:app --port 8000 &
+# (startup 로그에 'PydanticAILLMComparator wired' 안 나옴 = 정상)
+
+# 실 LLM 경로: 환경 변수 지정 후 재기동
+export ONTONG_LLM_COMPARATOR=openai
+.venv/bin/python -m uvicorn backend.main:app --port 8000
+# INFO: Gap detection: PydanticAILLMComparator wired (ONTONG_LLM_COMPARATOR=openai)
+# (실제 engine 주입은 D3-3 에서 gaps_api 빌드 시 create_gap_engine(llm=_llm_comparator))
+```
+
+### Checklist
+- [ ] 시나리오 1 : 12 passed / 1 skipped (integration) / 0 failed (기본 스위트).
+- [ ] 시나리오 2 : `severity="apocalyptic"` → `ValidationError(literal_error)`.
+- [ ] 시나리오 3 : Fake agent output 이 `(HIGH, reasoning)` 튜플로 반환.
+- [ ] 시나리오 4 : `RuntimeError` / `TimeoutError` / `ValidationError` 모두 prior 보존 + reasoning 에 ExcType 기록.
+- [ ] 시나리오 5 : "hard" (MISSING_IN) 또는 "apocalyptic" → MEDIUM 폴백 + reasoning 에 "invalid".
+- [ ] 시나리오 6 : Hierarchical stage 1 HIGH → LLM override CRITICAL + description 에 reasoning append.
+- [ ] 시나리오 7 (opt-in) : 실 LLM 호출 시 severity ∈ 4 카테고리.
+- [ ] 시나리오 8 : `ONTONG_LLM_COMPARATOR=openai` 시 startup 로그에 "PydanticAILLMComparator wired" 출력.
+
+### Troubleshooting
+- **`ImportError: pydantic_ai`** : `pyproject.toml` 은 `pydantic-ai-slim[litellm]` 을 요구. `.venv` 재생성 or `poetry install` 필요.
+- **실 LLM 테스트가 계속 SKIP** : `ONTONG_LLM_INTEGRATION=1` 이 shell 환경에 안 실렸을 가능성. `env | grep ONTONG` 확인. `pytest -m integration` flag 도 필요.
+- **`LLM error: ValidationError: ...`** : pydantic-ai 가 severity 외 필드를 기대하는 버전 업데이트. `LLMComparisonResult` 스키마 재확인. 현재는 `severity` + `reasoning` 만.
+- **"LLM error: AuthenticationError"** : `OPENAI_API_KEY` 또는 해당 provider key 누락. `settings.litellm_model` 이 "provider/model" 포맷인지 확인.
+- **severity 가 계속 MEDIUM 만 나옴** : `_coerce_conflict_severity` 가 폴백 중. 로그에서 "invalid severity from LLM" warning 확인. 모델이 "hard"/"soft" 또는 알 수 없는 문자열을 뱉고 있음.
+- **`agent.run_sync()` 가 async 컨텍스트에서 hang** : 호출자가 이미 event loop 안이면 `run_sync` 금지. REST/SSE 호출은 D3-3 에서 `asyncio.to_thread(comparator.compare, ...)` 로 감쌀 것.
+- **HierarchicalGapEngine 이 comparator 호출 안 함** : stage 1 또는 stage 2 가 hit 해야 호출됨. 수량 mismatch 없고 embedding 유사하면 comparator 자체가 불림. LLMOnlyGapEngine 은 described_in 전체 순회.
+- **`prior_severity` 가 무시됨** : LLM 이 override 재량 — 정상. prior 는 프롬프트에 노출되지만 decision guide 가 주도. override 원치 않으면 `llm_comparator=None` 으로 D3-2-a 결과 유지.
+- **REST API 가 없음** : D3-2-b 는 comparator 만. API/UI 는 D3-3 예정 (`POST /api/modeling/gaps/scan` + 승인 큐).
+
+---
+
+## OD-11-D3-3 : Gap Queue REST/SSE API + 프론트 승인 UI (2026-04-21)
+
+**전제**: D3-2 로 `GapEngine` (Hierarchical) + (optional) `LLMComparator` 가 완비됨.
+이번 단계는 세 가지를 더한다:
+1. **`GapScanner` 오케스트레이터** — `MissingInDetector` + `GapEngine` 을 단일 스캔으로 묶고 ManualRegistry 에서 fragments 를 auto-pull.
+2. **4개 REST/SSE 엔드포인트** (`/api/modeling/gaps/...`) — POST `/scan`, POST `/scan/stream` (SSE), GET `/`, POST `/{gap_id}/confirm`.
+3. **프론트 `GapQueue.tsx`** — "갭 큐" 탭에서 스캔 실행 → 진행 단계 라이브 → 후보 테이블 → 확정 클릭.
+
+### 시나리오 0 : 서버 부팅 확인
+```bash
+./venv/bin/python -m uvicorn backend.main:app --port 8000
+# INFO: 156 routes 로드됨 (D3-2-b 대비 +4)
+# → /api/modeling/gaps/scan + /api/modeling/gaps/scan/stream + /api/modeling/gaps + /api/modeling/gaps/{gap_id}/confirm
+```
+
+### 시나리오 1 : Unified scan (sync, curl)
+```bash
+# fragments 를 body 에 명시하지 않으면 ManualRegistry 에서 auto-pull
+curl -X POST http://localhost:8000/api/modeling/gaps/scan \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "repo_id": "default",
+    "gap_mode": "hierarchical",
+    "business_terms": [],
+    "rules": [],
+    "described_in": []
+  }' | jq '.code_only | length, .manual_only | length, .conflicts | length, .errors'
+```
+**기대**:
+- ManualRegistry 에 fragments 가 있으면 `manual_only > 0` (코드 스캔 없으면 전부 manual_only).
+- `code_only` 는 아직 코드 분석 파이프라인 주입 전이므로 0.
+- `conflicts` 는 rules/described_in 비어 있으면 0.
+- 실행 후 `GET /api/modeling/gaps` 로 후보들이 보임.
+
+### 시나리오 2 : SSE streaming (curl)
+```bash
+curl -N -X POST http://localhost:8000/api/modeling/gaps/scan/stream \
+  -H 'Content-Type: application/json' \
+  -d '{"repo_id":"default","gap_mode":"hierarchical","business_terms":[],"rules":[],"described_in":[]}'
+```
+**기대** — 4 이벤트가 순서대로:
+```
+event: scanning
+data: {"stage":"scanning"}
+
+event: stage1_missing_in
+data: {"stage":"stage1_missing_in"}
+
+event: stage2_conflicts
+data: {"stage":"stage2_conflicts"}
+
+event: complete
+data: {"code_only":[...], "manual_only":[...], "conflicts":[...], "errors":[]}
+```
+
+### 시나리오 3 : 프론트 "갭 큐" 탭
+```bash
+# Front dev 서버 기동
+cd frontend && bun run dev
+# http://localhost:3000 → 모델링 섹션 → "갭 큐" 탭
+```
+**기대 흐름**:
+1. 필터 바 : Direction [all] / Severity [전체] / `[ ] 확정 포함`.
+2. "스캔 실행" 버튼 클릭 → Loader2 스피너 + `scanning → stage1_missing_in → stage2_conflicts → complete` 단계가 우측에 순서대로 표시.
+3. "complete" 도착 후 요약 (`code: N, manual: M, conflicts: K`).
+4. 하단 테이블에 후보가 렌더링. 각 행 : Direction 배지 / Severity 배지 / `target_fqn` / `counterpart_fqn` / description / `확정` 버튼.
+5. 버튼 클릭 → 서버 `POST /{gap_id}/confirm` → `확정` 체크 표시로 전환.
+
+### 시나리오 4 : 필터링 (GET /api/modeling/gaps)
+```bash
+# 기본 : confirmed 제외
+curl 'http://localhost:8000/api/modeling/gaps' | jq '.items | length'
+
+# direction 필터
+curl 'http://localhost:8000/api/modeling/gaps?direction=manual_only' | jq '.items[0]'
+
+# severity 필터 + confirmed 포함
+curl 'http://localhost:8000/api/modeling/gaps?severity=high&include_confirmed=true' | jq '.items | length'
+```
+
+### 시나리오 5 : 확정 엔드포인트 (404/200)
+```bash
+# 404 : unknown gap_id
+curl -i -X POST http://localhost:8000/api/modeling/gaps/nope_id/confirm
+
+# 200 : 유효 gap_id (시나리오 1 응답에서 추출)
+GID=$(curl -s 'http://localhost:8000/api/modeling/gaps' | jq -r '.items[0].gap_id')
+curl -X POST "http://localhost:8000/api/modeling/gaps/${GID}/confirm" | jq '.confirmed'
+# → true
+```
+
+### Checklist
+- [ ] 시나리오 0 : startup 로그에 gaps_api 라우터 include 성공.
+- [ ] 시나리오 1 : unified scan 응답이 `{code_only, manual_only, conflicts, errors}` 4 키 존재.
+- [ ] 시나리오 2 : SSE 4 이벤트 순서 `scanning → stage1_missing_in → stage2_conflicts → complete`.
+- [ ] 시나리오 3 : "갭 큐" 탭이 렌더링되고 스캔 후 테이블이 채워짐.
+- [ ] 시나리오 4 : 필터 쿼리 파라미터가 올바르게 동작 (confirmed 기본 제외).
+- [ ] 시나리오 5 : 확정 토글 후 재요청 시 `confirmed: true`.
+
+### Troubleshooting
+- **`503 gaps_api not configured`** : `gaps_api.init(...)` 가 `main.py` lifespan 에서 실행 안 됨. `_gap_scanner` / `_gap_store` / `_manual_registry` 주입 순서 확인.
+- **SSE 이벤트가 모두 `complete` 후 한 번에 쏟아짐** : 의도된 동작 (PoC buffered-flush). Prod 에서 진짜 진행바가 필요하면 `asyncio.Queue` 기반 streaming 으로 재설계.
+- **`manual_only` 가 계속 0** : ManualRegistry 에 fragments 없음. D2-2 업로드 시나리오 먼저 실행. 또는 body 에 `fragments` 를 명시적으로 전달.
+- **`conflicts` 가 계속 0** : `rules` 와 `described_in` 이 body 에 없으면 절대 안 잡힘 (D3-3 partial hybrid 제한). 코드 분석 파이프라인 주입 (Phase E) 후 해결.
+- **Frontend `g.id is undefined`** : `GapCandidateDto.gap_id` 필드명 사용. 렌더링 코드는 `g.gap_id` 이어야 함.
+- **`scanGapsStream` 이 한 번만 emit 후 멈춤** : fetch 가 `text/event-stream` 이 아닌 응답을 받은 경우 (예: 500). 네트워크 탭에서 Content-Type 확인.
+- **확정 후에도 테이블에 나옴** : 필터에서 "확정 포함" 을 켰거나, 재-fetch 를 안 호출. `confirmGap` 성공 후 `listGaps` 재실행.
+- **`HashingTextEmbedder` 가 너무 단조로운 결과** : 의도된 동작 (결정적 fallback). Prod 는 `OpenAIEmbedder` 주입. `ONTONG_EMBEDDER=openai` 같은 분기는 아직 없음 — 필요하면 D4/E 에서.
+
+---
+
+## Repository 관리 워크플로우 (2026-04-25)
+
+> 데모 코드를 12-Analyzer 로 파싱·등록하고 도메인 매핑·갭 분석 대상으로 활용하는 풀 워크플로우.
+> **브랜치**: `main`
+
+### 사전 준비
+```bash
+# 백엔드 (스타트업 시 sample-repos/*/.analyzed/ 자동 복원)
+cd /Users/donghae/workspace/ai/onTong
+.venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8001
+
+# 프론트엔드
+cd frontend && npm run dev   # localhost:3000 또는 3001
+```
+
+스타트업 로그에 다음이 보여야 정상:
+```
+auto_discover: slab-design-engine rehydrated (11 files, 95 entities)
+auto_discover: slab-design-real rehydrated (123 files, 1781 entities)
+RepositoryRegistry: auto-discovered 2 repo(s) from disk
+repos_api wired (POST /api/modeling/repos/register)
+```
+
+### 시나리오 1 — 등록된 repo 조회
+```bash
+curl -s http://localhost:8001/api/modeling/repos | python3 -m json.tool
+# {"items":[{"repo_id":"slab-design-engine",...},{"repo_id":"slab-design-real",...}]}
+```
+
+### 시나리오 2 — 신규 repo 등록 (sync)
+```bash
+curl -s -X POST http://localhost:8001/api/modeling/repos/register \
+  -H 'Content-Type: application/json' \
+  -d '{"repo_id":"my-demo","path":"sample-repos/scm-demo"}'
+# {"repo_id":"my-demo","files":13,"entities":...,"registered_at":"..."}
+# `<path>/.analyzed/entities.json` + `repo-meta.json` 생성됨
+```
+
+### 시나리오 3 — SSE 진행 스트림
+```bash
+curl -sN -X POST http://localhost:8001/api/modeling/repos/register/stream \
+  -H 'Content-Type: application/json' \
+  -d '{"repo_id":"sse-demo","path":"sample-repos/scm-demo"}'
+```
+이벤트 시퀀스 :
+```
+event: discovering   data: {"stage":"discovering","done":0,"total":13}
+event: parsing       data: {"stage":"parsing","done":1,"total":13}
+event: parsing       data: {"stage":"parsing","done":2,"total":13}
+...
+event: enriching     data: {"stage":"enriching","done":0,"total":1}
+event: done          data: {"repo_id":"sse-demo","files":...,"entities":...}
+```
+
+### 시나리오 4 — 등록 해제
+```bash
+curl -s -X DELETE http://localhost:8001/api/modeling/repos/sse-demo
+# {"removed":true,"repo_id":"sse-demo"}
+# 메모리에서만 제거. 디스크 캐시(`.analyzed/`) 는 유지 — 다음 startup 에 다시 복원됨.
+```
+
+### 시나리오 5 — 등록 후 즉시 propose-bindings
+```bash
+curl -s -X POST http://localhost:8001/api/modeling/terms/propose-bindings \
+  -H 'Content-Type: application/json' \
+  -d '{"repo_id":"slab-design-real"}' | python3 -m json.tool
+# {"repo_id":"slab-design-real","total_proposed":9,"total_skipped_no_match":159,"warnings":[]}
+```
+시드 BusinessTerm (품종코드 / 열연공장코드) 의 alias 가 JPA `@Column` 또는 필드명과 매치되는 9 케이스.
+
+### 시나리오 6 — UI 풀 워크플로우 (브라우저)
+1. `localhost:3001/` → 상단 **Modeling** 탭 클릭
+2. 좌측 사이드바 첫 항목 **Repository** 활성 (default 진입점) — 등록된 repo 카드 2개 (slab-design-engine, slab-design-real)
+3. **slab-design-real** 카드 클릭 → 자동으로 **도메인 매핑** 탭으로 이동 + 사이드바 "선택된 Repository: slab-design-real" 표시
+4. 도메인 매핑 화면: BusinessTerm (2) — 품종코드/열연공장코드 + 매핑 후보 (9) — 각 row 에 `term_fqn` / `code_fqn` / source=name_match / confidence=1.00 + [확정] [거부] 버튼
+5. 임의 row [확정] 클릭 → 상태 `proposed` → `confirmed` 변경 + 카운트 갱신
+6. **Repository** 탭으로 복귀 → "새 Repository 등록" 폼에서 preset chip "SCM 데모" 클릭 → `repo_id`/`path` 자동 채워짐 → [등록] 클릭 → 단계별 progress bar 표시 → 완료 시 카드 리스트에 추가
+
+### Checklist
+- [ ] 시나리오 1 : `GET /repos` 가 startup 로그의 `auto-discovered` repo 와 일치
+- [ ] 시나리오 2 : sync register 후 `<path>/.analyzed/entities.json` + `repo-meta.json` 생성
+- [ ] 시나리오 3 : SSE 가 `discovering` → `parsing` (N회) → `enriching` → `done` 순서로 emit
+- [ ] 시나리오 4 : DELETE 후 `GET /repos` 에서 사라지지만, backend 재시작 시 `.analyzed/` 로부터 다시 복원
+- [ ] 시나리오 5 : 등록 직후 propose-bindings 성공 (404 안 뜸)
+- [ ] 시나리오 6 : UI 에서 Repository 카드 클릭 → 도메인 매핑 자동 이동 + 매핑 후보 즉시 렌더링
+
+### Troubleshooting
+- **`404 repo_id=... 가 등록 안 됨`** : `GET /repos` 로 등록 확인. 누락이면 `POST /repos/register` 먼저, 또는 `.analyzed/` 디렉토리 존재 확인 후 backend 재시작.
+- **Auto-discover 가 잘못된 `repo_id` (예: "slab" 대신 dir 명) 로 복원** : `<path>/.analyzed/entities.json` 의 `metadata.repo_id` 가 구버전 dump_entities_snapshot 산출물. 직접 수정하거나 디렉토리 삭제 후 register 재실행.
+- **SSE 가 `done` 없이 끊김** : worker thread 에서 예외 발생. backend 로그에서 `register/stream worker failed` 확인.
+- **도메인 매핑 클릭 시 빈 화면** : (구버전 게이트 버그) — 현재는 Repository 탭으로 대체됐으므로 발생 안 함. 만약 재발하면 `selectedRepoId` state 가 비어있을 가능성 — Repository 탭에서 카드 클릭으로 선택.
+- **`POST /register/stream` 이 SSE 가 아닌 JSON 으로 오는 경우** : path 검증 실패 → 즉시 404 (StreamingResponse 시작 전). path 가 절대경로 또는 project-root 상대경로인지 확인.
+
+---
+
+## 🎯 풀 데모 시나리오 — 4-탭 워크플로우 (2026-04-26)
+
+> **타깃 분량** : 8~12분. 사용자 (현업/도메인 전문가) 가 코드를 만지지 않고 "내가 쓰는 용어가 코드 어디서 어떻게 쓰이고, 기준서와 어디가 안 맞는지" 한 번에 파악.
+> **전제** : `OPENAI_API_KEY` 환경변수 설정. 미설정 시 갭 큐 conflicts 가 noise 다수.
+
+### 사전 준비 (1분)
+```bash
+# Backend
+cd /Users/donghae/workspace/ai/onTong
+.venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8001 --log-level warning &
+
+# Frontend (별도 터미널)
+cd frontend && npm run dev
+```
+
+Backend startup log 확인 :
+```
+RuleRegistry seeded from slab-design-engine: 16 rules
+RuleRegistry seeded from slab-design-real: 38 rules
+ManualRegistry seeded: sd-tables.md (ingested)
+ManualRegistry seeded: slab-design.md (ingested)
+Auto-linker (openai-text-embedding-3-small, threshold=0.55): 7 DescribedInBinding ...
+Reverse lookup re-wired: 2 terms, shared with terms_api binding store
+```
+
+브라우저 → `http://localhost:3001` → 상단 **Modeling** 탭
+
+---
+
+### Step 1 — Repository (1분, "코드를 등록한다")
+
+**시연 멘트** : "먼저 분석할 코드베이스를 등록해야 합니다. 디스크 캐시가 있으면 자동 복원됩니다."
+
+1. 사이드바 **Repository** 탭 (default)
+2. 등록된 repo 카드 2개 확인 :
+   - `slab-design-real` (123 파일, 1781 엔티티, 3257 관계)
+   - `slab-design-engine` (11 파일, 95 엔티티)
+3. **slab-design-real** 카드 클릭 → 자동으로 **용어 매핑** 탭으로 이동 + 사이드바 "선택된 Repository: slab-design-real" 표시
+
+**선택 사항** — 새 repo 등록 시연 :
+- "새 Repository 등록" → preset chip "SCM 데모" 클릭 → [등록] → SSE 진행 표시 (discovering / parsing / enriching / done)
+
+---
+
+### Step 2 — 용어 매핑 (3~4분, "용어가 코드 어디 있는지 자동으로 찾는다")
+
+**시연 멘트** : "현업이 쓰는 한국어 용어를 등록하면, 코드의 JPA 컬럼/필드와 자동으로 후보 매핑을 만들어 줍니다."
+
+1. 도움말 패널 보여주기 — "동작 원리 — 3단계" + "용어 풀이"
+2. 좌측 "도메인 용어 (2)" — **품종코드** + **열연공장코드** 시드 확인
+3. 우측 상단 "**매핑 자동 탐색**" 클릭
+4. 결과 strip : "신규 후보 9 / 결정 보존 0 / 매칭 안 됨 159"
+5. 매핑 후보 표 확인 — 모두 검토대기 / name_match / conf 1.0
+6. 첫 행 **▸ 매칭 근거 펼치기** → evidence 패널 시연 :
+   - 클래스 / DB 컬럼명 / 이름 토큰 chips / 시도된 query chips
+7. 첫 행 [확정] 클릭 → 색깔 바뀜 (확정됨 + 거부 활성화 = 양방향 flip)
+8. 두번째 행 [확정] → 같은 식
+9. **"all fields + LLM" 모드 토글** → "매핑 자동 탐색" → opaque 식별자 시연 (없으면 0). 비-JPA 필드도 후보로 올라옴.
+
+**선택 사항** — 새 용어 등록 :
+- 좌측 "+ 새 용어" → 한국어 + alias 입력 → 등록 → 매핑 자동 탐색 재실행
+
+---
+
+### Step 3 — 갭 큐 (3~4분, "코드와 기준서 불일치를 자동 발견한다")
+
+**시연 멘트** : "코드의 비즈니스 룰과 기준서가 어디서 안 맞는지 자동 탐지합니다. 3 종류 갭이 있어요."
+
+1. 사이드바 **갭 큐** 탭
+2. 도움말 패널 — "3 종류 갭" 설명 (코드 → 기준서 없음 / 기준서 → 코드 없음 / 충돌)
+3. "**갭 자동 탐지**" 클릭
+4. 결과 strip : `31 코드 → 기준서 없음 · 18 기준서 → 코드 없음 · 7 충돌`
+5. 종류 필터 **"충돌"** 클릭 → 7건만 표시
+6. 충돌 1건의 **▸ 매칭 근거** 펼치기 → **EvidencePanel** 시연 :
+   - "stage: rule_ast" 배지
+   - 좌측 amber 박스 : 코드 룰 (Javadoc) — 예: `AND HR_TGT_WIDTH_LOW ≤ hrTgtWidth ...`
+   - 우측 blue 박스 : 기준서 fragment — 매뉴얼 발췌
+   - 하단 색깔 chips : numeric 불일치 / comparator 불일치 / unit 불일치 — 좌↔우 pair 시각화
+7. [확정] 클릭 → 갭 확정. **[보류로]** 클릭 → 다시 보류 (양방향 flip).
+8. 종류 필터 **"코드 → (기준서 없음)"** 으로 바꿔 31건 시연 — "이 룰들은 매뉴얼에 안 적혀있다" → **기준서 보완 필요** 액션 아이템
+
+---
+
+### Step 4 — 역탐색 (1~2분, "용어 → 코드 위치 즉답")
+
+**시연 멘트** : "확정한 매핑이 어떤 가치를 주는지 — 한국어 용어 한 단어로 영향받는 코드 위치를 다 찾을 수 있습니다."
+
+1. 사이드바 **역탐색** 탭
+2. 검색 용어 : `품종코드` 입력 → [역탐색] 클릭
+3. 용어 해석 결과 : `매칭된 용어 term.품종코드 / exact / conf 1.00`
+4. 영향 받는 코드 위치 (3, 또는 확정한 binding 만큼) :
+   - `com.example.slabdesign...CastSpecJpo.productTypeCd` — 거리 1, 신뢰도 1.00, name_match
+   - `...CustomerStdJpo.productNameCd` — 같은 식
+   - `...EdgingGroupJpo.productTypeCd`
+5. **mode 토글 시연** — "안전 (alias 만)" / "관측 (확정만)" / "잠재 (모두)" 의 차이 설명
+6. **"미확정 포함" 체크박스** — 미확정 매핑까지 포함 시 검색 범위 확대
+
+---
+
+### 마무리 멘트 (30초)
+"보신 4단계 — 코드 등록 → 용어 매핑 → 갭 발견 → 역탐색 — 가 우리 도구의 핵심입니다.
+- 도메인 전문가는 한국어로만 작업
+- AI 가 정확/별칭/임베딩/LLM 4단계로 자동 매칭
+- 결정은 사람이 확정 (확정·거부·보류로 양방향 변경 가능)
+- OpenAI text-embedding 으로 의미 기반 매칭 → noise 적은 진짜 신호"
+
+### 데모 후 자주 받는 질문
+- **Q. 매번 스캔 돌리면 확정한 결정 사라지나요?**
+  - A. 아니요. 백엔드가 확정/거부 상태를 보존하고, 재스캔 시 "결정 보존" 카운트로 표시.
+- **Q. 의미 없는 식별자 (`a1`, `i`) 도 매핑되나요?**
+  - A. all fields + LLM 모드에서 ContextBundler 가 클래스명/메서드명/sibling 필드까지 묶어서 LLM 에 던지면 가능. budget 30 cap 으로 비용 통제.
+- **Q. 충돌 7건 외에 더 발견하려면?**
+  - A. (1) 매뉴얼을 더 추가 (PDF/DOCX 도 인제스트 가능), (2) BusinessTerm 더 등록 → manual_only 감소, (3) Auto-linker threshold 낮추기 (현재 0.55 → 0.5 면 후보 증가).
+
+### Checklist (시연 전 체크)
+- [ ] Backend startup log 4종 (RuleRegistry / ManualRegistry / Auto-linker / Reverse lookup) 확인
+- [ ] Frontend `localhost:3001` 접속 → Modeling 탭 → Repository 자동 진입
+- [ ] slab-design-real 카드 클릭 → 용어 매핑 자동 이동
+- [ ] 매핑 자동 탐색 → 9 후보
+- [ ] 갭 자동 탐지 → 7 conflicts (OpenAI 활성 시), 100+ (Hashing fallback 시)
+- [ ] 역탐색 "품종코드" → 3+ affected (확정한 binding 수만큼)
+
+### Troubleshooting
+- **Conflicts 0건** : RuleRegistry 또는 ManualRegistry 시드 실패. backend log 에서 `Auto-linker:` 라인 확인.
+- **역탐색 0 affected** : 용어 매핑에서 binding 을 안 확정함. 또는 `concept_store.list_by_term` 의 confirmed patch 가 빠짐 (회귀).
+- **매핑 자동 탐색이 멈춤** : LLM stage budget 초과. log 에 `llm_budget_exhausted_30` 경고. opaque field 가 너무 많은 코드면 cap 조정 필요.
+- **Hashing embedder 로 fallback** : `OPENAI_API_KEY` 환경변수 확인. settings.openai_api_key 또는 환경 변수 둘 중 하나.
+
+---
+
+## 🎯 풀 데모 시나리오 v2 — 7-탭 + 깊이 탐색 (2026-04-26 갱신)
+
+> 4-탭 시나리오 (위 섹션) 확장판. **7 탭 + cross-tab navigation** 으로 데모 가치 극대화.
+> **타깃 분량** : 12~15분.
+> **하이라이트** : 한 화면 내에서 도메인 용어 → 코드 → 코드 그래프 끝까지 한 클릭으로 이동.
+
+### 사이드바 7-탭 한눈에
+| # | 탭 | 역할 |
+|---|---|---|
+| 1 | **Repository** | 코드 등록 (12-analyzer 파싱) |
+| 2 | **기준서** | 매뉴얼 업로드 (PDF/DOCX/PPTX/MD/Image) |
+| 3 | **용어 매핑** | 한국어 용어 ↔ JPA 컬럼 |
+| 4 | **갭 큐** | 코드↔기준서 갭/충돌 |
+| 5 | **역탐색** | 용어 → 코드 |
+| 6 | **영향 분석** | 코드 → 코드 |
+| 7 | **DI 그래프** | Spring 의존성 시각화 |
+
+---
+
+### Step 0 — 사전 준비 (1분)
+```bash
+cd /Users/donghae/workspace/ai/onTong
+.venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8001 --log-level warning &
+cd frontend && npm run dev
+```
+Backend startup log 5종 확인 :
+```
+RuleRegistry seeded from slab-design-real: 38 rules
+ManualRegistry seeded: sd-tables.md
+Auto-linker (openai-text-embedding-3-small): 7 DescribedInBinding
+Reverse lookup re-wired: 2 terms
+gaps_api initialized (auto-linked described_in=7, embedder=openai-text-embedding-3-small)
+```
+
+브라우저 → `http://localhost:3001` → Modeling 탭
+
+---
+
+### Step 1 — Repository (1분)
+**시연 멘트** : "분석 대상 코드를 등록하면 12-analyzer 가 자동 파싱합니다."
+
+1. Repository 탭 (default 진입)
+2. slab-design-real 카드 클릭 → 용어 매핑 자동 진입
+
+(선택) 새 register: preset chip "SCM 데모" → SSE 진행 표시
+
+---
+
+### Step 2 — 기준서 (1분)
+**시연 멘트** : "기준서/매뉴얼은 PDF, DOCX, PPTX, 마크다운, 이미지 어떤 형식이든 업로드 가능합니다. 갭 큐 의 입력 데이터가 됩니다."
+
+1. 사이드바 기준서 탭
+2. 등록된 매뉴얼 2건 (sd-tables.md, slab-design.md) 확인
+3. (선택) 데모용 PDF 드래그 → SSE 진행 → ingested 토스트
+
+---
+
+### Step 3 — 용어 매핑 (3분)
+**시연 멘트** : "현업이 쓰는 한국어 용어를 등록하면, 코드의 JPA 컬럼/필드와 자동 매핑 후보를 만들어 줍니다."
+
+1. 도움말 패널 — "동작 원리 — 3단계" 보여주기
+2. "매핑 자동 탐색" → 9 신규 후보, name_match
+3. 첫 행 ▸ 펼침 → evidence 패널 (클래스 / DB 컬럼 / 이름 토큰 chips / 시도된 query)
+4. 첫 행 [확정] → "거부" 버튼 활성화 (양방향 flip 시연)
+5. **Cross-nav 시연** : 두 번째 행의 **term.품종코드** 텍스트 클릭 → **역탐색** 탭으로 자동 이동 + "품종코드" 자동 검색
+6. 다른 행에서 **code_fqn 클릭** → **영향 분석** 탭 자동 이동 + 그 fqn 자동 분석
+
+(돌아오기) 사이드바 용어 매핑 탭 다시 클릭
+
+---
+
+### Step 4 — 갭 큐 (3분)
+**시연 멘트** : "코드와 기준서가 안 맞는 곳을 자동 탐지합니다. 3 종류 갭이 있어요."
+
+1. 사이드바 갭 큐 → 도움말 패널 — "3 종류 갭" 설명
+2. "갭 자동 탐지" → `31 코드 → 기준서 없음 · 18 기준서 → 코드 없음 · 7 충돌`
+3. 종류 필터 "충돌" 클릭 → 7건
+4. 충돌 1건 ▸ 펼침 → **EvidencePanel** :
+   - 좌 amber 박스: 코드 룰 (Javadoc)
+   - 우 blue 박스: 기준서 fragment
+   - 하단 chips: numeric / comparator / unit 불일치 좌↔우 pair
+5. **Cross-nav 시연** : 충돌 행의 **target_fqn** (예: `...EdgingService.findGroup#rule1`) 클릭 → 영향 분석 탭 → `EdgingService.findGroup` 자동 분석 → 호출자 트리
+
+(돌아오기) 갭 큐 탭
+
+(선택) **Auto-link UI** : 헤더 "auto-link (7)" 버튼 → 패널 펼침 → threshold slider 0.55 → 0.45 → 재계산 → bindings 7→59 → 갭 자동 탐지 다시 → conflicts 더 많이
+
+---
+
+### Step 5 — 역탐색 (1.5분)
+**시연 멘트** : "확정한 매핑이 어떤 가치를 주는지 — 한국어 용어 한 단어로 영향받는 코드 위치를 다 찾을 수 있습니다."
+
+1. 사이드바 역탐색 (또는 Step 3 의 cross-nav 로 이미 도달)
+2. "품종코드" 입력 → [역탐색]
+3. 용어 해석 결과 strip 확인 (term.품종코드, exact, conf 1.0)
+4. 영향 받는 코드 위치 — 확정한 binding 수만큼 (3+)
+5. **Cross-nav 시연** : affected 옆 [영향 분석] 버튼 클릭 → 영향 분석 탭 → 그 fqn 자동 분석
+
+---
+
+### Step 6 — 영향 분석 (2분)
+**시연 멘트** : "역탐색이 도메인→코드 라면 영향 분석은 코드→코드. 변경 영향 사전 파악."
+
+1. 사이드바 영향 분석 (또는 Step 5 cross-nav 로 도달, target 자동 입력됨)
+2. 방향 토글 "incoming/outgoing" 차이 설명
+3. 모드 토글 "잠재" → "안전" 비교 — 안전은 신뢰도 0.9 이상만
+4. EdgingService 입력 + outgoing → 71 affected (constructor + 메서드 + 의존 entity)
+5. **드릴다운 시연** : affected 행 옆 [드릴다운] 클릭 → 그 fqn 으로 같은 탭에서 재분석 (BFS 더 깊이)
+
+---
+
+### Step 7 — DI 그래프 (1.5분)
+**시연 멘트** : "Spring 빈 구조를 시각적으로. Controller → Service → Repository 흐름이 한눈에."
+
+1. 사이드바 DI 그래프
+2. Layer 색깔 표 — Controller (amber) / Service (blue) / Repository (green) / Config (violet) / Other
+3. slab-design-real: 61 beans / 50 autowires
+4. 그래프 zoom in/out + MiniMap
+5. 노드 클릭 (예: SdDesigner 같은 Service) → 우측 패널 :
+   - 빈 정보 (이름 / fqn / layer / bean_kind)
+   - **↓ outgoing** — 의존하는 빈 리스트 (각 클릭으로 그래프 선택 변경)
+   - **↑ incoming** — 이 빈을 사용하는 빈 리스트
+6. **Cross-nav 시연** : 우측 패널 [이 빈 영향 분석] → 영향 분석 탭 + 자동 분석
+
+---
+
+### 마무리 멘트 (30초)
+"7 탭 모두 cross-navigation 으로 연결됐습니다 :
+- **도메인 용어 → 코드** (역탐색)
+- **코드 → 코드** (영향 분석)
+- **빈 → 빈** (DI 그래프)
+- **갭/충돌 → 코드** (갭 큐 → 영향 분석)
+
+도메인 전문가가 한국어 용어 한 단어로 시작 → 한 클릭마다 한 단계 깊이 들어가며 시스템 전체를 파악할 수 있습니다."
+
+### 데모 후 자주 받는 질문 (확장)
+- **Q. DI 그래프 노드가 너무 많으면?**
+  - A. zoom + MiniMap + 우측 패널의 incoming/outgoing 클릭으로 흐름 따라가는 것이 graph 자체 스크롤보다 효율적.
+- **Q. "안전 / 관측 / 잠재" 모드 차이?**
+  - A. 안전 = 신뢰도 0.9 이상만 / 관측 = 런타임 추적 + static literal / 잠재 = 모두 (추정 포함). 안전 = 정밀 보고용, 잠재 = 영향 빠짐 없이.
+- **Q. Cross-nav 가 어디까지?**
+  - A. 모든 관련 정보를 클릭으로 따라갈 수 있어야 함. 현재 6 방향 — 용어→역탐색, 코드→영향, 갭→영향, 역탐색→영향, 영향→영향(드릴), DI→영향.
+
+### Checklist v2 (7-탭 시연 전 체크)
+- [ ] Backend startup log 5종 (RuleRegistry / ManualRegistry / Auto-linker / Reverse lookup / gaps_api auto-linked) 확인
+- [ ] 7 탭 모두 사이드바에 표시 (Repository / 기준서 / 용어 매핑 / 갭 큐 / 역탐색 / 영향 분석 / DI 그래프)
+- [ ] 매핑 자동 탐색 → 9 후보
+- [ ] 갭 자동 탐지 → 7 conflicts
+- [ ] 역탐색 "품종코드" → 3+ affected
+- [ ] DI 그래프 → 61 beans 노드 + 화살표 그려짐
+- [ ] term_fqn / code_fqn / [영향 분석] / [드릴다운] / [이 빈 영향 분석] 모든 cross-nav 동작
+
+---
+
+## P3-2 — slab-design-real Repo Import (REST)
+
+서버 기동: `uvicorn backend.main:app --port 8765`
+
+```bash
+# 1. 임포트 시작 (job_id 반환)
+curl -X POST http://127.0.0.1:8765/api/ontology/repos/import \
+  -H 'Content-Type: application/json' \
+  -d '{"repo_id":"slab-design-real","repo_path":"sample-repos/slab-design-real"}'
+
+# 2. SSE 진행률 (parsing → adapting → classifying → storing → done)
+curl -N http://127.0.0.1:8765/api/ontology/repos/import/<job_id>/stream
+
+# 3. 결과 확인
+curl http://127.0.0.1:8765/api/ontology/code-types?repo_id=slab-design-real | jq 'length'
+# 기대: 123 (framework 6 / domain 76 / infra 41)
+```
+
+기대값:
+- 122 Java 파일 분석 → 123 CodeType, 956 CodeMethod, 1018 CallSite, errors=0
+- 동일 repo_id 재실행 시 idempotent (delete_repo + cascade FK 로 깨끗하게 교체)
+- Jpo 14개 모두 role=infra, Entity 12개 모두 role=domain
+
+---
+
+## P3-3 — 자동 매핑 추천 (REST)
+
+P3-2 import 후 즉시 호출 가능.
+
+```bash
+# 미리보기 (read-only) — 신뢰도 0.7 이상만
+curl -s -X POST 'http://127.0.0.1:8765/api/ontology/repos/slab-design-real/recommend?min_confidence=0.7' | jq '.summary'
+# {"terms":19,"actions":22,"type_realizations":24}
+
+# 영속 (confirmed=False, source="auto")
+curl -s -X POST 'http://127.0.0.1:8765/api/ontology/repos/slab-design-real/recommend?persist=true' | jq '.persisted_counts'
+# {"terms":29,"actions":36,"type_realizations":34}
+
+# 검증
+curl -s 'http://127.0.0.1:8765/api/ontology/terms?repo_id=slab-design-real' | jq 'length'  # 29
+curl -s 'http://127.0.0.1:8765/api/ontology/actions?repo_id=slab-design-real' | jq 'length'  # 36
+```
+
+데모 포인트:
+- 12 BusinessTerm 후보 confidence=1.0 (한국어 라벨 정확 매칭): 주문, 슬랩, 강종, 품종, 실수율, 단중, ...
+- SDOrderEntity 가 4 Jpo (Os/Om/Chemical/Qd) 의 PARTIAL realization 으로 자동 등록 — 평탄화 흡수 패턴 자동 검출.
+- 16 *Action.execute() 모두 `declared_on_term=주문` 으로 자동 추정 (첫 param 의 SDOrderEntity 타입 매칭).
+- SdDesigner.design() = workflow (orchestrator), 나머지 *Action.execute = effectful, validate/classify = pure_function.
+
+---
+
+## P3-4 — Repo Import 모달 (UI)
+
+```bash
+# 백엔드
+uvicorn backend.main:app --port 8000   # 또는 NEXT_PUBLIC_API_BASE_URL 로 다른 포트 가리키기
+
+# 프론트
+cd frontend && npm run dev   # http://localhost:3000
+```
+
+데모 흐름:
+1. TopBar 「Import」 버튼 클릭 (FolderInput 아이콘, 검색박스 옆).
+2. 모달 열림 — `repo_path` 기본값 `sample-repos/slab-design-real`, `repo_id` 자동 추출.
+3. 「Import 시작」 → progress bar 가 "Java 파싱 중 → CodeType 매핑 중 → Role 분류 중 → SQLite 저장 중" 단계별로 진행 (~150ms).
+4. import done 즉시 자동으로 「자동 매핑 추천 생성 중...」 → 추천 큐에 29 Term + 36 Action + 34 Realization 등록.
+5. done 카드 — CodeType/Method/CallSite 통계 + 추천 큐 카드 (BusinessTerm/Action/Realization).
+6. 「닫기」 → activeRepoId 가 import 한 repo 로 갱신됨, 워크벤치 좌측 패널에서 결과 조회 가능.
+
+---
+
+## P3-5 — Ontology Graph (xyflow + dagre)
+
+P3-3 추천 persist 후 즉시 시각화 가능.
+
+```bash
+curl -s 'http://localhost:3000/api/ontology/repos/slab-design-real/graph' | jq '.summary'
+# {"nodes_total":188,"edges_total":69,"nodes_term":29,"nodes_code_type":123,"nodes_action":36}
+
+# focus + BFS
+curl -s 'http://localhost:3000/api/ontology/repos/slab-design-real/graph?focus_fqn=term.scm.order.order&hops=2' | jq '.summary.nodes_total'
+```
+
+UI 흐름:
+1. TopBar 「그래프」 버튼 → Graph mode 진입 (default L3 = 온톨로지 ★).
+2. dagre LR 자동 layout — Term/CodeType/Action 188 노드 + 69 엣지 자동 배치.
+3. 검색박스에 텍스트 입력 → 매칭 노드 dropdown → 클릭 시 그 노드 중심 BFS subgraph.
+4. hops slider 로 반경 1~4 조절. focus 해제는 ✕.
+5. 엣지 색상 → 매핑 종류 즉시 식별: emerald=PRIMARY / amber 애니메이션=PARTIAL ★ / orange=Action realization / slate=extends/implements / violet=composition.
+6. 우하단 minimap 으로 큰 그래프 panning 보조.
+
+데모 포인트: SDOrderEntity 클릭 → 4 PARTIAL 매핑 (OS/OM/Chemical/QD) 가 amber 애니메이션 엣지로 즉시 시각화 — 평탄화 흡수 패턴이 한눈에 보임.
+
+---
+
+## P3-6 — 매핑 큐 confirm/reject (UI)
+
+```bash
+curl -s http://localhost:3000/api/ontology/repos/slab-design-real/queue | jq '.summary'
+# {"terms":28,"actions":35,"type_realizations":32,"total":95}
+
+curl -X POST 'http://localhost:3000/api/ontology/repos/slab-design-real/terms/term.scm.error_code/confirm'
+# {"ok":true,"action":"confirmed","target":"term.scm.error_code"}
+```
+
+UI 흐름:
+1. 좌측 사이드바 「큐」 탭.
+2. 4-section sub-tab — Term / Action / Real / Code (legacy callsite/unmapped).
+3. 각 sub-tab 에 카운트 배지 (예: Term 28, Action 35, Real 32, Code 7).
+4. 행 hover → 우측에 ✓ / ✗ 버튼 fade-in.
+5. ✓ 클릭 → optimistic 으로 큐에서 즉시 사라짐 + 백엔드 confirm. Term confirm 시 graph 가 다음 fetch 때 emerald 테두리로 변환.
+6. ✗ 클릭 → 후보 영구 삭제. recommend 다시 돌리면 재생성 가능.
+
+데모 포인트: 5 PARTIAL realization 모두 confirm → SDOrderEntity 의 평탄화 흡수 매핑이 "사용자 검증 완료" 상태로 그래프에 굳어짐.
+
+
+---
+## R6 — Authoring Agent Graph (2026-05-05)
+
+자바독 부재 레거시 코드를 graph 로 회복. 모든 cap (1/2/5/6/7) 이 ReAct 로 Code+Ontology+Mapping graph 탐색.
+
+### 새 흐름
+1. **새 세션** — Authoring 모드 진입 (✏️ Authoring → 🆕 새 세션)
+2. **① 코드 추출** — 좌측 트리에서 JPO 클래스 클릭 (선택 없으면 bundled HrSpec). cap 1 결과 카드.
+3. **② 가설** — graph 호출 시작 (β 카드 "🔍 가설 수립 · 그래프 탐색 중" + 현재 tool spinner).
+4. **③ 인터뷰** → ④ 답변 (Q-별 textarea 또는 freeform).
+5. **⑤ 옵션** — 2-4 선택지 + ★ 추천 + 각 옵션 클릭하여 채택.
+6. **⑦ 패턴 (NEW)** — 채택한 옵션이 기존 ontology 패턴과 정합한지 검사. severity color (rose/amber/blue) + recommendation.
+7. **⑥ 갭** — code-vs-domain 불일치 surface (옵션 선택 후).
+8. **⑩ 다음 단계 (NEW)** — 어디에서든 클릭 가능. 현재 state 보고 다음 액션 추천 (priority + reason + alternatives).
+9. **⑧ 명명 → ⑨ Archive → ✓ Confirm** — 기존 흐름.
+
+### β 라이브 진행 (graph 탐색 중)
+- 파란 카드: stage 라벨 + "그래프 탐색 중" + 현재 tool 의 펄스 dot + tool 이름 + args summary
+- 카드 하단: 완료 N회 + 최근 3개 tool 이름
+
+### γ Trace 펼치기 ("어떻게 알아냈나")
+- assistant 메시지 (cap 2/5/6/7) 하단 "🔍 어떻게 알아냈나 — N회 (Mms)" 토글
+- 클릭 시 ordered list — tool_name · args · result_summary · duration · cached/error 표시
+- 색상: error=rose / cached=amber / normal=blue
+
+### 검증된 시나리오
+- HrSpecJpo (slab-design-real) 자바독·코멘트 strip → cap 2 confidence 0.50→0.45 (5pt drop only). 자세한 측정: `r6_validation_report.md`.
+- 7개 신규 SSE/trace endpoint (`/extract|hypothesize|options|gaps|pattern/stream`, `/pattern`, `/tool-calls`, `/next-step`).
+- Tool budget enforcement: pydantic_ai `UsageLimits(tool_calls_limit=N)` 가 hard cap.
+
+### 비용 (slab-design-real, cold cache 기준)
+- Cap 1: ~$0.03 (Sonnet)
+- Cap 2: ~$1.00 (Opus, graph) — 가장 비싼
+- Cap 5: ~$0.50 (Opus)
+- Cap 6: ~$2.00 (Opus)
+- Cap 7: ~$1.90 (Opus)
+- Cap 10: ~$0.01 (Sonnet, no graph)
+- 풀 사이클 ~$5-7. Warm cache 세션은 절반 이하.
+
+
+---
+
+## P1a — Multi-entity Workflow (2026-05-05)
+
+> 한 세션 = N JPO. 5K 클래스 repo 에서 새 세션 5000번 만들 필요 없이 줄줄이 처리.
+
+### 흐름
+1. **새 세션** → 첫 entity (예: HrPlant) — extract → 가설 → 인터뷰 → 옵션 → 채택 → ⑦ 패턴 → ⑧ 명명 → ⑨ archive → ✓ Confirm.
+2. **⤳ 다음 Entity** 클릭 (violet) — 현재 entity 의 final artifact 를 history 로 push, capability state 초기화.
+3. **자동 cap 11 호출** — graph 로 다음 JPO 3-5개 추천 (signal: pk_overlap=emerald / same_package=blue / uncovered_domain=violet / frequent_caller=amber / inheritance_chain=cyan + confidence %).
+4. 「① 이 JPO 로 시작」 클릭 → 새 entity 의 cap 1 자동 실행.
+5. 두 번째 entity 부터 cap 7 (패턴 검사) 가 **prior_session_entities 도 입력 받음** — 직전 entity 들의 채택 옵션 / 구조 / persisted FQN 과의 일관성 자동 catch.
+6. **📚 종합 archive** (cyan, ≥1 entity 시 노출, ≥2 fully-active) — 도메인 전체 보고서 합성. title / executive summary / per-entity sections / 종합 관찰 / 결정 / 다음 세션 follow-up. .md 다운로드.
+
+### 세션 재개
+- **🔗 URL 버튼** — 현재 세션의 resume URL (`?authoring_session=<id>`) 클립보드 복사. 새 탭 / 다른 컴퓨터에서 열면 자동 복원.
+- **↻ 이어서 버튼** — 세션 ID prompt → backend `/replay` → store 복원 + chat 에 history 1줄 요약 자동 push.
+- 백엔드 무엇이 복원되나: 모든 cap 출력 (jpo / hypothesis / interview / answers / options / accepted_option / gaps / pattern / names / archive) + 완료된 entity 사이클 + 누적 비용.
+
+### 신규 endpoint
+- `POST /sessions/{id}/next-entity` (sync) + `/next-entity/stream` (SSE) — cap 11
+- `POST /sessions/{id}/next-entity-marker` — boundary marker
+- `POST /sessions/{id}/comprehensive-archive` — cap 12 종합 보고서
+- `GET /sessions/{id}/replay` — 세션 재개 state
+
+### Cap 7 cross-entity 동작
+사용자가 HrPlant 에서 "단일 master entity" 채택 후 다음 HrPlantConstraint 작업 시:
+- cap 7 가 PriorEntitySnapshot 으로 HrPlant 정보 받음 (채택 옵션 + 구조 + FQN)
+- prompt 룰: "In-session priors are the strongest signal" — DB 와 in-session 충돌 시 in-session 승리
+- HrPlantConstraint 가 Composition 패턴 따르면 ✓ matches 파인딩, 안 따르면 ≠ deviates / warn 으로 표시 + recommendation = "사용자 의견 필요"
+
+### 비용 (P1a 추가)
+- Cap 11 (next-entity, Sonnet): ~$0.05-0.10 per 호출
+- Cap 12 (comprehensive_archive, Sonnet, no graph): ~$0.10-0.20 per 호출
+- 5 entity 풀 세션 (cold cache) ~$25-35. Warm cache 절반.

@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>onTong Ontology · 작업 순서 + Action 의 정체</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#111b2e; --line:#1f2a44; --fg:#e6edf7; --muted:#94a3b8;
+    --primary:#38bdf8; --emerald:#10b981; --amber:#f59e0b; --rose:#f43f5e; --violet:#8b5cf6; --orange:#fb923c;
+  }
+  body{margin:0;font:13px -apple-system,Pretendard,sans-serif;background:var(--bg);color:var(--fg);padding:24px;line-height:1.55;max-width:1100px;margin:0 auto}
+  h1{margin:0 0 6px 0;font-size:20px}
+  h2{font-size:15px;margin:24px 0 8px 0;padding:6px 0;border-bottom:1px solid var(--line)}
+  h3{font-size:13px;margin:14px 0 6px 0;color:var(--violet)}
+  h4{font-size:12.5px;margin:10px 0 4px 0;color:var(--primary)}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:16px}
+  pre{background:#0f172a;color:#e6edf7;padding:10px;border-radius:6px;overflow-x:auto;font-size:11.5px;line-height:1.5;border:1px solid var(--line)}
+  code{background:rgba(56,189,248,0.1);color:var(--primary);padding:1px 5px;border-radius:3px;font-size:11.5px;font-family:ui-monospace,Consolas,monospace}
+  table{border-collapse:collapse;width:100%;margin:8px 0;font-size:12px}
+  th,td{padding:6px 8px;border:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:rgba(56,189,248,0.08);color:var(--primary);font-weight:600}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;margin:14px 0}
+  .panel.ok{border-color:rgba(16,185,129,0.5);background:rgba(16,185,129,0.04)}
+  .panel.info{border-color:rgba(139,92,246,0.5);background:rgba(139,92,246,0.04)}
+  .panel.warn{border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.04)}
+  .pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:600;margin-right:4px;vertical-align:middle}
+  .pill.violet{background:rgba(139,92,246,0.15);color:var(--violet);border:1px solid rgba(139,92,246,0.4)}
+  .pill.orange{background:rgba(251,146,60,0.15);color:var(--orange);border:1px solid rgba(251,146,60,0.4)}
+  .pill.amber{background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.4)}
+  .pill.emerald{background:rgba(16,185,129,0.15);color:var(--emerald);border:1px solid rgba(16,185,129,0.4)}
+  .pill.rose{background:rgba(244,63,94,0.15);color:var(--rose);border:1px solid rgba(244,63,94,0.4)}
+  .pill.muted{background:rgba(148,163,184,0.1);color:var(--muted);border:1px solid rgba(148,163,184,0.3)}
+  textarea{width:100%;box-sizing:border-box;background:#0f172a;color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-size:12px;font-family:inherit;line-height:1.4;min-height:50px;resize:vertical}
+  textarea:focus{outline:none;border-color:var(--primary)}
+  .field{margin:10px 0}
+  .field label{display:block;font-size:12px;margin-bottom:4px}
+  .field label .hint{display:block;font-size:11px;color:var(--muted);font-style:italic;margin-top:1px;font-weight:normal}
+  .form{background:rgba(56,189,248,0.04);border:1px solid rgba(56,189,248,0.2);border-radius:8px;padding:14px;margin:14px 0}
+  .form h4{color:var(--primary);margin-top:0}
+  .actions{display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap}
+  .btn{background:var(--primary);color:#0b1220;border:none;border-radius:4px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}
+  .btn:hover{opacity:0.9}
+  .btn.outline{background:transparent;border:1px solid var(--line);color:var(--fg)}
+  .btn.copied{background:var(--emerald);color:#fff}
+  .preview{display:none;background:#0f172a;border:1px solid var(--line);border-radius:6px;padding:10px;margin-top:8px;font-family:ui-monospace,Consolas,monospace;font-size:11px;white-space:pre-wrap}
+  .preview.visible{display:block}
+  .ascii{font-family:ui-monospace,Consolas,monospace;background:#0f172a;padding:14px;border-radius:6px;color:#cbd5e1;font-size:11.5px;white-space:pre;overflow-x:auto;line-height:1.5;border:1px solid var(--line)}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin:8px 0;display:grid;grid-template-columns:40px 1fr;gap:12px}
+  .step .num{width:32px;height:32px;border-radius:50%;background:var(--card);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+  .step.done .num{background:var(--emerald);border-color:var(--emerald);color:#0b1220}
+  .step.active .num{background:var(--primary);border-color:var(--primary);color:#0b1220}
+  .step.todo .num{color:var(--muted)}
+  .step .label{font-size:13px;font-weight:600;margin-bottom:3px}
+  .step .body{font-size:11.5px;color:var(--muted);line-height:1.6}
+</style>
+</head>
+<body>
+
+<h1>onTong Ontology — Layered 구조 + 작업 순서</h1>
+<div class="sub">2026-05-05 · 사용자 질문: "Detail/Split 이 Action 만 받는 이유" + "처음부터 작업 순서"</div>
+
+<!-- ============================================== -->
+<h2>§1. ontology 의 4 layer 구조</h2>
+
+<div class="panel info">
+  onTong ontology 는 의도적으로 4개 layer 로 분리되어 있습니다 (project_decisions_v4_action.md 의 핵심 결정). 각 layer 는 다른 type 의 entity 를 다루고, 별도 작업이 필요합니다.
+</div>
+
+<div class="ascii">┌─────────────────────────────────────────────────────────────┐
+│  Layer 4 — View / Simulation                              │
+│    시뮬레이션, 영향도 분석, 그래프 — 위 layer 들 위에 작동   │
+└─────────────────────────────────────────────────────────────┘
+                            ▲
+┌─────────────────────────────────────────────────────────────┐
+│  Layer 3 — Mapping (anchor binding)                       │
+│    method 의 fragment ↔ Action 의 parameter / variable    │
+│    "이 if 조건은 X 도메인 룰" / "이 변수는 Y 도메인 값"    │
+└─────────────────────────────────────────────────────────────┘
+                            ▲
+┌──────────────────────────┐ │ ┌───────────────────────────┐
+│  Layer 2 — Domain        │ │ │  Layer 1 — Code           │
+│    BusinessTerm (명사)    │ │ │    CodeType (Java class)  │
+│    Action (동사)          │ │ │    CodeMethod (Java mtd)  │
+│    Inheritance / Compose │ │ │    CodeField              │
+└──────────────────────────┘ │ └───────────────────────────┘
+                            ▲
+                       (자동 import)
+                            ▲
+                       repo source
+</div>
+
+<table>
+<tr><th>Layer</th><th>주요 entity</th><th>현재 onTong 진행도</th></tr>
+<tr>
+  <td><span class="pill emerald">L1 Code</span></td>
+  <td><code>CodeType</code> (class), <code>CodeMethod</code>, <code>CodeField</code></td>
+  <td>✅ 자동 import 작동 — slab-design-real 123 class 인덱스됨</td>
+</tr>
+<tr>
+  <td><span class="pill violet">L2 Domain - 명사</span></td>
+  <td><code>BusinessTerm</code> (열연공장, 슬랩, 주문)</td>
+  <td>🟡 우리 <strong>Authoring 모드</strong> 가 작성 중 (현재 R2 진행)</td>
+</tr>
+<tr>
+  <td><span class="pill orange">L2 Domain - 동사</span></td>
+  <td><code>Action</code> (slab 설계, validate, 폭 계산)</td>
+  <td>🔴 미작성 — Authoring 모드는 아직 Action 못 만듦</td>
+</tr>
+<tr>
+  <td><span class="pill amber">L3 Mapping</span></td>
+  <td><code>AnchorBinding</code> (code fragment ↔ Action 의 도메인 의미)</td>
+  <td>🔴 미작업 — Action 이 있어야 매핑 가능</td>
+</tr>
+<tr>
+  <td><span class="pill muted">L4 View</span></td>
+  <td>시뮬레이션 코드 생성, 영향도 분석</td>
+  <td>⏳ 다음 phase</td>
+</tr>
+</table>
+
+<!-- ============================================== -->
+<h2>§2. 명사 (BusinessTerm) vs 동사 (Action) — 구분 이유</h2>
+
+<div class="panel">
+  도메인 표현은 <strong>"무엇이 있나"</strong>(명사) 와 <strong>"무엇을 하나"</strong>(동사) 로 나뉩니다. 코드도 마찬가지로 <strong>data structure</strong>(class/field) 와 <strong>behavior</strong>(method) 로 분리됩니다.
+</div>
+
+<table>
+<tr><th></th><th>BusinessTerm (명사) <span class="pill violet">term</span></th><th>Action (동사) <span class="pill orange">action</span></th></tr>
+<tr><td>예시</td>
+  <td>열연공장, 슬랩, 주문, HrPlantConstraint, 압연MAX단중기준</td>
+  <td>"slab 설계", "validate 우선도", "폭 LOW 산정", "EDGING_GROUP 룩업"</td></tr>
+<tr><td>코드 매핑</td>
+  <td><code>CodeType</code> (Java class) — 1:1 가깝게 매핑</td>
+  <td><code>CodeMethod</code> (Java method) — 다형성 (1:N realization)</td></tr>
+<tr><td>핵심 facet</td>
+  <td>kind, key (PK), facets, composition</td>
+  <td>params, output, preconditions, realizations, anchor_bindings</td></tr>
+<tr><td>Round 5 예시</td>
+  <td>HrPlant (열연공장)</td>
+  <td>SdSecondWgtHighAction.execute() → "2차 단중상한 산정"</td></tr>
+<tr><td>Detail/Split mode</td>
+  <td>안 봄 (BusinessTerm 은 별도 view)</td>
+  <td>✅ 이 mode 의 입력 — Action 의 anchor binding 작업용</td></tr>
+</table>
+
+<h4>왜 분리했나</h4>
+<ul style="font-size:12px">
+  <li><strong>Action 다형성</strong> — Java OO 의 추상메서드 + override 패턴. abstract Action 을 N 개 class 가 realize. ex. <code>validate()</code> 가 50 class 에서 override → Action 1개 + realization 50개.</li>
+  <li><strong>Anchor binding 의 단위</strong> — method body 안의 if/return/계산 fragment 마다 도메인 의미. method=Action 일 때만 자연스러움.</li>
+  <li><strong>시뮬레이션</strong> — Action 단위로 generate (메서드별 Python 변환). BusinessTerm 은 data shape, Action 은 logic.</li>
+</ul>
+
+<!-- ============================================== -->
+<h2>§3. 처음부터의 작업 순서 (이상적 흐름)</h2>
+
+<div class="step done">
+  <div class="num">1</div>
+  <div>
+    <div class="label">Repo Import — 코드 자동 분석</div>
+    <div class="body">
+      Java repo 를 onTong 에 import. tree-sitter 가 class/method/field 를 추출 → <code>code_types</code>, <code>code_methods</code>, <code>code_fields</code> 테이블에 저장. <span class="pill emerald">slab-design-real ✅ 완료 (123 CodeType)</span>
+    </div>
+  </div>
+</div>
+
+<div class="step active">
+  <div class="num">2</div>
+  <div>
+    <div class="label">BusinessTerm 작성 — 도메인 명사 entity</div>
+    <div class="body">
+      "열연공장", "슬랩", "주문" 같은 도메인 entity 를 만든다. 각 BusinessTerm 은 facets / composition / inheritance 를 가진다.<br>
+      <span class="pill amber">현재 진행 중</span> — 우리 ✏️ Authoring 모드 가 이 단계 자동화. round 5 인터뷰 패턴으로 코드 → 가설 → 옵션 → 명명 → confirm.
+    </div>
+  </div>
+</div>
+
+<div class="step todo">
+  <div class="num">3</div>
+  <div>
+    <div class="label">Action 작성 — 도메인 동사 entity</div>
+    <div class="body">
+      "validate 우선도", "폭 LOW 산정", "EDGING_GROUP 룩업" 같은 도메인 행위. 각 Action 의 params / output / preconditions / realizations 를 정의.<br>
+      <span class="pill rose">미구현</span> — Authoring 모드를 Action 모드로 확장하면 가능 (인터뷰: 이 method 는 도메인상 어떤 행위? 입력은 어떤 BusinessTerm? 출력은? 룰은?). round 5 형식 그대로 적용 가능.
+    </div>
+  </div>
+</div>
+
+<div class="step todo">
+  <div class="num">4</div>
+  <div>
+    <div class="label">AnchorBinding — 코드 ↔ 도메인 매핑</div>
+    <div class="body">
+      Step 3 의 Action 이 만들어진 후, 코드 method body 안의 fragment (if 조건, 변수, 호출) 를 Action 의 parameter / 도메인 룰과 매핑. <strong>이 단계에서 Detail/Split 모드를 사용</strong>.<br>
+      <span class="pill rose">미구현</span> — Detail mode 는 이미 UI 가 있지만 Action 데이터가 없어서 빈 화면.
+    </div>
+  </div>
+</div>
+
+<div class="step todo">
+  <div class="num">5</div>
+  <div>
+    <div class="label">Verification + Simulation — 매핑 위에서 실행</div>
+    <div class="body">
+      매핑된 Action 을 Python 으로 generate, 도메인 룰 위에서 simulation 실행 + 영향도 분석. <span class="pill muted">미래 phase</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<h2>§4. 사용자 질문에 대한 정확한 답</h2>
+
+<div class="panel ok">
+  <h4 style="margin-top:0">Q: Detail/Split 이 Action 만 받는 이유?</h4>
+  <p style="font-size:12px;margin:4px 0">
+    Detail/Split 은 <strong>Step 4 (AnchorBinding)</strong> 작업의 view 입니다. 이 단계는 "Action 이 이미 존재한다" 는 가정 위에서 method body 의 fragment 를 그 Action 의 parameter 등에 매핑하는 작업이라 <strong>Action FQN 이 입력</strong>.
+  </p>
+  <p style="font-size:12px;margin:4px 0">
+    좌측 트리에서 <strong>CodeType (class)</strong> 만 선택해도 Detail 은 빈 화면 — Class 자체는 method 들의 컨테이너이지 Action 이 아님. Class 의 method 하나하나가 <code>execute()</code>, <code>validate()</code> 같은 도메인 행위 후보.
+  </p>
+</div>
+
+<div class="panel ok">
+  <h4 style="margin-top:0">Q: 처음부터 어떤 순서로?</h4>
+  <p style="font-size:12px;margin:4px 0">
+    위 5 step 그대로. <strong>Step 1 (코드 import)</strong> 은 자동 완료, <strong>Step 2 (BusinessTerm)</strong> 가 우리 Authoring 의 현재 작업. <strong>Step 3 (Action) 부터는 아직 인터뷰 capability 가 없으니 Authoring 모드를 확장해야</strong> 진행 가능.
+  </p>
+</div>
+
+<!-- ============================================== -->
+<h2>§5. 우리가 갈 길 — 두 갈래</h2>
+
+<table>
+<tr><th>경로</th><th>의미</th><th>사용자 결과</th></tr>
+<tr style="background:rgba(56,189,248,0.04)">
+  <td><strong>A. 깊게 (BusinessTerm 만)</strong></td>
+  <td>현재 R2 진행. BusinessTerm 인터뷰 + cascading + UI 폴리시. Action 은 별도 phase 에 둠.</td>
+  <td>HrPlant + 산하 entity 다 만들고, 다른 entity (Customer, Productivity 등) 도 BusinessTerm 으로 만든 후, 별도 phase 에서 Action 작성.</td>
+</tr>
+<tr style="background:rgba(139,92,246,0.04)">
+  <td><strong>B. 넓게 (BusinessTerm + Action 둘 다)</strong></td>
+  <td>R2 의 핵심 (P1-B humble, P2-B refresh, P4-1 markdown) 끝낸 후, Authoring capability 를 Action 까지 확장. 한 BusinessTerm 작성 후 그 BusinessTerm 과 관련된 Action 도 같은 인터뷰로.</td>
+  <td>HrPlant + Action (validate, lookup 등) 같이. 하지만 작업 ↑↑.</td>
+</tr>
+</table>
+
+<div class="panel info">
+  <strong>현 시점 추천:</strong> <strong>경로 A</strong> — BusinessTerm 인터뷰의 quality 를 R2 로 끌어올려 한 entity 를 정확히 만든 후, 그게 제대로 작동하면 Action 으로 확장. Round 5 의 만족감 5/5 에 도달 후 다음 단계로.
+</div>
+
+<!-- ============================================== -->
+<h2>§6. 답변 폼</h2>
+
+<div class="form">
+  <h4>각 질문 1-2 줄 OK</h4>
+
+  <div class="field">
+    <label>Q1. <strong>4 layer 구조 + Action 분리 의도</strong> 이해됐나?
+      <span class="hint">또는 더 설명 필요한 부분 있는지</span>
+    </label>
+    <textarea name="q1_understand" placeholder="예: 이해됨 / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q2. <strong>경로 선택</strong> — A (BusinessTerm 만 깊게) / B (BusinessTerm + Action 둘 다 넓게) / 다른 안
+      <span class="hint">내 추천: A. 한 단계 quality 끝낸 후 다음으로</span>
+    </label>
+    <textarea name="q2_path" placeholder="예: A / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q3. <strong>현재 R2 작업 우선순위</strong>
+      <span class="hint">계속 R2 진행 (F3 피드백 루프 + cascading 다음 작업) / 다른 영역 먼저</span>
+    </label>
+    <textarea name="q3_r2_next" placeholder="예: R2 F3 진행 / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q4. <strong>Detail/Split 모드의 빈 화면</strong> 처리
+      <span class="hint">A 유지 (그대로) / B 안내 메시지 (Authoring 모드로 가라는) 추가 / C Detail 도 클래스 view 로 확장</span>
+    </label>
+    <textarea name="q4_detail_empty" placeholder="예: B 안내 추가"></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q5. <strong>다음 행동</strong>
+      <span class="hint">F3 (피드백 루프) 시작 / 또는 다른 우선순위</span>
+    </label>
+    <textarea name="q5_next" placeholder="예: F3 시작"></textarea>
+  </div>
+
+  <div class="actions">
+    <button class="btn" data-action="copy">📋 답변 복사</button>
+    <button class="btn outline" data-action="preview">미리보기</button>
+  </div>
+
+  <div class="preview" id="preview"></div>
+</div>
+
+<script>
+const fields = [
+  ["q1_understand",   "Q1. 4 layer + Action 분리 이해"],
+  ["q2_path",         "Q2. 경로 선택 (A / B)"],
+  ["q3_r2_next",      "Q3. R2 우선순위"],
+  ["q4_detail_empty", "Q4. Detail/Split 빈 화면 처리"],
+  ["q5_next",         "Q5. 다음 행동"],
+];
+
+function buildText() {
+  const out = ["[onTong Ontology Workflow — 사용자 답변]"];
+  for (const [k, label] of fields) {
+    const v = (document.querySelector(`textarea[name="${k}"]`)?.value ?? "").trim();
+    if (v) out.push(`\n## ${label}\n${v}`);
+  }
+  return out.join("\n");
+}
+
+document.querySelector('[data-action="preview"]').addEventListener("click", () => {
+  const slot = document.getElementById("preview");
+  slot.textContent = buildText();
+  slot.classList.add("visible");
+});
+
+document.querySelector('[data-action="copy"]').addEventListener("click", async (e) => {
+  const txt = buildText();
+  try {
+    await navigator.clipboard.writeText(txt);
+    const btn = e.currentTarget;
+    const orig = btn.textContent;
+    btn.textContent = "✓ 복사됨";
+    btn.classList.add("copied");
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove("copied"); }, 1500);
+    const slot = document.getElementById("preview");
+    slot.textContent = txt;
+    slot.classList.add("visible");
+  } catch {
+    alert("복사 실패. 미리보기 영역에서 수동 복사하세요.");
+  }
+});
+</script>
+
+</body>
+</html>

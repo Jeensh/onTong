@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Round 2 — 비즈니스 개념 + 코드↔개념 브릿지</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161a22;
+    --panel-2: #1d222d;
+    --border: #2a3142;
+    --text: #e6e8ee;
+    --muted: #9aa3b2;
+    --accent: #6ea8fe;
+    --accent-2: #7ee787;
+    --warn: #f2b35b;
+    --danger: #ff6b6b;
+    --code-bg: #0b0d13;
+
+    --code: #6ea8fe;       /* blue : 코드 구조 노드 (Round 1 정의) */
+    --spring: #7ee787;     /* green : Spring 특화 노드 (Round 1) */
+    --db: #f2b35b;         /* orange : DB (Round 1) */
+    --cfg: #c792ea;        /* purple : Config (Round 1) */
+    --biz: #ff9ec7;        /* pink : BusinessTerm */
+    --rule: #ffb86c;       /* amber : BusinessRule */
+    --process: #8be9fd;    /* cyan : BusinessProcess */
+    --role: #bd93f9;       /* violet : Role */
+    --edge: #9aa3b2;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, "SF Pro Display", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; line-height: 1.6; }
+  body { padding: 40px 24px 120px; }
+  .container { max-width: 1120px; margin: 0 auto; }
+  h1 { font-size: 34px; margin: 0 0 8px; letter-spacing: -0.3px; }
+  h2 { font-size: 24px; margin: 56px 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); letter-spacing: -0.2px; }
+  h3 { font-size: 18px; margin: 32px 0 10px; color: var(--text); }
+  h4 { font-size: 14px; margin: 20px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  p { margin: 10px 0; color: var(--text); }
+  a { color: var(--accent); text-decoration: none; }
+  code.inline { background: var(--code-bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; font-size: 13px; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; overflow: auto; font-size: 13px; line-height: 1.55; color: #c9d1d9; }
+  pre code { white-space: pre; }
+  .kw { color: #ff7b72; }
+  .an { color: #79c0ff; }
+  .tp { color: #d2a8ff; }
+  .st { color: #a5d6ff; }
+  .fn { color: #d2a8ff; }
+  .cm { color: #8b949e; font-style: italic; }
+
+  .lead { font-size: 17px; color: #cfd3db; background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--biz); padding: 16px 20px; border-radius: 10px; margin: 20px 0 10px; }
+  .callout { border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin: 14px 0; background: var(--panel); }
+  .callout.warn { border-left: 4px solid var(--warn); }
+  .callout.ok { border-left: 4px solid var(--accent-2); }
+  .callout.danger { border-left: 4px solid var(--danger); }
+  .callout.q { border-left: 4px solid var(--accent); }
+  .muted { color: var(--muted); }
+  .hstack { display: flex; gap: 16px; flex-wrap: wrap; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; flex: 1; min-width: 260px; }
+  .card h4 { margin-top: 0; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--panel-2); color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  tr:last-child td { border-bottom: none; }
+  td code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; color: #c9d1d9; font-size: 12px; }
+
+  .chip { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); margin-right: 6px; }
+  .chip.code { color: var(--code); border-color: color-mix(in srgb, var(--code) 35%, var(--border)); }
+  .chip.spring { color: var(--spring); border-color: color-mix(in srgb, var(--spring) 35%, var(--border)); }
+  .chip.db { color: var(--db); border-color: color-mix(in srgb, var(--db) 35%, var(--border)); }
+  .chip.cfg { color: var(--cfg); border-color: color-mix(in srgb, var(--cfg) 35%, var(--border)); }
+  .chip.biz { color: var(--biz); border-color: color-mix(in srgb, var(--biz) 35%, var(--border)); }
+  .chip.rule { color: var(--rule); border-color: color-mix(in srgb, var(--rule) 35%, var(--border)); }
+  .chip.process { color: var(--process); border-color: color-mix(in srgb, var(--process) 35%, var(--border)); }
+  .chip.role { color: var(--role); border-color: color-mix(in srgb, var(--role) 35%, var(--border)); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 20px; }
+  .legend .chip { font-size: 12px; padding: 4px 10px; }
+
+  .svg-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; overflow-x: auto; }
+  svg text { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+  .node-label { fill: #e6e8ee; }
+  .edge-label { fill: var(--muted); font-size: 10px; }
+
+  .toc { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; font-size: 14px; }
+  .toc ol { margin: 6px 0 0 18px; padding: 0; }
+  .toc li { margin: 3px 0; color: var(--muted); }
+  .toc a { color: var(--text); }
+  .toc a:hover { color: var(--accent); }
+
+  .check { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+  .check:last-child { border-bottom: none; }
+  .check .box { font-weight: 700; color: var(--accent); min-width: 28px; }
+  .check .q { color: var(--text); }
+  .check .hint { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+  .walk-step { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin: 14px 0; }
+  .walk-step .step-title { font-size: 15px; font-weight: 700; color: var(--biz); margin-bottom: 6px; }
+  .walk-step .step-title .num { display: inline-block; background: var(--biz); color: #0b0d13; border-radius: 6px; padding: 1px 8px; margin-right: 8px; font-weight: 700; }
+
+  .field-row { display: grid; grid-template-columns: 180px 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
+  .field-row:last-child { border-bottom: none; }
+  .field-row .k { color: var(--muted); }
+  .field-row .v { color: var(--text); }
+
+  .badge { display: inline-block; background: var(--panel-2); border: 1px solid var(--border); padding: 1px 8px; border-radius: 4px; font-size: 11px; color: var(--muted); margin-left: 6px; }
+
+  .qbox { background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 10px; padding: 14px 18px; margin: 18px 0; }
+  .qbox .qtitle { font-weight: 700; color: var(--accent); margin-bottom: 6px; font-size: 15px; }
+  .qbox .qopts { margin: 10px 0 4px 0; padding-left: 18px; }
+  .qbox .qopts li { margin: 4px 0; }
+  .qbox .draft { color: var(--warn); font-size: 12px; margin-top: 8px; }
+
+  footer { margin-top: 80px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <div class="muted" style="font-size:12px; letter-spacing: 0.6px;">ONTONG · SECTION 2 · ROUND 2 · 2026-04-20 · rev.2</div>
+  <h1>비즈니스 개념 + 코드↔개념 브릿지</h1>
+  <p class="muted">Round 1은 코드만. Round 2는 "이 코드가 어떤 <em>비즈니스 개념</em>을 실현하는가?" 를 붙인다. Reverse Lookup 의 정합성이 여기서 정해진다.</p>
+  <div class="callout ok" style="margin-top:18px;">
+    <strong>rev.2 — 사용자 Q1~Q7 합의 반영 (2026-04-20)</strong>
+    <ul style="margin:6px 0 0 18px; padding:0;">
+      <li><strong>Q1 A</strong> : 수동 seed 우선. 팀 리더가 핵심 용어 20~50 등록 → 자동 제안 확장. <a href="#ops">§7</a></li>
+      <li><strong>Q2 B</strong> : 표준 confidence cutoff. name_match≥0.85 / embedding≥0.78 / llm≥0.6. <a href="#edges">§3-1</a></li>
+      <li><strong>Q3 B</strong> : 한 메서드 → primary 1개 + partial N개 REALIZES 허용. <a href="#one-to-many">§4</a></li>
+      <li><strong>Q4 D</strong> : <em>Role 노드 1차 제외</em> (Phase D+ 로 이월). <a href="#nodes">§2</a></li>
+      <li><strong>Q5 A→B</strong> : VALIDATES 는 어노테이션·주석부터 → 검증 메서드 이름 패턴 자동 제안 확장. <a href="#edges">§3</a></li>
+      <li><strong>Q6 A</strong> : 임베딩 스택 = OpenAI text-embedding-3-small + chromadb (Wiki 와 통일). <a href="#resolver">§6-3</a></li>
+      <li><strong>Q7 경계 B + 재검증 (d)</strong> : <em>BusinessProcess 도 1차 제외</em> (Term + Rule 만). 재검증은 PR 영향 범위만. <a href="#nodes">§2</a></li>
+    </ul>
+    <p style="margin:10px 0 0;"><strong>1차 노드 2종</strong> (BusinessTerm / BusinessRule) + <strong>엣지 2종</strong> (REALIZES / VALIDATES + Round 3 예약 DERIVED_FROM) 으로 간소화. BusinessProcess / Role / PART_OF / RESPONSIBLE_FOR 는 Phase D 이월.</p>
+  </div>
+</header>
+
+<div class="lead">
+  <strong>이 라운드의 한 줄</strong><br>
+  "<em>'안전재고'</em> 를 건드리려면 어디 어디를 봐야 하는가?" 라는 질문에 <strong>개념 → 코드 역매핑</strong>으로 답할 수 있는 스키마를 확정한다. 이 라운드에서 LLM 은 <em>보조 제안자</em> 역할 (사람 승인 전제).
+</div>
+
+<div class="toc">
+  <strong>목차</strong>
+  <ol>
+    <li><a href="#why">왜 Round 2 는 '개념 브릿지' 인가</a></li>
+    <li><a href="#nodes">노드 2종 (1차) — BusinessTerm / BusinessRule <span class="badge">Process/Role 은 Phase D 이월</span></a></li>
+    <li><a href="#edges">브릿지 엣지 — REALIZES / VALIDATES / DERIVED_FROM(예약)</a></li>
+    <li><a href="#one-to-many">1:N 구조 + method-level 1급 시민</a></li>
+    <li><a href="#walk">워킹 예시 — "안전재고" Reverse Lookup</a></li>
+    <li><a href="#resolver">Term Resolution Chain — exact → alias → 임베딩 → LLM</a></li>
+    <li><a href="#ops">코드↔개념 매핑 운영 — 자동 제안 + 사람 승인</a></li>
+    <li><a href="#reverse">Reverse Lookup 질의 시뮬레이션</a></li>
+    <li><a href="#questions">Open Questions (Q1~Q7) <span class="badge">드래프트 합의 필요</span></a></li>
+    <li><a href="#next">다음 라운드 예고 (Round 3 기준서)</a></li>
+  </ol>
+</div>
+
+<!-- =================================================================== -->
+<h2 id="why">1. 왜 Round 2 는 '개념 브릿지' 인가</h2>
+
+<p>
+  Round 1 로 "<code class="inline">OrderController.place()</code> 를 바꾸면 어디에 영향 가는가?" 는 답할 수 있게 됐다. 하지만 팀 리더의 실제 질문은 이쪽에 더 가깝다:
+</p>
+<ul>
+  <li>"<strong>안전재고</strong> 로직을 이번 스프린트에 수정해야 하는데, 손대야 할 모든 코드 위치를 알고 싶다."</li>
+  <li>"기준서에 '<strong>MOQ 제약</strong>' 이 있는데, 이게 실제로 어느 메서드/테이블에서 강제되는지?"</li>
+  <li>"'<strong>공정별 납기 계산</strong>' 프로세스를 누가 담당하고, 어떤 서비스가 그 책임을 구현하는가?"</li>
+</ul>
+<p>
+  이 질문들의 공통점 : <em>출발은 한국어 비즈니스 용어</em>, <em>도착은 코드 위치</em>. Round 1 스키마만으로는 "안전재고" 라는 한국어 검색어가 <code class="inline">SafetyStockCalculator.compute()</code> 또는 <code class="inline">safety_stock</code> 컬럼으로 연결되지 않는다. <strong>브릿지 레이어가 필요하다.</strong>
+</p>
+
+<h3>Round 1 vs Round 2 역할 분리</h3>
+<div class="hstack">
+  <div class="card">
+    <h4>Round 1 — 코드 그래프</h4>
+    <p><strong>사용자</strong> : 개발자, 아키텍트</p>
+    <p><strong>질문</strong> : "X.method 를 바꾸면 뭐가 깨지나?"</p>
+    <p><strong>해소</strong> : <em>결정적</em> BFS (QueryEngine.impact)</p>
+    <p><strong>LLM 개입</strong> : 없음</p>
+  </div>
+  <div class="card">
+    <h4>Round 2 — 개념 브릿지</h4>
+    <p><strong>사용자</strong> : 팀 리더, PM, 도메인 전문가</p>
+    <p><strong>질문</strong> : "'안전재고' 는 어디에 구현돼 있나?"</p>
+    <p><strong>해소</strong> : term → 개념 노드 → <em>다수 코드 위치</em> (QueryEngine.reverse_lookup)</p>
+    <p><strong>LLM 개입</strong> : term resolver 최후 fallback + 매핑 초안 제안 (사람 승인 전제)</p>
+  </div>
+</div>
+
+<div class="callout ok">
+  <strong>핵심 설계 원칙</strong> — Round 2 의 브릿지는 <em>데이터 계층</em> 이지 <em>LLM 응답</em> 이 아니다. 임베딩/LLM 은 <strong>매핑 등록·갱신 시점에만</strong> 호출돼서 <code class="inline">BusinessTerm</code> / <code class="inline">ConceptBinding</code> 에 고정된다. 사용자 쿼리 시점에는 결정적 그래프 조회로 답한다 (Round 1 동작 철학 계승).
+</div>
+
+<!-- =================================================================== -->
+<h2 id="nodes">2. 노드 — 1차 2종 + 이월 2종</h2>
+
+<div class="legend">
+  <span class="chip biz">BusinessTerm</span>
+  <span class="chip rule">BusinessRule</span>
+  <span class="chip process" style="opacity:0.4;">BusinessProcess (Phase D 이월)</span>
+  <span class="chip role" style="opacity:0.4;">Role (Phase D 이월)</span>
+</div>
+
+<div class="callout warn">
+  <strong>1차 범위 축소 — Q4 D + Q7 경계 B 반영</strong> — Round 2 에서는 <code class="inline">BusinessTerm</code> + <code class="inline">BusinessRule</code> 만 구현한다. <code class="inline">BusinessProcess</code> 와 <code class="inline">Role</code> 은 PoC 과잉으로 판단, Phase D 에 이월. 실제 Slab sample 에서 다단계 프로세스 또는 Spring Security role 이 Reverse Lookup 맥락에 필요하다고 드러날 때 재도입.
+</div>
+
+<h3>2-1. <span class="chip biz">BusinessTerm</span> — 비즈니스 용어 · 도메인 개념</h3>
+<p>한국어/영어 용어 단위. "안전재고", "BOM", "MOQ", "LeadTime" 같은 것. 팀 리더가 일상 대화에서 쓰는 단어들.</p>
+<pre><code><span class="kw">@dataclass</span>(frozen=<span class="tp">True</span>)
+<span class="kw">class</span> <span class="tp">BusinessTerm</span>:
+    <span class="an">qualified_name</span>: <span class="tp">str</span>         <span class="cm"># e.g. "inventory.safety_stock"</span>
+    <span class="an">canonical_label</span>: <span class="tp">str</span>        <span class="cm"># "안전재고" (권장 표기)</span>
+    <span class="an">aliases</span>: <span class="tp">list[str]</span>           <span class="cm"># ["Safety Stock", "안전 재고", "SS"]</span>
+    <span class="an">domain</span>: <span class="tp">str</span>                 <span class="cm"># "inventory" / "order" / "bom"</span>
+    <span class="an">description</span>: <span class="tp">str</span>            <span class="cm"># 1~3 줄 정의</span>
+    <span class="an">embedding</span>: <span class="tp">list[float] | None</span>  <span class="cm"># canonical_label + description 임베딩</span>
+    <span class="an">source</span>: <span class="tp">str</span>                 <span class="cm"># manual / extracted / llm_proposed</span>
+    <span class="an">confirmed</span>: <span class="tp">bool</span>             <span class="cm"># 사람이 승인했는가</span>
+</code></pre>
+
+<h3>2-2. <span class="chip rule">BusinessRule</span> — 비즈니스 규칙 · 제약</h3>
+<p>"안전재고 이하로 떨어지면 발주", "MOQ 미만 주문 거부", "납기일은 공휴일을 건너뛴다" 등 <em>검증 가능한 명제</em>. Round 1 의 메서드 <code class="inline">precondition</code> / <code class="inline">postcondition</code> 와 연결된다.</p>
+<pre><code><span class="kw">@dataclass</span>(frozen=<span class="tp">True</span>)
+<span class="kw">class</span> <span class="tp">BusinessRule</span>:
+    <span class="an">qualified_name</span>: <span class="tp">str</span>         <span class="cm"># e.g. "inventory.rule.below_safety_stock_triggers_order"</span>
+    <span class="an">statement</span>: <span class="tp">str</span>              <span class="cm"># "현재 재고 &lt; 안전재고 이면 자동 발주"</span>
+    <span class="an">terms_ref</span>: <span class="tp">list[str]</span>         <span class="cm"># 사용된 BusinessTerm FQN 들</span>
+    <span class="an">severity</span>: <span class="tp">str</span>               <span class="cm"># "hard" | "soft"</span>
+    <span class="an">source</span>: <span class="tp">str</span>                 <span class="cm"># 기준서 조항 / 담당자 인터뷰 / 코드 추론</span>
+    <span class="an">confirmed</span>: <span class="tp">bool</span>
+</code></pre>
+
+<h3>2-3. <span class="chip process" style="opacity:0.5;">BusinessProcess</span> — Phase D 이월</h3>
+<p class="muted">
+  "주문 접수 → 신용 체크 → 재고 할당 → 배송 지시" 같은 다단계 절차는 Round 2 에서 제외. 단어·명사 단위 (BusinessTerm) 로 Reverse Lookup 요구 대부분 충족된다는 판단. Slab sample 에서 시퀀스 맥락이 필요하다고 확인되면 Phase D 에서 노드+<code class="inline">PART_OF</code>/<code class="inline">NEXT_STEP</code> 엣지로 재도입.
+</p>
+
+<h3>2-4. <span class="chip role" style="opacity:0.5;">Role</span> — Phase D 이월</h3>
+<p class="muted">
+  역할/권한/페르소나 축도 PoC 범위에서 과잉. Spring Security <code class="inline">@PreAuthorize</code> 가 실제 코드에서 Reverse Lookup 질의 패턴으로 나올 때 재도입 (1차 스코프 : 권한 = Spring Security role 1:1, 조직/페르소나는 그 이후).
+</p>
+
+<!-- =================================================================== -->
+<h2 id="edges">3. 브릿지 엣지</h2>
+
+<table>
+  <thead>
+    <tr><th>엣지 kind</th><th>방향</th><th>의미</th><th>대표 속성</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>REALIZES</code></td>
+      <td>Method/Class → BusinessTerm</td>
+      <td>이 코드가 해당 비즈니스 개념을 <em>실현</em> 한다</td>
+      <td><code>confidence</code>, <code>source</code> ∈ {manual, name_match, embedding, llm}, <code>scope</code> ∈ {primary, partial}</td>
+    </tr>
+    <tr>
+      <td><code>VALIDATES</code></td>
+      <td>Method → BusinessRule</td>
+      <td>이 메서드가 해당 규칙을 <em>검증</em> 한다 (runtime assertion 또는 branch condition)</td>
+      <td><code>confidence</code>, <code>source</code>, <code>rule_position</code> ∈ {guard, assert, throw}</td>
+    </tr>
+    <tr>
+      <td><code>DERIVED_FROM</code><span class="badge">Round 3 예약</span></td>
+      <td>BusinessTerm → ManualDocument</td>
+      <td>이 용어가 어느 기준서 조항에서 나왔나</td>
+      <td><code>doc_ref</code>, <code>section</code>, <code>quote</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout ok">
+  <strong>1차 엣지 2종 (+1 예약)</strong> — Q4 D + Q7 경계 B 반영으로 <code class="inline">PART_OF</code> / <code class="inline">RESPONSIBLE_FOR</code> 후보 엣지는 삭제 (대상 노드 Process/Role 이 Phase D 이월). <code class="inline">DERIVED_FROM</code> 은 Round 3 (기준서 인제스트) 연결 지점으로 스키마에만 예약.
+</div>
+
+<h3>3-1. REALIZES 엣지의 3대 축</h3>
+<p>Reverse Lookup 정확도의 핵심이 이 엣지. 세 속성을 묶어서 본다:</p>
+<div class="hstack">
+  <div class="card">
+    <h4>source</h4>
+    <ul style="padding-left:16px; margin:6px 0;">
+      <li><code>manual</code> — 사람이 직접 승인</li>
+      <li><code>name_match</code> — 메서드/클래스 이름 정규식 매칭</li>
+      <li><code>embedding</code> — 임베딩 유사도 ≥ cutoff</li>
+      <li><code>llm</code> — LLM 초안 (승인 전)</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>confidence</h4>
+    <ul style="padding-left:16px; margin:6px 0;">
+      <li><code>manual</code> → 1.0</li>
+      <li><code>name_match</code> → 0.85~0.95</li>
+      <li><code>embedding</code> → 코사인 유사도 값</li>
+      <li><code>llm</code> → 0.4 (승인 필요 강제)</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>scope <span class="badge">Q3 B 결정</span></h4>
+    <ul style="padding-left:16px; margin:6px 0;">
+      <li><code>primary</code> — 해당 개념의 <em>주 구현</em>. <strong>메서드당 최대 1 개</strong> (유일성 제약).</li>
+      <li><code>partial</code> — 일부 관여 (보조/검증/로깅). <strong>개수 제한 없음</strong>.</li>
+    </ul>
+    <p class="muted" style="font-size:12px; margin-top:6px;">동일 메서드가 여러 개념에 걸리면 : 1 개 primary + N 개 partial. QueryEngine edge_kinds={REALIZES} + scope=primary 필터로 "주 구현만" 결정적 질의 가능.</p>
+  </div>
+</div>
+
+<h3>3-2. VALIDATES — Q5 A→B 단계적 확장</h3>
+<p>1단계 (A, 즉시) : <code class="inline">@AssertTrue</code> / <code class="inline">@Valid</code> / <code class="inline">@NotNull</code> 류 Bean Validation 어노테이션 + Javadoc <code class="inline">@precondition</code> / <code class="inline">@postcondition</code> 주석 → BusinessRule 로 자동 VALIDATES 엣지. 보수적, 오탐 거의 0.</p>
+<p>2단계 (B, A 안정화 후) : <code class="inline">validateXxx(...)</code> / <code class="inline">checkYyy(...)</code> / <code class="inline">ensureZzz(...)</code> 메서드 이름 패턴 → <code class="inline">source=name_match</code>, <code class="inline">confidence=0.85</code> 로 자동 제안 (사람 승인 큐).</p>
+<p>3단계 (C, Phase D+) : <code class="inline">if (x &lt; min) throw ...</code> branch 패턴 LLM 해석. 비용·품질 편차로 일단 제외.</p>
+
+<!-- =================================================================== -->
+<h2 id="one-to-many">4. 1:N 구조 + method-level 1급 시민</h2>
+
+<p>
+  <strong>Rewrite 대상</strong> — 기존 <code class="inline">backend/modeling/mapping/mapping_models.py</code> 는 <code class="inline">Mapping.code</code> 가 <em>단일 qualified name</em>. 이 구조로는 "안전재고" → 5개 메서드 + 3개 엔드포인트 + 2개 테이블 매핑을 표현할 수 없다.
+</p>
+
+<h3>4-1. 재설계 원칙</h3>
+<ol>
+  <li><strong>BusinessTerm 은 노드</strong> — `Mapping` 이 값 컨테이너가 아님. 이게 핵심 전환.</li>
+  <li><strong>ConceptBinding 은 엣지</strong> — BusinessTerm ↔ Code entity (method / class / field / table / endpoint) 각각 별도 <code class="inline">REALIZES</code> 엣지.</li>
+  <li><strong>method-level 이 기본 granularity</strong> — class-level 바인딩은 옵션. 대부분의 "안전재고 로직" 은 메서드 단위에 떨어져 있음.</li>
+  <li><strong>한 메서드 → 여러 BusinessTerm 에 REALIZES 허용</strong> (Q3 B) — primary 는 메서드당 1 개, partial 은 제한 없음. 예: <code class="inline">OrderService.place()</code> 가 "주문" primary + "신용 체크" partial + "재고 할당" partial.</li>
+</ol>
+
+<h3>4-2. 신/구 비교</h3>
+<pre><code><span class="cm"># 현재 (단일 매핑)</span>
+<span class="kw">class</span> <span class="tp">Mapping</span>:
+    <span class="an">term</span>: <span class="tp">str</span>
+    <span class="an">code</span>: <span class="tp">str</span>  <span class="cm"># 단일 FQN</span>
+    <span class="an">granularity</span>: <span class="tp">str</span>
+
+<span class="cm"># Round 2 (N:N 브릿지)</span>
+<span class="kw">class</span> <span class="tp">BusinessTerm</span>:           <span class="cm"># 노드 (위 §2-1)</span>
+    ...
+
+<span class="kw">class</span> <span class="tp">ConceptBinding</span>:          <span class="cm"># 엣지 DTO (REALIZES)</span>
+    <span class="an">term_fqn</span>: <span class="tp">str</span>           <span class="cm"># BusinessTerm 참조</span>
+    <span class="an">code_fqn</span>: <span class="tp">str</span>           <span class="cm"># Method/Class/Field FQN (Round 1)</span>
+    <span class="an">confidence</span>: <span class="tp">float</span>
+    <span class="an">source</span>: <span class="tp">str</span>             <span class="cm"># manual / name_match / embedding / llm</span>
+    <span class="an">scope</span>: <span class="tp">str</span>              <span class="cm"># primary / partial</span>
+    <span class="an">created_at</span>: <span class="tp">datetime</span>
+    <span class="an">confirmed_by</span>: <span class="tp">str | None</span>  <span class="cm"># 승인자 (사람만 저장, llm=None)</span>
+</code></pre>
+
+<!-- =================================================================== -->
+<h2 id="walk">5. 워킹 예시 — "안전재고" Reverse Lookup</h2>
+
+<div class="walk-step">
+  <div class="step-title"><span class="num">5-1</span>입력 — 사용자 질문</div>
+  <p class="muted" style="margin-top:0;">팀 리더 (한국어 입력):</p>
+  <pre><code>reverse_lookup(<span class="st">"안전재고"</span>)</code></pre>
+</div>
+
+<div class="walk-step">
+  <div class="step-title"><span class="num">5-2</span>Term Resolution (§6 체인)</div>
+  <ol>
+    <li><strong>exact</strong> : BusinessTerm.canonical_label 에 "안전재고" 직접 매칭 → <code class="inline">inventory.safety_stock</code> 노드 찾음. <strong>종료.</strong></li>
+    <li>(미스 시) alias 조회 → 임베딩 유사도 → LLM fallback.</li>
+  </ol>
+</div>
+
+<div class="walk-step">
+  <div class="step-title"><span class="num">5-3</span>BusinessTerm → Code (REALIZES outgoing)</div>
+  <p>QueryEngine.reverse_lookup (B8-3) 을 내부적으로 호출:</p>
+  <pre><code>result = engine.reverse_lookup(<span class="st">"inventory.safety_stock"</span>, edge_kinds={<span class="st">"REALIZES"</span>})
+<span class="cm"># BusinessTerm 노드에서 outgoing REALIZES 만 따라감</span></code></pre>
+  <p>기대 결과:</p>
+  <ul>
+    <li><code class="inline">com.acme.inventory.SafetyStockCalculator.compute()</code> — scope=primary, conf=1.0 (manual)</li>
+    <li><code class="inline">com.acme.inventory.InventoryService.checkAndOrder()</code> — scope=partial, conf=0.92 (embedding)</li>
+    <li><code class="inline">com.acme.order.OrderValidator.validateStock()</code> — scope=partial, conf=0.78 (embedding)</li>
+    <li><code class="inline">db_schema.table.safety_stock</code> — scope=primary, conf=1.0 (manual)</li>
+    <li><code class="inline">GET /api/inventory/safety-stock/{sku}</code> — scope=primary, conf=0.95 (name_match)</li>
+  </ul>
+</div>
+
+<div class="walk-step">
+  <div class="step-title"><span class="num">5-4</span>선택 — Round 1 체인으로 hop</div>
+  <p>사용자가 "이 중 <code class="inline">SafetyStockCalculator.compute()</code> 를 바꾸면 뭐가 영향?" 이라고 follow-up:</p>
+  <pre><code>result2 = engine.impact(ImpactQuery(
+    target_fqn=<span class="st">"com.acme.inventory.SafetyStockCalculator.compute"</span>,
+    mode=ImpactMode.POTENTIAL,
+))
+<span class="cm"># Round 1 incoming BFS 로 callers 추적 (B8-1)</span></code></pre>
+  <p>→ Round 1 + Round 2 체인 : 비즈니스 용어로 들어와서 코드 그래프로 파고 들어감.</p>
+</div>
+
+<div class="callout ok">
+  <strong>이게 Phase C 의 목표 동작</strong> — 한국어 입력 → BusinessTerm 노드 → REALIZES outgoing → 다수 코드 위치. 각 위치에서 Round 1 impact 로 체인. 사용자가 LLM 응답 기다릴 일 없음 (Term resolver 는 이미 매핑 확정된 결과 리턴).
+</div>
+
+<!-- =================================================================== -->
+<h2 id="resolver">6. Term Resolution Chain</h2>
+
+<p><strong>Rewrite 대상</strong> — 기존 <code class="inline">backend/modeling/query/term_resolver.py</code> 는 한국어 alias 가 하드코딩. 이걸 <em>데이터 드리븐</em> 으로 바꾼다.</p>
+
+<h3>6-1. 체인 4단계</h3>
+<ol>
+  <li><strong>exact</strong> — <code class="inline">canonical_label</code> 직접 매칭. 테이블 룩업 O(1).</li>
+  <li><strong>alias</strong> — <code class="inline">BusinessTerm.aliases</code> 에 포함 여부. 대소문자/공백 정규화. 여전히 O(1) (역인덱스).</li>
+  <li><strong>embedding</strong> — 쿼리 임베딩 vs 전체 <code class="inline">BusinessTerm.embedding</code> cosine. top-K (기본 3) + cutoff (기본 0.78).</li>
+  <li><strong>LLM fallback</strong> — 위 3단에서 매칭 없거나 모두 cutoff 미만 → LLM 에 "이 용어가 어느 BusinessTerm 과 가장 가까운가? 또는 신규 제안?" 요청. 결과는 <strong>반드시 사람 승인</strong> 대상으로 큐잉 (자동 바인딩 X).</li>
+</ol>
+
+<h3>6-2. 데이터 드리븐 원칙</h3>
+<pre><code><span class="cm"># AS-IS (한국어 하드코딩)</span>
+<span class="an">ALIASES</span> = {
+    <span class="st">"안전재고"</span>: <span class="st">"safety_stock"</span>,
+    <span class="st">"안전 재고"</span>: <span class="st">"safety_stock"</span>,
+    ...  <span class="cm"># 파일 하나에 쌓임 — drift</span>
+}
+
+<span class="cm"># TO-BE (BusinessTerm.aliases 에서 끌어옴)</span>
+<span class="kw">def</span> <span class="fn">build_alias_index</span>(terms: <span class="tp">list[BusinessTerm]</span>) -&gt; <span class="tp">dict[str, str]</span>:
+    index = {}
+    <span class="kw">for</span> t <span class="kw">in</span> terms:
+        <span class="kw">for</span> a <span class="kw">in</span> [t.canonical_label, *t.aliases]:
+            index[_normalize(a)] = t.qualified_name
+    <span class="kw">return</span> index
+</code></pre>
+
+<h3>6-3. 임베딩 스택</h3>
+<ul>
+  <li>대상 임베딩 텍스트 — <code class="inline">canonical_label + "\n" + description</code></li>
+  <li>모델 — §9 Q6 에서 결정 (OpenAI text-embedding-3-small 기본 제안 vs 로컬)</li>
+  <li>저장 — <code class="inline">chromadb</code> 재활용 (Wiki 에서 이미 검증됨) 또는 Neo4j vector index</li>
+  <li>갱신 시점 — BusinessTerm 신규 등록 / aliases 변경 시 비동기 재계산</li>
+</ul>
+
+<div class="callout ok">
+  <strong>Q6 A 결정</strong> — 임베딩 스택 = <code class="inline">OpenAI text-embedding-3-small</code> + <code class="inline">chromadb</code> (Wiki 와 통일). 저장소 전환 대비해 C3 에서 <code class="inline">EmbeddingProvider</code> Protocol 로 추상화 (구현체 <code class="inline">OpenAIChromaProvider</code>).
+</div>
+
+<!-- =================================================================== -->
+<h2 id="ops">7. 코드↔개념 매핑 운영 — 자동 제안 + 사람 승인</h2>
+
+<p>
+  매핑 품질이 Reverse Lookup 정확도를 정한다. 자동화와 수동 관리의 경계선이 제일 민감.
+</p>
+
+<h3>7-1. 파이프라인 <span class="badge">Q1 A 결정</span></h3>
+<ol>
+  <li><strong>수동 seed (Q1 A 확정)</strong> — 팀 리더가 핵심 용어 20~50 개 먼저 등록 (canonical_label + aliases + 대표 코드 위치 1~2 개). CLI 또는 YAML 배치 제공.</li>
+  <li><strong>자동 제안 엔진</strong> — Seed 이후 :
+    <ul>
+      <li>메서드/클래스 이름 ↔ canonical_label / aliases 정규식 매칭 → <code class="inline">source=name_match</code> 제안</li>
+      <li>메서드 docstring + Java doc ↔ term.description 임베딩 유사도 ≥ cutoff → <code class="inline">source=embedding</code> 제안</li>
+      <li>LLM 에 "이 메서드는 어떤 BusinessTerm 을 실현하나?" 질의 → <code class="inline">source=llm</code> 제안</li>
+    </ul>
+  </li>
+  <li><strong>제안 큐</strong> — 제안된 모든 매핑은 <code class="inline">confirmed=False</code> 로 저장. Reverse Lookup 결과에 <em>기본 포함 안 함</em>.</li>
+  <li><strong>사람 승인 UI</strong> — 팀 리더가 제안 큐를 주기적으로 검토, Approve / Reject / Edit (scope 조정). 승인 시 <code class="inline">confirmed=True</code> + confidence=1.0.</li>
+  <li><strong>활성 룩업</strong> — Reverse Lookup 은 <code class="inline">confirmed=True</code> 만 기본. <code class="inline">include_unconfirmed=True</code> 옵션으로 자동 제안도 같이 볼 수 있음 (개발 모드).</li>
+</ol>
+
+<h3>7-2. 제안 트리거 시점</h3>
+<table>
+  <thead>
+    <tr><th>시점</th><th>트리거</th><th>범위</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>BusinessTerm 신규 등록</td><td>자동 — 전 코드 인덱스에서 매칭 제안 생성</td><td>name_match + embedding</td></tr>
+    <tr><td>코드 변경 (B9 E2E 이후)</td><td>자동 — 변경 파일의 엔티티 대상으로 재제안</td><td>name_match + embedding</td></tr>
+    <tr><td>사람 요청</td><td>"이 용어 매핑 후보 더 제안해줘" UI 버튼</td><td>LLM</td></tr>
+  </tbody>
+</table>
+
+<div class="callout ok">
+  <strong>Q7 (d) 재검증 결정</strong> — <strong>PR 영향 범위만</strong> 재검증. GitHub webhook / PR 이벤트에서 변경 파일의 엔티티를 추출 → 그 엔티티 대상 REALIZES 엣지만 재검증 + 사라진 엔티티 참조 엣지는 <code class="inline">stale=True</code> 마킹. 야간 배치·매 커밋 훅은 비용·노이즈로 제외.
+</div>
+
+<!-- =================================================================== -->
+<h2 id="reverse">8. Reverse Lookup 질의 시뮬레이션</h2>
+
+<h3>8-1. 시나리오 A — 단일 용어</h3>
+<pre><code><span class="cm"># 입력</span>
+<span class="kw">from</span> backend.modeling.query <span class="kw">import</span> term_resolver, query_engine
+
+term_fqn = term_resolver.resolve(<span class="st">"안전재고"</span>)
+<span class="cm"># → "inventory.safety_stock" (exact 매칭, confidence 1.0)</span>
+
+result = engine.reverse_lookup(
+    term_fqn,
+    edge_kinds={<span class="st">"REALIZES"</span>},  <span class="cm"># 브릿지 엣지만</span>
+    entity_kinds={<span class="st">"method"</span>, <span class="st">"http_endpoint"</span>, <span class="st">"db_table"</span>},
+)
+
+<span class="cm"># 결과 5개 affected (§5-3 예시)</span></code></pre>
+
+<h3>8-2. 시나리오 B — 모호 용어 (embedding fallback)</h3>
+<pre><code>term_fqn = term_resolver.resolve(<span class="st">"재고 부족 경고"</span>)
+<span class="cm"># exact/alias 미스 → embedding top-3:</span>
+<span class="cm">#   - inventory.safety_stock (sim=0.82)</span>
+<span class="cm">#   - inventory.stock_alert (sim=0.79)</span>
+<span class="cm">#   - inventory.low_stock_threshold (sim=0.75 &lt; cutoff)</span>
+<span class="cm"># 상위 2개 후보를 사용자에 반환, 클릭 → 선택된 FQN 으로 reverse_lookup</span></code></pre>
+
+<h3>8-3. 시나리오 C — 미등록 용어 (LLM 제안)</h3>
+<pre><code>term_fqn = term_resolver.resolve(<span class="st">"슬랩 폭 조정"</span>)
+<span class="cm"># 4단 전부 미스 → LLM 에 "이 용어는 기존 BusinessTerm 중 어디와 가장 가까운가?"</span>
+<span class="cm"># LLM : "slab.design.width_adjustment 가 가장 가깝지만 새 term 을 만들 것을 추천"</span>
+<span class="cm"># 사용자에게 2 옵션 제시:</span>
+<span class="cm">#   - (A) 기존 slab.design.width_adjustment 로 바인딩</span>
+<span class="cm">#   - (B) 신규 BusinessTerm "slab.design.width_adjustment" 등록 (LLM 제안 메타데이터 포함)</span></code></pre>
+
+<h3>8-4. 시나리오 D — 다중 맥락 질의 (Q3 B)</h3>
+<pre><code><span class="cm"># "OrderService.place() 가 어떤 개념들을 실현하고 있나?" (incoming REALIZES)</span>
+code_fqn = <span class="st">"com.acme.order.OrderService.place"</span>
+result = engine.impact(ImpactQuery(
+    target_fqn=code_fqn,
+    direction=<span class="st">"incoming"</span>,
+    edge_kinds={<span class="st">"REALIZES"</span>},
+    entity_kinds={<span class="st">"business_term"</span>},
+))
+<span class="cm"># 기대 결과:</span>
+<span class="cm">#   - order.placement (scope=primary, conf=1.0)</span>
+<span class="cm">#   - credit.check (scope=partial, conf=0.88)</span>
+<span class="cm">#   - inventory.allocation (scope=partial, conf=0.82)</span></code></pre>
+<p class="muted">역방향 Impact — "이 메서드의 비즈니스 맥락이 뭔가?" 질문. Round 1 BFS 엔진에 그대로 얹음 (scope=primary 만 필터하면 "주 구현 개념" 1 개만 리턴).</p>
+
+<!-- =================================================================== -->
+<h2 id="questions">9. 결정 사항 (Q1~Q7)</h2>
+
+<p class="muted">
+  2026-04-20 사용자 확정. 각 결정의 근거와 구현 영향을 같이 남긴다.
+</p>
+
+<table>
+  <thead>
+    <tr><th style="width:70px;">Q</th><th>결정</th><th>영향 파일</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Q1 A</strong></td>
+      <td>
+        <strong>수동 seed 우선</strong>. 팀 리더가 핵심 BusinessTerm 20~50 먼저 등록 → 이후 자동 제안(name_match/embedding/llm)으로 확장.<br>
+        <span class="muted">근거: Slab PoC 맥락에서 핵심 용어는 팀 리더가 잘 알고 있음. B (자동 추출 우선) 는 승인 부하 과다.</span>
+      </td>
+      <td><code>C2 mapping_models.py</code> seed CLI + <code>C3 term_resolver.py</code> 제안 엔진 분리</td>
+    </tr>
+    <tr>
+      <td><strong>Q2 B</strong></td>
+      <td>
+        <strong>표준 confidence cutoff</strong>. name_match ≥ 0.85 / embedding ≥ 0.78 / llm ≥ 0.6.<br>
+        <span class="muted">근거: Round 1 기본 (SAFE ≥ 0.9 / POTENTIAL 0.5~) 와 정렬. 극단값 회피.</span>
+      </td>
+      <td><code>C2</code> <code class="inline">ConceptBindingConfig</code> DI frozen dataclass</td>
+    </tr>
+    <tr>
+      <td><strong>Q3 B</strong></td>
+      <td>
+        <strong>primary 메서드당 1개, partial 무제한</strong>. 역방향 1:N 허용.<br>
+        <span class="muted">근거: "주 구현만" 질의가 가장 빈번. primary 중복은 현실에서 드묾. 유일성 제약으로 결정적 질의 보장.</span>
+      </td>
+      <td><code>C2</code> <code class="inline">ConceptBinding</code> 저장 시 primary 유일성 검증 + <code>C4</code> API scope 필터</td>
+    </tr>
+    <tr>
+      <td><strong>Q4 D</strong></td>
+      <td>
+        <strong>Role 노드 1차 제외</strong> (Phase D 이월).<br>
+        <span class="muted">근거: Slab PoC 범위에서 Spring Security role 활용 패턴 아직 미확인. Reverse Lookup 핵심은 BusinessTerm. Role 도입은 실제 필요 드러날 때.</span>
+      </td>
+      <td><code>C2</code> <code class="inline">Role</code> DTO 미작성, <code>RESPONSIBLE_FOR</code> 엣지 삭제</td>
+    </tr>
+    <tr>
+      <td><strong>Q5 A→B</strong></td>
+      <td>
+        <strong>VALIDATES 는 어노테이션+주석 우선, 검증 메서드 이름 패턴은 2단계로</strong>.<br>
+        <span class="muted">근거: A 로 보수적 출발 → 품질 검증 후 B 자동 제안 추가. C (branch LLM) 는 비용·품질 편차로 Phase D+.</span>
+      </td>
+      <td><code>C2</code> <code class="inline">RuleBindingAnalyzer</code> 2-stage (annotation-first, name-pattern opt-in)</td>
+    </tr>
+    <tr>
+      <td><strong>Q6 A</strong></td>
+      <td>
+        <strong>OpenAI text-embedding-3-small + chromadb</strong> (Wiki 스택 통일).<br>
+        <span class="muted">근거: 검증된 조합 + 통일성. 비용 민감 단계에서 로컬 모델로 전환 가능하도록 <code class="inline">EmbeddingProvider</code> Protocol 추상화.</span>
+      </td>
+      <td><code>C3</code> <code class="inline">EmbeddingProvider</code> Protocol + <code class="inline">OpenAIChromaProvider</code> 구현</td>
+    </tr>
+    <tr>
+      <td><strong>Q7 경계 B + 재검증 (d)</strong></td>
+      <td>
+        <strong>BusinessProcess 도 Phase D 이월</strong>. 1차는 BusinessTerm + BusinessRule 만. <strong>재검증은 PR 영향 범위만</strong>.<br>
+        <span class="muted">근거: Round 2 의 Reverse Lookup 요구 대부분 Term 으로 충족. Process 도입은 Slab sample 에서 시퀀스 맥락 필요 확인 시. 재검증 (d) 는 비용·노이즈 최소.</span>
+      </td>
+      <td><code>C2</code> <code class="inline">BusinessProcess</code> DTO 미작성 + <code>C4</code> PR webhook / CLI 기반 재검증 진입점</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout ok">
+  <strong>1차 범위 요약</strong> —
+  노드 <strong>2종</strong> (BusinessTerm / BusinessRule) · 엣지 <strong>2종 + 1 예약</strong> (REALIZES / VALIDATES / DERIVED_FROM) · Resolver <strong>4단</strong> (exact → alias → embedding → LLM fallback) · 매핑 운영 <strong>수동 seed → 자동 제안 → 사람 승인</strong>.
+</div>
+
+<!-- =================================================================== -->
+<h2 id="next">10. 다음 라운드 예고 — Round 3 기준서 인제스트</h2>
+
+<p>
+  Round 2 합의 확정 + C2/C3/C4 코드 완료 후 진입. 범위:
+</p>
+<ul>
+  <li>노드 — <code class="inline">ManualDocument</code>, <code class="inline">ManualSection</code>, <code class="inline">ManualFragment</code> (PDF/PPT/이미지 단위)</li>
+  <li>엣지 — <code class="inline">DESCRIBED_IN</code> (BusinessTerm ← ManualSection), <code class="inline">CONFLICTS_WITH</code>, <code class="inline">MISSING_IN</code></li>
+  <li>인제스트 파이프라인 — <code class="inline">backend/application/image/ocr_engine.py</code> + python-pptx 재활용</li>
+  <li>검증 시나리오 — "코드에는 있는데 기준서에 없는 로직" / "기준서에 있는데 구현 안 된 규칙"</li>
+</ul>
+
+<p class="muted">Round 3 는 <strong>드리프트 회수</strong> 의 근거 데이터. Round 2 의 BusinessRule + DERIVED_FROM 이 받침이 됨.</p>
+
+<footer>
+  ONTONG · Section 2 · Round 2 — concept-bridge (rev.2 — Q1~Q7 합의 반영) — 2026-04-20<br>
+  다음 단계 : C2 <code class="inline">mapping_models.py</code> 재설계 (BusinessTerm/BusinessRule + ConceptBinding DTO) → C3 <code class="inline">term_resolver.py</code> 4단 체인 + EmbeddingProvider Protocol → C4 Reverse Lookup API → E3 실증.
+</footer>
+
+</div>
+</body>
+</html>

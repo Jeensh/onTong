@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>이상향 4-Phase vs 현재 시스템 — 정직한 비교 분석</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "SF Pro Korean", "Apple SD Gothic Neo", "Pretendard", sans-serif;
+    color: #0f172a;
+    background: #f8fafc;
+    line-height: 1.65;
+    margin: 0;
+    padding: 0;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 28px 80px; }
+  h1 {
+    font-size: 26px;
+    font-weight: 700;
+    border-bottom: 3px solid #1e40af;
+    padding-bottom: 10px;
+    margin-bottom: 6px;
+  }
+  .subtitle { color: #475569; font-size: 14px; margin-bottom: 28px; }
+  h2 {
+    font-size: 19px;
+    margin-top: 36px;
+    padding: 8px 12px;
+    background: linear-gradient(90deg, #1e40af, #3b82f6);
+    color: white;
+    border-radius: 4px;
+  }
+  h3 {
+    font-size: 16px;
+    margin-top: 22px;
+    padding-left: 10px;
+    border-left: 4px solid #3b82f6;
+    color: #1e3a8a;
+  }
+  h4 { font-size: 14px; margin: 18px 0 6px; color: #334155; }
+  .summary-card {
+    background: #fef3c7;
+    border: 2px solid #f59e0b;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 18px 0 28px;
+  }
+  .summary-card .lead { font-weight: 700; color: #92400e; margin-bottom: 6px; font-size: 15px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 13px;
+    background: white;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  th, td {
+    border: 1px solid #e2e8f0;
+    padding: 9px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #f1f5f9;
+    font-weight: 600;
+    color: #1e293b;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  td.center { text-align: center; }
+  td.score-good { background: #dcfce7; color: #15803d; font-weight: 600; }
+  td.score-mid { background: #fef9c3; color: #a16207; font-weight: 600; }
+  td.score-bad { background: #fee2e2; color: #b91c1c; font-weight: 600; }
+  .grid-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 16px 0; }
+  .card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 13px;
+  }
+  .card .label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+  .card .val { font-size: 22px; font-weight: 700; color: #1e40af; margin: 4px 0; }
+  .card .note { font-size: 11px; color: #475569; }
+  .gap-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin: 12px 0;
+  }
+  .gap-cell {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-size: 13px;
+  }
+  .gap-cell .head {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+    font-weight: 700;
+  }
+  .gap-cell.ideal .head { color: #6d28d9; }
+  .gap-cell.ours .head { color: #047857; }
+  .gap-cell.gap .head { color: #b91c1c; }
+  .gap-cell.ideal { background: #f5f3ff; border-color: #ddd6fe; }
+  .gap-cell.ours { background: #ecfdf5; border-color: #bbf7d0; }
+  .gap-cell.gap { background: #fef2f2; border-color: #fecaca; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  .badge-ok { background: #dcfce7; color: #166534; }
+  .badge-mid { background: #fef9c3; color: #854d0e; }
+  .badge-bad { background: #fee2e2; color: #991b1b; }
+  ul { margin: 6px 0 12px 18px; padding: 0; }
+  li { margin: 3px 0; }
+  code {
+    background: #f1f5f9;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: "SF Mono", "JetBrains Mono", monospace;
+    font-size: 12px;
+    color: #0f172a;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 14px 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: "SF Mono", "JetBrains Mono", monospace;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+  .priority-matrix {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+  }
+  .pmatrix-table { font-size: 12px; }
+  .pmatrix-table th { background: #1e40af; color: white; }
+  .impact-high { background: #fee2e2; }
+  .impact-mid { background: #fef9c3; }
+  .impact-low { background: #f1f5f9; }
+  .verdict {
+    background: #1e293b;
+    color: white;
+    padding: 18px 22px;
+    border-radius: 8px;
+    margin: 24px 0;
+  }
+  .verdict h3 { color: white; border-color: #60a5fa; padding-left: 10px; margin-top: 0; }
+  .verdict ul li { color: #cbd5e1; }
+  .arrow { color: #3b82f6; font-weight: 700; padding: 0 6px; }
+  .small { font-size: 11px; color: #64748b; }
+  hr { border: none; border-top: 1px solid #e2e8f0; margin: 28px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>이상향 4-Phase 프레임워크 vs 현재 onTong Section 2 — 정직한 비교 분석</h1>
+<div class="subtitle">2026-04-28 · 외부 의견(Continuous Ontology Integration / Semantic Hooks / Deterministic Sandbox / Knowledge Feedback Loop) 대비 현실 점수 + 병목 지목 + 공학적 대안</div>
+
+<div class="summary-card">
+  <div class="lead">한 줄 결론</div>
+  외부 프레임워크의 4단계 모두 우리 시스템에 <strong>씨앗(scaffold)</strong>은 있지만, <strong>"실행 가능한 자동화"로 닫힌 루프</strong>가 만들어진 단계는 0개입니다.
+  특히 외부 의견이 정확히 짚은 대로 <strong>Phase 1 (코드↔온톨로지 비동기화)</strong>과 <strong>Phase 2 (매핑의 해상도)</strong> 가 가장 먼저 파열음을 낼 지점입니다.
+  Phase 3 (결정론적 샌드박스) 도 LLM 의존으로 인해 본질적 약점이 있습니다.
+</div>
+
+<h2>📊 Executive Summary — 4단계 점수표</h2>
+
+<div class="grid-cards">
+  <div class="card">
+    <div class="label">Phase 1 · 지식 동기화</div>
+    <div class="val" style="color:#dc2626;">35 / 100</div>
+    <div class="note">씨앗: 12-15 analyzer + .analyzed cache. 부재: git hook, stale binding 감지, build-fail 차단.</div>
+  </div>
+  <div class="card">
+    <div class="label">Phase 2 · 시맨틱 훅</div>
+    <div class="val" style="color:#d97706;">45 / 100</div>
+    <div class="note">씨앗: ConceptBinding + MethodAnchor + ChangeSpec. 부재: 셋이 하나로 묶인 "실행 가능한 API 명세".</div>
+  </div>
+  <div class="card">
+    <div class="label">Phase 3 · 결정론적 샌드박스</div>
+    <div class="val" style="color:#dc2626;">30 / 100</div>
+    <div class="note">씨앗: RestrictedPython sandbox + DiffReporter. 부재: SHACL/OWL reasoner, step-by-step 제약 검증, 결정론.</div>
+  </div>
+  <div class="card">
+    <div class="label">Phase 4 · 자가 증식</div>
+    <div class="val" style="color:#dc2626;">10 / 100</div>
+    <div class="note">씨앗: simulation_result 영속 저장. 부재: 결과→온톨로지 write-back, critical path 추출, 자가 학습.</div>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:14%">단계</th>
+      <th style="width:20%">현재 시스템 점수</th>
+      <th style="width:33%">존재하는 부품 (Asset)</th>
+      <th style="width:33%">부재하는 부품 (Gap)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Phase 1</strong><br/><span class="small">지식 동기화</span></td>
+      <td class="center score-bad">35</td>
+      <td>
+        15 analyzer 풀 파싱<br/>
+        repo register 시 disk cache (.analyzed/entities.json)<br/>
+        SQLite 영속 (BusinessTerm/Rule/Binding)
+      </td>
+      <td>
+        Git push → 자동 재파싱 (webhook) ❌<br/>
+        Stale binding 감지 (code_fqn 사라짐) ❌<br/>
+        Build-fail / PR-block 차단 게이트 ❌<br/>
+        Term ↔ 구버전 코드 diff 알림 ❌
+      </td>
+    </tr>
+    <tr>
+      <td><strong>Phase 2</strong><br/><span class="small">시맨틱 훅</span></td>
+      <td class="center score-mid">45</td>
+      <td>
+        ConceptBinding (term ↔ code_fqn + scope/confidence)<br/>
+        MethodAnchor (param/return/literal/local 단위 좌표)<br/>
+        ChangeSpec (kind: anchor_value / method_body / rule_severity)
+      </td>
+      <td>
+        ConceptBinding 이 anchor 단위까지 안 들어감 (필드 FQN 까지만) ❌<br/>
+        <code>Mutate({...}, {Service.method.param[1]})</code> 같은 정형 명세 ❌<br/>
+        에이전트가 코드 내부 보지 않고 호출 가능한 "API 카탈로그" ❌
+      </td>
+    </tr>
+    <tr>
+      <td><strong>Phase 3</strong><br/><span class="small">결정론적 샌드박스</span></td>
+      <td class="center score-bad">30</td>
+      <td>
+        RestrictedPython sandbox (NetworkPolicy/MemoryLimit)<br/>
+        DiffReporter (before/after mutation diff)<br/>
+        SyntheticInputGenerator (case 자동 생성)
+      </td>
+      <td>
+        Python 변환이 LLM 기반 → hallucination 위험 ❌<br/>
+        SHACL/OWL reasoner 없음 (rule.statement 자연어 텍스트) ❌<br/>
+        Step-by-step 제약 검증 없음 (최종 diff 만 비교) ❌<br/>
+        Reasoner traceback 형식의 위반 보고 ❌
+      </td>
+    </tr>
+    <tr>
+      <td><strong>Phase 4</strong><br/><span class="small">자가 증식</span></td>
+      <td class="center score-bad">10</td>
+      <td>
+        ChangeSpec.simulation_result 영속 저장<br/>
+        DiffReporter 가 영향 rule 식별
+      </td>
+      <td>
+        Critical path 자동 추출 ❌<br/>
+        새 BusinessRule 자동 제안 (write-back) ❌<br/>
+        시뮬 결과로 confidence 갱신 ❌<br/>
+        자가 학습 루프 ❌
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<hr/>
+
+<h2>📋 Phase 1 — 무결점 지식 동기화 (Continuous Ontology Integration)</h2>
+
+<div class="gap-row">
+  <div class="gap-cell ideal">
+    <div class="head">🎯 이상향</div>
+    git commit → CI 파이프라인 → Joern CPG + 런타임 로그 자동 분석 → 그래프 DB 갱신.
+    파괴적 변경 감지 시 build fail + "매핑 재설정 요망" 알럿.
+  </div>
+  <div class="gap-cell ours">
+    <div class="head">✅ 현재 가진 것</div>
+    <ul>
+      <li>15 analyzer 풀 파싱 (`parse_repo`)</li>
+      <li>P29-3 qualifier-aware call resolver</li>
+      <li>P29-2 MyBatis XML/Annotation</li>
+      <li>P30-1/2 AOP fan-out + event chain</li>
+      <li>.analyzed/entities.json + repo-meta 디스크 캐시</li>
+    </ul>
+  </div>
+  <div class="gap-cell gap">
+    <div class="head">❌ 결정적 결손</div>
+    <ul>
+      <li><strong>git push 자동 트리거 없음</strong> — 사용자가 「재등록」 버튼 눌러야 함</li>
+      <li><strong>Stale binding 감지 없음</strong> — confirmed binding 의 code_fqn 이 사라져도 그대로 confirmed</li>
+      <li><strong>차단 게이트 없음</strong> — gap_engine 은 후행 알림만, PR 막는 hook 없음</li>
+      <li><strong>변경 영향 추적 없음</strong> — "이 commit 이 어떤 binding 을 깨뜨렸나" 답 못함</li>
+    </ul>
+  </div>
+</div>
+
+<h4>현재 시스템 체크포인트 답</h4>
+<blockquote style="background:#fef2f2;border-left:4px solid #dc2626;padding:12px 16px;margin:8px 0;font-size:13px;">
+"자바 코드가 오늘 배포되었을 때 매핑 데이터가 구버전으로 전락하는 것을 시스템 레벨에서 즉각 감지하고 차단할 수 있는가?"
+<br/><br/>
+<strong style="color:#dc2626;">답: 못 한다.</strong>
+사용자가 직접 「Repository → 재등록」 버튼을 눌러야 새 분석 결과로 갱신되며, 갱신 후에도 stale binding 은 「proposed → confirmed」 상태 그대로 보존되어 사라진 코드를 가리킬 수 있다. CI 차단 게이트는 존재하지 않는다.
+</blockquote>
+
+<h4>제안: 우회 가능한 공학적 대안 (Joern 도입 없이도)</h4>
+<table>
+  <tr><th style="width:25%">개입 지점</th><th>구체적 액션</th><th style="width:14%">구현 난이도</th></tr>
+  <tr>
+    <td><strong>S7-A. Git webhook</strong></td>
+    <td>GitHub/GitLab webhook → <code>POST /repos/{id}/reindex</code> 백엔드 엔드포인트 신규. 또는 <code>git pull</code> + 변경 파일 추적 데몬 (slab-design-real 같은 로컬 repo 도 가능).</td>
+    <td>낮음 (1일)</td>
+  </tr>
+  <tr>
+    <td><strong>S7-B. Stale binding sweeper</strong></td>
+    <td>매 재파싱 후 <code>ConceptBindingProposal</code> 전수 점검: <code>code_fqn</code> 이 새 entity index 에 없으면 status를 <code>stale</code> 로 자동 전환 + 사용자 알림. 새 후보 자동 매칭 시도 (alias 일치).</td>
+    <td>낮음 (반나절)</td>
+  </tr>
+  <tr>
+    <td><strong>S7-C. Diff-driven 알림</strong></td>
+    <td>이전 entities snapshot 과 신규 비교 → "삭제된 method/field 가 어떤 confirmed binding 을 갖고 있었나" 리포트 + 「재매핑 큐」 자동 생성.</td>
+    <td>중 (1~2일)</td>
+  </tr>
+  <tr>
+    <td><strong>S7-D. PR check (선택)</strong></td>
+    <td>GitHub Actions step: <code>onTong CLI --check-bindings</code> 실행 → exit 1 if breaking. 사용자가 GitHub PR 사용 시만 의미.</td>
+    <td>중 (1~2일, 외부 환경 의존)</td>
+  </tr>
+</table>
+
+<hr/>
+
+<h2>📋 Phase 2 — 시맨틱 API 계층화 (Decoupled Semantic Hooks)</h2>
+
+<div class="gap-row">
+  <div class="gap-cell ideal">
+    <div class="head">🎯 이상향</div>
+    수동 매핑 결과는 단순 선이 아니라 <code>Mutate({Domain.SafetyStock}, {StockService.reduceStock.param[1]})</code> 같은 정형화된 메타데이터.
+    에이전트는 자바 코드 안 보고 "조작 가능한 변수 카탈로그" 만 봄.
+  </div>
+  <div class="gap-cell ours">
+    <div class="head">✅ 현재 가진 것</div>
+    <ul>
+      <li><strong>ConceptBinding</strong>: term_fqn ↔ code_fqn (필드/메서드 단위)</li>
+      <li><strong>MethodAnchor</strong>: param[base], return[@line:6], literal[70@line:6] 등 정밀 좌표</li>
+      <li><strong>ChangeSpec.kind</strong>: <code>anchor_value</code> / <code>method_body</code> 로 변경 타입 분류</li>
+      <li><strong>P14 mutation_extractor</strong>: tree-sitter 로 메서드 내 변수 mutation 추적</li>
+    </ul>
+  </div>
+  <div class="gap-cell gap">
+    <div class="head">❌ 결정적 결손</div>
+    <ul>
+      <li><strong>3 부품이 서로 모름</strong> — ConceptBinding 은 anchor 까지 못 들어감, ChangeSpec 은 binding 모름</li>
+      <li><strong>"조작 가능 카탈로그" 부재</strong> — 에이전트가 "이 term 으로 무엇을 mutate 할 수 있나" 질의 불가</li>
+      <li><strong>역할 메타 없음</strong> — binding 이 "param[1] 인지 return 인지 field-write 인지" 구분 X</li>
+      <li><strong>Python generator 가 raw Java 봄</strong> — "블랙박스 시맨틱 훅" 정확히 반대 방향</li>
+    </ul>
+  </div>
+</div>
+
+<h4>현재 시스템 체크포인트 답</h4>
+<blockquote style="background:#fef2f2;border-left:4px solid #dc2626;padding:12px 16px;margin:8px 0;font-size:13px;">
+"운영자가 수동 매핑을 완료했을 때, 그 결과물이 '단순한 관계망'인가, 아니면 시뮬레이터가 즉시 변수를 인젝션할 수 있는 '실행 가능한 API 명세서'인가?"
+<br/><br/>
+<strong style="color:#d97706;">답: 단순한 관계망에 가깝다.</strong>
+ConceptBinding 의 정보는 <code>(term_fqn, code_fqn, scope, confidence)</code> 4-tuple 이며, 이걸로 "어떤 위치를 mutate 할 수 있는지" 자동 추론 불가능. ChangeSpec 의 anchor_value 는 직접 anchor_locator 를 사용자가 입력해야 함 (binding 과 join 안 됨).
+</blockquote>
+
+<h4>제안: SemanticHook DTO 도입 — 가장 큰 한 방</h4>
+<pre>
+class SemanticHook(BaseModel):
+    """ConceptBinding × MethodAnchor 결합 — 에이전트가 보는 '실행 가능 카탈로그' 한 줄."""
+    term_fqn: str                # "term.안전재고"
+    method_fqn: str              # "com.x.StockService.reduceStock"
+    anchor_locator: str          # "param[stock]" or "return[@line:42]" or "field_write:this.stock"
+    operation: Literal["read", "write", "mutate", "constrain"]
+    declared_type: str           # "long" / "BigDecimal" / "List&lt;Slab&gt;"
+    valid_range: dict | None     # {"min": 0, "max": 999999} (BusinessRule 에서 추출)
+    confidence: float
+    source: str                  # "manual" | "alias_match" | "llm_anchor_suggester"
+</pre>
+
+<table>
+  <tr><th style="width:25%">개입 지점</th><th>구체적 액션</th><th style="width:14%">구현 난이도</th></tr>
+  <tr>
+    <td><strong>S8-A. SemanticHook 모델 + 자동 derive</strong></td>
+    <td>기존 <code>(ConceptBinding × MethodAnchor)</code> 조합으로 자동 derive. anchor_binding_suggester 결과를 SemanticHook 으로 승격.</td>
+    <td>중 (2~3일)</td>
+  </tr>
+  <tr>
+    <td><strong>S8-B. <code>GET /semantic-hooks?term_fqn=...</code></strong></td>
+    <td>"term.안전재고로 무엇을 할 수 있나" 질의 → SemanticHook 리스트 반환. Python generator 가 이걸 받아서 hook 단위로 코드 조립.</td>
+    <td>중 (1~2일)</td>
+  </tr>
+  <tr>
+    <td><strong>S8-C. PythonGenerator 재설계</strong></td>
+    <td>현재: Java 본문 → LLM → Python (hallucination 발생). 변경 후: SemanticHook 호출 trace → Python 템플릿 (LLM 은 hook 선택만 담당). 결정론 + 검증 가능.</td>
+    <td>높음 (3~5일, 핵심 변경)</td>
+  </tr>
+  <tr>
+    <td><strong>S8-D. ChangeSpec ↔ Hook</strong></td>
+    <td>ChangeSpec 생성 시 SemanticHook 카탈로그에서 선택 (드롭다운). anchor_locator/operation 자동 fill. 사용자는 "안전재고 mutate" 정도만 선택.</td>
+    <td>중 (2일)</td>
+  </tr>
+</table>
+
+<hr/>
+
+<h2>📋 Phase 3 — 결정론적 샌드박스 시뮬레이션</h2>
+
+<div class="gap-row">
+  <div class="gap-cell ideal">
+    <div class="head">🎯 이상향</div>
+    가상 메모리 state machine + CFG 따라가며 매 노드마다 SHACL/OWL reasoner 가 "현재 상태가 도메인 룰 102 위반?" 질의.
+    위반 시 LLM 이 지어내지 않고 reasoner traceback 그대로 보고.
+  </div>
+  <div class="gap-cell ours">
+    <div class="head">✅ 현재 가진 것</div>
+    <ul>
+      <li>RestrictedPython sandbox (network/memory cap)</li>
+      <li>SyntheticInputGenerator (입력 자동 생성)</li>
+      <li>DiffReporter — before/after mutation diff + 영향 rule 매칭</li>
+      <li>method_mutation_extractor — 변수 단위 mutation 추적</li>
+    </ul>
+  </div>
+  <div class="gap-cell gap">
+    <div class="head">❌ 결정적 결손</div>
+    <ul>
+      <li><strong>Python 변환을 LLM 이 함</strong> — Java body → Claude → 한국어 Python. 결정론 X</li>
+      <li><strong>SHACL/OWL 미사용</strong> — BusinessRule.statement 는 자연어 텍스트, 기계 검증 불가</li>
+      <li><strong>Step-by-step 검증 없음</strong> — Python 다 돌리고 최종 mutation diff 만 봄</li>
+      <li><strong>Traceback 형식 위반 보고 없음</strong> — DiffReporter 가 "rule X 영향" 만, "어느 줄에서 어떻게 깨졌는지" 답 X</li>
+    </ul>
+  </div>
+</div>
+
+<h4>현재 시스템 체크포인트 답</h4>
+<blockquote style="background:#fef2f2;border-left:4px solid #dc2626;padding:12px 16px;margin:8px 0;font-size:13px;">
+"파이썬 시뮬 스크립트가 실행되는 도중, 매 스텝마다 온톨로지 추론기 (Reasoner) 의 하드 팩트 검증을 통과하도록 설계되어 있는가?"
+<br/><br/>
+<strong style="color:#dc2626;">답: 그렇지 않다.</strong>
+실행은 RestrictedPython 한 번 끝까지, 검증은 종료 후 mutation diff 와 BusinessRule.statement 의 휴리스틱 매칭. SHACL/OWL reasoner 는 도입 안 됨. "rule 102 위반" 같은 결정론적 traceback 불가능.
+</blockquote>
+
+<h4>제안: SHACL 도입은 과하다 — 경량 ConstraintEvaluator 로 우회</h4>
+<table>
+  <tr><th style="width:25%">개입 지점</th><th>구체적 액션</th><th style="width:14%">구현 난이도</th></tr>
+  <tr>
+    <td><strong>S9-A. BusinessRule 머신화</strong></td>
+    <td>지금: <code>statement: str</code>. 추가: <code>predicate: str</code> (Python eval 가능, 예: <code>slab.lengthHigh &gt;= slab.lengthLow</code>) + 변수 binding (term_fqn → 가상 변수). LLM 이 자연어 statement → predicate 변환 (1회 / 사용자 검증).</td>
+    <td>높음 (3~5일, BusinessRule 모델 확장)</td>
+  </tr>
+  <tr>
+    <td><strong>S9-B. Step-by-step ConstraintEvaluator</strong></td>
+    <td>Python sandbox 가 mutation 발생할 때마다 hook 발동 → 적용 가능한 BusinessRule.predicate 평가 → False 면 즉시 traceback (line, rule_fqn, expected vs actual).</td>
+    <td>중 (2~3일)</td>
+  </tr>
+  <tr>
+    <td><strong>S9-C. PythonGenerator 결정론화</strong></td>
+    <td>S8-C 와 함께. SemanticHook 기반 템플릿 + LLM 은 hook 선택만. hallucination 영역 제거.</td>
+    <td>높음 (S8-C 와 묶음)</td>
+  </tr>
+  <tr>
+    <td><strong>S9-D. SHACL/OWL 옵션</strong></td>
+    <td>완전한 reasoner 가 정말 필요한가? slab demo 의 룰들 (max/min/range) 은 대부분 단순 술어. 완전 SHACL 도입은 ROI 낮음. predicate-eval 충분.</td>
+    <td>X (지금 단계 비추천)</td>
+  </tr>
+</table>
+
+<hr/>
+
+<h2>📋 Phase 4 — 지식의 자가 증식 (Knowledge Feedback Loop)</h2>
+
+<div class="gap-row">
+  <div class="gap-cell ideal">
+    <div class="head">🎯 이상향</div>
+    시뮬 결과의 "위험 파급 경로"나 "새로 발견된 제약"이 휘발 없이 온톨로지에 새 edge / rule 로 자동 write-back.
+    시간 지나면 에이전트 성능이 인간 개입 없이 고도화.
+  </div>
+  <div class="gap-cell ours">
+    <div class="head">✅ 현재 가진 것</div>
+    <ul>
+      <li>ChangeSpec.simulation_result (diff + 영향 rule) DB 영속</li>
+      <li>history UI (Workbench R 「📋 시뮬레이션 기록」)</li>
+      <li>cache hit re-run</li>
+    </ul>
+  </div>
+  <div class="gap-cell gap">
+    <div class="head">❌ 결정적 결손</div>
+    <ul>
+      <li><strong>Critical path 자동 추출 X</strong> — diff 패턴 분석 안 됨</li>
+      <li><strong>새 BusinessRule 제안 X</strong> — "이 mutation 이 항상 X 결과로 이어진다" 학습 안 함</li>
+      <li><strong>Confidence 자동 갱신 X</strong> — 시뮬 통과한 binding 의 confidence 안 올라감</li>
+      <li><strong>Cross-spec 패턴 인식 X</strong> — 비슷한 ChangeSpec 끼리 묶기 안 됨</li>
+    </ul>
+  </div>
+</div>
+
+<h4>현재 시스템 체크포인트 답</h4>
+<blockquote style="background:#fef2f2;border-left:4px solid #dc2626;padding:12px 16px;margin:8px 0;font-size:13px;">
+"시뮬레이션이 성공적으로 끝난 후, 그 결과 (파급 효과 패턴) 가 다음 시뮬레이션을 더 똑똑하게 만들기 위해 온톨로지 시스템의 지식으로 저장 (피드백) 되는가?"
+<br/><br/>
+<strong style="color:#dc2626;">답: 안 된다.</strong>
+ChangeSpec.simulation_result 는 그 spec 안에 갇힌다. 다른 spec 이나 BusinessRule 큐로 흘러들지 않는다. "안전 바닥 제거 = lengthLow 100% 변동" 같은 발견이 새 BusinessRule 후보로 자동 등록되지 않는다.
+</blockquote>
+
+<h4>제안: 가장 ROI 낮은 단계 — 1, 2, 3 끝나기 전엔 손대지 말 것</h4>
+<table>
+  <tr><th style="width:25%">개입 지점</th><th>구체적 액션</th><th style="width:14%">구현 난이도</th></tr>
+  <tr>
+    <td><strong>S10-A. Sim 결과 → BusinessRule 후보</strong></td>
+    <td>spec.simulation_result 에서 "differs &gt; 50%" 같은 큰 변동 패턴 추출 → "anchor X 변경 시 anchor Y 도 함께 변함" rule 후보 자동 등록 (proposed 상태, 사용자 confirm 필요).</td>
+    <td>중 (2일)</td>
+  </tr>
+  <tr>
+    <td><strong>S10-B. Spec 패턴 클러스터링</strong></td>
+    <td>비슷한 anchor 변경 패턴 spec 끼리 묶어서 "이 패턴은 항상 X 영향" 발견 → ImpactPropagator 의 학습 가중치로.</td>
+    <td>높음 (4~7일, 데이터 충분 후)</td>
+  </tr>
+</table>
+
+<hr/>
+
+<h2>🎯 우선순위 매트릭스 — 진짜 최고 솔루션을 위한 순서</h2>
+
+<div class="priority-matrix">
+  <table class="pmatrix-table">
+    <tr>
+      <th style="width:18%">우선순위</th>
+      <th style="width:25%">작업</th>
+      <th style="width:15%">소속 Phase</th>
+      <th style="width:15%">예상 효과</th>
+      <th style="width:14%">난이도</th>
+      <th style="width:13%">선행 조건</th>
+    </tr>
+    <tr class="impact-high">
+      <td><strong>1순위 (즉시)</strong></td>
+      <td><strong>S7-B Stale binding sweeper</strong> + <strong>S7-A Git webhook</strong></td>
+      <td>Phase 1</td>
+      <td>가장 큰 위험 (silent corruption) 막음</td>
+      <td>낮음 (2일)</td>
+      <td>없음</td>
+    </tr>
+    <tr class="impact-high">
+      <td><strong>2순위</strong></td>
+      <td><strong>S8-A SemanticHook 모델</strong> + <strong>S8-B 카탈로그 API</strong></td>
+      <td>Phase 2</td>
+      <td>모든 Phase 3/4 의 전제</td>
+      <td>중 (3~4일)</td>
+      <td>없음</td>
+    </tr>
+    <tr class="impact-mid">
+      <td><strong>3순위</strong></td>
+      <td><strong>S8-C/S9-C PythonGenerator 결정론화</strong></td>
+      <td>Phase 2+3</td>
+      <td>hallucination 차단, 시뮬 신뢰도 ↑</td>
+      <td>높음 (1주)</td>
+      <td>S8-A/B</td>
+    </tr>
+    <tr class="impact-mid">
+      <td><strong>4순위</strong></td>
+      <td><strong>S9-A/B BusinessRule predicate + step evaluator</strong></td>
+      <td>Phase 3</td>
+      <td>traceback 형식 위반 보고</td>
+      <td>높음 (1주)</td>
+      <td>S8-A</td>
+    </tr>
+    <tr class="impact-mid">
+      <td><strong>5순위</strong></td>
+      <td><strong>S7-C diff-driven 알림</strong></td>
+      <td>Phase 1</td>
+      <td>1순위 보강</td>
+      <td>중 (2일)</td>
+      <td>S7-A/B</td>
+    </tr>
+    <tr class="impact-low">
+      <td><strong>6순위 (later)</strong></td>
+      <td><strong>S10-A 시뮬 결과 → rule 후보</strong></td>
+      <td>Phase 4</td>
+      <td>자가 증식 첫 발</td>
+      <td>중 (2일)</td>
+      <td>S9-A/B</td>
+    </tr>
+    <tr class="impact-low">
+      <td><strong>나중</strong></td>
+      <td>S7-D PR check / S10-B 클러스터링 / SHACL 도입</td>
+      <td>모든 단계</td>
+      <td>nice-to-have</td>
+      <td>높음</td>
+      <td>1~5순위 후</td>
+    </tr>
+  </table>
+</div>
+
+<hr/>
+
+<h2>🩺 외부 의견의 병목 진단 — 반박 + 보강</h2>
+
+<table>
+  <tr>
+    <th style="width:30%">외부 의견 예측</th>
+    <th>실제 진단</th>
+  </tr>
+  <tr>
+    <td>"가장 먼저 파열음 — Phase 1 (코드↔매핑 비동기화)"</td>
+    <td><strong>적중.</strong> stale binding 검출 0%. 사용자가 직접 재등록 안 누르면 무한히 구버전 그대로. 1순위 작업.</td>
+  </tr>
+  <tr>
+    <td>"또는 Phase 2 (운영자 매핑의 해상도 부족)"</td>
+    <td><strong>적중.</strong> ConceptBinding 이 필드 단위에서 멈춤. param/return/literal 단위 anchor 와 분리되어 "실행 가능"하지 않음. 2순위 작업.</td>
+  </tr>
+  <tr>
+    <td>"이 단계는 도저히 자동화 안 보인다고 느껴지는 병목 지목"</td>
+    <td>
+      <strong>병목 1 — Phase 3 의 LLM 의존성.</strong> Java body → Python 변환에 Claude 가 끼어 있는 한 결정론 불가능. 우회: SemanticHook 템플릿 기반 코드 조립 (LLM 은 hook 선택만).<br/><br/>
+      <strong>병목 2 — BusinessRule 자연어 statement.</strong> 기계 검증 불가능. 우회: <code>predicate: str</code> 필드 추가 + LLM 일회성 변환 + 사용자 검증.<br/><br/>
+      <strong>병목 3 — SHACL/OWL 풀 도입.</strong> ROI 매우 낮음. 우회: 경량 Python eval 기반 ConstraintEvaluator. 우리 도메인 (slab range / chemical composition / process matching) 은 대부분 단순 술어로 표현 가능.
+    </td>
+  </tr>
+</table>
+
+<hr/>
+
+<h2>💎 진짜 최고 솔루션을 위한 우리만의 차별화</h2>
+
+<div class="gap-row">
+  <div class="gap-cell ours" style="grid-column:1 / span 2;">
+    <div class="head">🌟 외부 프레임워크가 안 짚은 우리의 강점</div>
+    <ul>
+      <li><strong>BusinessTerm 한국어 alias 사슬</strong> — 외부는 영어 시맨틱 가정. 우리는 한국어 도메인 (품종코드/Slab 단중) 4-stage chain (exact/alias/embedding/LLM) 매칭 — 외부 의견은 이 layer 가 없음.</li>
+      <li><strong>도메인 맵 Top-down 진입점 (S6)</strong> — Joern CPG 도 평면 그래프임. 우리는 LLM 으로 비즈니스 흐름 카테고리 (주문→화학성분→Slab사양→공정매칭) 자동 추출 — 외부에는 없는 사용성 레이어.</li>
+      <li><strong>매뉴얼 ↔ Rule auto-link</strong> — 외부는 "도메인 룰" 운영자 입력 가정. 우리는 PDF/MD/DOCX 인제스트 + 임베딩 ↔ rule 자동 연결 (auto_linker) — 운영자 부담 ↓</li>
+      <li><strong>Multi-Layer ImpactPropagator</strong> — anchor 단위까지 BFS. 외부의 "위험 파급 경로" 의 backbone 이 이미 있음.</li>
+    </ul>
+  </div>
+  <div class="gap-cell ideal">
+    <div class="head">🎯 이걸 다 합치면</div>
+    한국어 도메인 + LLM 카테고리 + 매뉴얼 자동 인제스트 = <strong>"운영자 진입 비용 최소화"</strong> 가 우리만의 무기.
+    여기에 외부 프레임워크의 Phase 1/2/3 자동화를 얹으면, 단순 모방이 아닌 <strong>"한국 제조 현장에 진짜 들어갈 수 있는 솔루션"</strong> 이 됨.
+  </div>
+</div>
+
+<div class="verdict">
+  <h3>🏁 다음 행보 (제안)</h3>
+  <ul>
+    <li>이번 주: <strong>1순위 — Phase 1 stale sweeper + git hook</strong>. 가장 큰 silent corruption 막음. 2일 안에 끝남.</li>
+    <li>다음 주: <strong>2순위 — SemanticHook 모델 + 카탈로그</strong>. 모든 후속 작업의 전제. 3~4일.</li>
+    <li>그 다음: PythonGenerator 결정론화 (3순위) + BusinessRule predicate (4순위) — 묶어서 1주 단위.</li>
+    <li>Phase 4 자가 증식은 1~3 끝난 후, 데이터 쌓이고 나서 손대기.</li>
+  </ul>
+</div>
+
+<p class="small" style="margin-top:32px;text-align:center;">
+  생성: 2026-04-28 · onTong Section 2 · <code>toClaude/modeling/reports/4-phase-ideal-comparison.html</code>
+</p>
+
+</div>
+</body>
+</html>

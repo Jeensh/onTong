@@ -9,53 +9,7 @@ Validates:
 """
 
 import asyncio
-import sys
-import types
 import pytest
-
-# Stub heavy dependencies
-_STUBS = [
-    "chromadb", "chromadb.config", "chromadb.utils", "chromadb.utils.batch_utils",
-    "pydantic_ai", "pydantic_settings", "litellm",
-    "backend.infrastructure.vectordb.chroma",
-    "backend.infrastructure.storage.base",
-    "backend.infrastructure.storage.local_fs",
-    "backend.infrastructure.search.bm25",
-    "backend.infrastructure.search.hybrid",
-    "backend.infrastructure.cache.query_cache",
-    "backend.core.session",
-    "backend.core.config",
-    "backend.core.auth.acl_store",
-    "backend.application.agent.context",
-]
-for mod_name in _STUBS:
-    if mod_name not in sys.modules:
-        stub = types.ModuleType(mod_name)
-        if "vectordb.chroma" in mod_name:
-            stub.ChromaWrapper = type("ChromaWrapper", (), {})
-        if "storage.base" in mod_name:
-            stub.StorageProvider = type("StorageProvider", (), {})
-        if "session" in mod_name:
-            stub.session_store = type("SS", (), {"add_pending_action": lambda *a: "id"})()
-            stub.SessionStore = type("SessionStore", (), {})
-        if "context" in mod_name:
-            stub.AgentContext = type("AgentContext", (), {})
-        if mod_name == "pydantic_settings":
-            stub.BaseSettings = type("BaseSettings", (), {})
-        if mod_name == "backend.core.config":
-            stub.settings = type("Settings", (), {
-                "wiki_root": "/tmp", "chroma_host": "localhost", "chroma_port": 8000,
-                "litellm_model": "test", "upload_dir": "/tmp",
-            })()
-        if "acl_store" in mod_name:
-            stub.acl_store = type("ACL", (), {"check_permission": lambda *a: True})()
-        if "bm25" in mod_name:
-            stub.bm25_index = type("BM25", (), {"search": lambda *a, **k: []})()
-        if "query_cache" in mod_name:
-            stub.query_cache = type("QC", (), {"get": lambda *a: None, "put": lambda *a: None})()
-        if "hybrid" in mod_name:
-            stub.reciprocal_rank_fusion = lambda *a, **k: {}
-        sys.modules[mod_name] = stub
 
 from backend.application.agent.models import QueryAugmentResult
 from backend.application.agent.skills.query_augment import (

@@ -2,8 +2,8 @@
 status: draft
 created_by: 동해
 updated_by: 동해
-created: '2026-04-16T09:15:18Z'
-updated: '2026-04-16T09:15:18Z'
+created: '2026-04-18T00:44:58Z'
+updated: '2026-04-18T00:44:58Z'
 ---
 # 내 AI 설정
 

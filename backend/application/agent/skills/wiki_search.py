@@ -8,6 +8,10 @@ from typing import Any
 from backend.core.config import settings
 from backend.application.agent.skill import SkillResult
 from backend.application.agent.filter_extractor import extract_metadata_filter, extract_path_filter
+from backend.application.agent.filter_compiler import (
+    compile_to_chroma_where,
+    compile_to_bm25_predicate,
+)
 from backend.infrastructure.search.bm25 import bm25_index
 from backend.infrastructure.search.hybrid import reciprocal_rank_fusion
 from backend.infrastructure.search.reranker import rerank
@@ -29,6 +33,7 @@ class WikiSearchSkill:
         query: str = "",
         n_results: int = 8,
         metadata_filter: dict | None = None,
+        filters: dict | None = None,
         exclude_deprecated: bool = True,
         user_roles: list[str] | None = None,
         path_preference: str | None = None,
@@ -36,8 +41,16 @@ class WikiSearchSkill:
     ) -> SkillResult:
         chroma = ctx.chroma
 
+        # FilterSpec (structured or DSL) → Chroma where + BM25 predicate
+        spec_where = compile_to_chroma_where(filters)
+        spec_bm25_pred = compile_to_bm25_predicate(filters)
+
         # Auto-extract metadata filter from query
         base_filter = metadata_filter or extract_metadata_filter(query)
+
+        # Merge explicit FilterSpec on top of auto-extracted/LLM filter
+        if spec_where:
+            base_filter = _merge_where_filters(base_filter, spec_where)
 
         # L2: Path filter — explicit preference (from L3 disambiguation) or auto-extracted
         path_filter = None
@@ -79,8 +92,19 @@ class WikiSearchSkill:
                 vector_results = chroma.query(query_text=query, n_results=n_results)
                 effective_filter = None
 
-            # BM25 keyword search
-            bm25_results = bm25_index.search(query, n_results=n_results)
+            # BM25 keyword search (with metadata post-filter when FilterSpec present)
+            bm25_filter_fn = None
+            meta_index_for_bm25 = getattr(ctx, "meta_index", None)
+            if spec_bm25_pred and meta_index_for_bm25:
+                from backend.application.wiki.wiki_indexer import _extract_path_depths
+
+                def bm25_filter_fn(bm25_doc):  # noqa: E306
+                    entry = dict(meta_index_for_bm25.get_file_entry(bm25_doc.file_path) or {})
+                    entry.update(_extract_path_depths(bm25_doc.file_path))
+                    return spec_bm25_pred(entry)
+            bm25_results = bm25_index.search(
+                query, n_results=n_results, filter_predicate=bm25_filter_fn
+            )
 
             if bm25_results:
                 results = reciprocal_rank_fusion(vector_results, bm25_results, n_results=n_results)
@@ -158,6 +182,7 @@ class WikiSearchSkill:
             fallback = await self.execute(
                 ctx, query=query, n_results=n_results,
                 metadata_filter=metadata_filter,
+                filters=filters,
                 exclude_deprecated=False,
                 user_roles=user_roles,
                 path_preference=path_preference,
@@ -186,8 +211,70 @@ class WikiSearchSkill:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "검색 쿼리"},
+                        "query": {"type": "string", "description": "검색 쿼리 (키워드/자연어)"},
                         "n_results": {"type": "integer", "description": "검색 결과 수", "default": 8},
+                        "filters": {
+                            "type": "object",
+                            "description": (
+                                "메타데이터 검색 조건. 사용자가 특정 폴더/태그/작성자/기간/타입/상태를 "
+                                "명시하거나 문맥상 한정할 필요가 있을 때 설정. 구조화 필드 또는 boolean DSL 사용."
+                            ),
+                            "properties": {
+                                "path": {
+                                    "type": "string",
+                                    "description": "경로 글롭, 예: 'wiki/ERP/**'",
+                                },
+                                "folders": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "폴더 목록 (중첩 가능: 'ERP/마스터데이터'). 여러 개는 OR.",
+                                },
+                                "tags": {
+                                    "type": "object",
+                                    "description": "태그 필터",
+                                    "properties": {
+                                        "include": {"type": "array", "items": {"type": "string"}},
+                                        "exclude": {"type": "array", "items": {"type": "string"}},
+                                        "mode": {"type": "string", "enum": ["AND", "OR"], "default": "OR"},
+                                    },
+                                },
+                                "authors": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "작성자 멘션(@이름) 목록. OR 결합.",
+                                },
+                                "types": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "문서 유형 (예: sop, spec, incident). OR 결합.",
+                                },
+                                "mtime_from": {
+                                    "type": "string",
+                                    "description": "수정일 시작 (ISO 8601, 예: 2026-01-01)",
+                                },
+                                "mtime_to": {
+                                    "type": "string",
+                                    "description": "수정일 끝 (ISO 8601)",
+                                },
+                                "statuses": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "상태 목록 (active, review, deprecated 등). OR 결합.",
+                                },
+                                "acl": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "ACL 스코프 (public, team:mes 등). OR 결합.",
+                                },
+                                "boolean": {
+                                    "type": "string",
+                                    "description": (
+                                        "Boolean DSL 표현. 설정 시 위 구조화 필드보다 우선. "
+                                        "예: '(tag:재고 OR tag:주문) AND author:@동해 AND !status:draft'"
+                                    ),
+                                },
+                            },
+                        },
                     },
                     "required": ["query"],
                 },

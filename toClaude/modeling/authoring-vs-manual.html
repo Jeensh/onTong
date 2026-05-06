@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>onTong Ontology · Authoring vs Recommend vs 수동</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#111b2e; --line:#1f2a44; --fg:#e6edf7; --muted:#94a3b8;
+    --primary:#38bdf8; --emerald:#10b981; --amber:#f59e0b; --rose:#f43f5e; --violet:#8b5cf6;
+  }
+  body{margin:0;font:13px -apple-system,Pretendard,sans-serif;background:var(--bg);color:var(--fg);padding:24px;line-height:1.55;max-width:1100px;margin:0 auto}
+  h1{margin:0 0 6px 0;font-size:20px}
+  h2{font-size:15px;margin:24px 0 8px 0;padding:6px 0;border-bottom:1px solid var(--line)}
+  h3{font-size:13px;margin:14px 0 6px 0;color:var(--violet)}
+  h4{font-size:12.5px;margin:10px 0 4px 0;color:var(--primary)}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:16px}
+  pre{background:#0f172a;color:#e6edf7;padding:10px;border-radius:6px;overflow-x:auto;font-size:11.5px;line-height:1.5;border:1px solid var(--line)}
+  code{background:rgba(56,189,248,0.1);color:var(--primary);padding:1px 5px;border-radius:3px;font-size:11.5px;font-family:ui-monospace,Consolas,monospace}
+  table{border-collapse:collapse;width:100%;margin:8px 0;font-size:12px}
+  th,td{padding:6px 8px;border:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:rgba(56,189,248,0.08);color:var(--primary);font-weight:600}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;margin:14px 0}
+  .panel.ok{border-color:rgba(16,185,129,0.5);background:rgba(16,185,129,0.04)}
+  .panel.info{border-color:rgba(139,92,246,0.5);background:rgba(139,92,246,0.04)}
+  .panel.warn{border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.04)}
+  .panel.crit{border-color:rgba(244,63,94,0.5);background:rgba(244,63,94,0.04)}
+  .panel-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .pcard{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px}
+  .pcard h3{margin:0 0 4px 0;font-size:13px}
+  .pcard.green{border-color:rgba(16,185,129,0.5)}
+  .pcard.violet{border-color:rgba(139,92,246,0.5)}
+  .pcard.amber{border-color:rgba(245,158,11,0.5)}
+  .pcard ul{font-size:11.5px;margin:4px 0;padding-left:18px}
+  .pcard li{margin:2px 0;line-height:1.5}
+  textarea{width:100%;box-sizing:border-box;background:#0f172a;color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-size:12px;font-family:inherit;line-height:1.4;min-height:50px;resize:vertical}
+  textarea:focus{outline:none;border-color:var(--primary)}
+  .field{margin:10px 0}
+  .field label{display:block;font-size:12px;margin-bottom:4px}
+  .field label .hint{display:block;font-size:11px;color:var(--muted);font-style:italic;margin-top:1px;font-weight:normal}
+  .form{background:rgba(56,189,248,0.04);border:1px solid rgba(56,189,248,0.2);border-radius:8px;padding:14px;margin:14px 0}
+  .form h4{color:var(--primary);margin-top:0}
+  .actions{display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap}
+  .btn{background:var(--primary);color:#0b1220;border:none;border-radius:4px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}
+  .btn:hover{opacity:0.9}
+  .btn.outline{background:transparent;border:1px solid var(--line);color:var(--fg)}
+  .btn.copied{background:var(--emerald);color:#fff}
+  .preview{display:none;background:#0f172a;border:1px solid var(--line);border-radius:6px;padding:10px;margin-top:8px;font-family:ui-monospace,Consolas,monospace;font-size:11px;white-space:pre-wrap;user-select:all}
+  .preview.visible{display:block}
+  .pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:600;margin-right:4px;vertical-align:middle}
+  .pill.violet{background:rgba(139,92,246,0.15);color:var(--violet);border:1px solid rgba(139,92,246,0.4)}
+  .pill.emerald{background:rgba(16,185,129,0.15);color:var(--emerald);border:1px solid rgba(16,185,129,0.4)}
+  .pill.amber{background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.4)}
+  .pill.rose{background:rgba(244,63,94,0.15);color:var(--rose);border:1px solid rgba(244,63,94,0.4)}
+  .pill.muted{background:rgba(148,163,184,0.1);color:var(--muted);border:1px solid rgba(148,163,184,0.3)}
+  .ascii{font-family:ui-monospace,Consolas,monospace;background:#0f172a;padding:14px;border-radius:6px;color:#cbd5e1;font-size:11.5px;white-space:pre;overflow-x:auto;line-height:1.5;border:1px solid var(--line)}
+  .copy-status{font-size:10.5px;color:var(--muted);margin-left:8px}
+  .copy-status.ok{color:var(--emerald)}
+  .copy-status.err{color:var(--rose)}
+</style>
+</head>
+<body>
+
+<h1>onTong Ontology — Authoring vs 자동 Recommend vs 수동</h1>
+<div class="sub">2026-05-05 · 사용자 질문 "수동 작성 방법을 전혀 모르겠다" + clipboard 복사 fix</div>
+
+<div class="panel info">
+  <strong>이번 토론 두 가지:</strong>
+  <ol style="margin:6px 0;font-size:12px">
+    <li><strong>onTong 의 ontology 작성 3 path</strong> 비교 — 무엇이 있고, 어떤 차이?</li>
+    <li><strong>HTML 답변 복사 실패 fix</strong> — <code>file://</code> protocol 에선 <code>navigator.clipboard</code> 가 막힘. fallback 추가 (이번 HTML 부터 적용).</li>
+  </ol>
+</div>
+
+<!-- ============================================== -->
+<h2>§1. onTong 의 ontology 작성 3 path</h2>
+
+<div class="panel-grid">
+  <div class="pcard green">
+    <h3 style="color:var(--emerald)">① 자동 Recommend</h3>
+    <span class="pill emerald">기존 · 작동 중</span>
+    <div style="font-size:11.5px">
+      코드 import 후 <code>POST /api/ontology/repos/{repo}/recommend</code> 로 자동 후보 생성. heuristic + LLM 으로 BusinessTerm + Action + Realization 한꺼번에 generate.
+    </div>
+    <ul>
+      <li><strong>입력</strong>: 코드 (CodeType, CodeMethod)</li>
+      <li><strong>출력</strong>: 후보 entity 들 (큐에 적재)</li>
+      <li><strong>인간 개입</strong>: 거의 없음 (자동 generate)</li>
+    </ul>
+  </div>
+
+  <div class="pcard violet">
+    <h3 style="color:var(--violet)">② 큐 confirm / reject</h3>
+    <span class="pill violet">기존 · 작동 중</span>
+    <div style="font-size:11.5px">
+      좌측 <strong>📥큐</strong> 탭에 ① recommend 가 만든 후보 list. 사용자가 한 행 클릭 → confirm 또는 reject.
+    </div>
+    <ul>
+      <li><strong>입력</strong>: 자동 후보 + 사용자 판단</li>
+      <li><strong>출력</strong>: confirmed BusinessTerm / Action</li>
+      <li><strong>인간 개입</strong>: per-entity 1 클릭 (yes/no)</li>
+    </ul>
+  </div>
+
+  <div class="pcard amber">
+    <h3 style="color:var(--amber)">③ Authoring AI 인터뷰 (우리)</h3>
+    <span class="pill amber">신규 · R2 진행 중</span>
+    <div style="font-size:11.5px">
+      코드 → 가설 → Q&A → 옵션 → 명명 → archive → confirm. Round 5 의 협업 패턴 그대로.
+    </div>
+    <ul>
+      <li><strong>입력</strong>: 코드 + 도메인 인터뷰</li>
+      <li><strong>출력</strong>: 정확한 BusinessTerm (with composition)</li>
+      <li><strong>인간 개입</strong>: 매 turn 답변 + 옵션 선택</li>
+    </ul>
+  </div>
+</div>
+
+<div class="panel crit">
+  <strong>발견한 사실</strong> — frontend grep 결과: <em>"신규 Term", "BusinessTermForm", "ActionForm"</em> 등 매칭 0건.
+  <br>
+  → onTong 에 <strong>완전 수동 form (빈 페이지부터 BusinessTerm 직접 작성)</strong> 은 없음. 자동 recommend 가 만든 것을 큐에서 confirm / reject 하는 게 유일한 manual path.
+</div>
+
+<!-- ============================================== -->
+<h2>§2. 3 path 의 적합 시나리오</h2>
+
+<table>
+<tr>
+  <th>시나리오</th>
+  <th>최적 path</th>
+  <th>이유</th>
+</tr>
+<tr>
+  <td>repo 처음 import — 100+ class 한꺼번에 채워야</td>
+  <td><span class="pill emerald">① + ②</span></td>
+  <td>recommend 가 1회 generate → 큐에서 빠르게 confirm/reject. quality 낮아도 양 우선.</td>
+</tr>
+<tr>
+  <td>핵심 entity (HrPlant 같은) 깊이 있게 만들기</td>
+  <td><span class="pill amber">③ Authoring</span></td>
+  <td>도메인 인터뷰로 의미·composition·옵션 trade-off 까지. 비용 ↑ 이지만 quality ↑↑.</td>
+</tr>
+<tr>
+  <td>recommend 결과 잘못 — 이름·구조 다르게</td>
+  <td><span class="pill violet">② reject + ③ 다시</span></td>
+  <td>큐에서 reject 후 Authoring 으로 새로 — 가장 reliable.</td>
+</tr>
+<tr>
+  <td>Action 작성</td>
+  <td><span class="pill emerald">① 만 가능</span></td>
+  <td>Authoring 은 아직 BusinessTerm 만 다룸. Action 은 recommend 가 method 분석으로 만들고 큐에서 confirm.</td>
+</tr>
+<tr>
+  <td>"빈 페이지부터 BusinessTerm 만들기" (코드 없이)</td>
+  <td><span class="pill rose">없음</span></td>
+  <td>onTong 디자인은 <strong>코드가 source of truth</strong>. 코드 없이 entity 직접 만드는 path 는 의도적으로 빠짐. (reverse engineering tool 컨셉)</td>
+</tr>
+</table>
+
+<!-- ============================================== -->
+<h2>§3. 현재 onTong 의 ontology 작성 흐름 — 사용자 입장에서</h2>
+
+<div class="ascii">[코드 import 직후 — recommend 안 돌렸을 때]
+                                        ↓
+좌측 코드 트리: 클래스 보임            큐 탭: 비어있음
+Detail mode:    Action 미선택 (빈 화면)
+✏️ Authoring:  사용 가능 ✓
+
+────────────────────────────────────────────────────────────
+
+[recommend 1회 실행 후 — 일반 onTong 사용 흐름]
+                                        ↓
+좌측 코드 트리: 클래스 + ★ (term 있음 표시)
+큐 탭: 후보 N개 list
+Detail mode:    Action FQN 선택하면 detail 보임 ✓
+✏️ Authoring:  사용 가능 (대안 또는 reject 후 깊게)
+</div>
+
+<div class="panel warn">
+  <strong>사용자 혼란의 원인:</strong> 우리는 <strong>recommend 안 돌리고 Authoring 만</strong> 진행 중. 그래서 큐도 비어있고 Detail/Split 도 빈 화면. 즉 onTong 의 default 흐름 (recommend → 큐 → confirm) 이 안 작동하는 상태.
+</div>
+
+<!-- ============================================== -->
+<h2>§4. 권장 흐름 (이상적)</h2>
+
+<table>
+<tr>
+  <th>단계</th>
+  <th>경로</th>
+  <th>현재 진행도</th>
+</tr>
+<tr>
+  <td>1. 코드 import</td>
+  <td>자동</td>
+  <td>✅ 완료 (slab-design-real 123 class)</td>
+</tr>
+<tr>
+  <td>2. 자동 recommend 실행</td>
+  <td>📥 큐 → bulk 후보 generate</td>
+  <td>🔴 안 돌렸음 (Authoring 만 사용)</td>
+</tr>
+<tr>
+  <td>3. 핵심 entity 깊게 (HrPlant 류)</td>
+  <td>✏️ Authoring 인터뷰</td>
+  <td>🟡 R2 진행</td>
+</tr>
+<tr>
+  <td>4. 나머지 entity bulk confirm</td>
+  <td>📥 큐에서 confirm/reject</td>
+  <td>🔴 큐 비어있음</td>
+</tr>
+<tr>
+  <td>5. Action 작성 (큐 confirm)</td>
+  <td>📥 큐 confirm/reject</td>
+  <td>🔴 큐 비어있음</td>
+</tr>
+<tr>
+  <td>6. AnchorBinding (Detail/Split)</td>
+  <td>Detail/Split mode</td>
+  <td>🔴 Action 데이터 없어서 빈 화면</td>
+</tr>
+</table>
+
+<div class="panel ok">
+  <strong>실용적 다음 행동 후보:</strong>
+  <ol style="font-size:12px;margin:6px 0">
+    <li><strong>recommend 1회 돌려서 큐 채우기</strong> — 그럼 Detail/Split 도 작동, 현재 빈 화면 해소</li>
+    <li><strong>Authoring 으로 핵심 entity (HrPlant) 만 깊게</strong> — recommend 가 못 만드는 quality</li>
+    <li><strong>Authoring + recommend 하이브리드</strong> — recommend 로 채운 후 잘못된 것만 Authoring 으로 재작성</li>
+  </ol>
+  <p style="font-size:11.5px;color:var(--muted);margin:6px 0">
+    Round 5 의 우리 협업처럼 "정확한 quality" 가 목표면 ② Authoring 단독으로도 OK. 양적 채움이 필요하면 ① + ② 조합.
+  </p>
+</div>
+
+<!-- ============================================== -->
+<h2>§5. 큐 / recommend UI 의 현재 상태</h2>
+
+<div class="panel">
+  <h4 style="margin-top:0">좌측 LeftPanel 의 두 탭</h4>
+  <table>
+    <tr>
+      <td><strong>🗂 코드</strong></td>
+      <td>패키지 트리 (방금 우리가 fix 함 — JPO 클래스 inline 표시)</td>
+    </tr>
+    <tr>
+      <td><strong>📥 큐</strong></td>
+      <td>
+        recommend 가 만든 후보 list. 현재 비어있음 (recommend 미실행). 좌측 <strong>📥큐</strong> 탭 클릭 시 진입 가능.<br>
+        실제 사용 흐름: queue → 사용자 confirm/reject → Detail/Split 에 데이터 channel.
+      </td>
+    </tr>
+  </table>
+</div>
+
+<!-- ============================================== -->
+<h2>§6. Clipboard 복사 fix (이번 HTML 부터 적용)</h2>
+
+<div class="panel info">
+  <strong>이전 HTML 답변 복사 실패 원인:</strong> <code>file://</code> protocol 은 secure context 가 아니어서 <code>navigator.clipboard.writeText()</code> 가 거부당함. 폴백 코드 추가.
+</div>
+
+<pre>// 이 HTML 의 copy 버튼은 다음 fallback chain 사용:
+async function copyText(text) {
+  try {
+    if (navigator.clipboard &amp;&amp; window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return "modern";
+    }
+  } catch {}
+  // file:// fallback — temp textarea + execCommand
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.cssText = "position:fixed;opacity:0;left:-9999px";
+  document.body.appendChild(ta);
+  ta.select();
+  const ok = document.execCommand("copy");
+  document.body.removeChild(ta);
+  return ok ? "fallback" : "failed";
+}</pre>
+
+<p style="font-size:11.5px;color:var(--muted)">
+  성공 시 버튼이 "✓ 복사됨 (modern)" 또는 "✓ 복사됨 (fallback)" 으로 표시. 둘 다 실패하면 "✕ 복사 실패 — 미리보기에서 직접 선택" + 미리보기 영역이 자동 select 가능.
+</p>
+
+<!-- ============================================== -->
+<h2>§7. 답변 폼 (clipboard fallback 적용)</h2>
+
+<div class="form">
+  <h4>각 질문 1-2 줄 OK</h4>
+
+  <div class="field">
+    <label>Q1. <strong>3 path 차이 이해됐나?</strong>
+      <span class="hint">자동 recommend / 큐 confirm / Authoring 인터뷰</span>
+    </label>
+    <textarea name="q1_understand" placeholder="예: 이해됨 / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q2. <strong>다음 행동 후보 중 선택</strong>
+      <span class="hint">A: 일단 R2 (Authoring quality) 마무리 → recommend 는 나중<br>B: recommend 1회 돌려서 큐 채우기 + Detail/Split 빈 화면 해소<br>C: Authoring + recommend 하이브리드 동시</span>
+    </label>
+    <textarea name="q2_action" placeholder="예: A / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q3. <strong>큐 / recommend UI</strong> 가 보고 싶은가?
+      <span class="hint">📥큐 탭으로 가서 recommend 1회 돌려서 어떻게 생겼는지 같이 볼지</span>
+    </label>
+    <textarea name="q3_see_queue" placeholder="예: Yes / 또는 R2 마무리 후"></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q4. <strong>Clipboard 복사 fix 작동 확인</strong>
+      <span class="hint">이번 HTML 의 "📋 답변 복사" 버튼 잘 동작하는지 (작동하면 "OK" 만)</span>
+    </label>
+    <textarea name="q4_clipboard" placeholder="예: OK / 또는 여전히 실패"></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q5. <strong>R2 다음 항목 (F3 피드백 루프)</strong> 진행?
+      <span class="hint">또는 다른 우선순위</span>
+    </label>
+    <textarea name="q5_next" placeholder="예: F3 진행 / 또는 ..."></textarea>
+  </div>
+
+  <div class="actions">
+    <button class="btn" data-action="copy">📋 답변 복사</button>
+    <button class="btn outline" data-action="preview">미리보기</button>
+    <span class="copy-status" id="copyStatus"></span>
+  </div>
+
+  <div class="preview" id="preview"></div>
+</div>
+
+<script>
+const fields = [
+  ["q1_understand", "Q1. 3 path 차이 이해"],
+  ["q2_action",     "Q2. 다음 행동 (A/B/C)"],
+  ["q3_see_queue",  "Q3. 큐 / recommend UI 보고 싶나"],
+  ["q4_clipboard",  "Q4. Clipboard 복사 fix 작동"],
+  ["q5_next",       "Q5. R2 다음 항목"],
+];
+
+function buildText() {
+  const out = ["[onTong Authoring vs Manual — 사용자 답변]"];
+  for (const [k, label] of fields) {
+    const v = (document.querySelector(`textarea[name="${k}"]`)?.value ?? "").trim();
+    if (v) out.push(`\n## ${label}\n${v}`);
+  }
+  return out.join("\n");
+}
+
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return "modern";
+    }
+  } catch {}
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;opacity:0;left:-9999px;top:0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok ? "fallback" : "failed";
+  } catch {
+    return "failed";
+  }
+}
+
+function showPreview(text) {
+  const slot = document.getElementById("preview");
+  slot.textContent = text;
+  slot.classList.add("visible");
+  // user-select:all 이라 클릭 한 번에 전체 선택 가능
+}
+
+document.querySelector('[data-action="preview"]').addEventListener("click", () => {
+  showPreview(buildText());
+});
+
+document.querySelector('[data-action="copy"]').addEventListener("click", async (e) => {
+  const txt = buildText();
+  showPreview(txt);
+  const result = await copyText(txt);
+  const btn = e.currentTarget;
+  const status = document.getElementById("copyStatus");
+  if (result === "modern" || result === "fallback") {
+    const orig = btn.textContent;
+    btn.textContent = `✓ 복사됨 (${result})`;
+    btn.classList.add("copied");
+    status.textContent = "";
+    status.classList.remove("err");
+    status.classList.add("ok");
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove("copied"); }, 2000);
+  } else {
+    status.textContent = "✕ 복사 실패 — 아래 미리보기 영역에서 텍스트 클릭하면 전체 선택됨";
+    status.classList.remove("ok");
+    status.classList.add("err");
+  }
+});
+
+// 미리보기 영역 클릭 시 전체 selection
+document.getElementById("preview").addEventListener("click", () => {
+  const slot = document.getElementById("preview");
+  const range = document.createRange();
+  range.selectNodeContents(slot);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+});
+</script>
+
+</body>
+</html>

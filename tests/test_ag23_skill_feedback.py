@@ -1,22 +1,7 @@
 """AG-2-3: SkillResult feedback field — unit tests."""
 
 import sys
-import types
 from pathlib import Path
-
-# ── Module stubs (avoid heavy deps) ─────────────────────────────
-for mod_name in [
-    "chromadb", "chromadb.config", "pydantic_ai", "pydantic_ai.models",
-    "pydantic_ai.models.openai", "pydantic_settings",
-    "litellm", "httpx",
-]:
-    if mod_name not in sys.modules:
-        sys.modules[mod_name] = types.ModuleType(mod_name)
-
-# Stub pydantic_settings.BaseSettings → plain class
-_ps = sys.modules["pydantic_settings"]
-if not hasattr(_ps, "BaseSettings"):
-    _ps.BaseSettings = type("BaseSettings", (), {"model_config": {}})
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>OD-11-B7 Reflection 런타임 collector — 착수 전 결정 사항</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161a22;
+    --panel-2: #1d222d;
+    --border: #2a3142;
+    --text: #e6e8ee;
+    --muted: #9aa3b2;
+    --accent: #6ea8fe;
+    --accent-2: #7ee787;
+    --warn: #f2b35b;
+    --danger: #ff6b6b;
+    --code-bg: #0b0d13;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, "SF Pro Display", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; line-height: 1.65; }
+  body { padding: 40px 24px 120px; }
+  .container { max-width: 1080px; margin: 0 auto; }
+
+  h1 { font-size: 32px; margin: 0 0 8px; letter-spacing: -0.3px; }
+  h2 { font-size: 22px; margin: 48px 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); letter-spacing: -0.2px; }
+  h3 { font-size: 17px; margin: 24px 0 10px; color: var(--text); }
+  h4 { font-size: 14px; margin: 18px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+
+  code.inline { background: var(--code-bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; font-size: 13px; color: #c9d1d9; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; overflow: auto; font-size: 12.5px; line-height: 1.55; color: #c9d1d9; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  .lead { font-size: 15.5px; color: #cfd3db; background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--accent); padding: 16px 20px; border-radius: 10px; margin: 18px 0; }
+  .muted { color: var(--muted); }
+
+  .toc { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; font-size: 14px; margin: 20px 0 36px; }
+  .toc h4 { margin: 0 0 10px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .toc ol { margin: 6px 0 0 20px; padding: 0; }
+  .toc li { margin: 4px 0; }
+  .toc a { color: var(--text); text-decoration: none; }
+  .toc a:hover { color: var(--accent); }
+
+  .q-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 22px 26px; margin: 24px 0; }
+  .q-card .q-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .q-card .q-num { background: var(--accent); color: #0b0d13; font-weight: 700; border-radius: 6px; padding: 3px 10px; font-size: 13px; }
+  .q-card .q-cat { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  .q-card .q-title { font-size: 17px; font-weight: 700; color: var(--text); margin: 0 0 10px; }
+  .q-card .context { font-size: 14px; color: #cfd3db; margin: 0 0 14px; }
+
+  .options { display: flex; flex-direction: column; gap: 10px; margin: 14px 0; }
+  .option { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; font-size: 14px; }
+  .option .opt-label { display: inline-block; font-weight: 700; color: var(--muted); margin-right: 8px; min-width: 20px; }
+  .option .opt-title { font-weight: 700; color: var(--text); }
+  .option.recommended { border-color: var(--accent-2); border-width: 2px; background: rgba(126, 231, 135, 0.08); }
+  .option.recommended .opt-label { color: var(--accent-2); }
+  .option.recommended::after { content: "★ 추천"; float: right; font-size: 12px; color: var(--accent-2); font-weight: 700; }
+  .option .pros-cons { margin-top: 8px; font-size: 13px; }
+  .option .pros-cons .row { display: flex; gap: 10px; margin: 4px 0; }
+  .option .pros-cons .row .tag-mini { font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 3px; flex-shrink: 0; height: 18px; line-height: 18px; }
+  .option .pros-cons .pro .tag-mini { background: rgba(126, 231, 135, 0.2); color: var(--accent-2); }
+  .option .pros-cons .con .tag-mini { background: rgba(255, 107, 107, 0.2); color: var(--danger); }
+  .option .pros-cons .txt { color: #cfd3db; }
+
+  .rationale { background: var(--code-bg); border-left: 3px solid var(--accent); padding: 10px 16px; margin-top: 14px; font-size: 13.5px; color: #cfd3db; border-radius: 0 6px 6px 0; }
+  .rationale .r-label { color: var(--accent); font-weight: 700; margin-right: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .aux { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin: 12px 0; font-size: 14px; }
+  .aux .aux-k { color: var(--accent-2); font-weight: 700; }
+
+  .decision { background: var(--panel); border: 2px solid var(--accent-2); border-radius: 12px; padding: 20px 26px; margin: 40px 0 20px; text-align: center; }
+  .decision h3 { margin: 0 0 10px; color: var(--accent-2); font-size: 18px; }
+  .decision p { margin: 6px 0; color: #cfd3db; font-size: 14px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #1d222d; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  tr:last-child td { border-bottom: none; }
+
+  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-right: 4px; font-weight: 600; }
+  .tag.code { background: rgba(110, 168, 254, 0.15); color: var(--accent); border: 1px solid rgba(110, 168, 254, 0.4); }
+  .tag.runtime { background: rgba(242, 179, 91, 0.15); color: var(--warn); border: 1px solid rgba(242, 179, 91, 0.4); }
+  .tag.static { background: rgba(126, 231, 135, 0.15); color: var(--accent-2); border: 1px solid rgba(126, 231, 135, 0.4); }
+
+  .diagram { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 18px; margin: 16px 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; color: #c9d1d9; white-space: pre; overflow-x: auto; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>OD-11-B7 Reflection 런타임 collector</h1>
+<div class="subtitle">착수 전 결정 사항 3건 — 2026-04-19 · Section 2 Modeling · Phase B</div>
+
+<div class="lead">
+B6 가 정적 분석 라운드를 끝냈습니다 (10 analyzer + CrossFileEnricher 까지 272/272 통과). B7 은 <b>런타임 trace</b> 를 받아 <b>Reflection 콜사이트를 실엣지로 승격</b>시키는 인터페이스를 만듭니다. 아직 JVM Agent 는 붙이지 않고, 파이프라인과 Protocol 을 먼저 정의합니다.
+</div>
+
+<div class="toc">
+<h4>이 문서에서 결정할 것</h4>
+<ol>
+  <li><a href="#q1">Q1 — B7 sub-spec 문서를 먼저 쓸지, 바로 TDD 로 진입할지</a></li>
+  <li><a href="#q2">Q2 — 정적 marker 와 런타임 trace 가 만났을 때 엣지 병합 규칙</a></li>
+  <li><a href="#q3">Q3 — JVM Agent 임시 섹션 범위 — B7 에서 어디까지 만들지</a></li>
+</ol>
+</div>
+
+<h2>왜 지금 이 결정이 필요한가</h2>
+
+<h3>현재 상태</h3>
+<p>B5-8 <code class="inline">ReflectionAnalyzer</code> 가 정적 call-site 를 찾아서 다음과 같이 마킹해 둔 상태입니다. <b>아직 엣지로는 승격되지 않았습니다.</b></p>
+
+<pre>METHOD entity
+  .attributes["reflection_calls"] = [
+    {"api": "Class.forName",        "arg": "com.acme.FooService", "line": 42},
+    {"api": "ctx.getBean",          "arg": "orderService",        "line": 58},
+    {"api": "clazz.getDeclaredMethod","arg": "calculate",          "line": 71},
+  ]</pre>
+
+<p>즉, "이 메서드 안에서 <code class="inline">Class.forName("com.acme.FooService")</code> 를 부른다" 라는 <b>사실</b>만 기록되어 있고, "그래서 실제로 어떤 클래스/메서드를 호출하느냐" 는 아직 미정입니다.</p>
+
+<h3>B7 이 해야 할 일</h3>
+<div class="diagram">
+┌──────────────────────┐         ┌──────────────────────┐
+│ B5-8 정적 marker     │         │ B7 런타임 trace       │
+│ reflection_calls[]   │         │ (JVM Agent 로 수집)   │
+└──────────┬───────────┘         └──────────┬───────────┘
+           │                                │
+           └───────────┬────────────────────┘
+                       ↓
+           ┌──────────────────────────┐
+           │ RuntimeCollector (B7)     │
+           │ Protocol + DTO            │
+           │ 정적·런타임 → 엣지 병합    │
+           └──────────┬───────────────┘
+                      ↓
+           CALLS{source: static|runtime, confidence: ...}
+           REFLECTS_AS (정적 reflection_calls → 실제 타겟)</div>
+
+<p>여기서 <b>엣지 승격 규칙</b>(어떤 source 를 신뢰할지, confidence 는 어떻게 줄지)과 <b>수집 경로</b>(JVM Agent 를 이번 단계에서 붙일지) 결정이 코드 구조를 크게 좌우합니다.</p>
+
+<h2 id="q1">Q1 — B7 sub-spec 문서를 먼저 쓸지, 바로 TDD 로 진입할지</h2>
+
+<div class="q-card">
+  <div class="q-header">
+    <span class="q-num">Q1</span>
+    <span class="q-cat">Process · 문서화 범위</span>
+  </div>
+  <p class="q-title">B6 처럼 OD-11-B7-SPEC.md 를 먼저 승인받고 시작할까요?</p>
+
+  <div class="context">
+    B6 는 10 개 결정사항을 담은 <code class="inline">OD-11-B6-SPEC.md</code> 를 먼저 쓰고, 승인받은 후 B6-1~B6-4 TDD 로 진입했습니다. 덕분에 4 하위 단계가 서로 충돌 없이 진행됐습니다. B7 은 범위가 상대적으로 좁지만, <b>런타임 trace format · confidence weight · JVM Agent 경계</b> 같은 결정이 여전히 남아 있습니다.
+  </div>
+
+  <div class="options">
+    <div class="option recommended">
+      <span class="opt-label">A</span><span class="opt-title">Sub-spec 문서 먼저 작성 (B6 패턴 유지)</span>
+      <div class="pros-cons">
+        <div class="row pro"><span class="tag-mini">PRO</span><span class="txt">Protocol 의 DTO 필드가 나중에 바뀌면 B9 Slab 샘플 E2E 때 파급이 크다. 미리 한 번 합의하면 그때 재작업 없음.</span></div>
+        <div class="row pro"><span class="tag-mini">PRO</span><span class="txt">Q2·Q3 결정이 문서 안에 박제되어 다음 세션에서 기억할 필요 없음.</span></div>
+        <div class="row con"><span class="tag-mini">CON</span><span class="txt">스펙 작성 + 승인 1 턴 소요 (B6-SPEC 은 약 30분 작업이었음).</span></div>
+      </div>
+    </div>
+    <div class="option">
+      <span class="opt-label">B</span><span class="opt-title">바로 Protocol + 10 테스트 TDD 진입</span>
+      <div class="pros-cons">
+        <div class="row pro"><span class="tag-mini">PRO</span><span class="txt">착수가 빠름.</span></div>
+        <div class="row con"><span class="tag-mini">CON</span><span class="txt">Q2·Q3 결정을 코드 안에 묻어두게 되어 B8·B9 착수 시 재합의가 필요할 가능성.</span></div>
+        <div class="row con"><span class="tag-mini">CON</span><span class="txt">B5-8 + B7 관계가 미묘해서 (static→runtime 승격 규칙) 스펙 없이는 중간 리뷰가 어려움.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rationale">
+    <span class="r-label">RATIONALE</span>
+    A 추천. B6 에서 "스펙 먼저" 패턴이 잘 작동했고, Q2 의 confidence weight 같은 수치는 문서 없이 코드만 읽어서는 나중에 왜 이 값인지 모호해짐. 30분 투자해 B7-SPEC 5~6 결정 lock 해두는 편이 B9 E2E 때 안전합니다.
+  </div>
+</div>
+
+<h2 id="q2">Q2 — 정적 marker 와 런타임 trace 가 만났을 때 엣지 병합 규칙</h2>
+
+<div class="q-card">
+  <div class="q-header">
+    <span class="q-num">Q2</span>
+    <span class="q-cat">Design · 엣지 승격</span>
+  </div>
+  <p class="q-title">같은 메서드에서 "정적 marker 로도 감지"되고 "런타임 trace 로도 찍힌" 경우, <br>그래프에 어떻게 저장할까요?</p>
+
+  <div class="context">
+    예시 시나리오 — <code class="inline">OrderService.dispatch()</code> 가 <code class="inline">Class.forName(name)</code> 를 부름:
+    <ul style="margin-top:10px; color:#cfd3db;">
+      <li><span class="tag static">static</span> B5-8 marker : <code class="inline">{api: "Class.forName", arg: "name", line: 42}</code> — <b>arg 가 변수</b>라 실제 대상은 모름</li>
+      <li><span class="tag runtime">runtime</span> B7 trace : <code class="inline">{api: "Class.forName", resolved: "com.acme.FooShipper", method: "OrderService.dispatch"}</code> — <b>실제로 로드된 클래스 확인</b></li>
+    </ul>
+    이 둘을 그래프 엣지로 옮길 때 3가지 접근이 가능합니다.
+  </div>
+
+  <h4>Option A — 런타임 trace 가 정적 marker 를 교체 (Replace)</h4>
+  <div class="diagram">
+정적 marker 만 있을 때:
+  METHOD("OrderService.dispatch") —[CALLS{source: static, target_unknown: true, confidence: 0.3}]→ &lt;reflection-site&gt;
+
+런타임 trace 가 도착하면 위 엣지 삭제하고:
+  METHOD("OrderService.dispatch") —[CALLS{source: runtime, confidence: 0.95}]→ CLASS("com.acme.FooShipper")</div>
+
+  <h4>Option B — 정적·런타임 엣지를 공존 (Coexist)</h4>
+  <div class="diagram">
+METHOD("OrderService.dispatch") —[CALLS{source: static, confidence: 0.3}]→ &lt;reflection-site&gt;
+METHOD("OrderService.dispatch") —[CALLS{source: runtime, confidence: 0.95}]→ CLASS("com.acme.FooShipper")
+
+→ Impact Analysis 쿼리 시 "source IN ('static','runtime')" 로 둘 다 타거나,
+   보수적으로 "source = 'runtime'" 만 타게 할 수 있음.</div>
+
+  <h4>Option C — 단일 엣지에 confidence weight 로 반영 (Merge)</h4>
+  <div class="diagram">
+METHOD("OrderService.dispatch") —[CALLS{
+  sources: ["static","runtime"],
+  confidence: 0.95,         ← 런타임 도착하면 정적 0.3 을 덮어씀
+  static_line: 42,
+  runtime_sample_count: 127
+}]→ CLASS("com.acme.FooShipper")</div>
+
+  <div class="options">
+    <div class="option">
+      <span class="opt-label">A</span><span class="opt-title">Replace — 런타임이 정적을 대체</span>
+      <div class="pros-cons">
+        <div class="row pro"><span class="tag-mini">PRO</span><span class="txt">그래프가 깔끔. BFS 결과에 중복 경로 없음.</span></div>
+        <div class="row con"><span class="tag-mini">CON</span><span class="txt">정적 marker 가 있었다는 사실 자체가 사라짐 (감사 추적 불가).</span></div>
+        <div class="row con"><span class="tag-mini">CON</span><span class="txt">런타임에 안 찍힌 경로는 영영 안 잡힘. 정적 marker 가 남긴 "<code class="inline">&lt;reflection-site&gt;</code>" 경고 효과도 잃음.</span></div>
+      </div>
+    </div>
+    <div class="option recommended">
+      <span class="opt-label">B</span><span class="opt-title">Coexist — 두 엣지를 <code class="inline">source</code> 속성으로 구분해 보존</span>
+      <div class="pros-cons">
+        <div class="row pro"><span class="tag-mini">PRO</span><span class="txt">Impact Analysis 에서 "런타임 확인된 것만" / "정적 포함 전체" 를 쿼리 레벨로 스위치 가능 — Q6 hops 자율 조정과 잘 맞음.</span></div>
+        <div class="row pro"><span class="tag-mini">PRO</span><span class="txt">정적은 많이 잡히고 런타임은 못 찍는 경로(예: 프로덕션에서만 동작하는 profile) 도 놓치지 않음.</span></div>
+        <div class="row pro"><span class="tag-mini">PRO</span><span class="txt">confidence 기본값이 분리되어 있어서 가중 BFS 가 단순.</span></div>
+        <div class="row con"><span class="tag-mini">CON</span><span class="txt">엣지 개수가 늘어남. 시각화 시 중복 보일 수 있어 뷰어 단에서 source 필터링 필요.</span></div>
+      </div>
+    </div>
+    <div class="option">
+      <span class="opt-label">C</span><span class="opt-title">Merge — 단일 엣지에 sources 리스트 + 가중 confidence</span>
+      <div class="pros-cons">
+        <div class="row pro"><span class="tag-mini">PRO</span><span class="txt">그래프 조회 시 엣지 1 개만 보면 되어 뷰어가 간단.</span></div>
+        <div class="row con"><span class="tag-mini">CON</span><span class="txt">Cypher MERGE 로직이 복잡 (런타임 trace 가 batch 로 계속 들어올 때 confidence·sample_count 재계산).</span></div>
+        <div class="row con"><span class="tag-mini">CON</span><span class="txt">동일 source 메서드가 서로 다른 target 을 여러 개 로드하는 경우 (<code class="inline">Class.forName</code> with 변수) 1:N 표현이 어려움.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rationale">
+    <span class="r-label">RATIONALE</span>
+    B 추천. <b>정적 정보는 "잠재 경로", 런타임은 "관측 경로"</b> 로 역할이 다릅니다. 둘을 모두 그래프에 남겨두고 Impact Analysis 쿼리 파라미터로 <code class="inline">sources=["runtime"]</code> 같이 고를 수 있게 하는 편이 Slab 엔진 E2E 에서 "안전한 리팩토링 범위 / 전체 잠재 범위" 두 관점을 바로 뽑아낼 수 있습니다. Confidence 기본값은 <span class="tag static">static</span> = 0.4, <span class="tag runtime">runtime</span> = 0.95 정도로 제안.
+  </div>
+</div>
+
+<h2 id="q3">Q3 — JVM Agent 임시 섹션 범위 — B7 에서 어디까지 만들지</h2>
+
+<div class="q-card">
+  <div class="q-header">
+    <span class="q-num">Q3</span>
+    <span class="q-cat">Scope · 런타임 수집기 구현 경계</span>
+  </div>
+  <p class="q-title">B7 에서 실제 trace 수집기를 얼마나 만들까요?</p>
+
+  <div class="context">
+    과거 합의 (Q10, 2026-04-19): JVM Agent 는 정식 Section 3 이전에 <b>임시 섹션</b>(<code class="inline">toClaude/temp-runtime/</code>, <code class="inline">backend/temp_runtime/</code>) 에서 실험하기로 했습니다. 하지만 "임시 섹션" 이 정확히 언제 들어오는지, B7 에서 어디까지 붙일지는 미정.
+  </div>
+
+  <h4>B7 작업 범위 시각화</h4>
+  <div class="diagram">
+   ┌───────────────────── B7 단계 경계 선택지 ─────────────────────┐
+   │                                                              │
+   │   Protocol + DTO        로컬 trace file         JVM Agent    │
+   │   (python 쪽)            수집기 CLI            (실제 bytecode) │
+   │       │                      │                      │       │
+   │       │◀── Option A ──▶│                      │              │
+   │       │◀──────── Option B ───────▶│           │              │
+   │       │◀──────────────── Option C ──────────────▶│           │
+   │                                                              │
+   └──────────────────────────────────────────────────────────────┘</div>
+
+  <div class="options">
+    <div class="option recommended">
+      <span class="opt-label">A</span><span class="opt-title">Protocol + DTO 만 — 실제 수집기는 B9 임시 섹션에서</span>
+      <div class="pros-cons">
+        <div class="row pro"><span class="tag-mini">PRO</span><span class="txt">B7 범위가 명확. Protocol (<code class="inline">RuntimeCollector</code>) + DTO (<code class="inline">ReflectionTrace</code>, <code class="inline">CallTrace</code>) + 합성 fixture 만으로 TDD 완성.</span></div>
+        <div class="row pro"><span class="tag-mini">PRO</span><span class="txt">JVM Agent 는 <b>Slab 엔진 repo 를 실제로 받은 뒤</b> 어떤 byte-code instrumentation 포인트가 필요한지 알고 나서 만드는 편이 낭비 없음.</span></div>
+        <div class="row pro"><span class="tag-mini">PRO</span><span class="txt">CrossFileEnricher 가 이미 관례로 자리잡은 "synthetic ParseResult" 패턴과 잘 맞음 — 런타임 trace 도 <code class="inline">ParseResult(file_path="&lt;runtime&gt;")</code> 로 들어오게 설계.</span></div>
+        <div class="row con"><span class="tag-mini">CON</span><span class="txt">실제 JVM 에서 한 번도 돌려보지 않고 Protocol 을 박제하면 B9 에서 수정 가능성.</span></div>
+      </div>
+    </div>
+    <div class="option">
+      <span class="opt-label">B</span><span class="opt-title">Protocol + DTO + 로컬 trace file 수집기 CLI (JSON 읽어 ParseResult 만듦)</span>
+      <div class="pros-cons">
+        <div class="row pro"><span class="tag-mini">PRO</span><span class="txt">사용자가 직접 <code class="inline">java -javaagent:...</code> 없이도 샘플 JSON 파일만 있으면 E2E 를 돌려볼 수 있음.</span></div>
+        <div class="row pro"><span class="tag-mini">PRO</span><span class="txt">B8 Impact Analysis 테스트 데이터를 손으로 만들 수 있어 B9 Slab 엔진 대기 중에도 개발 진행 가능.</span></div>
+        <div class="row con"><span class="tag-mini">CON</span><span class="txt">JSON schema 를 먼저 고정해야 함. 나중에 JVM Agent 가 실제로 뱉는 포맷과 다르면 재작업.</span></div>
+      </div>
+    </div>
+    <div class="option">
+      <span class="opt-label">C</span><span class="opt-title">JVM Agent 까지 한 번에 — 임시 섹션 신설 + byte-code instrumentation 프로토타입</span>
+      <div class="pros-cons">
+        <div class="row pro"><span class="tag-mini">PRO</span><span class="txt">실제 Java 환경에서 trace 가 나오는지 확인 가능.</span></div>
+        <div class="row con"><span class="tag-mini">CON</span><span class="txt">ByteBuddy / ASM 같은 library 선정, agent manifest, shading, 배포 경로 등 완전히 새로운 스택 — B7 범위를 크게 넘어섬.</span></div>
+        <div class="row con"><span class="tag-mini">CON</span><span class="txt">Slab 엔진 repo 를 아직 받지 않았는데 Agent 를 먼저 만들면 "어디에 쏠지" 를 추측으로 결정해야 함.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rationale">
+    <span class="r-label">RATIONALE</span>
+    A 추천. <b>"정보가 더 있기 전까지는 가장 적은 일을 한다"</b> 원칙 — 지금은 Slab 엔진 sample repo 를 기다리는 중이고, Agent 구현은 그 repo 가 어떤 구조인지 알고 나서 붙이는 편이 합리적입니다. B7 에서는 Protocol + DTO + 합성 fixture 10 케이스 TDD 까지만 하고, JVM Agent 는 B9 Slab 샘플 수령 직후 임시 섹션 신설과 함께 별도 step 으로 빼는 것을 제안.
+  </div>
+</div>
+
+<h2>추천 경로 요약</h2>
+
+<div class="aux">
+<table>
+  <thead>
+    <tr><th>결정</th><th>추천</th><th>핵심 이유</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="aux-k">Q1</span> B7 sub-spec 먼저?</td>
+      <td>A — 스펙 먼저</td>
+      <td>B6 에서 검증된 패턴. Q2·Q3 결정을 문서로 박제해두는 편이 B9 때 안전.</td>
+    </tr>
+    <tr>
+      <td><span class="aux-k">Q2</span> 정적·런타임 병합 방식</td>
+      <td>B — Coexist</td>
+      <td>Impact Analysis 가 관측된 경로(runtime)만 탈지, 잠재 경로(static 포함) 까지 탈지 쿼리로 스위치 가능.</td>
+    </tr>
+    <tr>
+      <td><span class="aux-k">Q3</span> JVM Agent 범위</td>
+      <td>A — Protocol + DTO 만</td>
+      <td>실제 Agent 구현은 B9 Slab repo 수령 후 임시 섹션에서. 지금 박제하면 재작업 위험.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="decision">
+  <h3>다음 액션</h3>
+  <p>위 3 결정에 대해 "A·B·A" (추천 그대로) 혹은 다르게 가고 싶은 조합을 알려주세요.</p>
+  <p class="muted">승인되면 <code class="inline">toClaude/modeling/OD-11-B7-SPEC.md</code> 작성 → Protocol + DTO TDD red 로 진입합니다.</p>
+</div>
+
+<p class="muted" style="margin-top:40px; text-align:center; font-size:12px;">
+OD-11-B7 decisions · 2026-04-19 · 참조: <code class="inline">OD-11-B6-SPEC.md</code> · <code class="inline">archive/step_b6_4_summary.md</code>
+</p>
+
+</div>
+</body>
+</html>

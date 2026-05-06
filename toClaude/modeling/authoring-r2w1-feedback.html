@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Authoring AI · R2-W1 변경 후 피드백</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#111b2e; --line:#1f2a44; --fg:#e6edf7; --muted:#94a3b8;
+    --primary:#38bdf8; --emerald:#10b981; --amber:#f59e0b; --rose:#f43f5e; --violet:#8b5cf6;
+  }
+  body{margin:0;font:13px -apple-system,Pretendard,sans-serif;background:var(--bg);color:var(--fg);padding:24px;line-height:1.55;max-width:1100px;margin:0 auto}
+  h1{margin:0 0 6px 0;font-size:20px}
+  h2{font-size:15px;margin:24px 0 8px 0;padding:6px 0;border-bottom:1px solid var(--line)}
+  h3{font-size:13px;margin:14px 0 6px 0;color:var(--violet)}
+  h4{font-size:12.5px;margin:10px 0 4px 0;color:var(--primary)}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:16px}
+  pre{background:#0f172a;color:#e6edf7;padding:10px;border-radius:6px;overflow-x:auto;font-size:11.5px;line-height:1.5;border:1px solid var(--line)}
+  code{background:rgba(56,189,248,0.1);color:var(--primary);padding:1px 5px;border-radius:3px;font-size:11.5px;font-family:ui-monospace,Consolas,monospace}
+  table{border-collapse:collapse;width:100%;margin:8px 0;font-size:12px}
+  th,td{padding:5px 8px;border:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:rgba(56,189,248,0.08);color:var(--primary);font-weight:600}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;margin:14px 0}
+  .panel.ok{border-color:rgba(16,185,129,0.5);background:rgba(16,185,129,0.04)}
+  .panel.info{border-color:rgba(139,92,246,0.5);background:rgba(139,92,246,0.04)}
+  .panel.warn{border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.04)}
+  .changes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+  .change{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:10px}
+  .change .id{font-size:11px;font-weight:700;color:var(--emerald);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px}
+  .change .what{font-size:12px;font-weight:600;margin-bottom:4px}
+  .change .detail{font-size:11px;color:var(--muted)}
+  textarea{width:100%;box-sizing:border-box;background:#0f172a;color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-size:12px;font-family:inherit;line-height:1.4;min-height:50px;resize:vertical}
+  textarea:focus{outline:none;border-color:var(--primary)}
+  .field{margin:10px 0}
+  .field label{display:block;font-size:12px;margin-bottom:4px}
+  .field label .hint{display:block;font-size:11px;color:var(--muted);font-style:italic;margin-top:1px;font-weight:normal}
+  .form{background:rgba(56,189,248,0.04);border:1px solid rgba(56,189,248,0.2);border-radius:8px;padding:14px;margin:14px 0}
+  .form h4{color:var(--primary);margin-top:0}
+  .actions{display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap}
+  .btn{background:var(--primary);color:#0b1220;border:none;border-radius:4px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}
+  .btn:hover{opacity:0.9}
+  .btn.outline{background:transparent;border:1px solid var(--line);color:var(--fg)}
+  .btn.copied{background:var(--emerald);color:#fff}
+  .preview{display:none;background:#0f172a;border:1px solid var(--line);border-radius:6px;padding:10px;margin-top:8px;font-family:ui-monospace,Consolas,monospace;font-size:11px;white-space:pre-wrap}
+  .preview.visible{display:block}
+  .pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:600;margin-right:4px;vertical-align:middle}
+  .pill.violet{background:rgba(139,92,246,0.15);color:var(--violet);border:1px solid rgba(139,92,246,0.4)}
+  .pill.amber{background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.4)}
+  .pill.emerald{background:rgba(16,185,129,0.15);color:var(--emerald);border:1px solid rgba(16,185,129,0.4)}
+  .pill.rose{background:rgba(244,63,94,0.15);color:var(--rose);border:1px solid rgba(244,63,94,0.4)}
+  .star{color:var(--emerald);font-weight:700}
+  .quote{background:#0f172a;border-left:3px solid var(--rose);padding:8px 12px;margin:8px 0;font-style:italic;color:#e2e8f0;font-size:12.5px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:10px;text-align:center}
+  .stat .num{font-size:24px;font-weight:700;color:var(--primary);font-family:ui-monospace,Consolas,monospace}
+  .stat .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em}
+</style>
+</head>
+<body>
+
+<h1>R2-W1 변경 후 피드백</h1>
+<div class="sub">2026-05-05 · 사용자 1.5/5 → ?/5 비교 · Round 5 form 그대로</div>
+
+<div class="panel info">
+  <strong>이전 round 의 사용자 피드백 (1.5/5)</strong>
+  <div class="quote">"답변 퀄리티 부족 + 맥락 정정 흐름 약함 + UI 가독성 부족 + 질문별 답변 구조 선호 + 너무 많이 알고 물어보는 느낌."</div>
+  <strong>R2-W1 으로 5 항목 모두 수정 시도. 이번 round 평가.</strong>
+</div>
+
+<!-- ============================================== -->
+<h2>§1. R2-W1 변경 요약</h2>
+
+<div class="changes">
+  <div class="change">
+    <div class="id">P3-A · Q 별 textarea</div>
+    <div class="what">Round 5 form 패턴 복원</div>
+    <div class="detail">각 Q 마다 textarea + my_guess hint + skip 체크박스 + 옵션 선택지 + 마지막 freeform 영역. 단일 textarea 폐기. cap 4 LLM 호출 폐기 → frontend 직접 build (~$0.02/cycle 절감).</div>
+  </div>
+  <div class="change">
+    <div class="id">P4-2-A · Collapsible</div>
+    <div class="what">우측 섹션 접기/펼치기</div>
+    <div class="detail">PreviewSection 헤더에 ▾/▸ 토글. 6 섹션 (세션/가설/옵션/엔티티/갭/Archive) 모두 가능.</div>
+  </div>
+  <div class="change">
+    <div class="id">P2-B · Refresh 버튼</div>
+    <div class="what">가설 다시 보기 흐름</div>
+    <div class="detail">우측 가설 카드에 <code>🔄 가설 다시 보기</code> 버튼. 답변 후 활성화. 클릭 시 cap 2 재호출 + 옵션·갭·명명·archive 모두 cleared. contradictions 있으면 pulse animation.</div>
+  </div>
+  <div class="change">
+    <div class="id">P1-B · Humble hypothesis</div>
+    <div class="what">가설 prompt 전면 재작성</div>
+    <div class="detail">confidence calibration 0.30~0.55 권장. "추정" 마커 + 한국어 hedging ("열연공장 표준?"). domain_role=`unknown` 기본 권장. 영어 id transliteration default (HrSpec, not HrPlant).</div>
+  </div>
+  <div class="change">
+    <div class="id">P4-1 · Markdown 렌더 + .md 다운로드</div>
+    <div class="what">archive HTML 렌더 + export</div>
+    <div class="detail">react-markdown + remark-gfm. 표·헤더·코드블록 풍부하게 표시. <code>⬇ .md 내려받기</code> 버튼.</div>
+  </div>
+  <div class="change">
+    <div class="id">기타</div>
+    <div class="what">Toolbar wrap + proxyTimeout 수정</div>
+    <div class="detail">Next.js dev proxyTimeout 30s → 5분 (이전 500 에러 원인). Toolbar 좁은 화면에서 줄바꿈 시 ⑨ Archive 가려지던 문제.</div>
+  </div>
+</div>
+
+<div class="panel ok">
+  <strong>예상 효과</strong> — 만족감 1.5 → 3.5 / 5 (Round 5 form 복원 + 맥락 정정 흐름 + humble 가설). UI/UX 깔끔함은 R2-W2 (Stepper + 디자인) 에서 다룰 예정.
+</div>
+
+<!-- ============================================== -->
+<h2>§2. 자체 진단 — 변경되지 않은 영역</h2>
+
+<table>
+  <tr><th>이전 피드백</th><th>R2-W1 처리</th><th>여전히 남은</th></tr>
+  <tr><td>"답변 퀄리티 부족"</td><td>P1-B humble + P3-A 구조화</td><td>LLM output 자체 quality 는 model 의존</td></tr>
+  <tr><td>"맥락 정정 흐름 약함"</td><td>P2-B refresh 버튼</td><td>자동 재호출은 안 함 (사용자 명시 click 필요)</td></tr>
+  <tr><td>"UI 가독성 부족 / md 미렌더링"</td><td>P4-1 markdown 렌더 + P4-2-A collapsible</td><td>전체 UI 디자인의 "구식 느낌" — R2-W2 예정</td></tr>
+  <tr><td>"질문별 답변 구조 선호"</td><td>P3-A 완전 적용</td><td>—</td></tr>
+  <tr><td>"너무 많이 알고 물어보는 느낌"</td><td>P1-B humble prompt</td><td>실제 LLM 이 prompt 따르는지는 응답 보고 확인</td></tr>
+  <tr><td>—</td><td>—</td><td><strong>매 turn 30~40s 대기</strong> (streaming 미구현 — R2-W3)</td></tr>
+  <tr><td>—</td><td>—</td><td><strong>버튼 디자인 구식</strong> (Stepper UI — R2-W2)</td></tr>
+</table>
+
+<!-- ============================================== -->
+<h2>§3. 답변 폼 — 항목별 평가</h2>
+
+<div class="form">
+  <h4>각 질문 1-2 줄로 OK · "동일" / "개선됨" / "여전히 문제" / "더 안 좋음"</h4>
+
+  <div class="field">
+    <label>Q1. <strong>전체 만족감</strong> — 이전 1.5/5 → 이번엔 몇 / 5?
+      <span class="hint">예: "3/5 — Q 별 textarea 와 humble 가설은 좋아짐. 매 turn 대기 시간이 여전히 큰 부담."</span>
+    </label>
+    <textarea name="q1_overall" placeholder="예: ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>P3-A 평가 — <strong>Q 별 textarea + skip + freeform</strong>
+      <span class="hint">Round 5 form 과 비슷한 느낌이 들었나? 답변 입력이 자연스러웠나?</span>
+    </label>
+    <textarea name="p3a_eval" placeholder="예: 자연스러움 / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>P1-B 평가 — <strong>Humble 가설</strong>
+      <span class="hint">"너무 많이 아는 느낌" 이 줄었나? 가설이 더 humble 했나? confidence 0.3~0.55 사이로 떨어졌나?</span>
+    </label>
+    <textarea name="p1b_eval" placeholder="예: 좋아짐 / 여전히 너무 specific / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>P2-B 평가 — <strong>Refresh 버튼 (가설 다시 보기)</strong>
+      <span class="hint">버튼이 보였나? 사용해봤나? 답변 후 가설이 새로 검토되는 흐름이 자연스러웠나?</span>
+    </label>
+    <textarea name="p2b_eval" placeholder="예: 사용 안 함 / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>P4-2-A 평가 — <strong>섹션 collapsible</strong>
+      <span class="hint">우측 섹션 ▾/▸ 토글이 유용했나? 화면 정리에 도움됐나?</span>
+    </label>
+    <textarea name="p42a_eval" placeholder="예: 도움됨 / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>P4-1 평가 — <strong>Archive markdown 렌더 + .md 내려받기</strong>
+      <span class="hint">archive 표·헤더 등 보기 좋아졌나? 다운로드 잘 작동했나?</span>
+    </label>
+    <textarea name="p41_eval" placeholder="예: ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q+. <strong>새로 발견된 issue / 어색함</strong>
+      <span class="hint">R2-W1 변경 후 처음 본 / 이전엔 못 봤던 이슈</span>
+    </label>
+    <textarea name="new_issues" placeholder="예: 가설 다시 보기 클릭해도 답변이 같으면 결과가 똑같음 / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q. <strong>다음 wave 우선순위</strong>
+      <span class="hint">R2-W2 디자인 polish (Stepper UI + spacing) / R2-W3 streaming + 진행률 / R2-W4 multi-entity (file picker, session 재개) / 다른 영역</span>
+    </label>
+    <textarea name="next_wave" placeholder="예: R2-W3 streaming 가장 시급 (매 turn 30s 대기 너무 큼)"></textarea>
+  </div>
+
+  <div class="field">
+    <label>마지막. <strong>한 마디 추가</strong> 자유</label>
+    <textarea name="freeform" placeholder="optional"></textarea>
+  </div>
+
+  <div class="actions">
+    <button class="btn" data-action="copy">📋 답변 복사</button>
+    <button class="btn outline" data-action="preview">미리보기</button>
+    <span style="font-size:11px;color:var(--muted)">Q1 + 다음 wave 만 답해도 진행 가능</span>
+  </div>
+
+  <div class="preview" id="preview"></div>
+</div>
+
+<!-- ============================================== -->
+<h2>§4. 다음 wave 후보 (참고)</h2>
+
+<div class="changes">
+  <div class="change" style="border-color:rgba(245,158,11,0.4)">
+    <div class="id" style="color:var(--amber)">R2-W2 · 디자인 polish</div>
+    <div class="what">Stepper + spacing + button modernize</div>
+    <div class="detail">P5-B Stepper UI (toolbar 8 버튼 → horizontal stepper). P5-D 디자인 시스템 다듬기 (typography, spacing, micro-interaction).</div>
+  </div>
+  <div class="change" style="border-color:rgba(245,158,11,0.4)">
+    <div class="id" style="color:var(--amber)">R2-W3 · streaming + 진행률</div>
+    <div class="what">SSE + per-turn progress + cost breakdown</div>
+    <div class="detail">매 turn 30~40s 대기 → 글자 단위 streaming. "turn 5/8 옵션 제시 중..." progress indicator. cost 를 capability 별 분리 표시.</div>
+  </div>
+  <div class="change" style="border-color:rgba(245,158,11,0.4)">
+    <div class="id" style="color:var(--amber)">R2-W4 · multi-entity</div>
+    <div class="what">file picker + session 재개 + cap 7/10</div>
+    <div class="detail">HrSpecJpo 하드코딩 해제. session URL 보존. cap 7 (pattern_checker), cap 10 (next_step) 추가. 두 번째 entity 인터뷰 가능.</div>
+  </div>
+</div>
+
+<script>
+const fields = [
+  ["q1_overall",   "Q1. 전체 만족감 (이전 1.5/5 vs 지금)"],
+  ["p3a_eval",     "P3-A 평가 (Q 별 textarea)"],
+  ["p1b_eval",     "P1-B 평가 (Humble 가설)"],
+  ["p2b_eval",     "P2-B 평가 (Refresh 버튼)"],
+  ["p42a_eval",    "P4-2-A 평가 (섹션 collapsible)"],
+  ["p41_eval",     "P4-1 평가 (markdown 렌더 + .md 내려받기)"],
+  ["new_issues",   "새로 발견된 issue"],
+  ["next_wave",    "다음 wave 우선순위"],
+  ["freeform",     "추가"],
+];
+
+function buildText() {
+  const out = ["[Authoring AI R2-W1 변경 후 피드백]"];
+  for (const [k, label] of fields) {
+    const v = (document.querySelector(`textarea[name="${k}"]`)?.value ?? "").trim();
+    if (v) out.push(`\n## ${label}\n${v}`);
+  }
+  return out.join("\n");
+}
+
+document.querySelector('[data-action="preview"]').addEventListener("click", () => {
+  const slot = document.getElementById("preview");
+  slot.textContent = buildText();
+  slot.classList.add("visible");
+});
+
+document.querySelector('[data-action="copy"]').addEventListener("click", async (e) => {
+  const txt = buildText();
+  try {
+    await navigator.clipboard.writeText(txt);
+    const btn = e.currentTarget;
+    const orig = btn.textContent;
+    btn.textContent = "✓ 복사됨";
+    btn.classList.add("copied");
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove("copied"); }, 1500);
+    const slot = document.getElementById("preview");
+    slot.textContent = txt;
+    slot.classList.add("visible");
+  } catch {
+    alert("복사 실패. 미리보기 영역에서 수동 복사하세요.");
+  }
+});
+</script>
+
+</body>
+</html>

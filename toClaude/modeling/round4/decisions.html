@@ -1,0 +1,1318 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>onTong — Palantir 심층 조사 결정 회의</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --line: #334155;
+    --fg: #e2e8f0;
+    --muted: #94a3b8;
+    --primary: #38bdf8;
+    --emerald: #10b981;
+    --amber: #f59e0b;
+    --rose: #fb7185;
+    --violet: #a78bfa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0;
+    font: 14px/1.55 -apple-system, "Pretendard", "Apple SD Gothic Neo", sans-serif;
+    background: var(--bg); color: var(--fg);
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 28px 80px; }
+  header h1 {
+    font-size: 22px; margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+  header .sub {
+    color: var(--muted); font-size: 12px;
+  }
+  .progress {
+    margin: 16px 0 32px;
+    display: flex; gap: 6px; flex-wrap: wrap;
+    align-items: center;
+  }
+  .step {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border-radius: 999px;
+    background: var(--card); border: 1px solid var(--line);
+    font-size: 11px; color: var(--muted);
+  }
+  .step.active {
+    border-color: var(--primary); color: var(--fg);
+    background: rgba(56, 189, 248, 0.1);
+  }
+  .step.done {
+    border-color: var(--emerald); color: var(--emerald);
+    background: rgba(16, 185, 129, 0.06);
+  }
+  .step .num {
+    display: inline-block; width: 18px; height: 18px;
+    text-align: center; line-height: 18px;
+    background: var(--line); color: var(--fg);
+    border-radius: 50%; font-size: 10px; font-weight: 600;
+  }
+  .step.done .num { background: var(--emerald); color: var(--bg); }
+  .step.active .num { background: var(--primary); color: var(--bg); }
+
+  .agenda {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 10px; padding: 20px 24px;
+    margin-bottom: 24px;
+  }
+  .agenda h2 {
+    margin: 0 0 4px; font-size: 17px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .agenda .meta {
+    font-size: 11px; color: var(--muted); margin-bottom: 16px;
+    display: flex; gap: 12px;
+  }
+  .badge {
+    padding: 2px 8px; border-radius: 4px; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .badge.discuss { background: rgba(56, 189, 248, 0.15); color: var(--primary); }
+  .badge.decided { background: rgba(16, 185, 129, 0.15); color: var(--emerald); }
+  .badge.deferred { background: rgba(245, 158, 11, 0.15); color: var(--amber); }
+
+  h3 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted); margin: 18px 0 8px;
+    font-weight: 600;
+  }
+  p { margin: 6px 0 10px; }
+
+  table.options {
+    width: 100%; border-collapse: collapse;
+    font-size: 12.5px; margin: 8px 0 16px;
+  }
+  table.options th, table.options td {
+    border-bottom: 1px solid var(--line);
+    padding: 8px 10px; text-align: left;
+    vertical-align: top;
+  }
+  table.options th {
+    background: rgba(255,255,255,0.02);
+    font-weight: 600; color: var(--muted);
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  table.options th.opt { width: 14%; }
+  table.options .opt-name {
+    font-weight: 600; color: var(--fg);
+  }
+  .yes { color: var(--emerald); font-weight: 600; }
+  .no  { color: var(--rose); }
+  .partial { color: var(--amber); }
+
+  .reco {
+    background: rgba(56, 189, 248, 0.06);
+    border-left: 3px solid var(--primary);
+    padding: 12px 14px; border-radius: 4px;
+    margin: 8px 0 12px;
+  }
+  .reco .label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--primary); font-weight: 600; margin-bottom: 4px;
+  }
+  .reco strong { color: var(--fg); }
+
+  .impact {
+    background: rgba(167, 139, 250, 0.05);
+    border-left: 3px solid var(--violet);
+    padding: 10px 14px; border-radius: 4px;
+    font-size: 12.5px; margin: 8px 0 12px;
+  }
+  .impact .label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--violet); font-weight: 600; margin-bottom: 4px;
+  }
+
+  .open {
+    border-top: 1px dashed var(--line);
+    padding-top: 8px; margin-top: 12px;
+    font-size: 12px; color: var(--muted);
+  }
+
+  .decision-slot {
+    margin-top: 16px;
+    background: rgba(16, 185, 129, 0.04);
+    border: 1px dashed var(--emerald);
+    border-radius: 6px;
+    padding: 14px 16px;
+  }
+  .decision-slot .ds-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--emerald); font-weight: 700; margin-bottom: 10px;
+  }
+  .options-row {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;
+  }
+  .opt-radio {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 6px;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--line);
+    font-size: 12.5px; cursor: pointer;
+    color: var(--fg);
+    transition: all 0.12s ease;
+    user-select: none;
+  }
+  .opt-radio:hover { border-color: var(--primary); }
+  .opt-radio input { margin: 0; cursor: pointer; }
+  .opt-radio.checked {
+    background: rgba(56, 189, 248, 0.12);
+    border-color: var(--primary);
+  }
+  .opt-radio.other.checked {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: var(--amber);
+  }
+  textarea.notes {
+    width: 100%; min-height: 70px;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid var(--line); border-radius: 6px;
+    color: var(--fg); padding: 8px 10px;
+    font: inherit; font-size: 12.5px;
+    resize: vertical;
+  }
+  textarea.notes:focus {
+    outline: none; border-color: var(--primary);
+  }
+  .ds-actions {
+    display: flex; gap: 8px; margin-top: 10px; align-items: center;
+  }
+  .btn {
+    padding: 7px 14px; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--card);
+    color: var(--fg); font-size: 12px; cursor: pointer;
+    font-weight: 500;
+    transition: all 0.12s ease;
+  }
+  .btn:hover { border-color: var(--primary); }
+  .btn.primary {
+    background: var(--primary); color: var(--bg); border-color: var(--primary);
+  }
+  .btn.primary:hover { filter: brightness(1.1); }
+  .btn.copied { background: var(--emerald); border-color: var(--emerald); color: var(--bg); }
+  .copy-hint {
+    font-size: 11px; color: var(--muted); margin-left: auto;
+  }
+
+  .preview {
+    margin-top: 10px; padding: 10px 12px;
+    background: rgba(0,0,0,0.3); border-radius: 6px;
+    font-family: "JetBrains Mono", "SF Mono", monospace;
+    font-size: 11.5px; color: var(--fg);
+    white-space: pre-wrap;
+    border: 1px solid var(--line);
+    display: none;
+  }
+  .preview.visible { display: block; }
+  .preview-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted); margin-bottom: 6px;
+  }
+
+  .upcoming {
+    margin: 32px 0 0;
+    background: var(--card); border: 1px dashed var(--line);
+    border-radius: 10px; padding: 16px 20px;
+    font-size: 12.5px; color: var(--muted);
+  }
+  .upcoming h3 { margin-top: 0; }
+  .upcoming ol { margin: 8px 0 0 18px; padding: 0; }
+  .upcoming li { padding: 2px 0; }
+
+  code, kbd {
+    font-family: "JetBrains Mono", "SF Mono", monospace;
+    font-size: 92%;
+    background: rgba(255,255,255,0.06);
+    padding: 1px 5px; border-radius: 3px;
+  }
+  ul.tight { margin: 4px 0 8px 18px; padding: 0; }
+  ul.tight li { padding: 1px 0; }
+
+  .stars { color: var(--amber); letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Palantir 심층 조사 결정 회의 (Round 4 Stage 4)</h1>
+  <div class="sub">
+    Stage 1~3 raw notes → Stage 4 결정. 각 안건 한 번씩 토의 + 결정 후 다음.
+    산출물 참고: <code>round4/palantir-sources.md</code> · <code>palantir-raw-notes.md</code>
+    · <code>palantir-schema-vs-ontong.md</code> · <code>palantir-ux-catalog.md</code>
+    · <code>graph-viz-patterns.md</code>
+  </div>
+  <div class="progress">
+    <span class="step done"><span class="num">✓</span> ELK 마이그레이션 spike</span>
+    <span class="step done"><span class="num">✓</span> Perspective 1급 노드화</span>
+    <span class="step done"><span class="num">✓</span> 3-pane workspace IA</span>
+    <span class="step done"><span class="num">✓</span> 5-kind 노드 확장</span>
+    <span class="step done"><span class="num">✓</span> Save / share URL</span>
+    <span class="step done"><span class="num">✓</span> 5K class 검증</span>
+    <span class="step done"><span class="num">✓</span> 실행 순서</span>
+  </div>
+</header>
+
+<!-- ============================================================ -->
+<section class="agenda" id="agenda-1">
+  <h2>안건 1 — dagre → ELK 마이그레이션 spike</h2>
+  <div class="meta">
+    <span class="badge decided">결정됨 → C (spike 후 결정)</span>
+    <span>관련: 차용 후보 #2 (compound expand-in-place), 사용자 피드백 6번</span>
+  </div>
+
+  <h3>무엇이 안건</h3>
+  <p>
+    현재 layout 은 <code>@dagrejs/dagre</code>. ELK.js (Eclipse Layout Kernel) 는
+    <strong>compound node</strong> (패키지 box 안에 클래스 노드 중첩) 를 1급 지원.
+    dagre 는 사실상 못 함.
+  </p>
+  <p>
+    <strong>Compound expand-in-place 패턴</strong> (Stage 3 차용 후보 #2): 패키지 box
+    클릭 → 그 자리에서 안의 클래스만 펼침. 현재 cluster mode 통째 전환 대비
+    drill-down 단절 없음. 사용자 피드백 6번 (패키지 hierarchy 가시화) 정답에 가장 가까움.
+  </p>
+
+  <h3>Option 비교</h3>
+  <table class="options">
+    <thead>
+      <tr>
+        <th></th>
+        <th class="opt">A. dagre 유지</th>
+        <th class="opt">B. ELK 풀 마이그</th>
+        <th class="opt">C. ELK spike + 결정</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th>Compound expand-in-place</th>
+        <td><span class="no">❌ 포기</span></td>
+        <td><span class="yes">✅</span></td>
+        <td><span class="yes">✅ if proven</span></td>
+      </tr>
+      <tr>
+        <th>Bundle size 증가</th>
+        <td>+0</td>
+        <td>+250~300 KB</td>
+        <td>+0 (spike 후 결정)</td>
+      </tr>
+      <tr>
+        <th>5K class layout 시간</th>
+        <td>알려진 빠름</td>
+        <td><span class="partial">불확실 — 측정 필요</span></td>
+        <td>측정 결과 보고 결정</td>
+      </tr>
+      <tr>
+        <th>코드 변경량</th>
+        <td>0</td>
+        <td>OntologyGraph 절반</td>
+        <td>PoC 1 페이지</td>
+      </tr>
+      <tr>
+        <th>학습 cost</th>
+        <td>0</td>
+        <td>medium (async API + ELK options)</td>
+        <td>low</td>
+      </tr>
+      <tr>
+        <th>Backout 가능성</th>
+        <td>n/a</td>
+        <td><span class="no">hard (의존 깊음)</span></td>
+        <td><span class="yes">easy</span></td>
+      </tr>
+      <tr>
+        <th>일정 risk</th>
+        <td>0</td>
+        <td>중–high</td>
+        <td>low</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="reco">
+    <div class="label">내 추천</div>
+    <strong>C — ELK spike 먼저, 결과로 풀 마이그 결정.</strong>
+    이유:
+    <ul class="tight">
+      <li>ELK 가 compound 의 정답이지만, 5K class 에서 layout 시간이 unacceptable 가능성. ELK 는 일반적으로 dagre 보다 2–5배 느림 (hierarchical algorithm 비용).</li>
+      <li>spike 산출 = 작은 page 에 ELK 로 117 노드 + 가공된 5K 노드 layout 측정. <code>&lt; 2s</code> 면 마이그, <code>&gt; 5s</code> 면 hybrid (dagre default + ELK on-demand).</li>
+      <li>컨텍스트 비용 작고 evidence-driven 결정.</li>
+    </ul>
+  </div>
+
+  <div class="impact">
+    <div class="label">결정 영향</div>
+    <ul class="tight">
+      <li><strong>C 선택 → 안건 2/3/4 진행</strong> (모두 ELK 결과와 무관). compound 만 ELK 결과 본 후 commit.</li>
+      <li><strong>A 선택 → 안건 6 (5K verification) 결과 보고 cluster mode UX 개선 (smooth zoom, in-cluster breadcrumb) 으로 우회</strong>.</li>
+      <li>B 선택 → 일정 risk 큰 대신 가장 빠른 결과. 데모 시기 압박 시 가능.</li>
+    </ul>
+  </div>
+
+  <div class="open">
+    <strong>미해결 의문:</strong> xyflow 의 ELK 통합 사례 (공식 예시 있으나 유지보수 활발도?).
+    spike 가 답할 것.
+  </div>
+
+  <div class="decision-slot" style="background: rgba(16,185,129,0.08); border-style: solid;">
+    <div class="ds-label">✓ 결정: C — ELK spike + 결정</div>
+    <p style="margin: 6px 0 4px; font-size: 12.5px; color: var(--fg);">
+      <strong>사용자 의문:</strong> ELK 가 compound 의 정답이면 성능 해결하고 B 가야 하지 않나?
+    </p>
+    <p style="margin: 6px 0; font-size: 12px; color: var(--muted);">
+      <strong>답:</strong> "ELK 가 정답" 은 <em>기능적</em> 정답 (compound 1급 지원). 다만 5K 노드 성능은
+      mitigations (lazy / nested / downshift / worker) 로 풀 수 있을지 데이터 없음.
+      C = "성능 해결 방법 찾자" + "안 풀리면 dagre fallback 보존". B = commit 후 mitigations 강행.
+      C 가 option preserving + evidence-driven.
+    </p>
+    <p style="margin: 6px 0 0; font-size: 12px; color: var(--muted);">
+      <strong>다음:</strong> spike PoC (xyflow + ELK 117 노드 + 가공 5K 노드 layout 측정) →
+      결과 따라 풀 마이그 / hybrid / dagre 유지 micro-decision.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="agenda" id="agenda-2">
+  <h2>안건 2 — Perspective 1급 노드화</h2>
+  <div class="meta">
+    <span class="badge decided">결정됨 → B (Backend 1급 entity)</span>
+    <span>관련: Stage 3 차용 후보 #1 (Lens 본질 부재 해소)</span>
+  </div>
+
+  <h3>무엇이 안건</h3>
+  <p>
+    Neo4j Bloom 의 <strong>Perspective</strong> = 한 그래프 위에 사용자가 만든 named view
+    (어떤 노드 종류 보일지 / 어떤 facet 으로 색 입힐지 / 어떤 lens 적용할지 묶음).
+    우리도 도메인 전문가용 / PM용 / 시뮬 검증자용 다른 view 가 필요 — 이게 Stage 3 의 우리 약점 1순위.
+  </p>
+  <p>
+    "1급 노드화" = Perspective 를 schema 의 정식 entity 로 만들지 (backend 에 Pydantic + ORM + REST)
+    아니면 단순 frontend localStorage 로만 둘지.
+  </p>
+
+  <h3>Option 비교</h3>
+  <table class="options">
+    <thead>
+      <tr>
+        <th></th>
+        <th class="opt">A. localStorage 만</th>
+        <th class="opt">B. Backend 1급 entity</th>
+        <th class="opt">C. Hybrid — backend save + URL share, local draft</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th>한 명 사용자 use case</th>
+        <td><span class="yes">충분</span></td>
+        <td>over-eng</td>
+        <td><span class="yes">충분</span></td>
+      </tr>
+      <tr>
+        <th>팀 협업 (PM 이 Perspective 보내기)</th>
+        <td><span class="no">불가</span></td>
+        <td><span class="yes">URL 공유 + permission</span></td>
+        <td><span class="yes">URL 공유 + 본인 변경 사항만 local</span></td>
+      </tr>
+      <tr>
+        <th>데모 시나리오 (저장된 view 보여주기)</th>
+        <td><span class="partial">brittle (브라우저 별)</span></td>
+        <td><span class="yes">stable</span></td>
+        <td><span class="yes">stable</span></td>
+      </tr>
+      <tr>
+        <th>구현 복잡도</th>
+        <td>frontend 만, ~0.5일</td>
+        <td>backend (table+REST+권한) + frontend ~2일</td>
+        <td>backend save+읽기 (권한 X) + frontend ~1일</td>
+      </tr>
+      <tr>
+        <th>버전 관리 / audit</th>
+        <td>없음</td>
+        <td><span class="yes">created_at/updated_at/by</span></td>
+        <td>backend 저장된 것만</td>
+      </tr>
+      <tr>
+        <th>변경 비용 (잘못 선택 시)</th>
+        <td>크다 (협업 추가하려면 backend 신규)</td>
+        <td>크다 (필요 없어도 schema 박힘)</td>
+        <td>작다 (incremental 추가 가능)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Perspective 가 무엇을 담는가 (schema 미리보기)</h3>
+  <p>참고 — Bloom Perspective 의 facet, 우리에 매핑:</p>
+  <ul class="tight">
+    <li><strong>Visible kinds</strong> — Term / CodeType / Action 어느 것 보일지 toggle</li>
+    <li><strong>Visible edge kinds</strong> — extends/implements/composition/PRIMARY/PARTIAL/realization 토글</li>
+    <li><strong>Filter</strong> — role / verification / domain / package 별 facet</li>
+    <li><strong>Lens</strong> — 노드 색을 어떤 facet 으로 칠할지 (verification heat / confirmed bool / package color)</li>
+    <li><strong>Layout 모드</strong> — 이웃 / 경로 / 클러스터 + n_max</li>
+    <li><strong>Saved focus</strong> — 시작 노드 + hops</li>
+    <li><strong>Annotation</strong> — Perspective 설명, 사용처</li>
+  </ul>
+
+  <div class="reco">
+    <div class="label">내 추천</div>
+    <strong>C — Hybrid (backend save + URL share, local draft).</strong>
+    이유:
+    <ul class="tight">
+      <li>한 명 use case 도 cover (local draft 자유) + 팀 use case 도 cover (저장 시 backend, URL 로 공유).</li>
+      <li>schema 가 단순 — table 1개 (id, name, repo_id, created_by, perspective_json). 권한은 1차에 모두 read-only public, 다음 phase 에 ACL.</li>
+      <li>변경 비용 작음. 처음에 권한 비공개로 시작 → 필요 시 공개 → 차기 ACL 도입.</li>
+      <li>데모 시나리오 안정성 (사용자 브라우저 무관) — 가장 큰 가치.</li>
+    </ul>
+  </div>
+
+  <div class="impact">
+    <div class="label">결정 영향</div>
+    <ul class="tight">
+      <li><strong>C 선택 → 안건 5 (Save/share URL)</strong> 와 강하게 연결. URL routing + share token 디자인 같이 결정.</li>
+      <li><strong>A 선택 → 안건 5 도 frontend 만</strong>. 데모 임박 + 일정 압박 시 합리적.</li>
+      <li><strong>B 선택 → 안건 5 + 권한 모델 (ACL)</strong> 설계 같이 진행. 가장 비용 큼.</li>
+    </ul>
+  </div>
+
+  <div class="open">
+    <strong>미해결 의문:</strong> Perspective 안에 "내가 저장한 focus 노드" 가 시간 지나 사라진 (re-import 후 fqn 바뀐) 경우 어떻게? graceful degrade 정책 필요. C 선택 시 backend 의 perspective load 시 invalid 노드 검사 로직 추가.
+  </div>
+
+  <div class="decision-slot" style="background: rgba(16,185,129,0.08); border-style: solid;">
+    <div class="ds-label">✓ 결정: B — Backend 1급 entity</div>
+    <p style="margin: 6px 0; font-size: 12.5px; color: var(--fg);">
+      Perspective 가 정식 ORM entity (table + REST CRUD + audit) 가 됨.
+    </p>
+    <p style="margin: 6px 0 0; font-size: 12px; color: var(--muted);">
+      <strong>다음 작업 backlog:</strong>
+      ① 새 layer <code>view_layer/</code> 또는 mapping_layer 안에 <code>Perspective</code> Pydantic +
+      ORM (id / name / repo_id / created_by / perspective_json)
+      ② REST <code>/api/ontology/repos/{id}/perspectives</code> CRUD
+      ③ frontend perspective 매니저 + 토글 UI
+      ④ 안건 5 (Save/share URL) 와 합쳐서 routing 디자인.
+      ⑤ 권한 모델은 다음 phase (1차에 read-only public).
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="agenda" id="agenda-3">
+  <h2>안건 3 — 3-pane workspace IA + 노드 detail context</h2>
+  <div class="meta">
+    <span class="badge decided">결정됨 → B (Bottom overlay)</span>
+    <span>관련: Stage 3 차용 후보 #3 (Bottom preview + Quiver pattern), 사용자 피드백 4번 (길 잃음)</span>
+  </div>
+
+  <h3>무엇이 안건</h3>
+  <p>
+    현재 workspace = 3-pane (좌측 navigator + 메인 canvas + 우측 4-tab 컨텍스트). 그래프 모드에서 노드 클릭 시
+    "이게 뭔지" 빠르게 확인할 곳이 없음 — 그래프 떠나야 detail 봄. Stage 3 핵심 약점.
+  </p>
+  <p>
+    Quiver / Foundry Lineage 패턴 = <strong>bottom slide-up panel</strong>. 그래프 안에서 노드 선택 시
+    화면 하단에 미리보기 (간단한 detail + 빠른 액션). 그래프 컨텍스트 유지하면서 자세히.
+  </p>
+
+  <h3>Option 비교</h3>
+  <table class="options">
+    <thead>
+      <tr>
+        <th></th>
+        <th class="opt">A. 변경 없음</th>
+        <th class="opt">B. Bottom overlay (slide-up, 그래프 모드 전용)</th>
+        <th class="opt">C. 4-pane permanent (sidebar + canvas + bottom + right)</th>
+        <th class="opt">D. Mode-contextual (detail = right, graph = bottom)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th>그래프에서 detail 보기</th>
+        <td><span class="no">그래프 떠나야</span></td>
+        <td><span class="yes">overlay 즉시</span></td>
+        <td><span class="yes">상시 노출</span></td>
+        <td><span class="yes">bottom 노출</span></td>
+      </tr>
+      <tr>
+        <th>화면 공간 효율</th>
+        <td><span class="yes">좋음</span></td>
+        <td><span class="yes">좋음 (overlay 라 평소 사라짐)</span></td>
+        <td><span class="no">좁아짐 (영구 점유)</span></td>
+        <td><span class="yes">좋음 (모드 별 1개만)</span></td>
+      </tr>
+      <tr>
+        <th>구현 복잡도</th>
+        <td>0</td>
+        <td>중 (overlay 컴포넌트 + 노드 클릭 wiring)</td>
+        <td>중-high (grid 재설계 + responsive)</td>
+        <td>중 (모드 별 layout 분기)</td>
+      </tr>
+      <tr>
+        <th>우측 4-tab (코드/매뉴얼/호출지점/영향) 활용</th>
+        <td><span class="yes">유지</span></td>
+        <td><span class="yes">유지 (graph 에서도)</span></td>
+        <td><span class="yes">유지 + bottom 추가</span></td>
+        <td><span class="partial">graph 에서는 사라짐</span></td>
+      </tr>
+      <tr>
+        <th>Quiver / Foundry Lineage 패턴 정합</th>
+        <td><span class="no">없음</span></td>
+        <td><span class="yes">정확히 일치</span></td>
+        <td><span class="partial">일부 (영구 노출 다름)</span></td>
+        <td><span class="partial">일부</span></td>
+      </tr>
+      <tr>
+        <th>인지부하 (사용자 피드백 4번)</th>
+        <td>큼</td>
+        <td>낮음 (overlay 닫으면 깨끗)</td>
+        <td>중 (4 영역 동시 인지)</td>
+        <td>낮음 (모드 별 명확)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Bottom panel 이 무엇을 담는가 (B/C/D 공통)</h3>
+  <ul class="tight">
+    <li><strong>노드 essentials</strong> — label / fqn / kind / role / verification / domain</li>
+    <li><strong>1줄 요약</strong> — Term 이면 description, Action 이면 declared_on_term + realization 수, CodeType 이면 패키지 + method 수</li>
+    <li><strong>인접 카운트</strong> — 1-hop 으로 직접 연결된 노드 종류별 (예: 5 actions, 3 PARTIAL realizations)</li>
+    <li><strong>quick action 버튼</strong> — focus 변경 / Detail 모드로 열기 / 큐 confirm/reject (해당 시) / Action edit</li>
+    <li><strong>닫기 / pin</strong> — 다음 노드 클릭 시 자동 갈아치움, pin 시 현 노드 유지</li>
+  </ul>
+
+  <div class="reco">
+    <div class="label">내 추천</div>
+    <strong>B — Bottom overlay (slide-up, 그래프 모드 전용).</strong>
+    이유:
+    <ul class="tight">
+      <li>Quiver/Foundry Lineage 패턴 정확히 정합 — 검증된 UX 패턴.</li>
+      <li>화면 공간 efficient (overlay 라 평소 안 보임). 4-pane 영구 (C) 는 5K class 시나리오 graph 영역 좁아져 역효과.</li>
+      <li>구현 복잡도 중간. 우측 4-tab 도 그대로 유지 — graph 에서도 (예: focus 노드의 영향 분석) 동시 활용 가능.</li>
+      <li>D (mode-contextual) 는 우측 panel 이 graph 에서 사라지는 단점. 우리의 영향 분석 / 코드본체 패널은 graph 에서도 유용.</li>
+    </ul>
+  </div>
+
+  <div class="impact">
+    <div class="label">결정 영향</div>
+    <ul class="tight">
+      <li>B/C/D 모두 → 안건 4 (5-kind 노드 확장) 의 detail 표시 위치가 결정됨. 5 kind 별 표시 spec 필요.</li>
+      <li>B 선택 → graph 모드의 핸들 빠른 액션 (focus / open detail / 큐 처리) wiring 추가. 안건 7 우선순위에 영향.</li>
+    </ul>
+  </div>
+
+  <div class="open">
+    <strong>미해결 의문:</strong> bottom panel 높이 — 고정 (240px) vs 사용자 drag-resizable. drag 가 자유로운데 구현 cost 약간 증가. 1차에 고정 240, 다음 phase 에 drag.
+  </div>
+
+  <div class="decision-slot" style="background: rgba(16,185,129,0.08); border-style: solid;">
+    <div class="ds-label">✓ 결정: B — Bottom overlay (그래프 모드 전용)</div>
+    <p style="margin: 6px 0; font-size: 12.5px; color: var(--fg);">
+      그래프에서 노드 클릭 시 화면 하단 슬라이드업 패널 (240px 고정 1차).
+      노드 essentials + quick action + pin/닫기. 우측 4-tab 도 graph 에서 그대로 활용.
+    </p>
+    <p style="margin: 6px 0 0; font-size: 12px; color: var(--muted);">
+      <strong>backlog:</strong>
+      ① <code>NodePreviewPanel.tsx</code> 신규
+      ② OntologyGraph 의 onNodeClick → setSelectedNode + 패널 mount
+      ③ kind 별 미리보기 컴포넌트 (Term/CodeType/Action)
+      ④ quick action 와이어링 (focus / open detail / 큐 confirm/reject).
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="agenda" id="agenda-4">
+  <h2>안건 4 — 노드 종류 확장 (3 → 5+)</h2>
+  <div class="meta">
+    <span class="badge decided">결정됨 → C (5 kinds)</span>
+    <span>관련: Stage 3 multi-level (Structurizr 패턴), 안건 1 ELK (compound)</span>
+  </div>
+
+  <h3>무엇이 안건</h3>
+  <p>
+    현재 그래프 노드 3종 (Term / CodeType / Action). 이 단순함이 빠른 이해 도움 vs 정보 손실.
+  </p>
+  <p>
+    Stage 3 가 제안한 multi-level 확장:
+  </p>
+  <ul class="tight">
+    <li><strong>Domain</strong> — 패키지 또는 비즈니스 도메인 그룹 (예: <code>feature.sd.process.working</code> 또는 "주문 도메인")</li>
+    <li><strong>CompositeTerm vs AtomicTerm</strong> — 우리 schema 의 <code>TermKind</code> 가 이미 구분, 그래프에서도 시각 차이 (composite=네모, atomic=원 등)</li>
+    <li><strong>Method</strong> — 현재 CodeType 의 자식이지만 graph 노드 아님. 가장 dense (5K class × N method = 50K+)</li>
+  </ul>
+
+  <h3>Option 비교</h3>
+  <table class="options">
+    <thead>
+      <tr>
+        <th></th>
+        <th class="opt">A. 3 kinds 유지</th>
+        <th class="opt">B. 4 kinds (Term split)</th>
+        <th class="opt">C. 5 kinds (B + Domain)</th>
+        <th class="opt">D. 6 kinds (C + Method, opt-in)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th>변경 범위</th>
+        <td>0</td>
+        <td>frontend 만 (시각 차이)</td>
+        <td>backend graph_api + frontend</td>
+        <td>backend + opt-in mode UI</td>
+      </tr>
+      <tr>
+        <th>composite/atomic 한눈에</th>
+        <td><span class="no">label 봐야 구분</span></td>
+        <td><span class="yes">시각 즉시</span></td>
+        <td><span class="yes">시각 즉시</span></td>
+        <td><span class="yes">시각 즉시</span></td>
+      </tr>
+      <tr>
+        <th>Domain (패키지) 컨텍스트 시각화</th>
+        <td><span class="no">없음</span></td>
+        <td><span class="no">없음</span></td>
+        <td><span class="yes">Domain 노드 + 안건 1 ELK 시 compound box</span></td>
+        <td><span class="yes">동일</span></td>
+      </tr>
+      <tr>
+        <th>Method-level 분석 (anchor / 호출 chain)</th>
+        <td><span class="no">없음</span></td>
+        <td><span class="no">없음</span></td>
+        <td><span class="no">없음</span></td>
+        <td><span class="yes">opt-in zoom mode</span></td>
+      </tr>
+      <tr>
+        <th>5K class 시 시각 복잡도</th>
+        <td>중</td>
+        <td>중</td>
+        <td><span class="yes">↓ (Domain 으로 묶음)</span></td>
+        <td><span class="no">↑ (method 까지 가면 50K)</span></td>
+      </tr>
+      <tr>
+        <th>안건 1 (ELK) 결과와의 결합</th>
+        <td>중립</td>
+        <td>중립</td>
+        <td>강하게 결합 (Domain = compound box)</td>
+        <td>강하게 결합</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>5 kind 별 시각 spec (C 기준 미리보기)</h3>
+  <table class="options">
+    <thead>
+      <tr>
+        <th>Kind</th>
+        <th>모양</th>
+        <th>색</th>
+        <th>크기</th>
+        <th>예시</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Domain</td>
+        <td>둥근 사각 (compound 시 박스)</td>
+        <td>회색 / 패키지 별 hue</td>
+        <td>가장 큼</td>
+        <td><code>feature.sd.process.working.action</code></td>
+      </tr>
+      <tr>
+        <td>CompositeTerm</td>
+        <td>모서리 둥근 사각</td>
+        <td>violet (현 색 유지)</td>
+        <td>중</td>
+        <td>주문, 슬랩</td>
+      </tr>
+      <tr>
+        <td>AtomicTerm</td>
+        <td>알약 (pill) 모양</td>
+        <td>violet 옅게 + value_type bullet</td>
+        <td>작음</td>
+        <td>강종, 공정</td>
+      </tr>
+      <tr>
+        <td>CodeType</td>
+        <td>사각</td>
+        <td>amber (현 색 유지)</td>
+        <td>중</td>
+        <td>SDOrderEntity</td>
+      </tr>
+      <tr>
+        <td>Action</td>
+        <td>화살표 모양 사각</td>
+        <td>orange (현 색 유지)</td>
+        <td>중</td>
+        <td>슬랩설계_실행</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="reco">
+    <div class="label">내 추천</div>
+    <strong>C — 5 kinds (Domain + 2 Term + CodeType + Action).</strong>
+    이유:
+    <ul class="tight">
+      <li>안건 1 ELK 결과와 가장 시너지 (Domain = compound box, package hierarchy 시각).</li>
+      <li>composite/atomic 구분은 schema 가 이미 가진 정보 — 시각 안 내는 것이 손실.</li>
+      <li>Method 는 5K class 에서 dense 너무 큼 (50K+ method). default 그래프 부적합. opt-in zoom mode (D) 는 다음 phase 에 별도 결정.</li>
+      <li>5 kinds 면 시각 복잡도 ↑ 우려는 있지만, Domain 이 묶음 역할이라 오히려 ↓.</li>
+    </ul>
+  </div>
+
+  <div class="impact">
+    <div class="label">결정 영향</div>
+    <ul class="tight">
+      <li>C 선택 → backend <code>graph_api</code> 에 Domain 노드 emit 로직 추가 + edge type 추가 (CONTAINS package → class)</li>
+      <li>안건 1 ELK 결과가 OK 면 Domain 이 compound box 로 시각. 안 OK 면 일반 노드 + 자식과 단색 묶음 라인.</li>
+      <li>D (Method) 는 안건 4 에서 결정 안 함 — 다음 phase 에 별도 zoom-in mode 결정. 기록만 남김.</li>
+      <li>안건 3 (bottom panel) 의 미리보기도 5 kind 별 spec 필요.</li>
+    </ul>
+  </div>
+
+  <div class="open">
+    <strong>미해결 의문:</strong> Domain 의 정의가 "Java 패키지" 인지 "비즈니스 도메인 그룹" 인지. 현재 우리에 후자 (비즈니스 도메인) 데이터가 부재. 1차에 Java 패키지로 시작 + 향후 비즈니스 도메인 grouping 도입 시 같은 Domain kind 재사용.
+  </div>
+
+  <div class="decision-slot" style="background: rgba(16,185,129,0.08); border-style: solid;">
+    <div class="ds-label">✓ 결정: C — 5 kinds (Domain + 2 Term + CodeType + Action)</div>
+    <p style="margin: 6px 0; font-size: 12.5px; color: var(--fg);">
+      Domain (Java 패키지 1차) / CompositeTerm / AtomicTerm / CodeType / Action.
+      Method 는 별도 zoom-in mode 다음 phase 결정.
+    </p>
+    <p style="margin: 6px 0 0; font-size: 12px; color: var(--muted);">
+      <strong>backlog:</strong>
+      ① backend <code>graph_api</code> Domain 노드 emit + CONTAINS edge
+      ② frontend node spec (모양/색/크기) — kind 별 컴포넌트
+      ③ Term split 시각화 (composite/atomic 구분)
+      ④ 안건 1 ELK 결과 OK 면 Domain 을 compound box. 안 OK 면 일반 노드 + 묶음 라인.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="agenda" id="agenda-5">
+  <h2>안건 5 — Save / Share URL (라우팅)</h2>
+  <div class="meta">
+    <span class="badge decided">결정됨 → B (Saved + ad-hoc)</span>
+    <span>관련: 안건 2 (Perspective backend entity 결정됨)</span>
+  </div>
+
+  <h3>무엇이 안건</h3>
+  <p>
+    안건 2 에서 Perspective 가 backend 1급 entity 가 됨. URL 로 어떻게 공유? 두 종류:
+  </p>
+  <ul class="tight">
+    <li><strong>Saved Perspective</strong> — 저장된 view (예: <code>/modeling?p=42</code>)</li>
+    <li><strong>Ad-hoc state</strong> — 사용자가 즉석에서 만든 view 도 URL 공유 가능 (예: <code>/modeling?focus=term.scm.order&hops=2&mode=neighborhood</code>)</li>
+  </ul>
+  <p>
+    권한 모델은 안건 2 에서 다음 phase 로 미룸 (1차에 모두 read-only public). 안건 5 는 그 정신과 맞춰 어디까지 1차에 build 할지.
+  </p>
+
+  <h3>Option 비교</h3>
+  <table class="options">
+    <thead>
+      <tr>
+        <th></th>
+        <th class="opt">A. Saved 만 (?p=42)</th>
+        <th class="opt">B. Saved + ad-hoc state encode</th>
+        <th class="opt">C. B + share token (read-only)</th>
+        <th class="opt">D. C + 풀 ACL (owner/edit/view)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th>저장된 view 공유</th>
+        <td><span class="yes">URL 복사</span></td>
+        <td><span class="yes">URL 복사</span></td>
+        <td><span class="yes">URL 또는 token</span></td>
+        <td><span class="yes">URL 또는 token</span></td>
+      </tr>
+      <tr>
+        <th>저장 안 한 view 즉석 공유</th>
+        <td><span class="no">불가 — 저장 후</span></td>
+        <td><span class="yes">URL 그대로</span></td>
+        <td><span class="yes">동일</span></td>
+        <td><span class="yes">동일</span></td>
+      </tr>
+      <tr>
+        <th>새로고침 후 view 복원</th>
+        <td><span class="partial">Perspective 만</span></td>
+        <td><span class="yes">상시</span></td>
+        <td><span class="yes">상시</span></td>
+        <td><span class="yes">상시</span></td>
+      </tr>
+      <tr>
+        <th>view-only 권한 (PM 에게 link 줄 때)</th>
+        <td><span class="no">repo 권한 그대로</span></td>
+        <td><span class="no">repo 권한 그대로</span></td>
+        <td><span class="yes">token 만 있으면 view</span></td>
+        <td><span class="yes">role 별</span></td>
+      </tr>
+      <tr>
+        <th>구현 비용 (1차)</th>
+        <td>매우 작음 (id 만)</td>
+        <td>작음 (URL state sync)</td>
+        <td>중 (token 발급/저장/만료)</td>
+        <td>큼 (ACL 모델)</td>
+      </tr>
+      <tr>
+        <th>안건 2 (1차 read-only public) 정합</th>
+        <td><span class="yes">정합</span></td>
+        <td><span class="yes">정합</span></td>
+        <td><span class="partial">권한 분리 추가</span></td>
+        <td><span class="no">초과</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>URL 구조 미리보기 (B 기준)</h3>
+  <ul class="tight">
+    <li><strong>Saved</strong>: <code>/modeling?repo=slab-design-real&p=42</code> — id 만, 나머지 backend 에서 fetch</li>
+    <li><strong>Ad-hoc</strong>: <code>/modeling?repo=slab-design-real&mode=neighborhood&focus=term.scm.order&n_max=60&kinds=term,code_type,action</code></li>
+    <li><strong>Saved + override</strong>: <code>?p=42&focus=...</code> — saved 위에 사용자가 변경한 부분만 override</li>
+    <li><strong>Graph 모드</strong>: <code>?view=graph</code> 또는 path-based <code>/modeling/graph?...</code></li>
+  </ul>
+
+  <div class="reco">
+    <div class="label">내 추천</div>
+    <strong>B — Saved + ad-hoc state encode.</strong>
+    이유:
+    <ul class="tight">
+      <li>구현 비용 작음 — URL state sync 는 zustand store ↔ <code>useSearchParams</code> wiring 1번이면 끝.</li>
+      <li>ad-hoc 공유가 Saved 와 동급으로 useful — "내가 본 것 그대로 보여줄게" 같은 협업 use case.</li>
+      <li>안건 2 (1차 read-only public) 정신 정합. Token / ACL 은 다음 phase 로 미룸.</li>
+      <li>Saved 위에 override 가능 (Bloom/Linkurious 패턴) — 향후 사용자 customization 자연스럽게.</li>
+    </ul>
+  </div>
+
+  <div class="impact">
+    <div class="label">결정 영향</div>
+    <ul class="tight">
+      <li>B/C/D 선택 → frontend 라우팅 재설계 (현재 모든 state 가 zustand 만, URL 동기화 X). Next.js <code>useSearchParams</code> + <code>router.replace</code> 정착.</li>
+      <li>새로고침 후 view 복원 / 브라우저 뒤로가기 자연스러움 — UX 개선 부수효과.</li>
+      <li>Token / ACL (C/D) 는 다음 phase 별도 결정. 1차에 안 들어가더라도 schema 에 owner_id 정도는 미리 박아두면 future-proof.</li>
+    </ul>
+  </div>
+
+  <div class="open">
+    <strong>미해결 의문:</strong> URL 길이 한계 (브라우저 ~2K 자) — 5 kinds × 4 facet × N filter 가 복잡해지면 URL 비대. 1차 ad-hoc 은 핵심 5~7 param 만 (mode/focus/n_max/kinds/repo). 더 복잡한 것은 Saved Perspective 로 강제.
+  </div>
+
+  <div class="decision-slot" style="background: rgba(16,185,129,0.08); border-style: solid;">
+    <div class="ds-label">✓ 결정: B — Saved + ad-hoc state encode</div>
+    <p style="margin: 6px 0; font-size: 12.5px; color: var(--fg);">
+      Saved Perspective <code>?p=42</code> + ad-hoc state URL encode (mode/focus/n_max/kinds 등 핵심 5~7 param).
+      Token / ACL 은 다음 phase.
+    </p>
+    <p style="margin: 6px 0 0; font-size: 12px; color: var(--muted);">
+      <strong>backlog:</strong>
+      ① Next.js <code>useSearchParams</code> ↔ zustand store 양방향 sync 훅
+      ② Saved ↔ ad-hoc override 로직 (?p=42&focus=... 동작)
+      ③ "URL 복사" 버튼 (현 view 즉시 share)
+      ④ schema 의 <code>owner_id</code> 미리 박아두기 (future ACL prep).
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="agenda" id="agenda-6">
+  <h2>안건 6 — 5K class 실제 import 검증</h2>
+  <div class="meta">
+    <span class="badge decided">결정됨 → D (B 인공 + C Spring)</span>
+    <span>관련: 안건 1 ELK spike, 안건 4 Domain compound, 사용자 가정 검증</span>
+  </div>
+
+  <h3>무엇이 안건</h3>
+  <p>
+    우리 검증 데이터는 <strong>117 노드 (slab-design-real)</strong>. "5000+ class scale 가정" 은
+    실측 부재. 안건 1 ELK spike 도 5K 가공 데이터 측정이 필요. import 시간 / DB 크기 / graph_api 응답 /
+    layout 시간 / 메모리 footprint / UX 응답성 모두 미지수.
+  </p>
+  <p>
+    어떤 데이터로 검증할지가 안건. 1 의 spike 와 합칠 수도 분리할 수도.
+  </p>
+
+  <h3>Option 비교</h3>
+  <table class="options">
+    <thead>
+      <tr>
+        <th></th>
+        <th class="opt">A. 검증 안 함</th>
+        <th class="opt">B. 인공 가공 (117 → 5K 합성)</th>
+        <th class="opt">C. 실제 OSS Java (Spring 등)</th>
+        <th class="opt">D. B + C — spike 빠른 / 정식 깊은</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th>5K 노드 layout/응답 시간 진짜 답</th>
+        <td><span class="no">없음</span></td>
+        <td><span class="partial">분포 prior 의존</span></td>
+        <td><span class="yes">실제</span></td>
+        <td><span class="yes">실제</span></td>
+      </tr>
+      <tr>
+        <th>실제 패키지 hierarchy 깊이</th>
+        <td>모름</td>
+        <td>합성 분포 (실제 X)</td>
+        <td><span class="yes">실제 분포</span></td>
+        <td><span class="yes">실제</span></td>
+      </tr>
+      <tr>
+        <th>Spring 10-analyzer 가 실 데이터 견디나</th>
+        <td>모름</td>
+        <td>모름</td>
+        <td><span class="yes">검증 (특히 Spring import 시 self-referential!)</span></td>
+        <td><span class="yes">검증</span></td>
+      </tr>
+      <tr>
+        <th>준비 시간</th>
+        <td>0</td>
+        <td>0.5일 (generator)</td>
+        <td>1일 (clone + import + 분석 + 디버깅)</td>
+        <td>1.5일</td>
+      </tr>
+      <tr>
+        <th>안건 1 ELK spike 와 결합</th>
+        <td>n/a</td>
+        <td><span class="yes">spike 데이터로 직접 활용</span></td>
+        <td><span class="partial">큰 데이터 — spike 다 통과 후 정식 검증</span></td>
+        <td><span class="yes">spike 는 B, 정식은 C</span></td>
+      </tr>
+      <tr>
+        <th>예상 발견 (cost overrun / breakage)</th>
+        <td>none</td>
+        <td>medium</td>
+        <td><span class="yes">high (실제 코드의 corner case)</span></td>
+        <td><span class="yes">most</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>실제 OSS 후보 (C/D 기준)</h3>
+  <table class="options">
+    <thead>
+      <tr>
+        <th>프로젝트</th>
+        <th>Java 클래스 수</th>
+        <th>특징</th>
+        <th>스코어</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Spring Framework</strong> (spring-projects/spring-framework)</td>
+        <td>~6500</td>
+        <td>우리 Spring analyzer 가 **그것을 분석** — self-referential 흥미로움</td>
+        <td>★★★★★ 1순위</td>
+      </tr>
+      <tr>
+        <td>Apache Kafka (apache/kafka)</td>
+        <td>~3000</td>
+        <td>core+streams 분리, Spring 의존 없음</td>
+        <td>★★★★</td>
+      </tr>
+      <tr>
+        <td>Eclipse JDT</td>
+        <td>~10000</td>
+        <td>너무 큼 — 스트레스 테스트용</td>
+        <td>★★★ (별도 단계)</td>
+      </tr>
+      <tr>
+        <td>JabRef / JHipster sample</td>
+        <td>1000~2000</td>
+        <td>중간 단계 검증</td>
+        <td>★★★</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="reco">
+    <div class="label">내 추천</div>
+    <strong>D — B (인공 가공) 로 spike 빠르게 + C (Spring Framework) 로 정식 검증.</strong>
+    이유:
+    <ul class="tight">
+      <li>안건 1 ELK spike 는 "5K 노드 layout 시간 측정" 만 필요 — 인공 가공 (B) 으로 충분히 빠르게 답.</li>
+      <li>그러나 import 파이프라인 / DB / graph_api / 실제 패키지 분포의 corner case 는 실제 OSS (C) 로만 노출. Spring Framework 가 1순위 — 우리 Spring analyzer 가 자기 자신을 분석하는 셀프 검증.</li>
+      <li>1.5일 비용 — 데모 임박 시 B 만 (spike) 으로 좁힐 수도. 그건 안건 7 우선순위에서 결정.</li>
+      <li>측정 지표 다층화: import 시간 / DB 크기 / graph_api p50/p99 / layout 시간 / 메모리 / UX (frame drop) 6 metric.</li>
+    </ul>
+  </div>
+
+  <div class="impact">
+    <div class="label">결정 영향</div>
+    <ul class="tight">
+      <li>D (or C) 결과 → 안건 1 ELK 결정 micro-decision (풀 마이그 / hybrid / dagre 유지) confirm.</li>
+      <li>발견된 bottleneck 따라 안건 4 Domain compound 의 lazy expansion 정책 디자인.</li>
+      <li>예상 발견들: graph_api response > 1MB → pagination 필요, importance scoring 비용 (5K × 5K) → caching, frontend tree 가상 스크롤 부재 confirm.</li>
+      <li>A 선택 → 위험 누적, 데모 시 발견 시 큰 수정 비용.</li>
+    </ul>
+  </div>
+
+  <div class="open">
+    <strong>미해결 의문:</strong> Spring Framework 의 build (Gradle) — 우리 import 가 *.java 파일만 보면 되니 build 불필요. 단, Java 21 syntax 확인 + 우리 tree-sitter 가 Spring 의 모든 modern Java syntax 견디는지. 1차 import 후 errors 카운트 = 1차 주요 metric.
+  </div>
+
+  <div class="decision-slot" style="background: rgba(16,185,129,0.08); border-style: solid;">
+    <div class="ds-label">✓ 결정: D — B (인공 가공 spike) + C (Spring Framework 정식)</div>
+    <p style="margin: 6px 0; font-size: 12.5px; color: var(--fg);">
+      6 metric 측정: import 시간 / DB 크기 / graph_api p50 p99 / layout 시간 / 메모리 / UX (frame drop).
+    </p>
+    <p style="margin: 6px 0 0; font-size: 12px; color: var(--muted);">
+      <strong>backlog:</strong>
+      ① 117 → 5K 가공 generator script (안건 1 ELK spike 데이터로도 활용)
+      ② Spring Framework clone + import → 6 metric 측정
+      ③ 발견된 bottleneck 따라 follow-up (pagination / caching / virtualization).
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="agenda" id="agenda-7">
+  <h2>안건 7 — 실행 순서 (track 분리 vs 직선)</h2>
+  <div class="meta">
+    <span class="badge decided">결정됨 → D (3-track parallel)</span>
+    <span>안건 1~6 모두 결정됨 → 이 안건은 "어떤 순서로, 무엇 먼저"</span>
+  </div>
+
+  <h3>의존 관계 정리</h3>
+  <p>안건 1~6 결정의 dependency DAG:</p>
+  <ul class="tight">
+    <li><strong>안건 1 (ELK spike)</strong> ← <strong>안건 6B (인공 가공 데이터)</strong></li>
+    <li><strong>안건 4 (Domain compound)</strong> ← <strong>안건 1 결과</strong></li>
+    <li><strong>안건 5 (URL state)</strong> ← <strong>안건 2 (Perspective backend)</strong></li>
+    <li><strong>안건 3 (Bottom panel)</strong> — 독립</li>
+    <li><strong>안건 6C (Spring 정식 검증)</strong> — 독립 (인프라 평가)</li>
+  </ul>
+
+  <h3>Option 비교</h3>
+  <table class="options">
+    <thead>
+      <tr>
+        <th></th>
+        <th class="opt">A. 직선 (1→2→3→4→5→6)</th>
+        <th class="opt">B. 인프라 first (6 → 1 → 나머지)</th>
+        <th class="opt">C. UX first (3 → 2 → 5 → 나머지)</th>
+        <th class="opt">D. 3-track parallel</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th>의존성 무시 risk</th>
+        <td><span class="partial">일부 (4 가 1 결과 전 시작 가능)</span></td>
+        <td><span class="yes">없음 (인프라 후 디자인)</span></td>
+        <td><span class="partial">4 가 1 결과 후</span></td>
+        <td><span class="yes">없음 (track 분리)</span></td>
+      </tr>
+      <tr>
+        <th>사용자 가시 가치 빠른 출현</th>
+        <td>중</td>
+        <td><span class="no">늦음 (인프라 먼저)</span></td>
+        <td><span class="yes">빠름 (Bottom panel + Perspective UI)</span></td>
+        <td><span class="yes">빠름 (UX track 동시 진행)</span></td>
+      </tr>
+      <tr>
+        <th>데모 임박 시 cut 가능성</th>
+        <td>cut 시 마지막 안건 빠짐</td>
+        <td><span class="no">초기 인프라만 도달</span></td>
+        <td><span class="yes">UX 부터 완성</span></td>
+        <td><span class="yes">track 별 독립 cut 가능</span></td>
+      </tr>
+      <tr>
+        <th>1인 작업 가정 (병렬 작업 어려움)</th>
+        <td><span class="yes">자연스러움</span></td>
+        <td><span class="yes">자연스러움</span></td>
+        <td><span class="yes">자연스러움</span></td>
+        <td><span class="partial">멀티태스킹 — context switch cost</span></td>
+      </tr>
+      <tr>
+        <th>인프라 evidence 가 디자인 결정 입력으로 활용</th>
+        <td>늦음</td>
+        <td><span class="yes">제일 먼저</span></td>
+        <td>마지막</td>
+        <td>track 1 결과를 track 3 합류 시</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Track 분할 (D 기준 spec)</h3>
+  <table class="options">
+    <thead>
+      <tr>
+        <th>Track</th>
+        <th>작업 흐름</th>
+        <th>독립성</th>
+        <th>최종 합류 지점</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>1. 인프라 검증</strong></td>
+        <td>6B 인공 가공 → 1 ELK spike → 1 micro-decision (풀/hybrid/dagre) → 6C Spring 정식</td>
+        <td>완전 독립</td>
+        <td>안건 4 (5-kind Domain compound) 시작 직전</td>
+      </tr>
+      <tr>
+        <td><strong>2. UX 빠른 출현</strong></td>
+        <td>3 Bottom panel → (병행) 2 Perspective backend → 5 URL state</td>
+        <td>완전 독립</td>
+        <td>안건 4 와 합류 (Perspective 에 lens spec 통합)</td>
+      </tr>
+      <tr>
+        <td><strong>3. 통합 마무리</strong></td>
+        <td>4 5-kind 노드 (Domain compound + composite/atomic split)</td>
+        <td>의존: 1+2 결과</td>
+        <td>전체 마무리 + Stage 2 의 차용 후보 top 3 (schema migration / Action SemVer / LLM tool spec) 는 별 phase</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="reco">
+    <div class="label">내 추천</div>
+    <strong>D — 3-track parallel (단, 사용자 작업 환경에 맞으면).</strong>
+    이유:
+    <ul class="tight">
+      <li>의존성 충실 + 빠른 가시 가치 (UX track) 둘 다 잡음.</li>
+      <li>인프라 track 의 결과가 통합 mat 합류 시점에 도착 — 디자인 evidence 자연스럽게 활용.</li>
+      <li>track 별 독립 cut 가능 — 데모 임박 시 가장 가시 가치 큰 트랙 (UX) 만 우선 완성, 인프라는 다음 phase.</li>
+      <li>1인 작업이라 진정한 동시는 아니지만, "한 트랙 막힐 때 다른 트랙으로" 가능. context switch cost 는 트랙 단위로 작업 chunk 묶으면 완화.</li>
+      <li>대안: A (직선) 도 합리적 — "한 번에 한 가지" 원칙 강하면. 그 경우 권장 직선 순서: <strong>2 (Perspective schema) → 3 (Bottom) → 5 (URL) → 6B+1 (spike) → 6C (Spring) → 4 (5-kind 통합)</strong>. UX 부터 출현, 인프라 evidence 후 통합.</li>
+    </ul>
+  </div>
+
+  <div class="impact">
+    <div class="label">결정 영향</div>
+    <ul class="tight">
+      <li>D 선택 → 다음 메시지에서 3 track 별 첫 작업 단위 정의 + 사용자 승인 후 시작.</li>
+      <li>A 선택 → 다음 메시지에서 첫 작업 (안건 2 Perspective schema) 시작.</li>
+      <li>B/C 선택 → 첫 작업 자동 결정.</li>
+      <li>모든 옵션 → 종합 보고서 <code>round4-palantir-deep-dive.html</code> 작성 (Stage 4 마무리 산출).</li>
+    </ul>
+  </div>
+
+  <div class="open">
+    <strong>미해결 의문:</strong> 안건 6C (Spring Framework 검증) 시점 — 인프라 track 끝 (track 1) 이 자연 vs 통합 mat 합류 후 (track 3) 가 자연. 1차 권장은 track 1 안에 (조기 발견 → 수정 비용 작음).
+  </div>
+
+  <div class="decision-slot" style="background: rgba(16,185,129,0.08); border-style: solid;">
+    <div class="ds-label">✓ 결정: D — 3-track parallel</div>
+    <p style="margin: 6px 0; font-size: 12.5px; color: var(--fg);">
+      트랙 1 (인프라 검증) + 트랙 2 (UX 빠른 가치) + 트랙 3 (통합 마무리). track 별 독립 cut 가능.
+    </p>
+    <p style="margin: 6px 0 0; font-size: 12px; color: var(--muted);">
+      다음: 종합 보고서 (round4-palantir-deep-dive.html) 작성 → backlog → TODO 정리 → 첫 작업 시작.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="agenda" style="background: linear-gradient(135deg, rgba(56,189,248,0.06), rgba(167,139,250,0.06)); border-color: var(--primary);">
+  <h2>📦 7 안건 결정 종합</h2>
+  <div class="meta">
+    <span class="badge decided">Stage 4 마무리</span>
+    <span>모든 결정 완료 — 다음 산출: 종합 보고서 + 실행 backlog</span>
+  </div>
+  <table class="options">
+    <thead>
+      <tr><th>#</th><th>안건</th><th>결정</th><th>핵심 작업</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>ELK 마이그레이션</td><td><strong>C</strong> spike</td><td>PoC + 풀/hybrid/dagre 결정</td></tr>
+      <tr><td>2</td><td>Perspective</td><td><strong>B</strong> backend 1급</td><td>새 layer + ORM + REST CRUD</td></tr>
+      <tr><td>3</td><td>3-pane workspace</td><td><strong>B</strong> Bottom overlay</td><td>NodePreviewPanel.tsx (graph 모드)</td></tr>
+      <tr><td>4</td><td>노드 종류</td><td><strong>C</strong> 5 kinds</td><td>Domain + Term split, graph_api 확장</td></tr>
+      <tr><td>5</td><td>Save/Share URL</td><td><strong>B</strong> Saved + ad-hoc</td><td>useSearchParams ↔ store sync</td></tr>
+      <tr><td>6</td><td>5K 검증</td><td><strong>D</strong> B+C</td><td>인공 가공 + Spring Framework import</td></tr>
+      <tr><td>7</td><td>실행 순서</td><td><strong>D</strong> 3-track</td><td>인프라 / UX / 통합 병렬</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<aside class="upcoming">
+  <h3>안건 7 결정 후</h3>
+  <ol>
+    <li>종합 보고서 <code>round4-palantir-deep-dive.html</code> 작성 (Stage 4 마무리 산출)</li>
+    <li>실행 단위로 backlog → TODO.md 정리</li>
+    <li>첫 작업 시작 (안건 7 결정 따라)</li>
+  </ol>
+</aside>
+
+</div>
+
+<script>
+  // Radio 시각화 (체크된 label 강조)
+  document.querySelectorAll('.opt-radio input[type=radio]').forEach((inp) => {
+    inp.addEventListener('change', () => {
+      const name = inp.name;
+      document.querySelectorAll(`.opt-radio input[name="${name}"]`).forEach((other) => {
+        other.parentElement.classList.toggle('checked', other.checked);
+      });
+    });
+  });
+
+  // 결정 텍스트 빌드
+  function buildDecisionText(slot) {
+    const id = slot.dataset.agenda;
+    const title = slot.dataset.title;
+    const checked = slot.querySelector('input[type=radio]:checked');
+    const choice = checked ? checked.value : '(선택 안 함)';
+    const notes = slot.querySelector('textarea.notes').value.trim();
+    let txt = `[안건 ${id} — ${title}] 결정: ${choice}`;
+    if (notes) {
+      txt += `\n이유 / 메모:\n${notes}`;
+    }
+    return txt;
+  }
+
+  // 미리보기
+  document.querySelectorAll('button[data-action="preview"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const slot = btn.closest('.decision-slot');
+      const preview = slot.querySelector('.preview');
+      const body = slot.querySelector('.preview-body');
+      body.textContent = buildDecisionText(slot);
+      preview.classList.add('visible');
+    });
+  });
+
+  // 복사
+  document.querySelectorAll('button[data-action="copy"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const slot = btn.closest('.decision-slot');
+      const txt = buildDecisionText(slot);
+      try {
+        await navigator.clipboard.writeText(txt);
+        const orig = btn.textContent;
+        btn.textContent = '✓ 복사됨';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = orig;
+          btn.classList.remove('copied');
+        }, 1600);
+        // 미리보기도 함께 표시
+        const preview = slot.querySelector('.preview');
+        const body = slot.querySelector('.preview-body');
+        body.textContent = txt;
+        preview.classList.add('visible');
+      } catch (e) {
+        alert('복사 실패. 미리보기 영역에서 수동 복사하세요.');
+        const preview = slot.querySelector('.preview');
+        const body = slot.querySelector('.preview-body');
+        body.textContent = txt;
+        preview.classList.add('visible');
+      }
+    });
+  });
+</script>
+
+</body>
+</html>

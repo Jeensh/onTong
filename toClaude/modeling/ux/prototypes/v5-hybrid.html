@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>onTong Workbench — V5 Hybrid (V1 base + V2/V3/V4 흡수)</title>
+<link rel="stylesheet" href="_shared.css" />
+<style>
+  /* ────────────────────────────────────────────────────────────
+     V5 = V1 base + 사용자 피드백 흡수
+     - 우측 사이드바 좁음 해결: resize handle + 코드 탭에 "split mode" expand 버튼
+     - 상단 탭 바 (V4 — 여러 작업 동시)
+     - 좌측 Queue 탭 풍부 (V3 차용)
+     - 중앙 mode 토글: Detail / Split / Graph
+     - Graph 모드는 full screen
+     - ⌘K palette + status bar 진척
+     ──────────────────────────────────────────────────────────── */
+  .app-shell {
+    display: grid;
+    grid-template-rows: 36px 32px 1fr 24px;
+    grid-template-columns: 280px minmax(420px, 1fr) var(--right-w, 380px);
+    grid-template-areas:
+      "top top top"
+      "tabs tabs tabs"
+      "left main right"
+      "status status status";
+    height: 100vh;
+  }
+  .app-shell.graph-mode {
+    grid-template-rows: 36px 32px 1fr 24px;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "top"
+      "tabs"
+      "graph"
+      "status";
+  }
+  .app-shell.graph-mode .left,
+  .app-shell.graph-mode .main,
+  .app-shell.graph-mode .right { display: none; }
+  .app-shell.graph-mode .graph { display: flex; }
+
+  .topbar { grid-area: top; }
+  .tabbar {
+    grid-area: tabs; background: var(--panel-2); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 8px; gap: 1px; overflow-x: auto;
+  }
+  .left  { grid-area: left;  background: var(--panel-2); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .main  { grid-area: main;  background: var(--bg); overflow: hidden; display: flex; flex-direction: column; position: relative; }
+  .right { grid-area: right; background: var(--panel-2); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+  .graph { grid-area: graph; background: var(--bg); display: none; flex-direction: column; overflow: hidden; }
+  .statusbar { grid-area: status; }
+
+  /* Tabbar (V4 차용) */
+  .tab {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px; height: 26px;
+    background: var(--panel-3); border: 1px solid var(--border);
+    border-bottom: 0; border-radius: 5px 5px 0 0; margin-bottom: -1px;
+    font-size: 11.5px; color: var(--text-dim);
+    cursor: pointer; max-width: 240px;
+  }
+  .tab:hover { background: var(--panel); color: var(--text); }
+  .tab.active {
+    background: var(--bg); color: var(--text);
+    border-bottom: 1px solid var(--bg);
+  }
+  .tab .x { color: var(--text-faint); padding: 0 2px; opacity: 0; transition: opacity 0.1s; }
+  .tab:hover .x { opacity: 1; }
+  .tab.unsaved::after {
+    content: '●'; color: var(--accent); font-size: 14px; margin-left: 2px;
+  }
+  .tab-add {
+    background: transparent; border: 0; color: var(--text-faint);
+    padding: 5px 10px; font-size: 16px; cursor: pointer;
+  }
+  .tab-add:hover { color: var(--accent); }
+
+  /* LEFT — V1 4탭 + V3 풍부함 */
+  .left-tabs {
+    display: flex; padding: 6px 8px 0; border-bottom: 1px solid var(--border);
+    gap: 0; flex-shrink: 0;
+  }
+  .left-tabs button {
+    border: 0; border-radius: 4px 4px 0 0; padding: 5px 10px;
+    color: var(--text-faint); border-bottom: 2px solid transparent;
+    font-size: 11.5px;
+  }
+  .left-tabs button.active {
+    color: var(--text); border-bottom-color: var(--accent); background: var(--panel-2);
+  }
+  .left-tabs .badge {
+    background: var(--bad); color: #fff; font-size: 9px; font-weight: 700;
+    padding: 1px 5px; border-radius: 7px; margin-left: 4px;
+  }
+  .panel-search {
+    padding: 6px 10px; border-bottom: 1px solid var(--border);
+  }
+  .panel-search input { width: 100%; font-size: 11.5px; }
+  .panel-filters {
+    display: flex; gap: 4px; padding: 5px 10px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border); background: var(--panel-3);
+  }
+  .panel-filters button {
+    font-size: 10px; padding: 2px 6px;
+  }
+  .tree { padding: 4px 4px; overflow-y: auto; flex: 1; font-size: 12px; }
+  .tree-node {
+    display: flex; align-items: center; gap: 5px;
+    padding: 3px 8px; border-radius: 3px; cursor: pointer;
+  }
+  .tree-node:hover { background: var(--panel-3); }
+  .tree-node.selected { background: rgba(56,189,248,0.12); color: var(--accent); }
+  .tree-node .caret { color: var(--text-faint); font-size: 9px; width: 10px; }
+  .tree-indent { padding-left: 14px; }
+  .extends-line { color: var(--text-faint); font-size: 10.5px; padding-left: 24px; }
+
+  /* Queue tab (V3 차용 — 풍부) */
+  .queue-list { overflow-y: auto; flex: 1; }
+  .queue-item {
+    padding: 8px 12px; border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background 0.1s;
+  }
+  .queue-item:hover { background: var(--panel-3); }
+  .queue-item.current {
+    background: rgba(56,189,248,0.08); border-left: 3px solid var(--accent); padding-left: 9px;
+  }
+  .queue-item .type-row { display: flex; gap: 5px; margin-bottom: 3px; align-items: center; }
+  .queue-item .title { font-size: 12px; line-height: 1.4; color: var(--text); }
+  .queue-item .desc {
+    font-size: 11px; color: var(--text-dim); margin-top: 3px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .queue-item .meta {
+    font-size: 10.5px; color: var(--text-faint); margin-top: 4px;
+    display: flex; gap: 6px;
+  }
+
+  /* MAIN — Mode 토글 */
+  .main-modebar {
+    height: 32px; padding: 0 14px; background: var(--panel-2);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+    flex-shrink: 0;
+  }
+  .main-modebar .crumb {
+    color: var(--text-faint); font-size: 11px; flex: 1;
+  }
+  .main-modebar .crumb a { color: var(--text-dim); text-decoration: none; }
+  .main-modebar .crumb .sep { margin: 0 4px; }
+  .mode-toggle {
+    display: flex; gap: 0; background: var(--panel-3);
+    border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
+  }
+  .mode-toggle button {
+    border: 0; border-radius: 0; padding: 3px 10px;
+    font-size: 11px; color: var(--text-faint);
+    border-right: 1px solid var(--border);
+  }
+  .mode-toggle button:last-child { border-right: 0; }
+  .mode-toggle button.active {
+    background: var(--accent); color: var(--bg);
+  }
+
+  .main-body {
+    flex: 1; overflow: auto; padding: 14px 20px;
+  }
+
+  /* Detail mode — V1 sectioned card */
+  h1.title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .subtitle { color: var(--text-dim); font-size: 12px; margin-bottom: 14px; }
+  .subtitle code { font-family: "SF Mono", Menlo, monospace; font-size: 11.5px; color: var(--text-faint); }
+  .section {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    margin: 12px 0; padding: 12px 16px;
+  }
+  .section h3 {
+    font-size: 12.5px; font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.04em;
+    margin-bottom: 8px;
+  }
+  .row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .param-row {
+    background: var(--panel-2); padding: 6px 10px; border-radius: 4px;
+    margin: 4px 0; display: grid; grid-template-columns: 110px 1fr 60px;
+    gap: 10px; align-items: center; font-size: 12.5px;
+  }
+  .real-row {
+    background: var(--panel-2); padding: 8px 12px; border-radius: 4px;
+    margin: 6px 0;
+  }
+  .real-row .meth { font-family: "SF Mono", Menlo, monospace; color: var(--text); font-size: 12px; }
+  .real-row .src { color: var(--text-faint); font-size: 11px; margin-top: 3px; }
+
+  /* Split mode (V2 차용) */
+  .split-wrap {
+    display: grid; grid-template-rows: 1fr 1fr; height: 100%;
+  }
+  .split-pane {
+    overflow: auto; padding: 14px 20px;
+  }
+  .split-pane.top { border-bottom: 1px solid var(--border); }
+  .split-pane h3 {
+    font-size: 11px; color: var(--text-faint); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  pre.code-snip {
+    background: var(--panel-3); border: 1px solid var(--border);
+    padding: 10px 14px; border-radius: 4px; overflow-x: auto;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+    color: var(--text); line-height: 1.55;
+  }
+  pre.code-snip .hi { background: rgba(56,189,248,0.18); padding: 0 2px; cursor: pointer; }
+  pre.code-snip .hi:hover { background: rgba(56,189,248,0.4); }
+  pre.code-snip .picked { background: rgba(52,211,153,0.25); padding: 0 2px; }
+
+  .anchor-tip {
+    background: var(--panel); border: 1px solid var(--accent);
+    padding: 8px 12px; border-radius: 4px; margin-top: 8px;
+    display: flex; gap: 10px; align-items: center;
+    font-size: 12px;
+  }
+
+  /* RIGHT — V1 4탭 + resize handle + expand 버튼 */
+  .right-resize {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+    cursor: col-resize; z-index: 5; background: transparent;
+  }
+  .right-resize:hover { background: var(--accent); }
+  .right-tabs {
+    display: flex; padding: 6px 8px 0; border-bottom: 1px solid var(--border);
+    flex-shrink: 0; gap: 0;
+  }
+  .right-tabs button {
+    border: 0; border-radius: 4px 4px 0 0; padding: 5px 10px;
+    color: var(--text-faint); border-bottom: 2px solid transparent;
+    font-size: 11.5px;
+  }
+  .right-tabs button.active {
+    color: var(--text); border-bottom-color: var(--accent);
+  }
+  .right-actions {
+    padding: 4px 10px; border-bottom: 1px solid var(--border);
+    display: flex; gap: 6px; align-items: center; background: var(--panel-3);
+    flex-shrink: 0;
+  }
+  .right-actions button {
+    font-size: 10.5px; padding: 2px 8px;
+  }
+  .right-actions button.expand-to-split {
+    color: var(--accent); border-color: var(--accent);
+  }
+  .right-content { padding: 12px 14px; overflow-y: auto; flex: 1; font-size: 12px; }
+  .ctx-block { margin-bottom: 14px; }
+  .ctx-block h4 {
+    font-size: 11px; color: var(--text-faint); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;
+  }
+
+  /* Graph mode — full screen */
+  .graph-toolbar {
+    height: 36px; padding: 0 18px; display: flex; align-items: center; gap: 12px;
+    background: var(--panel-2); border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .graph-toolbar h3 { font-size: 13px; font-weight: 600; }
+  .graph-toolbar .toggles { display: flex; gap: 4px; }
+  .graph-canvas {
+    flex: 1; background:
+      radial-gradient(circle at 50% 50%, var(--panel-2), var(--bg)),
+      repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px);
+    position: relative; overflow: hidden;
+  }
+  .graph-node {
+    position: absolute; padding: 8px 14px; border-radius: 6px;
+    background: var(--panel); border: 1px solid var(--border-2);
+    font-size: 11.5px; color: var(--text); cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    user-select: none;
+  }
+  .graph-node:hover { border-color: var(--accent); }
+  .graph-node.code { border-left: 3px solid var(--code-fg); }
+  .graph-node.domain { border-left: 3px solid var(--domain-fg); }
+  .graph-node.action { border-left: 3px solid var(--action-fg); }
+  .graph-node.selected { border-color: var(--accent); background: rgba(56,189,248,0.1); }
+  .graph-edge {
+    position: absolute; pointer-events: none; transform-origin: 0 50%;
+    height: 1px; background: var(--border-2);
+  }
+  .graph-edge.solid { background: var(--accent-2); }
+  .graph-edge.dashed {
+    background: repeating-linear-gradient(90deg, var(--text-faint), var(--text-faint) 4px, transparent 4px, transparent 8px);
+  }
+  .graph-legend {
+    position: absolute; bottom: 16px; left: 16px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 14px; font-size: 11px; line-height: 1.8;
+  }
+  .graph-legend .row { display: flex; align-items: center; gap: 6px; margin: 0; }
+  .graph-legend .swatch {
+    width: 10px; height: 3px; background: var(--accent-2); border-radius: 2px;
+  }
+  .graph-legend .swatch.dashed {
+    background: repeating-linear-gradient(90deg, var(--text-faint), var(--text-faint) 3px, transparent 3px, transparent 5px);
+  }
+  .graph-legend .swatch.code { width: 12px; height: 12px; background: var(--code-fg); border-radius: 2px; }
+  .graph-legend .swatch.domain { width: 12px; height: 12px; background: var(--domain-fg); border-radius: 2px; }
+  .graph-legend .swatch.action { width: 12px; height: 12px; background: var(--action-fg); border-radius: 2px; }
+
+  /* Cmd-K palette (mock — visible only when active) */
+  .cmdk-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 100; display: none; align-items: flex-start; justify-content: center;
+    padding-top: 100px;
+  }
+  .cmdk-overlay.show { display: flex; }
+  .cmdk {
+    width: 600px; max-width: 90vw; background: var(--panel);
+    border: 1px solid var(--border-2); border-radius: 8px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+  .cmdk input {
+    width: 100%; padding: 14px 18px; background: transparent;
+    border: 0; border-bottom: 1px solid var(--border); color: var(--text);
+    font-size: 14px;
+  }
+  .cmdk input:focus { outline: none; }
+  .cmdk-list { max-height: 400px; overflow-y: auto; }
+  .cmdk-section {
+    padding: 8px 18px 4px; font-size: 10.5px; color: var(--text-faint);
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .cmdk-item {
+    padding: 8px 18px; cursor: pointer; display: flex; gap: 10px; align-items: center;
+    font-size: 12.5px;
+  }
+  .cmdk-item:hover, .cmdk-item.sel { background: var(--panel-2); }
+  .cmdk-item .kind { width: 50px; }
+  .cmdk-item .name { flex: 1; color: var(--text); font-family: "SF Mono", Menlo, monospace; font-size: 11.5px; }
+  .cmdk-item .meta { color: var(--text-faint); font-size: 11px; }
+
+  .lvl-bar { display: inline-block; height: 5px; width: 60px; margin-left: 6px; background: var(--panel-3); border-radius: 3px; overflow: hidden; }
+  .lvl-bar > span { display: block; height: 100%; background: var(--accent); }
+</style>
+</head>
+<body>
+<div class="app-shell" id="shell">
+
+<header class="topbar">
+  <span class="brand"><span class="o">on</span>Tong</span>
+  <span class="repo">slab-design-real · main</span>
+  <span class="spacer"></span>
+  <button onclick="openCmdK()" class="cmd-k">⌘K  검색 / 명령</button>
+  <button onclick="toggleGraphMode(true)">🌐 그래프</button>
+  <button class="primary">시뮬</button>
+</header>
+
+<!-- TAB BAR (V4 차용) -->
+<div class="tabbar">
+  <div class="tab active unsaved">
+    <span>📋</span><span>주문_검증 매핑</span><span class="x">×</span>
+  </div>
+  <div class="tab">
+    <span>📋</span><span>안전재고_계산</span><span class="x">×</span>
+  </div>
+  <div class="tab">
+    <span>📦</span><span>주문스펙 편집</span><span class="x">×</span>
+  </div>
+  <div class="tab">
+    <span>📊</span><span>진척 대시보드</span><span class="x">×</span>
+  </div>
+  <button class="tab-add" title="새 탭 (⌘T)">+</button>
+</div>
+
+<!-- LEFT — 4 탭 (V1 + V3 풍부) -->
+<aside class="left">
+  <div class="left-tabs">
+    <button>Code</button>
+    <button>Domain</button>
+    <button class="active">Action</button>
+    <button>Queue<span class="badge">23</span></button>
+  </div>
+  <div class="panel-search">
+    <input type="search" placeholder="🔍 action 검색..." />
+  </div>
+  <div class="panel-filters">
+    <button class="primary" style="background: var(--panel); color: var(--accent); border-color: var(--accent);">all</button>
+    <button>pure</button>
+    <button>effectful</button>
+    <button>workflow</button>
+  </div>
+  <div class="tree">
+    <div class="tree-node"><span class="caret">▼</span><span>📁 scm</span><span class="pill dim">42</span></div>
+    <div class="tree-indent">
+      <div class="tree-node selected"><span class="caret"></span><span class="pill action">act</span>주문_검증 <span class="pill warn" style="font-size: 9px;">SL</span></div>
+      <div class="tree-node"><span class="caret"></span><span class="pill action">act</span>주문_생성</div>
+      <div class="tree-node"><span class="caret"></span><span class="pill action">act</span>주문_취소</div>
+      <div class="tree-node"><span class="caret"></span><span class="pill action">act</span>안전재고_계산 <span class="pill warn" style="font-size: 9px;">D</span></div>
+      <div class="tree-node"><span class="caret"></span><span class="pill action">act</span>발주_제안</div>
+      <div class="tree-node"><span class="caret"></span><span class="pill action">act</span>화학성분_검증 <span class="pill bad" style="font-size: 9px;">U</span></div>
+    </div>
+    <div class="tree-node"><span class="caret">▶</span><span>📁 quality</span><span class="pill dim">17</span></div>
+    <div class="tree-node"><span class="caret">▶</span><span>📁 production</span><span class="pill dim">28</span></div>
+  </div>
+</aside>
+
+<!-- MAIN — Mode 토글 (Detail / Split / Graph) -->
+<main class="main">
+  <div class="main-modebar">
+    <div class="crumb">
+      <a href="#">Action</a><span class="sep">›</span>
+      <a href="#">scm</a><span class="sep">›</span>
+      <span>주문_검증</span>
+    </div>
+    <div class="mode-toggle">
+      <button id="mode-detail" class="active" onclick="setMode('detail')">Detail</button>
+      <button id="mode-split" onclick="setMode('split')">↕ Split</button>
+      <button onclick="toggleGraphMode(true)">🌐 Graph</button>
+    </div>
+  </div>
+
+  <!-- BODY — mode 별 화면 -->
+  <div class="main-body" id="body-detail">
+    <h1 class="title">
+      주문 검증 <span class="pill action">action</span>
+      <span class="pill" style="color: var(--text-faint);">pure_function</span>
+      <span class="pill" style="color: var(--text-faint);">abstract</span>
+    </h1>
+    <div class="subtitle">
+      <code>action.scm.order_validate</code> · declared on <code>term.scm.order</code>
+      <span class="pill warn" style="margin-left: 8px;">SIGNATURE_LOCKED</span>
+      <span class="lvl-bar"><span style="width: 50%;"></span></span>
+      <span style="color: var(--text-faint);">3/6</span>
+    </div>
+
+    <section class="section">
+      <h3>Parameters · 1 · ✓ confirmed</h3>
+      <div class="param-row">
+        <span class="k">params[0]</span>
+        <span><strong>주문</strong> <span class="pill domain">→ term.scm.order</span></span>
+        <span class="pill good" style="font-size: 10px;">✓</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <h3>Output</h3>
+      <div class="param-row">
+        <span class="k">return</span>
+        <span><strong>검증결과</strong> <span class="pill domain">→ term.scm.validation_result</span></span>
+        <span class="pill good" style="font-size: 10px;">✓</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <h3>Realizations · 2 (다형성) · ✓ both confirmed</h3>
+      <div class="real-row">
+        <div class="row">
+          <span class="pill code">code</span>
+          <span class="meth">com.scm.RushOrder.validate</span>
+          <span class="pill" style="font-size: 10px;">@Override</span>
+          <span class="pill good" style="font-size: 10px;">primary</span>
+        </div>
+        <div class="src">applies to <span class="path-token">RushOrder</span> · single_impl · conf 1.0</div>
+      </div>
+      <div class="real-row">
+        <div class="row">
+          <span class="pill code">code</span>
+          <span class="meth">com.scm.StandardOrder.validate</span>
+          <span class="pill" style="font-size: 10px;">@Override</span>
+          <span class="pill good" style="font-size: 10px;">primary</span>
+        </div>
+        <div class="src">applies to <span class="path-token">StandardOrder</span> · single_impl · conf 1.0</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h3>Preconditions · 2 · ⚠ 1 unconfirmed</h3>
+      <div class="row" style="font-size: 12px;">
+        <span class="k">[0]</span>
+        <span class="pill rule">rule</span>
+        <span><code style="color: var(--text-dim); font-size: 11.5px;">rule.scm.c_range</code> — 0.10 ≤ C ≤ 0.25</span>
+        <span class="pill good" style="font-size: 10px; margin-left: auto;">✓ HARD</span>
+      </div>
+      <div class="row" style="font-size: 12px;">
+        <span class="k">[1]</span>
+        <span class="pill rule">rule</span>
+        <span><code style="color: var(--text-dim); font-size: 11.5px;">rule.scm.priority_range</code> — 1 ≤ priority ≤ 5</span>
+        <span class="pill warn" style="font-size: 10px; margin-left: auto;">미확정</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <h3>Anchor Bindings · 4 · ⚠ 2 unconfirmed → <button onclick="setMode('split')" style="font-size: 11px;">↕ Split mode 로 매핑</button></h3>
+      <div class="param-row">
+        <span class="k">literal:200</span>
+        <span><span class="path-token">RushOrder.validate:8</span> → <span class="path-token">params[0]<span class="subtype-cast">&lt;RushOrder&gt;</span>.spec.diameter.range[1]</span></span>
+        <span class="pill good" style="font-size: 10px;">✓</span>
+      </div>
+      <div class="param-row" style="border-left: 2px solid var(--warn); padding-left: 8px;">
+        <span class="k">branch</span>
+        <span><span class="path-token">if (latest.C &gt; 0.25)</span> → <em style="color: var(--warn);">미확정</em></span>
+        <button class="primary" style="font-size: 11px;" onclick="setMode('split')">매핑</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- SPLIT mode — Java body / Action card 동시 (V2 차용) -->
+  <div class="main-body" id="body-split" style="display: none; padding: 0;">
+    <div class="split-wrap">
+      <div class="split-pane top">
+        <h3>Java 본체 <span class="pill" style="font-size: 9.5px; color: var(--text-faint);">RushOrder.java:5-15</span> · 클릭하여 매핑</h3>
+        <pre class="code-snip">@Override
+public ValidationResult validate() {
+  ChemComposition latest = comps.get(comps.size()-1);
+  if (latest.C &lt; <span class="hi">0.10</span> || latest.C &gt; <span class="hi">0.25</span>)
+    return fail("C 함량 위반");
+  if (priority &lt; <span class="hi">1</span> || priority &gt; <span class="hi">5</span>)
+    return fail("우선도 범위");
+  if (spec.diameter &gt; <span class="picked">200.0</span>)  // ← 매핑 중
+    return fail("긴급주문 직경 한도");
+  return ok();
+}</pre>
+        <div class="anchor-tip">
+          <strong style="color: var(--accent);">📍</strong>
+          <span><code style="font-size: 11.5px;">literal:200.0</code> →
+          <span class="path-token">params[0]<span class="subtype-cast">&lt;RushOrder&gt;</span>.spec.diameter.range[1]</span>
+          </span>
+          <span class="pill good" style="font-size: 10px; margin-left: auto;">AI 84%</span>
+          <button class="primary" style="font-size: 11px;">✓ 확정</button>
+        </div>
+      </div>
+      <div class="split-pane">
+        <h3>Action 카드 — 매핑 슬롯</h3>
+        <div class="section" style="margin: 0;">
+          <div class="row" style="margin-bottom: 8px;">
+            <strong style="font-size: 13px;">주문 검증</strong>
+            <span class="pill action">pure_function</span>
+            <span class="pill warn" style="margin-left: auto;">SIGNATURE_LOCKED ●●●○○○</span>
+          </div>
+          <div class="param-row">
+            <span class="k">params[0]</span>
+            <span><strong>주문</strong> <span class="pill domain">term.scm.order</span></span>
+            <span class="pill good" style="font-size: 10px;">✓</span>
+          </div>
+          <div class="param-row" style="background: rgba(56,189,248,0.06); border: 1px solid var(--accent);">
+            <span class="k">spec.diameter.range[1]</span>
+            <span style="color: var(--accent);">← 위 코드 literal:200.0 매핑 중</span>
+            <button class="primary" style="font-size: 11px;">✓</button>
+          </div>
+          <div class="param-row">
+            <span class="k">priority.range</span>
+            <span style="color: var(--text-dim);">literal:1, 5 ✓</span>
+            <span class="pill good" style="font-size: 10px;">✓</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- RIGHT — V1 4탭 + resize handle + expand 버튼 -->
+<aside class="right">
+  <div class="right-resize" id="right-resize"></div>
+  <div class="right-tabs">
+    <button class="active">📄 코드</button>
+    <button>📖 매뉴얼</button>
+    <button>📞 호출지점</button>
+    <button>🌊 영향</button>
+  </div>
+  <div class="right-actions">
+    <button onclick="setMode('split')" class="expand-to-split">↕ Split mode 로 (코드 메인 영역에서)</button>
+    <span class="spacer" style="flex: 1;"></span>
+    <button title="우측 패널 너비 (드래그)">↔</button>
+    <button title="별창">⤢</button>
+  </div>
+  <div class="right-content">
+    <div class="ctx-block">
+      <h4>RushOrder.validate</h4>
+      <pre class="code-snip" style="font-size: 11px;">@Override
+public ValidationResult validate() {
+  ChemComposition latest = comps.get(comps.size()-1);
+  if (latest.C &lt; 0.10 || latest.C &gt; <span class="hi">0.25</span>)
+    return fail("C 함량 위반");
+  if (priority &lt; <span class="hi">1</span> || priority &gt; <span class="hi">5</span>)
+    return fail("우선도 범위");
+  if (spec.diameter &gt; <span class="hi">200.0</span>)
+    return fail("긴급주문 직경 한도");
+  return ok();
+}</pre>
+    </div>
+    <div class="ctx-block">
+      <h4>매뉴얼 (slab-design.md §3.2)</h4>
+      <p style="color: var(--text-dim);">긴급주문 (Rush Order) 의 직경 상한은 200.0mm. 표준주문 (240.0mm) 보다 엄격하게.</p>
+    </div>
+    <div class="ctx-block">
+      <h4>호출 사이트 (8)</h4>
+      <div style="color: var(--text-dim); font-size: 11px;">
+        <div>OrderService.process:42 ← RushOrder</div>
+        <div>OrderService.process:48 ← StandardOrder</div>
+        <div>BatchValidator.runAll:120 <em style="color: var(--warn);">모호 (큐)</em></div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- GRAPH mode — full screen -->
+<div class="graph">
+  <div class="graph-toolbar">
+    <h3>🌐 그래프 — 주문_검증 의존</h3>
+    <div class="toggles">
+      <button class="primary" style="background: var(--panel-3); color: var(--accent); border-color: var(--accent);">Action 의존</button>
+      <button>Term 트리</button>
+      <button>Code 클래스</button>
+      <button>호출 chain</button>
+    </div>
+    <span class="spacer" style="flex: 1;"></span>
+    <input type="search" placeholder="🔍 노드 강조" style="width: 200px;" />
+    <button onclick="toggleGraphMode(false)">⨯ 닫기 (esc)</button>
+  </div>
+  <div class="graph-canvas" id="graph-canvas">
+    <!-- 노드 + 엣지 (mock) -->
+    <div class="graph-node action selected" style="left: 48%; top: 30%;">
+      <span class="pill action" style="font-size: 9.5px;">act</span> 주문_검증
+      <div style="font-size: 10px; color: var(--text-faint); margin-top: 2px;">SIGNATURE_LOCKED</div>
+    </div>
+
+    <div class="graph-node domain" style="left: 20%; top: 30%;">
+      <span class="pill domain" style="font-size: 9.5px;">T</span> 주문 (abstract)
+    </div>
+    <div class="graph-node domain" style="left: 8%; top: 50%;">
+      <span class="pill domain" style="font-size: 9.5px;">T</span> 긴급주문
+    </div>
+    <div class="graph-node domain" style="left: 8%; top: 65%;">
+      <span class="pill domain" style="font-size: 9.5px;">T</span> 표준주문
+    </div>
+    <div class="graph-node domain" style="left: 16%; top: 12%;">
+      <span class="pill domain" style="font-size: 9.5px;">T</span> Trackable (intf)
+    </div>
+
+    <div class="graph-node code" style="left: 70%; top: 18%;">
+      <span class="pill code" style="font-size: 9.5px;">M</span> RushOrder.validate
+    </div>
+    <div class="graph-node code" style="left: 70%; top: 42%;">
+      <span class="pill code" style="font-size: 9.5px;">M</span> StandardOrder.validate
+    </div>
+    <div class="graph-node code" style="left: 78%; top: 60%;">
+      <span class="pill code" style="font-size: 9.5px;">C</span> com.scm.RushOrder
+    </div>
+    <div class="graph-node" style="left: 35%; top: 65%; border-left-color: var(--rule-fg);">
+      <span class="pill rule" style="font-size: 9.5px;">R</span> rule.c_range
+    </div>
+    <div class="graph-node" style="left: 50%; top: 75%; border-left-color: var(--rule-fg);">
+      <span class="pill rule" style="font-size: 9.5px;">R</span> rule.priority_range
+    </div>
+
+    <!-- Mock 엣지 (svg 가 더 나은데 prototype 이라 단순 라인) -->
+    <svg style="position: absolute; inset: 0; pointer-events: none;" width="100%" height="100%">
+      <defs>
+        <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#818cf8" />
+        </marker>
+      </defs>
+      <!-- 주문_검증 → 주문 (declared_on) -->
+      <line x1="48%" y1="33%" x2="28%" y2="32%" stroke="#818cf8" stroke-width="1.5" marker-end="url(#arrow)" />
+      <text x="36%" y="30%" fill="#94a3b8" font-size="10">declared_on</text>
+      <!-- 주문 → 긴급주문 (extends 역방향) -->
+      <line x1="22%" y1="35%" x2="14%" y2="50%" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="0" marker-end="url(#arrow)" />
+      <text x="14%" y="44%" fill="#94a3b8" font-size="10">extended by</text>
+      <line x1="22%" y1="35%" x2="14%" y2="65%" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)" />
+      <!-- 주문 → Trackable (implements) -->
+      <line x1="22%" y1="30%" x2="22%" y2="18%" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arrow)" />
+      <text x="23%" y="24%" fill="#94a3b8" font-size="10">implements</text>
+      <!-- 주문_검증 → RushOrder.validate (realization) -->
+      <line x1="58%" y1="32%" x2="69%" y2="22%" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrow)" />
+      <text x="62%" y="22%" fill="#fb923c" font-size="10">realized_by &lt;RushOrder&gt;</text>
+      <!-- 주문_검증 → StandardOrder.validate -->
+      <line x1="58%" y1="34%" x2="69%" y2="44%" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrow)" />
+      <text x="62%" y="42%" fill="#fb923c" font-size="10">realized_by &lt;StandardOrder&gt;</text>
+      <!-- RushOrder.validate → com.scm.RushOrder -->
+      <line x1="76%" y1="22%" x2="80%" y2="60%" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2" />
+      <!-- 주문_검증 → rule.c_range (precondition) -->
+      <line x1="50%" y1="35%" x2="40%" y2="65%" stroke="#f472b6" stroke-width="1.5" marker-end="url(#arrow)" />
+      <text x="42%" y="52%" fill="#f472b6" font-size="10">precondition</text>
+      <!-- 주문_검증 → rule.priority_range -->
+      <line x1="52%" y1="36%" x2="54%" y2="75%" stroke="#f472b6" stroke-width="1.5" stroke-dasharray="3 3" marker-end="url(#arrow)" />
+      <text x="55%" y="60%" fill="#f59e0b" font-size="10">precondition (미확정)</text>
+    </svg>
+
+    <div class="graph-legend">
+      <div style="font-weight: 600; color: var(--text-dim); margin-bottom: 4px;">Legend</div>
+      <div class="row"><span class="swatch action"></span><span>Action</span></div>
+      <div class="row"><span class="swatch domain"></span><span>Term (Domain)</span></div>
+      <div class="row"><span class="swatch code"></span><span>Code (Java)</span></div>
+      <div class="row"><span class="swatch" style="background: var(--rule-fg);"></span><span>Rule</span></div>
+      <hr style="margin: 4px 0;" />
+      <div class="row"><span class="swatch"></span><span>relation</span></div>
+      <div class="row"><span class="swatch dashed"></span><span>implements / dashed</span></div>
+    </div>
+  </div>
+</div>
+
+<footer class="statusbar">
+  <span class="verification">
+    <span class="pill bad" style="font-size: 9px;">U</span>16
+    <span class="pill warn" style="font-size: 9px;">D</span>18
+    <span class="pill" style="font-size: 9px;">SL</span>22
+    <span class="pill" style="font-size: 9px;">BA</span>47
+    <span class="pill good" style="font-size: 9px;">SV</span>31
+    <span class="pill good" style="font-size: 9px;">PR</span>8
+  </span>
+  <span>총 142 actions · BODY_ANCHORED+ <strong style="color: var(--good);">86</strong> (61%)</span>
+  <span class="spacer" style="flex: 1;"></span>
+  <span>Plugin: <span style="color: var(--text-faint);">simulation, change_pr, nl_impact (모두 unloaded)</span></span>
+</footer>
+
+</div>
+
+<!-- ⌘K palette -->
+<div class="cmdk-overlay" id="cmdk" onclick="if(event.target===this) closeCmdK()">
+  <div class="cmdk">
+    <input type="text" placeholder="검색 또는 명령 (esc로 닫기)" autofocus />
+    <div class="cmdk-list">
+      <div class="cmdk-section">최근</div>
+      <div class="cmdk-item sel">
+        <span class="kind"><span class="pill action" style="font-size: 9.5px;">action</span></span>
+        <span class="name">action.scm.order_validate</span>
+        <span class="meta">주문 검증</span>
+      </div>
+      <div class="cmdk-item">
+        <span class="kind"><span class="pill domain" style="font-size: 9.5px;">term</span></span>
+        <span class="name">term.scm.order</span>
+        <span class="meta">주문</span>
+      </div>
+      <div class="cmdk-item">
+        <span class="kind"><span class="pill code" style="font-size: 9.5px;">code</span></span>
+        <span class="name">com.scm.RushOrder</span>
+        <span class="meta">긴급주문</span>
+      </div>
+      <div class="cmdk-section">명령</div>
+      <div class="cmdk-item">
+        <span class="kind">⌘G</span>
+        <span class="name">그래프 모드</span>
+        <span class="meta">현재 선택의 의존 그래프</span>
+      </div>
+      <div class="cmdk-item">
+        <span class="kind">⌘S</span>
+        <span class="name">시뮬레이션 시작</span>
+        <span class="meta">SIGNATURE_LOCKED 이상 only</span>
+      </div>
+      <div class="cmdk-item">
+        <span class="kind">⌘Q</span>
+        <span class="name">큐 처리</span>
+        <span class="meta">23 미확정</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function setMode(mode) {
+  document.getElementById('mode-detail').classList.toggle('active', mode === 'detail');
+  document.getElementById('mode-split').classList.toggle('active', mode === 'split');
+  document.getElementById('body-detail').style.display = mode === 'detail' ? '' : 'none';
+  document.getElementById('body-split').style.display = mode === 'split' ? '' : 'none';
+}
+function toggleGraphMode(on) {
+  document.getElementById('shell').classList.toggle('graph-mode', on);
+}
+function openCmdK() { document.getElementById('cmdk').classList.add('show'); }
+function closeCmdK() { document.getElementById('cmdk').classList.remove('show'); }
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); openCmdK(); }
+  if (e.key === 'Escape') {
+    closeCmdK();
+    if (document.getElementById('shell').classList.contains('graph-mode')) toggleGraphMode(false);
+  }
+});
+
+// Resize handle for right pane
+(function() {
+  const handle = document.getElementById('right-resize');
+  const shell = document.getElementById('shell');
+  let dragging = false;
+  handle.addEventListener('mousedown', (e) => {
+    dragging = true; document.body.style.cursor = 'col-resize'; e.preventDefault();
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const w = window.innerWidth - e.clientX;
+    if (w < 250 || w > 700) return;
+    shell.style.setProperty('--right-w', w + 'px');
+  });
+  document.addEventListener('mouseup', () => { dragging = false; document.body.style.cursor = ''; });
+})();
+</script>
+
+</body>
+</html>

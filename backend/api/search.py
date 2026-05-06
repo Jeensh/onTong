@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from collections import deque
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.application.wiki.wiki_service import WikiService
 from backend.application.wiki.wiki_search import WikiSearchService
+from backend.application.agent.filter_compiler import (
+    compile_to_bm25_predicate,
+    compile_to_chroma_where,
+)
+from backend.application.wiki.wiki_indexer import _extract_path_depths
 from backend.core.schemas import (
     BacklinkMap, SearchIndexEntry, TagIndex,
     HybridSearchResult, RelatedDocResult, GraphNode, GraphEdge, GraphData,
@@ -56,6 +62,7 @@ _wiki_service: WikiService | None = None
 _search_service: WikiSearchService | None = None
 _chroma: ChromaWrapper | None = None
 _confidence_service = None
+_meta_index = None
 
 
 def init(
@@ -63,12 +70,45 @@ def init(
     search_service: WikiSearchService,
     chroma: ChromaWrapper | None = None,
     confidence_service=None,
+    meta_index=None,
 ) -> None:
-    global _wiki_service, _search_service, _chroma, _confidence_service
+    global _wiki_service, _search_service, _chroma, _confidence_service, _meta_index
     _wiki_service = wiki_service
     _search_service = search_service
     _chroma = chroma
     _confidence_service = confidence_service
+    _meta_index = meta_index
+
+
+def _parse_filters(filters_raw: str | None) -> dict | None:
+    """Parse JSON-encoded FilterSpec from query param. Returns None if empty/invalid."""
+    if not filters_raw:
+        return None
+    try:
+        parsed = json.loads(filters_raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail=f"filters JSON 파싱 실패: {exc}")
+    if not isinstance(parsed, dict):
+        raise HTTPException(status_code=400, detail="filters는 객체여야 합니다")
+    return parsed or None
+
+
+def _build_bm25_predicate(spec: dict | None):
+    """Build BM25 filter_predicate closure that injects path_depth_* per doc."""
+    if not spec:
+        return None
+    compiled = compile_to_bm25_predicate(spec)
+    if not compiled:
+        return None
+
+    def _predicate(bm25_doc):
+        entry: dict = {}
+        if _meta_index is not None:
+            entry = dict(_meta_index.get_file_entry(bm25_doc.file_path) or {})
+        entry.update(_extract_path_depths(bm25_doc.file_path))
+        return compiled(entry)
+
+    return _predicate
 
 
 def _wiki() -> WikiService:
@@ -124,9 +164,12 @@ async def get_tags():
 async def quick_search(
     q: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(20, ge=1, le=50, description="Number of results"),
+    filters: str | None = Query(None, description="JSON-encoded FilterSpec"),
 ):
     """Fast BM25-only keyword search (no vector search). Used for real-time search UI."""
-    bm25_results = bm25_index.search(q, n_results=limit)
+    spec = _parse_filters(filters)
+    predicate = _build_bm25_predicate(spec)
+    bm25_results = bm25_index.search(q, n_results=limit, filter_predicate=predicate)
     if not bm25_results:
         return []
 
@@ -178,14 +221,23 @@ async def resolve_link(
 async def hybrid_search(
     q: str = Query(..., min_length=1, description="Search query"),
     n: int = Query(10, ge=1, le=50, description="Number of results"),
+    filters: str | None = Query(None, description="JSON-encoded FilterSpec"),
 ):
     """User-facing hybrid search combining BM25 + vector similarity.
     Vector and BM25 searches run in parallel for lower latency."""
+
+    spec = _parse_filters(filters)
+    chroma_where = compile_to_chroma_where(spec) if spec else None
+    bm25_predicate = _build_bm25_predicate(spec)
 
     async def _vector_search() -> dict:
         if not _chroma:
             return {}
         try:
+            if chroma_where:
+                return await asyncio.to_thread(
+                    _chroma.query_with_filter, q, n, chroma_where
+                )
             return await asyncio.to_thread(_chroma.query, q, n_results=n)
         except Exception as e:
             logger.warning(f"Vector search failed: {e}")
@@ -193,7 +245,7 @@ async def hybrid_search(
 
     # Run vector (I/O bound) and BM25 (CPU bound) in parallel
     vector_task = asyncio.create_task(_vector_search())
-    bm25_results = bm25_index.search(q, n_results=n)  # CPU-bound, fast (~5ms)
+    bm25_results = bm25_index.search(q, n_results=n, filter_predicate=bm25_predicate)
     vector_results = await vector_task
 
     # Merge via RRF

@@ -4,27 +4,10 @@ Uses importlib.reload for cross-test compatibility.
 """
 
 import importlib
-import sys
-import types
-from pathlib import Path
-
-
-def _ensure_stubs():
-    for mod_name in [
-        "chromadb", "chromadb.config", "pydantic_ai", "pydantic_ai.models",
-        "pydantic_ai.models.openai", "pydantic_settings",
-        "litellm", "httpx",
-    ]:
-        if mod_name not in sys.modules:
-            sys.modules[mod_name] = types.ModuleType(mod_name)
-    _ps = sys.modules["pydantic_settings"]
-    if not hasattr(_ps, "BaseSettings"):
-        _ps.BaseSettings = type("BaseSettings", (), {"model_config": {}})
 
 
 def _reload_modules():
     """Reload agent modules to get fresh class definitions."""
-    _ensure_stubs()
     import backend.core.session as _sess
     import backend.application.agent.skill as _skill
     import backend.application.agent.context as _ctx

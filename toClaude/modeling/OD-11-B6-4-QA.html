@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>OD-11-B6-4 CrossFileEnricher — 스펙 확정 Q&amp;A</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161a22;
+    --panel-2: #1d222d;
+    --border: #2a3142;
+    --text: #e6e8ee;
+    --muted: #9aa3b2;
+    --accent: #6ea8fe;
+    --accent-2: #7ee787;
+    --warn: #f2b35b;
+    --danger: #ff6b6b;
+    --code-bg: #0b0d13;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, "SF Pro Display", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; line-height: 1.65; }
+  body { padding: 40px 24px 120px; }
+  .container { max-width: 1080px; margin: 0 auto; }
+
+  h1 { font-size: 32px; margin: 0 0 8px; letter-spacing: -0.3px; }
+  h2 { font-size: 22px; margin: 48px 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); letter-spacing: -0.2px; }
+  h3 { font-size: 17px; margin: 24px 0 10px; color: var(--text); }
+  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+
+  code.inline { background: var(--code-bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; font-size: 13px; color: #c9d1d9; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; overflow: auto; font-size: 12.5px; line-height: 1.55; color: #c9d1d9; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  .lead { font-size: 15.5px; color: #cfd3db; background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--accent); padding: 16px 20px; border-radius: 10px; margin: 18px 0; }
+  .muted { color: var(--muted); }
+
+  .toc { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; font-size: 14px; margin: 20px 0 36px; }
+  .toc h4 { margin: 0 0 10px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .toc ol { margin: 6px 0 0 20px; padding: 0; }
+  .toc li { margin: 4px 0; }
+  .toc a { color: var(--text); text-decoration: none; }
+  .toc a:hover { color: var(--accent); }
+  .toc .cat { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 12px 0 4px; }
+
+  .q-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 22px 26px; margin: 20px 0; }
+  .q-card .q-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .q-card .q-num { background: var(--accent); color: #0b0d13; font-weight: 700; border-radius: 6px; padding: 3px 10px; font-size: 13px; }
+  .q-card .q-cat { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  .q-card .q-title { font-size: 17px; font-weight: 700; color: var(--text); margin: 0 0 10px; }
+  .q-card .context { font-size: 14px; color: #cfd3db; margin: 0 0 14px; }
+
+  .options { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+  .option { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 14px; }
+  .option .opt-label { display: inline-block; font-weight: 700; color: var(--muted); margin-right: 8px; min-width: 20px; }
+  .option.recommended { border-color: var(--accent-2); border-width: 2px; background: rgba(126, 231, 135, 0.08); }
+  .option.recommended .opt-label { color: var(--accent-2); }
+  .option.recommended::after { content: "★ 추천"; float: right; font-size: 12px; color: var(--accent-2); font-weight: 700; }
+
+  .rationale { background: var(--code-bg); border-left: 3px solid var(--accent); padding: 10px 16px; margin-top: 14px; font-size: 13.5px; color: #cfd3db; border-radius: 0 6px 6px 0; }
+  .rationale .r-label { color: var(--accent); font-weight: 700; margin-right: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .aux { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin: 12px 0; font-size: 14px; }
+  .aux .aux-k { color: var(--accent-2); font-weight: 700; }
+
+  .decision { background: var(--panel); border: 2px solid var(--accent-2); border-radius: 12px; padding: 20px 26px; margin: 40px 0 20px; text-align: center; }
+  .decision h3 { margin: 0 0 10px; color: var(--accent-2); font-size: 18px; }
+  .decision p { margin: 6px 0; color: #cfd3db; font-size: 14px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #1d222d; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  tr:last-child td { border-bottom: none; }
+
+  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-right: 4px; font-weight: 600; }
+  .tag.code { background: rgba(110, 168, 254, 0.15); color: var(--accent); border: 1px solid rgba(110, 168, 254, 0.4); }
+  .tag.db { background: rgba(242, 179, 91, 0.15); color: var(--warn); border: 1px solid rgba(242, 179, 91, 0.4); }
+  .tag.spring { background: rgba(126, 231, 135, 0.15); color: var(--accent-2); border: 1px solid rgba(126, 231, 135, 0.4); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>OD-11-B6-4 <code class="inline">CrossFileEnricher</code> — 스펙 확정 Q&amp;A</h1>
+<div class="subtitle">2026-04-19 · B6 동적 매핑 엔리처 repo-level 후처리 · 10 가지 의사결정</div>
+
+<div class="lead">
+  B6-1/2/3 이 <strong>per-file marker</strong> 를 남겼고, B6-4 는 <strong>repo 전체 맥락</strong>에서 이 marker 들을 구체 엣지로 승격합니다.
+  구현 전에 확정해야 할 10 가지 결정 사항입니다. 각 항목에 ★ 추천안을 표시했습니다 — "이대로 진행" 또는 수정할 번호만 찍어 주세요.
+</div>
+
+<div class="toc">
+  <h4>목차</h4>
+  <span class="cat">§ 입출력 계약</span>
+  <ol>
+    <li><a href="#q1">Q1 · <code class="inline">enrich_repo()</code> 반환 방식</a></li>
+    <li><a href="#q2">Q2 · JPA annotation 추출 주체</a></li>
+    <li><a href="#q3">Q3 · <code class="inline">class_index</code> / <code class="inline">field_index</code> 빌드</a></li>
+  </ol>
+  <span class="cat">§ MapStruct implicit finalize</span>
+  <ol start="4">
+    <li><a href="#q4">Q4 · FIELD 교집합 기준</a></li>
+    <li><a href="#q5">Q5 · 명시 <code class="inline">@Mapping</code> vs implicit 중복 처리</a></li>
+  </ol>
+  <span class="cat">§ BeanUtils field intersection</span>
+  <ol start="6">
+    <li><a href="#q6">Q6 · 미해소 타입 fallback</a></li>
+  </ol>
+  <span class="cat">§ NativeSQL column → field</span>
+  <ol start="7">
+    <li><a href="#q7">Q7 · DB_TABLE / DB_COLUMN qn 컨벤션</a></li>
+    <li><a href="#q8">Q8 · <code class="inline">@Column</code> 미명시 필드 fallback</a></li>
+    <li><a href="#q9">Q9 · <code class="inline">READS_TABLE</code> + <code class="inline">READS</code> 엣지 병존</a></li>
+  </ol>
+  <span class="cat">§ DB_TABLE dedup &amp; 저장</span>
+  <ol start="10">
+    <li><a href="#q10">Q10 · DB_TABLE / DB_COLUMN entity 저장 위치</a></li>
+  </ol>
+  <span class="cat">§ 보조 결정</span>
+  <ol start="11">
+    <li><a href="#aux">비평만 — 테스트 픽스처, dedup, <code class="inline">via_methods</code>, JPQL entity→table</a></li>
+  </ol>
+</div>
+
+<!-- ============================================================ -->
+<h2>배경 — B6-1/2/3 이 남긴 marker 요약</h2>
+
+<p class="muted">B6-4 가 소비할 3 가지 marker 의 현재 형식입니다. 이 형식은 이미 구현되어 있어 변경 비용이 있습니다.</p>
+
+<h3><span class="tag spring">B6-1</span> MapStruct implicit marker</h3>
+<pre><code>METHOD.attributes["mapstruct_implicit_fields"] = [
+    {
+        "mapper_fqn": "com.x.mapper.OrderMapper",
+        "method": "toDto",
+        "src_type": "com.x.model.OrderReq",   # 미해소 시 simple name
+        "dst_type": "com.x.dto.OrderDto",
+        "line": 42,
+    },
+    ...
+]</code></pre>
+<p class="muted">명시 <code class="inline">@Mapping</code> 이 없는 매퍼 메서드만 marker 를 받음. <code class="inline">default</code> / <code class="inline">@Named</code> 메서드 제외.</p>
+
+<h3><span class="tag code">B6-2</span> BeanUtils call marker</h3>
+<pre><code>METHOD/CONSTRUCTOR.attributes["beanutils_calls"] = [
+    {
+        "library": "spring" | "apache" | "modelmapper" | "unknown",
+        "src_type": "com.x.model.OrderReq",   # 미해소 시 simple name
+        "dst_type": "com.x.dto.OrderDto",
+        "ignore": ["password"],               # Spring copyProperties 3rd+ arg
+        "confidence": 0.7 | 0.5,              # import 해소 실패 시 0.5
+        "line": 42,
+    },
+    ...
+]</code></pre>
+
+<h3><span class="tag db">B6-3</span> NativeSQL relation (이미 엣지)</h3>
+<pre><code>CodeRelation(
+    kind="reads_table" | "writes_table",
+    source="com.x.repo.OrderRepo.findByCustomer",
+    target="orders",                           # lowercase table
+    attributes={
+        "columns": ["id", "customer_id"],      # ["<dynamic>"] 가능
+        "confidence": 1.0,                     # dynamic=0.3
+        "raw_sql": "SELECT ...",
+        "dialect": "sql" | "jpql",
+        "multi_statement_warning"?: True,
+    },
+)</code></pre>
+<p class="muted">DB_TABLE 노드는 B6-3 에서 emit 하지 않음 (B6-4 가 dedup 해서 한 번만 emit). JPQL 의 경우 <code class="inline">target</code> 이 entity 이름 lowercase (예: <code class="inline">order</code>) 이므로 B6-4 가 table 로 해소해야 함.</p>
+
+<!-- ============================================================ -->
+<h2>§ 입출력 계약</h2>
+
+<div class="q-card" id="q1">
+  <div class="q-header">
+    <span class="q-num">Q1</span>
+    <span class="q-cat">입출력 계약</span>
+  </div>
+  <p class="q-title"><code class="inline">enrich_repo()</code> 반환 방식 — in-place vs 새 리스트</p>
+  <p class="context">B6-4 가 새 엣지 / 엔티티를 어디에 넣을지 정합니다. 100K 파일 규모에서 메모리 복사 비용이 차이가 큽니다.</p>
+
+  <div class="options">
+    <div class="option recommended">
+      <span class="opt-label">A</span>
+      <strong>in-place 수정</strong> — 기존 <code class="inline">ParseResult.entities / relations</code> 에 직접 append.
+    </div>
+    <div class="option">
+      <span class="opt-label">B</span>
+      새 ParseResult 리스트 생성 (불변).
+    </div>
+  </div>
+  <div class="rationale">
+    <span class="r-label">WHY</span>
+    100K 규모에서 메모리 copy 회피, B9 JavaParser 통합 단순. 테스트는 before/after snapshot 으로 비교해 mutation 검증.
+  </div>
+</div>
+
+<div class="q-card" id="q2">
+  <div class="q-header">
+    <span class="q-num">Q2</span>
+    <span class="q-cat">입출력 계약</span>
+  </div>
+  <p class="q-title">JPA annotation (<code class="inline">@Entity</code> / <code class="inline">@Table</code> / <code class="inline">@Column</code>) 추출 주체</p>
+  <p class="context">B6-4 는 JPA entity 정보를 알아야 SQL column 을 Java field 로 해소할 수 있습니다. 이 정보를 누가 AST 에서 뽑아줄지 결정합니다.</p>
+
+  <div class="options">
+    <div class="option">
+      <span class="opt-label">A</span>
+      <code class="inline">JavaParser</code> 본체 확장 — CLASS / FIELD entity 의 <code class="inline">attributes</code> 에 <code class="inline">jpa_table</code> / <code class="inline">jpa_column</code> 담아 배포.
+    </div>
+    <div class="option">
+      <span class="opt-label">B</span>
+      B6-4 내부에서 tree 재스캔.
+    </div>
+    <div class="option recommended">
+      <span class="opt-label">C</span>
+      별도 <code class="inline">JpaAnnotationExtractor</code> 모듈 — <code class="inline">cross_file_enricher</code> 만 소비.
+    </div>
+  </div>
+  <div class="rationale">
+    <span class="r-label">WHY</span>
+    JavaParser / analyzer 계층을 건드리지 않고 B6-4 전용 헬퍼로 격리. B5-7 <code class="inline">JpaAnalyzer</code> 가 나중에 들어와도 책임 중복 없음.
+  </div>
+</div>
+
+<div class="q-card" id="q3">
+  <div class="q-header">
+    <span class="q-num">Q3</span>
+    <span class="q-cat">입출력 계약</span>
+  </div>
+  <p class="q-title"><code class="inline">class_index</code> / <code class="inline">field_index</code> 를 누가 빌드?</p>
+  <p class="context">스펙 §6.1 은 이 두 dict 를 <em>파라미터로 주입</em>한다고만 명시. 실제로 빌드하는 주체를 정해야 합니다.</p>
+
+  <pre><code>def enrich_repo(
+    parse_results: list[ParseResult],
+    class_index: dict[str, CodeEntity],        # FQN → CLASS/INTERFACE/ENUM
+    field_index: dict[str, list[CodeEntity]],  # class_fqn → [FIELD, ...]
+) -> list[ParseResult]</code></pre>
+
+  <div class="options">
+    <div class="option recommended">
+      <span class="opt-label">★</span>
+      <code class="inline">cross_file_enricher.build_indices(parse_results) -> (class_index, field_index)</code> 헬퍼를 B6-4 모듈에 노출.
+      운영 통합 코드는 이 헬퍼 호출, 테스트는 합성 index 를 직접 주입. JPA info 는 <code class="inline">JpaAnnotationExtractor</code> 가 entity.attributes 에 merge 한 뒤 전달.
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2>§ MapStruct implicit finalize</h2>
+
+<div class="q-card" id="q4">
+  <div class="q-header">
+    <span class="q-num">Q4</span>
+    <span class="q-cat">MapStruct</span>
+  </div>
+  <p class="q-title">src ↔ dst FIELD 교집합 기준</p>
+  <p class="context">
+    예: <code class="inline">OrderReq → OrderDto</code> 매퍼 — 양쪽에 <code class="inline">id (Long)</code>, <code class="inline">total (BigDecimal)</code> 이 있으면 어디까지 교집합으로 볼지?
+  </p>
+
+  <div class="options">
+    <div class="option recommended">
+      <span class="opt-label">A</span>
+      <strong>이름만 같으면</strong> 교집합.
+    </div>
+    <div class="option">
+      <span class="opt-label">B</span>
+      이름 + 타입 둘 다 같아야.
+    </div>
+    <div class="option">
+      <span class="opt-label">C</span>
+      이름 같고 타입 호환 (<code class="inline">Long ↔ long</code>, <code class="inline">BigDecimal ↔ double</code> 등).
+    </div>
+  </div>
+  <div class="rationale">
+    <span class="r-label">WHY</span>
+    MapStruct 실제 동작이 타입 mismatch 를 auto-generated 변환 메서드로 해결 — 이름 기반이면 실제 사용 패턴을 거의 다 커버.
+    <code class="inline">implicit: true</code> 마커로 명시 엣지와 구분해 B7 런타임에서 정밀 검증 가능.
+  </div>
+</div>
+
+<div class="q-card" id="q5">
+  <div class="q-header">
+    <span class="q-num">Q5</span>
+    <span class="q-cat">MapStruct</span>
+  </div>
+  <p class="q-title">명시 <code class="inline">@Mapping</code> 과 implicit 의 중복 처리</p>
+  <p class="context">
+    B6-1 이 이미 <code class="inline">@Mapping(target="id")</code> 을 <code class="inline">PROPAGATES_TO(confidence=1.0)</code> 엣지로 emit.
+    B6-4 가 같은 메서드의 implicit 을 돌릴 때, <code class="inline">id</code> 필드가 양쪽 DTO 에 존재하면 중복 엣지가 생깁니다.
+  </p>
+
+  <div class="options">
+    <div class="option recommended">
+      <span class="opt-label">★</span>
+      B6-4 는 각 mapper method 단위로 B6-1 엣지의 target 필드셋 (<code class="inline">&lt;DstFqn&gt;.&lt;field&gt;</code>) 을 수집 → implicit 후보에서 <strong>제외</strong>.
+    </div>
+  </div>
+  <div class="rationale">
+    <span class="r-label">WHY</span>
+    같은 메서드 맥락에서 명시 &gt; implicit 우선. 엣지 중복 방지로 Impact BFS 결과 깨끗.
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2>§ BeanUtils field intersection</h2>
+
+<div class="q-card" id="q6">
+  <div class="q-header">
+    <span class="q-num">Q6</span>
+    <span class="q-cat">BeanUtils</span>
+  </div>
+  <p class="q-title">미해소 타입 fallback</p>
+  <p class="context">
+    B6-2 가 <code class="inline">src_type="OrderDto"</code> (simple name, import 해소 실패) 만 남긴 경우.
+    class_index 에서 simple name suffix 매칭 시 FQN 후보가 여러 개 나올 수 있습니다 (예: <code class="inline">com.x.OrderDto</code>, <code class="inline">com.y.OrderDto</code>).
+  </p>
+
+  <div class="options">
+    <div class="option recommended">
+      <span class="opt-label">★</span>
+      후보 1개 = 사용 (confidence 그대로). 후보 ≥2 = <strong>skip + METHOD marker 에 <code class="inline">ambiguous_types=[candidates]</code> 부착</strong>.
+    </div>
+  </div>
+  <div class="rationale">
+    <span class="r-label">WHY</span>
+    조기 emit 보다 명확한 실패 신호가 B9 회귀에서 유리. 모호 타입은 B7 런타임 / 사람 주석 레이어에서 확정.
+    <br>
+    <strong>Rename 정책:</strong> Round 1 은 same-name only (Spring / Apache / ModelMapper 공통 기본 동작).
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2>§ NativeSQL column → field</h2>
+
+<div class="q-card" id="q7">
+  <div class="q-header">
+    <span class="q-num">Q7</span>
+    <span class="q-cat">NativeSQL</span>
+  </div>
+  <p class="q-title">DB_TABLE / DB_COLUMN qn (qualified_name) 컨벤션</p>
+  <p class="context">
+    Round 1 은 single-schema 전제이나, qn 포맷을 미리 고정해야 dedup / Impact BFS 가 일관됩니다.
+  </p>
+
+  <div class="options">
+    <div class="option recommended">
+      <span class="opt-label">★</span>
+      <table>
+        <tr><th>노드</th><th>qn 포맷</th><th>예</th></tr>
+        <tr><td>DB_TABLE</td><td><code class="inline">&lt;table&gt;</code> (lowercase)</td><td><code class="inline">orders</code></td></tr>
+        <tr><td>DB_COLUMN</td><td><code class="inline">&lt;table&gt;.&lt;column&gt;</code> (lowercase)</td><td><code class="inline">orders.customer_id</code></td></tr>
+      </table>
+      <code class="inline">&lt;dynamic&gt;</code> target / columns → 노드 생성 <strong>skip</strong> (엣지 marker 만 유지).
+    </div>
+  </div>
+</div>
+
+<div class="q-card" id="q8">
+  <div class="q-header">
+    <span class="q-num">Q8</span>
+    <span class="q-cat">NativeSQL</span>
+  </div>
+  <p class="q-title">JPA <code class="inline">@Column(name=...)</code> 미명시 필드 fallback</p>
+  <p class="context">
+    <code class="inline">private Long customerId;</code> 에 <code class="inline">@Column</code> 이 없는 경우 — 실제 컬럼은 Hibernate naming strategy (<code class="inline">ImplicitNamingStrategyJpaCompliantImpl</code> 등) 설정에 따라 <code class="inline">customer_id</code> 또는 <code class="inline">customerid</code> 또는 <code class="inline">customerId</code> 일 수 있습니다.
+  </p>
+
+  <div class="options">
+    <div class="option">
+      <span class="opt-label">A</span>
+      camelCase → snake_case 추측 (<code class="inline">customerId → customer_id</code>), confidence 0.6 으로 emit.
+    </div>
+    <div class="option recommended">
+      <span class="opt-label">B</span>
+      <strong>명시된 컬럼만 매칭, 미명시 필드는 skip</strong> (Round 1 단순화).
+    </div>
+  </div>
+  <div class="rationale">
+    <span class="r-label">WHY</span>
+    naming strategy 는 설정 의존이라 오탐 위험. Round 1 은 <code class="inline">@Column(name=...)</code> 명시만 신뢰 — B9 Slab 엔진 실 데이터 보고 fallback 필요성 재결정.
+  </div>
+</div>
+
+<div class="q-card" id="q9">
+  <div class="q-header">
+    <span class="q-num">Q9</span>
+    <span class="q-cat">NativeSQL</span>
+  </div>
+  <p class="q-title"><code class="inline">READS_TABLE</code> + <code class="inline">READS</code> 엣지 병존 여부</p>
+  <p class="context">
+    B6-3 이 이미 <code class="inline">READS_TABLE</code> (method → table, columns 속성 내장) 을 emit.
+    B6-4 는 <code class="inline">READS</code> (method → column) 을 추가해야 합니다. 원래 엣지를 지울지 / 남길지?
+  </p>
+
+  <div class="options">
+    <div class="option">
+      <span class="opt-label">A</span>
+      교체 — <code class="inline">READS_TABLE</code> 삭제 후 <code class="inline">READS</code> 엣지만 남김.
+    </div>
+    <div class="option recommended">
+      <span class="opt-label">B</span>
+      <strong>병존</strong> — <code class="inline">READS_TABLE</code> 유지 + <code class="inline">READS</code> 추가.
+    </div>
+  </div>
+  <div class="rationale">
+    <span class="r-label">WHY</span>
+    Impact BFS 쿼리가 table-coarse (어느 테이블 건드리나) / column-fine (어느 컬럼) 둘 다 자주 필요.
+    컬럼 해소가 부분적 (JPA entity 가 아직 없거나 일부 컬럼만 명시) 이어도 table 레벨은 항상 유효 — <code class="inline">&lt;dynamic&gt;</code> SQL 도 table 엣지는 유의미.
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2>§ DB_TABLE dedup &amp; 저장</h2>
+
+<div class="q-card" id="q10">
+  <div class="q-header">
+    <span class="q-num">Q10</span>
+    <span class="q-cat">저장 위치</span>
+  </div>
+  <p class="q-title">DB_TABLE / DB_COLUMN entity 를 어느 ParseResult 에 부착?</p>
+  <p class="context">
+    여러 파일이 같은 테이블 <code class="inline">orders</code> 를 참조 → DB_TABLE entity 는 한 번만 emit.
+    반환 타입은 <code class="inline">list[ParseResult]</code> 로 고정되어 있으니 저장 위치를 정해야 합니다.
+  </p>
+
+  <div class="options">
+    <div class="option">
+      <span class="opt-label">A</span>
+      첫 참조 ParseResult 에 부착.
+    </div>
+    <div class="option recommended">
+      <span class="opt-label">B</span>
+      <strong>새로운 synthetic <code class="inline">ParseResult(file_path="&lt;db_schema&gt;", ...)</code> 를 리스트 끝에 추가</strong>.
+      PROPAGATES_TO / READS / WRITES 엣지는 각 caller ParseResult 에 부착 (source 가 그 파일의 METHOD 이므로).
+    </div>
+    <div class="option">
+      <span class="opt-label">C</span>
+      공유 리스트 반환 튜플로 분리 — 스펙 §6.1 시그니처 변경 필요.
+    </div>
+  </div>
+  <div class="rationale">
+    <span class="r-label">WHY</span>
+    (A) 는 "왜 이 파일이 DB_TABLE 을 emit 했지?" 역추적이 어려움. (C) 는 시그니처 변경 비용.
+    (B) 는 file_path 가 <code class="inline">&lt;db_schema&gt;</code> 로 "cross-file 산출물" 을 명시 — graph_writer 가 그대로 처리 가능.
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="aux">§ 보조 결정 (추천 그대로, 비평만)</h2>
+
+<p class="muted">개별 옵션이 없거나 자명한 결정들. 틀린 게 있으면 지적해 주세요.</p>
+
+<div class="aux">
+  <span class="aux-k">테스트 픽스처</span> — 합성 <code class="inline">ParseResult</code> + 합성 <code class="inline">class_index</code> 로 직접 구성 (JavaParser 실제 호출 최소화). 통합 케이스 1~2개만 실제 JavaParser + JpaAnnotationExtractor 전체 경로 태우기.
+</div>
+
+<div class="aux">
+  <span class="aux-k">중복 엣지 dedup</span> — <code class="inline">(kind, source, target)</code> 튜플로 dedup, <code class="inline">confidence = max(duplicates)</code>. attributes 는 first-wins 또는 merge 여부는 케이스별.
+</div>
+
+<div class="aux">
+  <span class="aux-k"><code class="inline">via_methods</code> 컨벤션</span>
+  <ul>
+    <li>BeanUtils : caller METHOD / CONSTRUCTOR FQN 1개 (호출 지점).</li>
+    <li>MapStruct implicit : <code class="inline">&lt;MapperFqn&gt;.&lt;method&gt;</code> (B6-1 명시 엣지와 동일 컨벤션).</li>
+  </ul>
+</div>
+
+<div class="aux">
+  <span class="aux-k">JPQL entity → table 해소</span>
+  <ol>
+    <li><code class="inline">@Entity(name="Order")</code> 명시 우선 (lowercase 비교).</li>
+    <li>없으면 클래스 simple name lowercase 매칭 (<code class="inline">Order</code> → <code class="inline">order</code>).</li>
+    <li>클래스에 <code class="inline">@Table(name="orders")</code> 있으면 table name 으로 최종 치환 — 없으면 entity name 그대로 사용.</li>
+  </ol>
+</div>
+
+<div class="aux">
+  <span class="aux-k">confidence merge 정책</span> — 한 메서드가 BeanUtils 여러 번 호출하고 같은 (src, dst) 쌍이 중복되면 <code class="inline">(kind, source, target)</code> 로 dedup 후 <code class="inline">confidence = max</code>, <code class="inline">library</code> 는 첫 번째 기준.
+</div>
+
+<!-- ============================================================ -->
+<div class="decision">
+  <h3>✓ 확인 요청</h3>
+  <p>Q1 ~ Q10 중 <strong>수정할 항목만 번호로</strong> 찍어 주세요.</p>
+  <p>이슈 없음 = <strong>"이대로 진행"</strong> → 스펙을 <code class="inline">OD-11-B6-SPEC.md</code> §6 에 반영 후 TDD 착수 (<code class="inline">tests/test_cross_file_enricher.py</code> ~10 케이스).</p>
+</div>
+
+</div>
+</body>
+</html>

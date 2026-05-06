@@ -10,6 +10,7 @@ import logging
 import re
 import threading
 from dataclasses import dataclass, field
+from typing import Callable
 
 from rank_bm25 import BM25Okapi
 
@@ -103,14 +104,21 @@ class BM25Index:
             self._dirty = False
             logger.info(f"BM25 index rebuilt: {len(self._documents)} documents")
 
-    def search(self, query: str, n_results: int = 8) -> list[tuple[BM25Document, float]]:
+    def search(
+        self,
+        query: str,
+        n_results: int = 8,
+        filter_predicate: Callable[["BM25Document"], bool] | None = None,
+    ) -> list[tuple[BM25Document, float]]:
         """Search the BM25 index. Returns (doc, score) pairs sorted by score desc.
 
         Uses the current index snapshot — never blocks for rebuild.
         On first call with dirty index, does an immediate rebuild.
+
+        filter_predicate: optional callable(doc) -> bool applied after scoring.
+        Docs that fail the predicate are dropped before n_results slicing.
         """
         if self._dirty and self._bm25 is None:
-            # First-time rebuild (blocking only on cold start)
             self._rebuild()
 
         bm25 = self._bm25
@@ -126,12 +134,18 @@ class BM25Index:
 
         scores = bm25.get_scores(query_tokens)
 
-        # Pair with documents and sort by score
         scored = [(doc, float(score)) for doc, score in zip(docs_snapshot, scores)]
         scored.sort(key=lambda x: x[1], reverse=True)
 
-        # Filter zero-score results
-        results = [(doc, score) for doc, score in scored[:n_results] if score > 0]
+        results: list[tuple[BM25Document, float]] = []
+        for doc, score in scored:
+            if score <= 0:
+                break
+            if filter_predicate and not filter_predicate(doc):
+                continue
+            results.append((doc, score))
+            if len(results) >= n_results:
+                break
         return results
 
 

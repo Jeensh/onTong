@@ -52,12 +52,18 @@ from backend.application.graph.graph_builder import GraphBuilder
 from backend.application.skill.skill_loader import UserSkillLoader
 from backend.application.skill.skill_matcher import SkillMatcher
 from backend.infrastructure.events.event_bus import event_bus
-from backend.modeling.api import modeling as modeling_api
-from backend.simulation.api import simulation as simulation_api
-from backend.simulation.api.slab_agent import router as slab_agent_router
-from backend.simulation.api.custom_agent import router as custom_agent_router
-from backend.simulation.client.modeling_client import create_modeling_client
-from backend.simulation.client.config import use_mock as simulation_use_mock
+# 2026-05-01 clean slate: backend.modeling (Section 2) + backend.simulation (Section 3)
+# import 폐기. CORE Phase C2~C6 + AGENT A1~A4 에서 새 온톨로지 + agent 모델로 재구성.
+# C2~C5 완료 (2026-05-02): Code/Domain/Mapping Layer + Query API.
+from backend.api import authoring as authoring_api
+from backend.modeling.api import ontology_router as ontology_query_api
+from backend.modeling.api import graph_api as ontology_graph_api
+from backend.modeling.api import modules_api as ontology_modules_api
+from backend.modeling.api import perspective_api
+from backend.modeling.api import queue_actions_api
+from backend.modeling.api import recommend_api
+from backend.modeling.api import repo_import as repo_import_api
+from backend.modeling.persistence.database import bootstrap_database
 
 setup_logging(
     level=settings.log_level,
@@ -244,7 +250,7 @@ async def lifespan(app: FastAPI):
     # Wire up API modules
     graph_api.init(graph_store, graph_builder)
     wiki_api.init(wiki_service, confidence_service=confidence_svc, digest_service=digest_svc, feedback_tracker=feedback_tracker)
-    search_api.init(wiki_service, search_service, chroma, confidence_service=confidence_svc)
+    search_api.init(wiki_service, search_service, chroma, confidence_service=confidence_svc, meta_index=meta_index)
     approval_api.init(wiki_service)
     metadata_api.init(wiki_service, meta_index)
     # Initialize user-facing skill system
@@ -258,20 +264,23 @@ async def lifespan(app: FastAPI):
     persona_api.init(storage)
     conflict_api.init(wiki_service, conflict_svc)
 
-    # Initialize Section 2 (Modeling) with Neo4j
-    from backend.modeling.infrastructure.neo4j_client import Neo4jClient
-    try:
-        neo4j_client = Neo4jClient(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password)
-        neo4j_health = neo4j_client.health()
-        logger.info(f"Neo4j: {neo4j_health['status']}")
-        modeling_api.init(neo4j_client=neo4j_client)
-    except Exception as e:
-        logger.warning(f"Neo4j unavailable, modeling in limited mode: {e}")
-        modeling_api.init()
 
-    # Initialize Section 3 (Simulation) API
-    sim_client = create_modeling_client(use_mock=simulation_use_mock())
-    simulation_api.init(sim_client)
+    # 2026-05-02 C2~C5 — Ontology Core 시작 (SQLite bootstrap + Query API client init)
+    # ORM modules 를 import 해야 Base.metadata 에 등록됨
+    from backend.modeling.code_layer import orm as _code_orm  # noqa: F401
+    from backend.modeling.domain_layer import orm as _domain_orm  # noqa: F401
+    from backend.modeling.mapping_layer import orm as _mapping_orm  # noqa: F401
+    from backend.modeling.view_layer import orm as _view_orm  # noqa: F401
+    from backend.application.authoring import orm as _authoring_orm  # noqa: F401
+    bootstrap_database()
+    ontology_query_api.init()
+    logger.info("Ontology Core wired: Code/Domain/Mapping Layer + Query API")
+
+    # Authoring AI — interview-driven ontology authoring (B.5 prototype, 2026-05-05)
+    from backend.modeling.domain_layer.store import DomainLayerStore
+    authoring_api.init(business_term_store=DomainLayerStore())
+    logger.info("Authoring AI wired: 8 capabilities + session + cost log")
+
 
     # Register skills (before agents — agents may use them)
     register_all_skills()
@@ -391,8 +400,12 @@ app = FastAPI(
 # CORS — explicit whitelist (no wildcards)
 _cors_origins = [settings.frontend_url]
 if settings.environment == "development":
-    _cors_origins.append("http://localhost:3000")
-    _cors_origins.append("http://localhost:3001")
+    # localhost + 127.0.0.1 둘 다 — Next dev 가 양쪽 어느 origin 으로든 서빙 가능.
+    # P12 (2026-04-25) : 127.0.0.1 누락으로 CORS preflight 실패 회귀 수정.
+    _cors_origins.extend([
+        "http://localhost:3000", "http://localhost:3001",
+        "http://127.0.0.1:3000", "http://127.0.0.1:3001",
+    ])
 
 app.add_middleware(
     CORSMiddleware,
@@ -430,10 +443,16 @@ app.include_router(persona_api.router)
 app.include_router(auth_api.router)
 app.include_router(graph_api.router)
 app.include_router(group_api.router)
-app.include_router(modeling_api.router)
-app.include_router(simulation_api.router)
-app.include_router(slab_agent_router)
-app.include_router(custom_agent_router)
+# 2026-05-02 C5 — Ontology Query API (Agent boundary)
+app.include_router(ontology_query_api.router)
+app.include_router(repo_import_api.router)
+app.include_router(recommend_api.router)
+app.include_router(ontology_graph_api.router)
+app.include_router(ontology_modules_api.router)
+app.include_router(perspective_api.router)
+app.include_router(queue_actions_api.router)
+# Authoring AI (2026-05-05 — B.5 prototype)
+app.include_router(authoring_api.router)
 
 
 # Global exception handler

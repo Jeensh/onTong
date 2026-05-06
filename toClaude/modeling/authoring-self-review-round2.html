@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Authoring AI · 사용자 피드백 (1.5/5) 분석 + 솔루션 토론 round 2</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#111b2e; --line:#1f2a44; --fg:#e6edf7; --muted:#94a3b8;
+    --primary:#38bdf8; --emerald:#10b981; --amber:#f59e0b; --rose:#f43f5e; --violet:#8b5cf6;
+  }
+  body{margin:0;font:13px -apple-system,Pretendard,sans-serif;background:var(--bg);color:var(--fg);padding:24px;line-height:1.55;max-width:1100px;margin:0 auto}
+  h1{margin:0 0 6px 0;font-size:20px}
+  h2{font-size:15px;margin:24px 0 8px 0;padding:6px 0;border-bottom:1px solid var(--line)}
+  h3{font-size:13px;margin:14px 0 6px 0;color:var(--violet)}
+  h4{font-size:12.5px;margin:10px 0 4px 0;color:var(--primary)}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:16px}
+  pre{background:#0f172a;color:#e6edf7;padding:10px;border-radius:6px;overflow-x:auto;font-size:11.5px;line-height:1.5;border:1px solid var(--line)}
+  code{background:rgba(56,189,248,0.1);color:var(--primary);padding:1px 5px;border-radius:3px;font-size:11.5px;font-family:ui-monospace,Consolas,monospace}
+  table{border-collapse:collapse;width:100%;margin:8px 0;font-size:12px}
+  th,td{padding:5px 8px;border:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:rgba(56,189,248,0.08);color:var(--primary);font-weight:600}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;margin:14px 0}
+  .panel.crit{border-color:rgba(244,63,94,0.5);background:rgba(244,63,94,0.04)}
+  .panel.warn{border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.04)}
+  .panel.ok{border-color:rgba(16,185,129,0.5);background:rgba(16,185,129,0.04)}
+  .panel.info{border-color:rgba(139,92,246,0.5);background:rgba(139,92,246,0.04)}
+  .quote{background:#0f172a;border-left:3px solid var(--rose);padding:8px 12px;margin:8px 0;font-style:italic;color:#e2e8f0;font-size:12.5px}
+  .my-guess{background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.3);border-radius:6px;padding:10px;margin:8px 0}
+  .my-guess .label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.04em;color:var(--violet);font-weight:600;margin-bottom:6px}
+  textarea{width:100%;box-sizing:border-box;background:#0f172a;color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-size:12px;font-family:inherit;line-height:1.4;min-height:50px;resize:vertical}
+  textarea:focus{outline:none;border-color:var(--primary)}
+  .field{margin:10px 0}
+  .field label{display:block;font-size:12px;margin-bottom:4px}
+  .field label .hint{display:block;font-size:11px;color:var(--muted);font-style:italic;margin-top:1px;font-weight:normal}
+  .form{background:rgba(56,189,248,0.04);border:1px solid rgba(56,189,248,0.2);border-radius:8px;padding:14px;margin:14px 0}
+  .form h4{color:var(--primary);margin-top:0}
+  .actions{display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap}
+  .btn{background:var(--primary);color:#0b1220;border:none;border-radius:4px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}
+  .btn:hover{opacity:0.9}
+  .btn.outline{background:transparent;border:1px solid var(--line);color:var(--fg)}
+  .btn.copied{background:var(--emerald);color:#fff}
+  .preview{display:none;background:#0f172a;border:1px solid var(--line);border-radius:6px;padding:10px;margin-top:8px;font-family:ui-monospace,Consolas,monospace;font-size:11px;white-space:pre-wrap}
+  .preview.visible{display:block}
+  .pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:600;margin-right:4px;vertical-align:middle}
+  .pill.violet{background:rgba(139,92,246,0.15);color:var(--violet);border:1px solid rgba(139,92,246,0.4)}
+  .pill.amber{background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.4)}
+  .pill.emerald{background:rgba(16,185,129,0.15);color:var(--emerald);border:1px solid rgba(16,185,129,0.4)}
+  .pill.rose{background:rgba(244,63,94,0.15);color:var(--rose);border:1px solid rgba(244,63,94,0.4)}
+  .star{color:var(--emerald);font-weight:700}
+  .ascii{font-family:ui-monospace,Consolas,monospace;background:#0f172a;padding:10px;border-radius:6px;color:#cbd5e1;font-size:11px;white-space:pre;overflow-x:auto;line-height:1.4;border:1px solid var(--line)}
+  details{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:6px 0}
+  summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--primary)}
+  details[open] summary{margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<h1>✏️ Authoring AI — 사용자 피드백 (1.5/5) 분석 + Round 2 토론</h1>
+<div class="sub">2026-05-05 · Round 5 인터뷰 form 패턴 그대로 — 질문 별 textarea</div>
+
+<div class="panel crit">
+  <strong>피드백 핵심 (사용자 직접 인용)</strong>
+  <div class="quote">"답변 퀄리티가 부족한 느낌. 맥락을 어디까지 들고 있는지, 너랑 나랑 할 때는 내가 너의 질문이 이상하면 새로운 내용을 알려주면서 새롭게 검토/리프레시 하는 흐름이 좋았는데 그 부분이 약함."</div>
+  <div class="quote">"UI가 뭔가 가독성이 부족한 부분, md 뷰가 적용 안되는 글, 필요없는 섹션 사이징 및 아예 화면 칸에서 일시적으로 없애는 UI 등이 필요."</div>
+  <div class="quote">"질문을 한번에 여러개 답해야 하는데, 지금처럼 질문 별로 대답을 할 수 있는 구조가 좋은 것 같아."</div>
+  <div class="quote">"버튼 등 UI 가 좀 어색하고 구식의 느낌이 있어."</div>
+  <div class="quote">"지금 한거는 뭔가 너가 이걸 위해서 미리 준비해서 한 느낌이야. 내가 뭘 알려주기 전에 너무 많은 걸 알고 물어보는 느낌?"</div>
+</div>
+
+<div class="panel info">
+  <h4 style="margin-top:0;color:var(--violet)">자체 진단 — 5 가지 본질적 문제</h4>
+  <ol style="font-size:12.5px;line-height:1.7;margin:6px 0">
+    <li><strong>P1. "너무 많이 알고 물어보는 느낌"</strong> — 가설이 과하게 specific. confidence calibration 부재.</li>
+    <li><strong>P2. 맥락 정정 + 리프레시 흐름 부재</strong> — backward / refresh 없음. step-by-step 단방향만.</li>
+    <li><strong>P3. 질문별 답변 구조 부재</strong> — Round 5 form 패턴 잃음. 한 textarea 에 몰아넣음.</li>
+    <li><strong>P4. UI 가독성 / Markdown 미렌더링</strong> — archive raw text. preview 섹션 항상 보임.</li>
+    <li><strong>P5. 버튼·디자인 어색</strong> — 구식 느낌. spacing / typography / micro-interaction.</li>
+  </ol>
+  <p style="font-size:11.5px;color:var(--muted)">→ P1, P2 가 LLM behavior 의 본질적 문제. P3, P4, P5 는 UI 작업.</p>
+</div>
+
+<!-- ============================================== -->
+<h2>P1. "너무 많이 알고 물어보는 느낌"</h2>
+
+<div class="my-guess">
+  <div class="label">진단</div>
+  <p style="font-size:12px;margin:4px 0">현재 hypothesis prompt 가 "코드 + 한국어 주석 모두 분석 → 도메인 entity 가설" 을 만들도록 강하게 push. 결과: 한국어 주석 ("열연설비사양기준") 을 그대로 활용해서 즉시 "열연공장" 같은 정답을 dump → 사용자에게 "왜 이렇게 잘 알지?" 위화감.</p>
+  <p style="font-size:12px;margin:4px 0">Round 5 의 자연스러움은 AI 가 <strong>모르는 척 시작</strong> 했기 때문. "이건 ... 같은데, 맞나요?" 라는 humble 자세에서 사용자가 가르치며 점진적으로 정확해짐.</p>
+</div>
+
+<h4>옵션 비교</h4>
+<table>
+<tr><th>옵션</th><th>접근</th><th>장단</th></tr>
+<tr><td><strong>P1-A</strong></td>
+  <td>Hypothesis prompt 를 "humble" 모드로 — Korean comment 를 직접 인용하지 말고 "이건 X 같은데..." 형식</td>
+  <td>적은 변경 / 효과 작을 수도</td></tr>
+<tr style="background:rgba(16,185,129,0.05)"><td><span class="star">★ P1-B</span></td>
+  <td><strong>Hypothesis 를 2-stage 로 분리</strong>: stage 1 "raw extraction 만 (가설 X)" / stage 2 "사용자가 이게 무엇 같냐고 물어볼 때만 가설"</td>
+  <td>사용자 주도성 ↑↑ / 클릭 1회 추가</td></tr>
+<tr><td><strong>P1-C</strong></td>
+  <td>Hypothesis 의 confidence 를 강하게 calibrate — 한국어 주석 있으면 0.6 max, 없으면 0.3 max. UI 에서 confidence < 0.5 면 "추측이 약합니다" 표시</td>
+  <td>UI 시그널 ↑ / behavior 자체는 같음</td></tr>
+<tr><td><strong>P1-D</strong></td>
+  <td>Hypothesis 자체 폐기 — 코드 추출만 보여주고 사용자가 "이건 뭐 같지?" 직접 짚음</td>
+  <td>가장 humble / 너무 minimal 가능</td></tr>
+</table>
+
+<!-- ============================================== -->
+<h2>P2. 맥락 정정 + 리프레시 흐름 부재 (가장 본질적)</h2>
+
+<div class="my-guess">
+  <div class="label">진단 — Round 5 패턴 vs 현재</div>
+  <pre>Round 5 (사용자가 가르치며 정정):
+  step 4 인터뷰 → 사용자: "EDGING 은 깎는 거야"
+   ↓
+  step 5 (가설 자동 정정) → 사용자가 새 답변
+   ↓
+  step 9 옵션 → 정정된 가설 위에 옵션 제시
+   ↓
+  step 10 비대칭 발견 → 다시 가설 재검토 (별도 step)
+
+현재 (단방향):
+  ① 코드 → ② 가설 (한 번 set) → ③ 인터뷰 → ④ 답변 → ⑤ 옵션 (가설 그대로)
+  사용자가 답변에서 가설 뒤집어도 옵션은 처음 가설 기준으로 제시
+  back 흐름 없음</pre>
+</div>
+
+<h4>옵션 비교</h4>
+<table>
+<tr><th>옵션</th><th>접근</th><th>장단</th></tr>
+<tr><td><strong>P2-A</strong></td>
+  <td>cap 4 (answer absorber) 가 contradicts_my_guess 발견 시 cap 2 (hypothesis) <strong>자동 재호출</strong> → 새 가설로 cap 6 (options) 진행</td>
+  <td>매끄러움 ↑ / 비용 +$0.16 (Opus 추가)</td></tr>
+<tr style="background:rgba(16,185,129,0.05)"><td><span class="star">★ P2-B</span></td>
+  <td><strong>"refresh 버튼"</strong> 명시적 — 인터뷰 답변 후 우측 preview 의 가설 카드에 "이 답변으로 가설 다시 보기" 버튼. 클릭 시 cap 2 재호출 + 옵션 cleared</td>
+  <td>사용자 주도 / 1 클릭 / 비용 명시적</td></tr>
+<tr><td><strong>P2-C</strong></td>
+  <td>"실시간 가설 갱신" — answer 가 들어올 때마다 우측 preview 의 가설 카드를 자동 update (LLM 호출 없이 contradicted fields 만 strikethrough)</td>
+  <td>비용 0 / 미묘한 표현</td></tr>
+<tr><td><strong>P2-D</strong></td>
+  <td>chat 명령으로 "다시 검토해줘" 입력 → 임의 시점에 cap 2 재호출. Round 5 의 "세분화" 명령 패턴</td>
+  <td>유연 / 사용자가 명령 인지해야 함</td></tr>
+</table>
+
+<p style="font-size:11.5px;color:var(--muted);margin:4px 0">→ B + C 조합도 가능. preview 자동 갱신 (C) + 명시 refresh 버튼 (B).</p>
+
+<!-- ============================================== -->
+<h2>P3. 질문별 답변 구조 (사용자가 명시적으로 선호)</h2>
+
+<div class="my-guess">
+  <div class="label">진단</div>
+  <p style="font-size:12px;margin:4px 0">현재 InterviewView 는 5-7 Q list 를 보여주고 사용자가 한 textarea 에 자유서술. cap 4 (answer absorber) 가 LLM 으로 그걸 분해. <strong>Round 5 의 form 패턴 (Q 별 textarea + my_guess + placeholder) 잃음.</strong></p>
+  <p style="font-size:12px;margin:4px 0">사용자: <em>"질문을 한번에 여러개 답해야 하는데, 지금처럼 질문 별로 대답을 할 수 있는 구조가 좋은 것 같아."</em></p>
+</div>
+
+<h4>옵션 비교</h4>
+<table>
+<tr><th>옵션</th><th>접근</th><th>장단</th></tr>
+<tr style="background:rgba(16,185,129,0.05)"><td><span class="star">★ P3-A</span></td>
+  <td><strong>Q 별 별개 textarea</strong> — Round 5 form 그대로. 각 Q 마다 my_guess + placeholder + skip 버튼. cap 4 (answer absorber) 의 LLM 호출 폐기 (이미 구조화돼서 들어옴)</td>
+  <td>UX 가 Round 5 와 동일 / cap 4 LLM 비용 0 절감 / answer_absorber 코드 삭제 필요</td></tr>
+<tr><td><strong>P3-B</strong></td>
+  <td>현재 single textarea + Q 별 textarea 둘 다 — 사용자 선택</td>
+  <td>유연 / 복잡</td></tr>
+<tr><td><strong>P3-C</strong></td>
+  <td>Q 별 textarea + 마지막에 "추가 의견" 단일 freeform 영역</td>
+  <td>structured + 자유 / Round 5 form 그대로</td></tr>
+</table>
+
+<p style="font-size:11.5px;color:var(--muted)">→ A 또는 C. C 가 Round 5 form 과 정확히 일치.</p>
+
+<!-- ============================================== -->
+<h2>P4. UI 가독성 — Markdown 미렌더링 + 섹션 토글</h2>
+
+<h4>P4-1. archive markdown</h4>
+<div class="my-guess">
+  <div class="label">현재</div>
+  <p style="font-size:12px;margin:4px 0">우측 preview "Archive (markdown)" 섹션이 raw text 그대로 표시 (<code>&lt;pre&gt;</code> tag 안에). Markdown 헤더, 표, 강조 등 안 보임.</p>
+</div>
+<table>
+<tr><th>옵션</th><th>접근</th></tr>
+<tr style="background:rgba(16,185,129,0.05)"><td><span class="star">★ P4-1-A</span></td>
+  <td><strong>react-markdown</strong> + remark-gfm 도입 — markdown 렌더링. github-flavored.</td></tr>
+<tr><td><strong>P4-1-B</strong></td>
+  <td>archive 를 markdown 대신 HTML 직접 생성 — backend 에서 직접 HTML 출력</td></tr>
+</table>
+
+<h4>P4-2. 섹션 토글 (사용자 명시적 요청)</h4>
+<div class="my-guess">
+  <div class="label">현재 vs 제안</div>
+  <p style="font-size:12px;margin:4px 0">현재 우측 preview 의 5 섹션 (세션/가설/채택옵션/엔티티/갭/archive) 모두 항상 표시 → 스크롤 부담.</p>
+  <p style="font-size:12px;margin:4px 0">사용자: <em>"필요없는 섹션 사이징 및 아예 화면 칸에서 일시적으로 없애는 UI 등이 필요해 보여."</em></p>
+</div>
+<table>
+<tr><th>옵션</th><th>접근</th></tr>
+<tr style="background:rgba(16,185,129,0.05)"><td><span class="star">★ P4-2-A</span></td>
+  <td>각 섹션 collapsible (HTML &lt;details&gt; 또는 shadcn Accordion) — 기본 expanded, 클릭 시 접기</td></tr>
+<tr><td><strong>P4-2-B</strong></td>
+  <td>섹션 별 닫기 버튼 (X) — 한 번 닫으면 안 보임. 다시 열려면 toolbar 의 "섹션 추가"</td></tr>
+<tr><td><strong>P4-2-C</strong></td>
+  <td>tabs 로 — 섹션 5개를 tab 으로 (한 번에 1개만 표시)</td></tr>
+</table>
+
+<!-- ============================================== -->
+<h2>P5. 버튼·디자인 — "구식 느낌"</h2>
+
+<div class="my-guess">
+  <div class="label">진단</div>
+  <p style="font-size:12px;margin:4px 0">현재 toolbar = 8 버튼 일렬 (① ~ ✓). 모두 같은 outline button. spacing/typography 통일성 부족. 진행상태 visual feedback 없음.</p>
+</div>
+
+<h4>옵션 비교</h4>
+<table>
+<tr><th>옵션</th><th>접근</th></tr>
+<tr><td><strong>P5-A</strong></td>
+  <td>shadcn 의 다른 component 활용 — Card / Badge / Progress / Stepper 등을 toolbar 대신 사용</td></tr>
+<tr style="background:rgba(16,185,129,0.05)"><td><span class="star">★ P5-B</span></td>
+  <td><strong>Stepper UI</strong> — toolbar 대신 horizontal stepper (① → ② → ③ → ...). 현재 단계 highlighted, 완료 단계 ✓, 다음 단계 클릭 가능. 자동 진행 시 spinner</td></tr>
+<tr><td><strong>P5-C</strong></td>
+  <td>버튼 통합 — "다음 단계 자동 진행" 버튼 한 개. 시스템이 알아서 chain. 사용자는 답변/선택만</td></tr>
+<tr><td><strong>P5-D</strong></td>
+  <td>큰 디자인 시스템 작업 — Tailwind palette 다듬기, micro-interaction (hover/active animation), badge typography 등</td></tr>
+</table>
+
+<!-- ============================================== -->
+<h2>제안 — round 2 작업 묶음 (사용자 우선순위 받기 위함)</h2>
+
+<table>
+<tr><th>묶음</th><th>포함</th><th>예상 시간</th><th>가치</th></tr>
+<tr style="background:rgba(16,185,129,0.05)">
+  <td><strong>★ R2-W1 핵심 흐름 + UX</strong></td>
+  <td>P1-B (lazy hypothesis) + P2-B (refresh 버튼) + P3-A (Q 별 textarea) + P4-1-A (markdown) + P4-2-A (collapsible)</td>
+  <td>중</td>
+  <td>만족감 1.5 → 3.5 / 5 (예상)</td>
+</tr>
+<tr>
+  <td>R2-W2 디자인 polish</td>
+  <td>P5-B (stepper) + spacing / typography 다듬기 + 버튼 micro-interaction</td>
+  <td>큼</td>
+  <td>"구식 느낌" 해결</td>
+</tr>
+<tr>
+  <td>R2-W3 streaming + 진행률 (이전 토론의 Wave 1)</td>
+  <td>SSE 응답 + per-turn progress + cost breakdown + retry</td>
+  <td>큼</td>
+  <td>Round 5 만족감 5 전략 마저 적용</td>
+</tr>
+<tr>
+  <td>R2-W4 다음 entity 작업 환경</td>
+  <td>file picker + session 재개 + pattern library + cap 7/10</td>
+  <td>큼</td>
+  <td>multi-entity 시 필수</td>
+</tr>
+</table>
+
+<!-- ============================================== -->
+<h2>📝 답변 폼 — 질문별 별개 textarea (사용자 선호 패턴)</h2>
+
+<div class="form">
+  <h4>각 질문 1-2 줄로 OK · 모름은 "모름" · skip 가능</h4>
+
+  <div class="field">
+    <label>P1. <strong>"너무 많이 알고 물어보는 느낌" 해결 옵션</strong>
+      <span class="hint">A (humble prompt) / <span class="star">★ B (lazy hypothesis 2-stage)</span> / C (confidence calibration) / D (가설 폐기)</span>
+    </label>
+    <textarea name="p1_choice" placeholder="예: B 동의 / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>P2. <strong>맥락 정정 + 리프레시 흐름</strong>
+      <span class="hint">A (자동 재호출) / <span class="star">★ B (refresh 버튼 명시)</span> / C (실시간 strikethrough) / D (chat 명령) / B+C 조합</span>
+    </label>
+    <textarea name="p2_choice" placeholder="예: B + C 조합 / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>P3. <strong>질문별 답변 구조</strong>
+      <span class="hint"><span class="star">★ A (Q 별 textarea, cap 4 폐기)</span> / B (둘 다 선택) / C (Q 별 + 추가 freeform)</span>
+    </label>
+    <textarea name="p3_choice" placeholder="예: C — Round 5 form 과 정확히 일치"></textarea>
+  </div>
+
+  <div class="field">
+    <label>P4-1. <strong>Markdown 렌더링</strong>
+      <span class="hint"><span class="star">★ A (react-markdown)</span> / B (backend HTML)</span>
+    </label>
+    <textarea name="p4_md_choice" placeholder="예: A 동의"></textarea>
+  </div>
+
+  <div class="field">
+    <label>P4-2. <strong>섹션 토글 UI</strong>
+      <span class="hint"><span class="star">★ A (collapsible)</span> / B (X 닫기 + 추가) / C (tabs)</span>
+    </label>
+    <textarea name="p4_toggle_choice" placeholder="예: A / 또는 C 가 더 깔끔"></textarea>
+  </div>
+
+  <div class="field">
+    <label>P5. <strong>UI 디자인 — "구식 느낌" 해결</strong>
+      <span class="hint">A (다른 component) / <span class="star">★ B (Stepper)</span> / C (자동 진행 단일 버튼) / D (디자인 시스템 다듬기)</span>
+    </label>
+    <textarea name="p5_choice" placeholder="예: B + D 함께 / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q. <strong>R2 wave 우선순위</strong>
+      <span class="hint">★ R2-W1 (핵심 흐름) → R2-W2 (디자인) → R2-W3 (streaming) → R2-W4 (multi-entity) — 동의?</span>
+    </label>
+    <textarea name="wave_priority" placeholder="예: W1 부터 시작 / 또는 W2 와 W1 합쳐서 진행"></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q+. <strong>제가 빠뜨린 영역</strong> 또는 <strong>가장 시급한 한 가지</strong> 직접 짚어주신다면?</label>
+    <textarea name="missed_or_urgent" placeholder="예: ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>마지막. <strong>다음 행동 결정</strong>
+      <span class="hint">위 답변으로 R2-W1 즉시 시작 OK? 또는 더 토론할 부분 있는지?</span>
+    </label>
+    <textarea name="next_action" placeholder="예: W1 시작 / 또는 ..."></textarea>
+  </div>
+
+  <div class="actions">
+    <button class="btn" data-action="copy">📋 답변 복사</button>
+    <button class="btn outline" data-action="preview">미리보기</button>
+    <span style="font-size:11px;color:var(--muted)">P1 + P2 + P3 가 가장 중요 — 만족감 ↑↑ 의 직접 원인</span>
+  </div>
+
+  <div class="preview" id="preview"></div>
+</div>
+
+<details style="margin-top:24px">
+  <summary>참고 — 자체 진단 metrics + 이전 토론과의 차이</summary>
+  <table>
+    <tr><th>측정</th><th>이전 토론</th><th>현재 (round 2)</th></tr>
+    <tr><td>발견 issue 수</td><td>~25 (5 영역)</td><td>5 본질적 + 다수 미세조정</td></tr>
+    <tr><td>scope</td><td>전체 영역 broadly</td><td>P1 P2 가 만족감의 직접 원인</td></tr>
+    <tr><td>사용자 만족감 진단</td><td>(추정)</td><td>1.5 / 5 (사용자 명시)</td></tr>
+    <tr><td>가장 큰 누락</td><td>streaming, file picker, multi-operator</td><td><strong>맥락 정정 흐름 (P2)</strong> — 이전엔 인지 못함</td></tr>
+  </table>
+  <p style="font-size:11.5px;color:var(--muted)">P2 (맥락 정정) 는 이전 토론에서 "Wave 4 협업" 에 묶여있었지만, 사실은 single-user 에서도 Round 5 의 핵심 패턴. 인지 실패한 부분.</p>
+</details>
+
+<script>
+const fields = [
+  ["p1_choice",          "P1. '너무 많이 알고 물어보는 느낌' 해결"],
+  ["p2_choice",          "P2. 맥락 정정 + 리프레시 흐름"],
+  ["p3_choice",          "P3. 질문별 답변 구조"],
+  ["p4_md_choice",       "P4-1. Markdown 렌더링"],
+  ["p4_toggle_choice",   "P4-2. 섹션 토글 UI"],
+  ["p5_choice",          "P5. UI 디자인 — 구식 느낌 해결"],
+  ["wave_priority",      "R2 wave 우선순위"],
+  ["missed_or_urgent",   "빠뜨린 영역 / 가장 시급한 한 가지"],
+  ["next_action",        "다음 행동 결정"],
+];
+
+function buildText() {
+  const out = ["[Authoring AI 자체 검토 round 2 — 사용자 답변]"];
+  for (const [k, label] of fields) {
+    const v = (document.querySelector(`textarea[name="${k}"]`)?.value ?? "").trim();
+    if (v) out.push(`\n## ${label}\n${v}`);
+  }
+  return out.join("\n");
+}
+
+document.querySelector('[data-action="preview"]').addEventListener("click", () => {
+  const slot = document.getElementById("preview");
+  slot.textContent = buildText();
+  slot.classList.add("visible");
+});
+
+document.querySelector('[data-action="copy"]').addEventListener("click", async (e) => {
+  const txt = buildText();
+  try {
+    await navigator.clipboard.writeText(txt);
+    const btn = e.currentTarget;
+    const orig = btn.textContent;
+    btn.textContent = "✓ 복사됨";
+    btn.classList.add("copied");
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove("copied"); }, 1500);
+    const slot = document.getElementById("preview");
+    slot.textContent = txt;
+    slot.classList.add("visible");
+  } catch {
+    alert("복사 실패. 미리보기 영역에서 수동 복사하세요.");
+  }
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1132 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>onTong — 온톨로지 방식 최종 결정 (Two-Layer + Action + Scenario)</title>
+<style>
+  :root {
+    --bg: #0b1018; --panel: #111827; --panel-2: #0f172a; --panel-3: #0a0f1a;
+    --border: #1f2937; --border-2: #334155;
+    --text: #e5e7eb; --text-dim: #94a3b8; --text-faint: #64748b;
+    --accent: #38bdf8; --accent-2: #818cf8;
+    --warn: #f59e0b; --bad: #f87171; --good: #34d399;
+    --code-bg: #0a0f1a;
+    --layer-code: #fb923c; --layer-domain: #a78bfa; --layer-map: #38bdf8; --layer-sim: #34d399;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.65 -apple-system, BlinkMacSystemFont, "SF Pro Text",
+      "Segoe UI", "Helvetica Neue", "Pretendard", sans-serif;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 48px 32px 96px; }
+  header.top { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 32px; }
+  h1 { font-size: 30px; margin: 0 0 8px; font-weight: 700; letter-spacing: -0.02em; }
+  h1 .badge {
+    display: inline-block; margin-left: 12px; padding: 5px 12px;
+    background: rgba(52,211,153,0.1); border: 1px solid var(--good);
+    color: var(--good); font-size: 11px; font-weight: 600;
+    border-radius: 4px; vertical-align: middle;
+  }
+  h2 {
+    font-size: 22px; margin: 56px 0 18px; padding-top: 14px;
+    border-top: 1px solid var(--border); color: var(--accent); font-weight: 600;
+  }
+  h3 { font-size: 17px; margin: 28px 0 10px; color: var(--text); font-weight: 600; }
+  h4 {
+    font-size: 13px; margin: 16px 0 6px; color: var(--text-dim);
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  p { margin: 8px 0; } ul, ol { margin: 8px 0; padding-left: 22px; } li { margin: 4px 0; }
+  code {
+    background: var(--code-bg); border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 3px;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--accent);
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    padding: 14px 16px; border-radius: 6px; overflow-x: auto;
+    font-size: 12.5px; line-height: 1.55;
+  }
+  pre code { background: none; border: none; padding: 0; color: var(--text); }
+  .lead { font-size: 15px; color: var(--text-dim); margin-top: 8px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 18px 22px; margin: 14px 0; }
+  .panel.warn { border-left: 3px solid var(--warn); }
+  .panel.good { border-left: 3px solid var(--good); }
+  .panel.bad  { border-left: 3px solid var(--bad); }
+  .panel.info { border-left: 3px solid var(--accent); }
+  .panel h3:first-child, .panel h4:first-child { margin-top: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--panel-2); color: var(--text-dim); font-weight: 600; }
+  tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+  .pill {
+    display: inline-block; padding: 1px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; vertical-align: middle;
+    border: 1px solid var(--border-2);
+  }
+  .pill.code { color: var(--layer-code); border-color: var(--layer-code); background: rgba(251,146,60,0.08); }
+  .pill.domain { color: var(--layer-domain); border-color: var(--layer-domain); background: rgba(167,139,250,0.08); }
+  .pill.map { color: var(--layer-map); border-color: var(--layer-map); background: rgba(56,189,248,0.08); }
+  .pill.sim { color: var(--layer-sim); border-color: var(--layer-sim); background: rgba(52,211,153,0.08); }
+  .pill.good { color: var(--good); border-color: var(--good); background: rgba(52,211,153,0.08); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: rgba(245,158,11,0.08); }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 32px 0; }
+  .quote { border-left: 3px solid var(--accent-2); padding: 4px 14px; color: var(--text-dim); font-style: italic; margin: 12px 0; }
+  .toc { color: var(--text-dim); font-size: 13px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .small { font-size: 12px; color: var(--text-faint); }
+  details { margin: 10px 0; }
+  summary { cursor: pointer; color: var(--accent); font-weight: 500; padding: 6px 0; }
+  summary:hover { color: var(--accent-2); }
+  .source { font-size: 12px; color: var(--text-faint); }
+  .source a { color: var(--text-dim); }
+
+  .layer-legend {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    margin: 14px 0; padding: 12px 16px;
+    background: var(--panel-3); border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .layer-legend > span {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--text-dim);
+  }
+
+  /* layer architecture diagram */
+  .arch-diagram {
+    background: var(--panel-3); border: 1px solid var(--border);
+    border-radius: 8px; padding: 24px; margin: 18px 0;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12.5px;
+  }
+  .arch-layer {
+    border-left: 3px solid;
+    padding: 12px 16px; margin: 10px 0;
+    background: var(--panel-2);
+    border-radius: 4px;
+  }
+  .arch-layer.l-code { border-color: var(--layer-code); }
+  .arch-layer.l-map { border-color: var(--layer-map); }
+  .arch-layer.l-domain { border-color: var(--layer-domain); }
+  .arch-layer.l-sim { border-color: var(--layer-sim); }
+  .arch-layer .l-title { font-weight: 700; margin-bottom: 6px; }
+  .arch-layer.l-code .l-title { color: var(--layer-code); }
+  .arch-layer.l-map .l-title { color: var(--layer-map); }
+  .arch-layer.l-domain .l-title { color: var(--layer-domain); }
+  .arch-layer.l-sim .l-title { color: var(--layer-sim); }
+  .arch-arrow { text-align: center; color: var(--text-faint); margin: 4px 0; }
+
+  .step-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-left: 4px solid var(--accent); border-radius: 8px;
+    padding: 16px 20px; margin: 14px 0;
+  }
+  .step-card .step-head {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 10px;
+  }
+  .step-card .step-num {
+    background: var(--accent); color: var(--bg);
+    padding: 4px 10px; border-radius: 4px;
+    font-weight: 700; font-size: 12px;
+  }
+  .step-card .step-title { font-size: 16px; font-weight: 600; flex: 1; }
+  .step-card .step-meta {
+    color: var(--text-faint); font-size: 11px;
+    background: var(--panel-3); padding: 2px 8px; border-radius: 4px;
+  }
+  .step-card .step-deliverables {
+    background: var(--panel-2); border-radius: 4px;
+    padding: 10px 14px; margin: 8px 0;
+    font-size: 12.5px;
+  }
+  .step-card .step-deliverables strong { color: var(--accent); }
+
+  .decision-grid {
+    display: grid; grid-template-columns: 1fr;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; margin: 14px 0;
+  }
+  .decision-grid > div {
+    display: grid; grid-template-columns: 70px 1fr 80px 2fr;
+    gap: 12px; padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12.5px; align-items: center;
+  }
+  .decision-grid > div:last-child { border-bottom: none; }
+  .decision-grid > div:nth-child(even) { background: rgba(255,255,255,0.012); }
+  .decision-grid .d-id { color: var(--text-faint); font-family: "SF Mono", Menlo, monospace; font-weight: 600; }
+  .decision-grid .d-q { color: var(--text); }
+  .decision-grid .d-a { color: var(--good); font-weight: 700; text-align: center; }
+  .decision-grid .d-meaning { color: var(--text-dim); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  .callsite {
+    background: var(--panel-3); border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px 16px; margin: 10px 0;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+  }
+  .callsite .case { color: var(--accent-2); font-weight: 600; margin-top: 8px; }
+  .callsite .case:first-child { margin-top: 0; }
+  .callsite .auto { color: var(--good); }
+  .callsite .ambig { color: var(--warn); }
+  .callsite .dyn { color: var(--bad); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>온톨로지 방식 — 최종 결정 <span class="badge">FINAL · 2026-05-01</span></h1>
+  <p class="lead">
+    v1 → v5 5 라운드 토론 결과. <strong>모든 architectural 결정 확정.</strong>
+    이 문서는 (1) 결정 16 개 정리, (2) Two-Layer 종합 모델 스키마,
+    (3) Java call-flow 자동 추적 + 사람 매핑 hybrid (D3 메모 응답),
+    (4) 데이터 흐름 end-to-end, (5) Step 8 단위 작업 분해.
+  </p>
+</header>
+
+<div class="layer-legend">
+  <span><span class="pill code">Code Layer</span> Java 클래스/메서드 충실 mirror</span>
+  <span><span class="pill map">Mapping Layer</span> Code ↔ Domain 매핑</span>
+  <span><span class="pill domain">Domain Layer</span> 비즈니스 의미 (사용자 보는 것)</span>
+  <span><span class="pill sim">Simulation Layer</span> Scenario · Adapter · Sandbox</span>
+</div>
+
+<nav class="toc panel info">
+  <strong>목차</strong>
+  <ol>
+    <li><a href="#decisions">확정 결정 16 개 (한 표로)</a></li>
+    <li><a href="#architecture">Two-Layer 종합 아키텍처</a></li>
+    <li><a href="#code-layer">Code Layer 스키마</a></li>
+    <li><a href="#domain-layer">Domain Layer 스키마</a></li>
+    <li><a href="#mapping-layer">Mapping Layer 스키마 (Action · Realization · AnchorBinding)</a></li>
+    <li><a href="#callflow">CallSiteAnalyzer — Java 정적 분석 + 사람 매핑 hybrid (D3 메모 응답)</a></li>
+    <li><a href="#sim-layer">Simulation Layer (Scenario + InputAdapter)</a></li>
+    <li><a href="#dataflow">End-to-End 데이터 흐름</a></li>
+    <li><a href="#order-walk">실제 케이스 walk-through — 주문 검증</a></li>
+    <li><a href="#steps">작업 분해 — Step 1 ~ 8</a></li>
+    <li><a href="#migration">마이그레이션 (Q10=D · 데모 reset)</a></li>
+    <li><a href="#open">남은 open 영역 (Phase 2+)</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================== -->
+<h2 id="decisions">1. 확정 결정 16 개</h2>
+
+<div class="decision-grid">
+  <div>
+    <span class="d-id">Q3</span>
+    <span class="d-q">Action ↔ Process(매뉴얼 동사) 관계</span>
+    <span class="d-a">A</span>
+    <span class="d-meaning">Process 폐기, Action 단일 동사 노드</span>
+  </div>
+  <div>
+    <span class="d-id">Q5</span>
+    <span class="d-q">precondition/postcondition 출처</span>
+    <span class="d-a">C</span>
+    <span class="d-meaning">자동 추출 + 사용자 confirm (혼합)</span>
+  </div>
+  <div>
+    <span class="d-id">Q6</span>
+    <span class="d-q">Action naming convention</span>
+    <span class="d-a">B</span>
+    <span class="d-meaning">영문 fqn + 한국어 label 둘 다</span>
+  </div>
+  <div>
+    <span class="d-id">Q8</span>
+    <span class="d-q">Signature lock 게이트</span>
+    <span class="d-a">A</span>
+    <span class="d-meaning">Strict — 미확정 시 시뮬 거부</span>
+  </div>
+  <div>
+    <span class="d-id">Q9</span>
+    <span class="d-q">Action effects 표현 깊이</span>
+    <span class="d-a">C</span>
+    <span class="d-meaning">정형 effect (op + target_term + target_attr)</span>
+  </div>
+  <div>
+    <span class="d-id">Q10</span>
+    <span class="d-q">기존 BusinessTerm 마이그레이션</span>
+    <span class="d-a">D</span>
+    <span class="d-meaning">데모 reset 후 새 모델로 시작</span>
+  </div>
+  <div>
+    <span class="d-id">Q1'</span>
+    <span class="d-q">Action vs Function 분리</span>
+    <span class="d-a">A</span>
+    <span class="d-meaning">단일 Action + VerificationLevel 신설</span>
+  </div>
+  <div>
+    <span class="d-id">Q2'</span>
+    <span class="d-q">매핑 못 하는 코드 처리</span>
+    <span class="d-a">C</span>
+    <span class="d-meaning">사용자 직접 매핑 + LLM 보조</span>
+  </div>
+  <div>
+    <span class="d-id">Q4'</span>
+    <span class="d-q">Anchor fragment-level binding</span>
+    <span class="d-a">A</span>
+    <span class="d-meaning">메서드 매핑 없이도 anchor 만 Action 슬롯에 binding</span>
+  </div>
+  <div>
+    <span class="d-id">Q7'</span>
+    <span class="d-q">Workflow 표현</span>
+    <span class="d-a">A</span>
+    <span class="d-meaning">SimulationScenario 별도, Step List + Side-by-side Diff UI</span>
+  </div>
+  <div>
+    <span class="d-id">C2</span>
+    <span class="d-q">collection 접근 syntax</span>
+    <span class="d-a">A</span>
+    <span class="d-meaning">풍부 — [i] / [-1] / [*] / [?(filter)]</span>
+  </div>
+  <div>
+    <span class="d-id">C3</span>
+    <span class="d-q">Composite 시뮬 input 데이터 출처</span>
+    <span class="d-a">A+</span>
+    <span class="d-meaning">사용자 직접 입력 BASE + InputAdapter plugin (Form/Generated/Fixture/Json/Csv/Db/Api 점진)</span>
+  </div>
+  <div>
+    <span class="d-id">C4</span>
+    <span class="d-q">Term tree 자동 추출 vs 수동</span>
+    <span class="d-a">A</span>
+    <span class="d-meaning">Java 클래스 구조 자동 추출 → 사용자 confirm 큐</span>
+  </div>
+  <div>
+    <span class="d-id">D1</span>
+    <span class="d-q">Domain ↔ Code framing</span>
+    <span class="d-a">C</span>
+    <span class="d-meaning"><strong>Two-Layer 분리</strong> — CodeType layer + BusinessTerm layer</span>
+  </div>
+  <div>
+    <span class="d-id">D2</span>
+    <span class="d-q">코드 노이즈 (BaseEntity / Helper)</span>
+    <span class="d-a">A</span>
+    <span class="d-meaning">Class.role 자동 분류 (domain / framework / infra / unknown), domain 만 BusinessTerm 으로 승격</span>
+  </div>
+  <div>
+    <span class="d-id">D3</span>
+    <span class="d-q">Action realization 다형성</span>
+    <span class="d-a">A+</span>
+    <span class="d-meaning">자동 dispatcher + <strong>CallSiteAnalyzer 정적 분석</strong>, 모호한 case 만 사용자 큐 (with 후보·컨텍스트)</span>
+  </div>
+</div>
+
+<p class="small">
+  Q1·Q2·Q4·Q7·C1 은 후속 Q1'·Q2'·Q4'·Q7'·D1 으로 override 되어 위 표에 반영. 자세한 진화는 v2~v5 문서 참조.
+</p>
+
+<!-- ============================================== -->
+<h2 id="architecture">2. Two-Layer 종합 아키텍처</h2>
+
+<div class="arch-diagram">
+  <div class="arch-layer l-code">
+    <div class="l-title">Code Layer — Java 사실 충실 mirror</div>
+    CodeType { fqn, kind(class/interface/abstract_class/enum), role(domain/framework/infra/unknown),<br>
+    &nbsp;&nbsp;is_abstract, fields[], methods[], extends, implements[] }<br>
+    CodeMethod { fqn, signature, modifiers, is_abstract, is_override, body, anchors[] }<br>
+    CallSite { caller, callee_name, possible_runtime_types[], confidence, analysis_source }
+  </div>
+  <div class="arch-arrow">↑↓ TypeRealization · Realization · AnchorBinding</div>
+  <div class="arch-layer l-map">
+    <div class="l-title">Mapping Layer — Code ↔ Domain 매핑</div>
+    TypeRealization { code_type_fqn ↔ term_fqn, scope, confidence, source, confirmed }<br>
+    Action { fqn, label, kind(pure/effectful/workflow), is_abstract, declared_on_term,<br>
+    &nbsp;&nbsp;params[], output, pre/post-conditions[], effects[], realizations[], verification_level }<br>
+    Realization { code_method_fqn, applies_to_code_type_fqn, is_override, dispatch_source }<br>
+    AnchorBinding { anchor_locator, code_method_fqn, target_action_fqn, target_slot, confidence, confirmed }
+  </div>
+  <div class="arch-arrow">↑↓ 도메인 의미 (사용자 시점)</div>
+  <div class="arch-layer l-domain">
+    <div class="l-title">Domain Layer — 사용자가 보는 비즈니스 모델</div>
+    BusinessTerm { fqn, label, kind(atomic/composite), is_abstract, is_interface,<br>
+    &nbsp;&nbsp;is_root_entity, struct_like_hint, parents[], parts[] }<br>
+    Inheritance { child_fqn, parent_fqn, kind(extends/implements) }<br>
+    Composition { parent_fqn, child_fqn, role_name, cardinality }<br>
+    BusinessRule { statement, severity, terms_ref[] }<br>
+    BusinessProcess (조직) · Role (팀)
+  </div>
+  <div class="arch-arrow">↑↓ Action 호출, BusinessTerm 데이터</div>
+  <div class="arch-layer l-sim">
+    <div class="l-title">Simulation Layer — 사용자 가설 시뮬 + PR</div>
+    SimulationScenario { steps[], initial_state, base_repo_id }<br>
+    ScenarioStep { kind(modify_action_slot / invoke), action_fqn, slot_path, inputs }<br>
+    ScenarioInput { adapter("form" | "generated" | "fixture" | "json" | ...), spec }<br>
+    ChangeSpec (target_action_fqn) → PythonGenerator → SandboxRunner → Diff → DraftPR
+  </div>
+</div>
+
+<div class="panel info">
+  <h4>왜 Two-Layer 인가 (D1=C 의 가치)</h4>
+  <ul>
+    <li><strong>Code Layer</strong> 가 Java 의 모든 사실 (extends/implements/abstract/private/helper) 을 잃지 않음 → 매핑 사각지대 0</li>
+    <li><strong>Domain Layer</strong> 는 깨끗한 의미 모델 — BaseEntity 같은 코드 노이즈가 새어들지 않음 (D2=A 정합)</li>
+    <li><strong>Mapping Layer</strong> 의 분리로 — code 변경 시 mapping 만 갱신, domain 변경 시 mapping 만 갱신, 양쪽 동시 cascade 회피</li>
+    <li>Anchor / Realization / TypeRealization 모두 명확한 양쪽 reference 를 가짐 → 양방향 traversal 쉬움</li>
+  </ul>
+</div>
+
+<!-- ============================================== -->
+<h2 id="code-layer">3. Code Layer 스키마</h2>
+
+<pre><code>class CodeTypeKind(StrEnum):
+    CLASS          = "class"
+    ABSTRACT_CLASS = "abstract_class"
+    INTERFACE      = "interface"
+    ENUM           = "enum"
+    RECORD         = "record"
+
+class CodeTypeRole(StrEnum):                # D2=A 분류
+    DOMAIN     = "domain"      # BusinessTerm 으로 승격 후보
+    FRAMEWORK  = "framework"   # Spring, JPA, 등 — domain 으로 승격 안 함
+    INFRA      = "infra"       # Repository, Mapper, DTO — 승격 안 함
+    UNKNOWN    = "unknown"     # 사용자 큐
+
+class CodeType:
+    fqn: str                             # "com.acme.scm.Order"
+    simple_name: str
+    kind: CodeTypeKind
+    role: CodeTypeRole
+    is_abstract: bool                    # kind 에 더해 명시 (interface 는 자동 True)
+    extends: str | None                  # 단일 부모 클래스 fqn
+    implements: list[str]                # 인터페이스 fqn 목록
+    fields: list[CodeField]
+    methods: list[CodeMethod]
+    annotations: list[str]               # @Service, @Entity 등 — role 분류 hint
+    source_file: str
+    line_start, line_end: int
+
+class CodeField:
+    name: str
+    type: str                            # primitive 또는 다른 CodeType fqn
+    modifiers: list[str]
+    is_collection: bool                  # List/Set/Map
+    element_type: str | None             # collection 일 때
+
+class CodeMethod:
+    fqn: str
+    name: str
+    params: list[CodeParam]
+    return_type: str
+    modifiers: list[str]
+    role: MethodRole                     # business / helper / adapter / unknown (Q2'=C 정합)
+    is_abstract: bool
+    is_override: bool                    # @Override 또는 signature 매칭으로 추출
+    body_text: str | None
+    anchors: list[MethodAnchor]          # 7종 (param/local/return/branch/literal/field/field_access)
+
+class MethodRole(StrEnum):
+    BUSINESS = "business"
+    HELPER   = "helper"
+    ADAPTER  = "adapter"
+    UNKNOWN  = "unknown"</code></pre>
+
+<h3>3.1 자동 분류 룰 (Java parser 보강)</h3>
+
+<table>
+  <thead><tr><th>관점</th><th>Class.role 자동 룰</th><th>Method.role 자동 룰</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>annotation 기반</td>
+      <td>@Entity / @Service / @Component → domain<br>@Configuration / @Aspect → framework<br>@Repository / @Mapper → infra</td>
+      <td>@Override → is_override<br>@Transactional → effectful 후보</td>
+    </tr>
+    <tr>
+      <td>이름 패턴</td>
+      <td>*Repository / *Mapper / *Dto / *Util → infra<br>Abstract* / Base* → unknown (확인 필요)</td>
+      <td>*Internal / *Helper → helper<br>get* / set* / is* → adapter (단순 접근자)</td>
+    </tr>
+    <tr>
+      <td>signature 기반</td>
+      <td>인터페이스 + impl 1개만 → domain (impl 그대로)</td>
+      <td>private + 짧음 (≤ 10 lines) → helper 후보<br>public + body 풍부 → business</td>
+    </tr>
+    <tr>
+      <td>LLM 보강</td>
+      <td>unknown 인 것만 LLM 분류 → confirm 큐 (Q2'=C 정합)</td>
+      <td>unknown 만 LLM</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== -->
+<h2 id="domain-layer">4. Domain Layer 스키마</h2>
+
+<pre><code>class BusinessTerm:
+    fqn: str                             # "term.scm.order"
+    label: str                           # "주문" (한국어)
+    aliases: list[str]
+    domain: str                          # "scm" / "purchasing" / ...
+    description: str
+
+    kind: Literal["atomic", "composite"]
+
+    # facets (조합 가능)
+    is_abstract: bool       = False      # 직접 인스턴스 불가
+    is_interface: bool      = False      # 순수 capability 선언
+    is_root_entity: bool    = False      # 독립 lifecycle (검색 가능)
+    struct_like_hint: bool  = False      # UI inline 렌더링
+
+    # composite 일 때
+    parents: list[Inheritance]           # extends + implements
+    parts:   list[Composition]           # HAS_A
+
+    # atomic 일 때
+    value_type: ValueType | None         # int/float/string/bool/timestamp
+    unit: str | None
+    range: list[float] | None
+    enum_values: list[str] | None
+
+    confirmed: bool
+    created_at: datetime
+
+class Inheritance:                       # IS_A
+    child_fqn: str
+    parent_fqn: str
+    kind: Literal["extends", "implements"]
+
+class Composition:                       # HAS_A
+    parent_fqn: str
+    child_fqn: str
+    role_name: str                       # "spec" / "composition"
+    cardinality: Literal["1:1", "0:1", "1:N", "0:N"]
+    required: bool
+    description: str = ""
+
+class BusinessRule:                      # 변경 없음 (v3 결정 유지)
+    fqn: str
+    statement: str
+    severity: Literal["hard", "soft"]
+    terms_ref: list[str]
+    source: str
+
+class BusinessProcess:                   # 조직 허브 (v3 결정 유지)
+class Role:                              # 팀 (v3 결정 유지)</code></pre>
+
+<h3>4.1 effective_parts resolver</h3>
+<pre><code># transitive closure — RushOrder 의 effective parts
+def effective_parts(term_fqn: str) -> list[Composition]:
+    own_parts = term.parts
+    inherited_parts = []
+    for parent in term.parents:
+        if parent.kind == "extends" or parent.kind == "implements":
+            inherited_parts += effective_parts(parent.parent_fqn)
+    return inherited_parts + own_parts  # own 이 override 가능</code></pre>
+
+<!-- ============================================== -->
+<h2 id="mapping-layer">5. Mapping Layer 스키마</h2>
+
+<pre><code>class TypeRealization:                   # CodeType ↔ BusinessTerm
+    code_type_fqn: str
+    term_fqn: str
+    scope: Literal["primary", "partial"]
+    confidence: float
+    source: Literal["manual", "name_match", "embedding", "llm"]
+    confirmed: bool
+    confirmed_by: str | None
+    rationale: str = ""
+
+class VerificationLevel(StrEnum):
+    UNMAPPED         = "unmapped"
+    DRAFT            = "draft"
+    SIGNATURE_LOCKED = "signature_locked"
+    BODY_ANCHORED    = "body_anchored"
+    SIM_VERIFIED     = "sim_verified"
+    PR_PROVEN        = "pr_proven"
+
+class Action:
+    fqn: str                             # "action.scm.주문_검증"
+    label: str
+    aliases: list[str]
+    domain: str
+    description: str
+
+    kind: Literal["pure_function", "effectful", "workflow"]
+    is_abstract: bool                    # Java abstract method 정합
+    declared_on_term: str | None         # 어느 BusinessTerm 에 선언
+
+    params: list[ActionParam]
+    output: ActionOutput | None
+    preconditions: list[str]             # BusinessRule fqn 참조
+    postconditions: list[str]
+    effects: list[ActionEffect]
+
+    realizations: list[Realization]      # 다중 (다형성)
+    sub_actions: list[str]               # workflow 일 때 — fqn 목록
+
+    verification_level: VerificationLevel
+    signature_locked_at: datetime | None
+    confirmed_by: str | None
+
+class ActionParam:
+    name: str                            # 한국어 가능 (D1)
+    type: ValueType                      # primitive 또는 object_ref
+    object_ref_term: str | None          # type=object_ref 일 때
+    unit, range, nullable
+    description: str = ""
+    anchor_locator: str | None           # 어느 anchor 에서 confirmed
+    confirmed: bool
+
+class ActionEffect:                      # Q9=C 정형
+    op: Literal["create", "mutate", "read", "delete"]
+    target_term: str
+    target_attr: str | None
+    description: str = ""
+
+class Realization:                       # Action ↔ CodeMethod (다중)
+    code_method_fqn: str
+    applies_to_code_type_fqn: str | None # subtype filter (None = base)
+    is_override: bool
+    dispatch_source: Literal[             # D3 메모 정합 — 어떻게 결정됐나
+        "single_impl",      # 인터페이스에 impl 1개
+        "instanceof_guard", # 코드의 instanceof 분기
+        "annotation",       # @Service 등 DI
+        "factory_branch",   # factory 의 if-else / switch
+        "spring_di_unique", # Spring DI 단일 등록
+        "user_confirmed",   # 사람이 명시
+        "static_unresolved" # 정적 분석 모호 → 사용자 큐
+    ]
+    confidence: float
+    scope: Literal["primary", "partial"]
+
+class AnchorBinding:                     # fragment-level (Q4'=A)
+    id: str
+    anchor_locator: str                  # "param[0]" / "local:latest" / "literal:0.10"
+    code_method_fqn: str
+    target_action_fqn: str
+    target_slot: str                     # path with subtype cast support
+    confidence: float
+    source: str
+    confirmed: bool</code></pre>
+
+<!-- ============================================== -->
+<h2 id="callflow">6. CallSiteAnalyzer — D3 메모 응답</h2>
+
+<div class="quote">
+  사용자 메모: "자바의 실행순서를 따라갈 수 있도록 하면, 어떤 게 들어가는지 알 수 있지 않아?
+  아닌 경우가 있나? 그런 경우가 있다면 그 경우에만 사람이 매핑할 수 있도록 하면 안되나?"
+</div>
+
+<p>
+  <strong>맞습니다.</strong> Java 정적 call-flow 분석으로 dispatch 의 상당 부분을 자동 추적할 수 있습니다.
+  추적 가능한 case 는 자동 confirmed Realization, 추적 불가능한 case 만 사용자 큐 (with 후보·컨텍스트).
+  Q-C=C3 (혼합 anchor) 와 같은 패턴.
+</p>
+
+<h3>6.1 정적 분석 7 케이스</h3>
+
+<div class="callsite">
+<span class="case">Case 1 — Single implementation (자동 ✓)</span>
+<span class="auto">interface Validator { ... }
+class StandardValidator implements Validator { ... }   // 유일 impl
+→ 호출 사이트 어디든 StandardValidator 로 dispatch 확정</span>
+
+<span class="case">Case 2 — Instanceof guard (자동 ✓)</span>
+<span class="auto">if (order instanceof RushOrder) {
+    order.validate();   // → RushOrder.validate 확정
+}</span>
+
+<span class="case">Case 3 — Annotation 기반 DI (자동 ✓)</span>
+<span class="auto">@Service class OrderService { ... }   // Spring 등록 1개
+@Autowired OrderService svc;
+svc.process();   // OrderService.process 확정</span>
+
+<span class="case">Case 4 — Factory if-else / switch (자동 ✓ per branch)</span>
+<span class="auto">switch (orderType) {
+    case "STANDARD": return new StandardOrder();   // branch 별 확정
+    case "RUSH":     return new RushOrder();
+}</span>
+
+<span class="case">Case 5 — Generic with reified bound (자동 ✓ 부분)</span>
+<span class="ambig">&lt;T extends Order&gt; void process(T o) → T 의 정적 upper bound 까지만 확정,
+   호출자에서 T 가 RushOrder 로 bound 되면 거기서 더 narrow</span>
+
+<span class="case">Case 6 — Strategy Map (모호 ⚠ → 사용자 큐)</span>
+<span class="dyn">Map&lt;String, Validator&gt; validators;
+validators.get(orderType).validate();   // key 가 동적이라 정적 추적 불가
+→ 사용자에게 "후보 = [StandardValidator, RushValidator, ...] / context = OrderService.line 42" 큐</span>
+
+<span class="case">Case 7 — Reflection / SPI (모호 ⚠ → 사용자 큐)</span>
+<span class="dyn">Class.forName(...).newInstance();
+ServiceLoader.load(Validator.class);
+→ 정적 분석 불가, 사용자 큐 (분석 source = "static_unresolved")</span>
+</div>
+
+<h3>6.2 사용자 큐 — 풍부한 context 제시</h3>
+
+<div class="panel">
+  <h4>모호한 call site 마다 보여줄 정보</h4>
+  <ul>
+    <li><strong>호출 사이트</strong>: 파일 경로 + 라인 + 주변 코드 5 lines</li>
+    <li><strong>정적 추론 후보 list</strong>: 같은 인터페이스 implement 한 모든 class (정렬: usage 빈도)</li>
+    <li><strong>Spring 등록 정보</strong> (있다면): @Conditional / @Profile 같은 조건</li>
+    <li><strong>이전 사용자 confirm 패턴</strong>: 같은 type pattern 에서 사용자가 이전에 고른 답</li>
+    <li><strong>도메인 컨텍스트</strong>: 호출 메서드가 어느 BusinessProcess 에 PART_OF 인지</li>
+  </ul>
+  <p>
+    이 정도 context 면 "코드 한번도 안 본 도메인 전문가" 도 어느 impl 이 맞는지 판단 가능.
+    LLM 보조까지 추가하면 — "이 호출 사이트는 OrderService 의 일부고, 입력 type 이 RushOrder 일 가능성 70%
+    (라인 38 의 if 체크 기반)" 식으로 추천.
+  </p>
+</div>
+
+<h3>6.3 데이터 모델</h3>
+<pre><code>class CallSite:
+    id: str
+    caller_method_fqn: str
+    callee_simple_name: str
+    callee_receiver_static_type: str
+
+    possible_runtime_types: list[CandidateType]
+    confidence: float                    # 1.0 = 단일 확정, &lt; 1.0 = 모호
+    analysis_source: str                 # 7 case 중 하나
+    needs_user_confirm: bool
+    user_confirmed_type: str | None      # 사용자 답
+    user_confirmed_at: datetime | None
+
+class CandidateType:
+    code_type_fqn: str
+    score: float                         # heuristic
+    reason: str                          # "유일 impl" / "instanceof guard line 38"</code></pre>
+
+<!-- ============================================== -->
+<h2 id="sim-layer">7. Simulation Layer</h2>
+
+<pre><code>class SimulationScenario:
+    id: str
+    name: str
+    description: str
+    base_repo_id: str
+    initial_state: dict | None
+    steps: list[ScenarioStep]
+    created_at, created_by
+
+class ScenarioStep:
+    order: int
+    kind: Literal["modify_action_slot", "invoke"]
+    action_fqn: str
+    slot_path: str | None                # modify 일 때
+    new_value: Any | None
+    inputs: dict[str, ScenarioInput] | None  # invoke 일 때
+
+class ScenarioInput:
+    adapter: str                         # "form" | "generated" | "fixture" | ...
+    spec: dict                           # adapter 별 자유
+
+class ScenarioInputAdapter(Protocol):
+    name: str
+    def can_handle(spec): ...
+    def materialize(term_fqn, spec) -&gt; Any: ...
+    # Phase 1: FormInputAdapter, FixtureInputAdapter
+    # Phase 2: GeneratedInputAdapter (term range 보고 자동), JsonInputAdapter
+    # Phase 3: CsvInputAdapter, DbQueryAdapter, ApiAdapter
+
+# ChangeSpec 은 v3 모델 유지하되 target 만 method → action
+class ChangeSpec:
+    id, repo_id
+    target_action_fqn: str               # 변경 — was target_method_fqn
+    target_slot: str | None              # NEW — Action 의 어느 슬롯
+    kind: ChangeSpecKind                 # 5종 그대로
+    description, payload
+    status, simulation_result</code></pre>
+
+<!-- ============================================== -->
+<h2 id="dataflow">8. End-to-End 데이터 흐름</h2>
+
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│ 1. 코드 import                                              │
+│    Java parser → CodeType + CodeMethod + CallSite           │
+│    Class.role / Method.role 자동 분류                       │
+│    CallSiteAnalyzer 7-case 추론                             │
+└─────────────────────────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 2. Domain 측 — 매뉴얼 import + LLM 추출                     │
+│    BusinessTerm 후보 + Inheritance + Composition 후보       │
+└─────────────────────────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 3. Mapping (혼합 큐 — 자동 + 사용자)                        │
+│    • TypeRealization (CodeType ↔ Term)                      │
+│    • Action 후보 — CodeMethod 가 declared_on_term 에 등록   │
+│    • Realization (다형성) — CallSiteAnalyzer 결과 자동 +    │
+│      모호한 case 사용자 큐 (with 후보·컨텍스트)             │
+│    • AnchorBinding — fragment-level, composite path         │
+└─────────────────────────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 4. VerificationLevel 진척                                   │
+│    UNMAPPED → DRAFT → SIGNATURE_LOCKED → BODY_ANCHORED →    │
+│    SIM_VERIFIED → PR_PROVEN                                 │
+│    Workbench 의 Unmapped Methods + Verification 패널        │
+└─────────────────────────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 5. SimulationScenario 빌드                                  │
+│    사용자 시나리오 빌더 → ScenarioStep[] (modify + invoke)  │
+│    InputAdapter 로 입력 데이터 materialize                  │
+└─────────────────────────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 6. PythonGenerator (D1 한국어 변수)                         │
+│    BusinessTerm 그래프 → nested dataclass 트리              │
+│    Realization 다중 → dispatcher 자동 생성                  │
+│    Java method body → 한국어 Python (LLM, 결정적 cache)     │
+└─────────────────────────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 7. SandboxRunner (RestrictedPython, Q-A=A2)                 │
+│    Step 별 실행 + state 누적 + effect 추적                  │
+└─────────────────────────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 8. Diff (Step List + Side-by-side)                          │
+│    각 step 의 input/output/effect, baseline vs scenario     │
+└─────────────────────────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 9. ChangeSpec → DraftPR (Q-E=E2)                            │
+│    Action 슬롯 단위 patch (anchor / rule / body)            │
+│    GitHub draft PR 자동 생성                                │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+
+<!-- ============================================== -->
+<h2 id="order-walk">9. 실제 케이스 walk-through — 주문 검증</h2>
+
+<details open>
+<summary>전체 데이터 흐름 — abstract Order + StandardOrder + RushOrder</summary>
+
+<h4>9.1 Code Layer (parser 결과)</h4>
+<pre><code>CodeType("com.scm.Order", abstract_class, role=domain, abstract=True,
+    methods=[CodeMethod(validate, abstract=True, role=business)])
+CodeType("com.scm.StandardOrder", class, role=domain,
+    extends="com.scm.Order",
+    methods=[CodeMethod(validate, override=True, role=business,
+        anchors=[literal:240.0])])
+CodeType("com.scm.RushOrder", class, role=domain,
+    extends="com.scm.Order",
+    fields=[CodeField(priorityLevel, int)],
+    methods=[CodeMethod(validate, override=True, role=business,
+        anchors=[literal:1, literal:5, literal:200.0])])
+
+CallSite(caller="OrderService.process", callee="validate",
+    receiver_static_type="Order",
+    possible_runtime_types=[StandardOrder, RushOrder],
+    confidence=0.5,
+    analysis_source="instanceof_guard"  # if (o instanceof RushOrder) {...}
+    → branch 마다 확정)</code></pre>
+
+<h4>9.2 Domain Layer</h4>
+<pre><code>BusinessTerm("Order", composite, abstract=True,
+    parts=[orderNo, customer, spec])
+BusinessTerm("Trackable", composite, abstract=True, interface=True,
+    parts=[trackingNo])
+BusinessTerm("StandardOrder", composite,
+    parents=[extends Order])
+BusinessTerm("RushOrder", composite,
+    parents=[extends Order],
+    parts=[priorityLevel])</code></pre>
+
+<h4>9.3 Mapping Layer</h4>
+<pre><code>TypeRealization(com.scm.Order, term=Order, primary, confirmed)
+TypeRealization(com.scm.StandardOrder, term=StandardOrder, primary)
+TypeRealization(com.scm.RushOrder, term=RushOrder, primary)
+
+Action("action.scm.주문_검증", "주문 검증",
+    abstract=True, declared_on_term="Order",
+    params=[ActionParam("주문", object_ref, ref="Order")],
+    realizations=[
+        Realization(StandardOrder.validate, applies_to=StandardOrder,
+            override=True, dispatch_source="single_impl"),
+        Realization(RushOrder.validate, applies_to=RushOrder,
+            override=True, dispatch_source="single_impl"),
+    ],
+    verification_level="SIGNATURE_LOCKED")
+
+AnchorBinding("literal:240.0 in StandardOrder.validate",
+    target_action="action.scm.주문_검증",
+    target_slot="params[0]&lt;StandardOrder&gt;.spec.diameter.range[1]")
+AnchorBinding("literal:200.0 in RushOrder.validate",
+    target_action="action.scm.주문_검증",
+    target_slot="params[0]&lt;RushOrder&gt;.spec.diameter.range[1]")</code></pre>
+
+<h4>9.4 Simulation</h4>
+<pre><code>Scenario("긴급주문 직경 한도 200→220 완화 영향",
+    steps=[
+        ScenarioStep(modify_action_slot,
+            action="action.scm.주문_검증",
+            slot="params[0]&lt;RushOrder&gt;.spec.diameter.range[1]",
+            new_value=220.0),
+        ScenarioStep(invoke,
+            action="action.scm.주문_검증",
+            inputs={"주문": ScenarioInput(adapter="fixture",
+                spec={"id": "rush_order_42"})}),
+    ])
+
+# PythonGenerator 결과
+@dataclass class Order: orderNo: str; customer: 거래처; spec: 주문스펙
+@dataclass class StandardOrder(Order): pass
+@dataclass class RushOrder(Order): priorityLevel: int
+
+def 주문_검증(주문: Order) -&gt; 검증결과:
+    if isinstance(주문, RushOrder):
+        return rush_order_validate(주문)   # ← 자동 dispatcher
+    elif isinstance(주문, StandardOrder):
+        return standard_order_validate(주문)
+    else:
+        raise UnreachableAction(...)
+
+def rush_order_validate(주문: RushOrder):
+    if 주문.priorityLevel &lt; 1 or 주문.priorityLevel &gt; 5: return 실패(...)
+    if 주문.spec.diameter &gt; 220.0: return 실패("긴급주문 직경 한도")  # ← 220 적용
+    return 통과()</code></pre>
+
+</details>
+
+<!-- ============================================== -->
+<h2 id="steps">10. 작업 분해 — Step 1 ~ 8</h2>
+
+<p class="lead">
+  사용자 워크플로우 (feedback_workflow 정합): 한 step 끝날 때마다 코드 + verify + log + demo + TODO + status 업데이트 + 보고. 다음 step 으로 사용자 승인 후 이동.
+</p>
+
+<div class="step-card">
+  <div class="step-head">
+    <span class="step-num">STEP 1</span>
+    <span class="step-title">Code Layer 신설 + Java parser 보강</span>
+    <span class="step-meta">의존성 없음 · 가장 먼저</span>
+  </div>
+  <ul>
+    <li>SQLite 스키마 — CodeType / CodeField / CodeMethod / CallSite 테이블</li>
+    <li>Java parser 보강: extends/implements/abstract/annotations 추출 (이미 modifier 있으니 확장)</li>
+    <li>Class.role 자동 분류 룰 (annotation + 이름 패턴) + LLM unknown 처리</li>
+    <li>Method.role 자동 분류 (이미 anchor 분석 있음, role 만 추가)</li>
+    <li>CallSiteAnalyzer — Case 1~4 기본 (instanceof / single impl / annotation / factory)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>backend/modeling/code_analysis/code_type.py</code>,
+    <code>java_parser.py</code> 보강, <code>callsite_analyzer.py</code>,
+    tests, demo_guide 업데이트 (Java import 후 CodeType count 확인)
+  </div>
+</div>
+
+<div class="step-card">
+  <div class="step-head">
+    <span class="step-num">STEP 2</span>
+    <span class="step-title">Domain Layer (BusinessTerm 신모델) + 데모 reset</span>
+    <span class="step-meta">Q10=D 정합</span>
+  </div>
+  <ul>
+    <li>SQLite — BusinessTerm (kind+facets) / Inheritance / Composition</li>
+    <li>기존 BusinessTerm 데이터 archive 후 reset (Q10=D)</li>
+    <li>effective_parts resolver (transitive closure)</li>
+    <li>Validator: kind=atomic 은 parts 금지, kind=composite 의 parents 사이클 금지</li>
+    <li>Composition cardinality / required 검증</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>backend/modeling/ontology/term_schema.py</code>,
+    <code>term_store.py</code>, validator, tests, archive script,
+    데모 데이터 reset + 새 모델로 seed
+  </div>
+</div>
+
+<div class="step-card">
+  <div class="step-head">
+    <span class="step-num">STEP 3</span>
+    <span class="step-title">Mapping Layer — TypeRealization + Action + Realization</span>
+    <span class="step-meta">Step 1·2 의존</span>
+  </div>
+  <ul>
+    <li>SQLite — TypeRealization / Action / Realization / VerificationLevel</li>
+    <li>Action 후보 자동 추출 — Method.role=business 인 것마다 Action 1개 후보</li>
+    <li>Realization 자동 binding — CallSiteAnalyzer 의 자동 case 결과 그대로 적용</li>
+    <li>모호한 case 사용자 큐 — 후보 + 컨텍스트 + LLM 추천 (D3 메모)</li>
+    <li>VerificationLevel 자동 계산 (state machine)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>action_schema.py</code>, <code>type_realization.py</code>,
+    <code>realization_resolver.py</code>, Workbench 큐 API
+  </div>
+</div>
+
+<div class="step-card">
+  <div class="step-head">
+    <span class="step-num">STEP 4</span>
+    <span class="step-title">AnchorBinding (fragment-level + composite path + subtype cast)</span>
+    <span class="step-meta">Step 3 의존</span>
+  </div>
+  <ul>
+    <li>AnchorBinding 모델 (fragment-level — 메서드 매핑 없이도 가능)</li>
+    <li>Path syntax parser — <code>params[0]&lt;Subtype&gt;.spec.diameter.range[1]</code> 파싱</li>
+    <li>Path validator — BusinessTerm 그래프 traversal 가능 여부 검사</li>
+    <li>Anchor 자동 binding (Q-C=C3 혼합) — alias / literal 자동, branch / lookup 큐</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>anchor_binding.py</code>, <code>path_parser.py</code>,
+    <code>anchor_suggester.py</code> 보강
+  </div>
+</div>
+
+<div class="step-card">
+  <div class="step-head">
+    <span class="step-num">STEP 5</span>
+    <span class="step-title">SimulationScenario + InputAdapter (Form + Fixture)</span>
+    <span class="step-meta">Step 3·4 의존</span>
+  </div>
+  <ul>
+    <li>SimulationScenario / ScenarioStep / ScenarioInput 모델 (SQLite)</li>
+    <li>ScenarioInputAdapter Protocol</li>
+    <li>1단계 구현: FormInputAdapter (UI form 입력) + FixtureInputAdapter (named sample)</li>
+    <li>Fixture 등록·관리 페이지</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>simulation/scenario.py</code>,
+    <code>simulation/input_adapter/{form,fixture}.py</code>, fixture API
+  </div>
+</div>
+
+<div class="step-card">
+  <div class="step-head">
+    <span class="step-num">STEP 6</span>
+    <span class="step-title">PythonGenerator 보강 — dataclass 트리 + dispatcher</span>
+    <span class="step-meta">Step 2·3·4 의존</span>
+  </div>
+  <ul>
+    <li>BusinessTerm 그래프 → @dataclass 트리 자동 생성 (effective_parts 평탄화)</li>
+    <li>Realization 다중 → isinstance 기반 dispatcher 자동 생성</li>
+    <li>기존 한국어 변수 변환 (D1) 그대로</li>
+    <li>RestrictedPython 호환 검증</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>python_generator.py</code> 보강 (dataclass + dispatcher),
+    sample 시뮬 e2e 테스트
+  </div>
+</div>
+
+<div class="step-card">
+  <div class="step-head">
+    <span class="step-num">STEP 7</span>
+    <span class="step-title">ChangeSpec 전환 + DraftPR</span>
+    <span class="step-meta">Step 6 의존</span>
+  </div>
+  <ul>
+    <li>ChangeSpec.target_method_fqn → target_action_fqn 마이그레이션 (Q10=D 시 빈 슬레이트)</li>
+    <li>ChangeSpec.target_slot 신설 — Action 의 어느 슬롯</li>
+    <li>5종 kind → Action 슬롯 매핑 (v2 §7 표 그대로)</li>
+    <li>DraftPR 생성: Action 슬롯 변경 → Java patch 템플릿 (Q-E=E2)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>change_spec.py</code> 보강, <code>pr_creator.py</code> 보강
+  </div>
+</div>
+
+<div class="step-card">
+  <div class="step-head">
+    <span class="step-num">STEP 8</span>
+    <span class="step-title">Workbench UI 통합</span>
+    <span class="step-meta">Step 1~7 모든 의존</span>
+  </div>
+  <ul>
+    <li>Term Tree (lazy expand, virtual scroll, FTS5 검색) — Inheritance 엣지 시각화 (extends 실선, implements 점선)</li>
+    <li>Action Card — nested params, realizations 다중 표시, VerificationLevel 배지</li>
+    <li>Path Picker — 자동완성 (subtype cast 포함)</li>
+    <li>Unmapped Methods 패널</li>
+    <li>CallSite 모호 큐 — 후보 list + 컨텍스트 + LLM 추천 (D3)</li>
+    <li>SimulationScenario 빌더 (Step List + Side-by-side Diff)</li>
+    <li>InputAdapter UI (Form / Fixture 골라쓰기)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>frontend/src/components/sections/modeling/*</code> 다수,
+    end-to-end 데모 가이드 갱신
+  </div>
+</div>
+
+<!-- ============================================== -->
+<h2 id="migration">11. 마이그레이션 (Q10=D)</h2>
+
+<div class="panel">
+  <ul>
+    <li>기존 BusinessTerm / ConceptBinding 데이터 → <code>archive/2026-05-pre-action-model/</code> 으로 이동</li>
+    <li>SQLite 신 테이블 생성, 빈 상태로 시작</li>
+    <li>데모 데이터 새 모델로 seed (Order/StandardOrder/RushOrder + 화학성분 등 SCM 케이스 1~2 종)</li>
+    <li>이전 ChangeSpec / SimulationResult 도 archive (target_method_fqn 기반이라 호환 X)</li>
+    <li>새 모델 데모 가이드 작성 — "데모 reset → import → mapping → simulate → PR" e2e</li>
+  </ul>
+</div>
+
+<!-- ============================================== -->
+<h2 id="open">12. 남은 open 영역 (Phase 2+)</h2>
+
+<table>
+  <thead><tr><th>영역</th><th>현 결정</th><th>Phase 2+ 검토</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>InputAdapter 확장</td>
+      <td>Form + Fixture (Step 5)</td>
+      <td>Generated → Json → Csv → DbQuery → Api 점진</td>
+    </tr>
+    <tr>
+      <td>CallSiteAnalyzer Case 5~7</td>
+      <td>Case 1~4 자동, 5~7 사용자 큐</td>
+      <td>generic upper bound 추론 / SPI 분석 추가</td>
+    </tr>
+    <tr>
+      <td>Action vs Function 분리</td>
+      <td>단일 Action (D1=A 의 본 결정)</td>
+      <td>멀티-tenant 운영 도구 갈 때 재검토</td>
+    </tr>
+    <tr>
+      <td>BusinessTerm Interface polymorphism 활용</td>
+      <td>is_interface flag 만</td>
+      <td>aggregating by interface (팔란티어 in-dev 기능 참고)</td>
+    </tr>
+    <tr>
+      <td>Workflow 권한·승인</td>
+      <td>없음 (draft PR 만)</td>
+      <td>Action 별 approval policy</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr>
+
+<div class="panel good">
+  <h3>요약 — 우리가 만든 것</h3>
+  <ol>
+    <li><strong>Two-Layer 아키텍처</strong> — Code(Java 사실) + Domain(비즈니스 의미) 분리, 노이즈 차단</li>
+    <li><strong>Action + Realization 다형성 모델</strong> — Java OO 4가지 (extends/implements/abstract/override) 모두 표현</li>
+    <li><strong>CallSiteAnalyzer</strong> — Java 정적 분석으로 dispatch 자동 추적, 모호한 case 만 사용자 큐 (with 후보·컨텍스트)</li>
+    <li><strong>Composite BusinessTerm</strong> — kind 2종 + facets, parents/parts, dotted path syntax (subtype cast 포함)</li>
+    <li><strong>SimulationScenario + InputAdapter plugin</strong> — Form/Fixture 시작, 점진 확장 (사용자 메모 정합)</li>
+    <li><strong>VerificationLevel</strong> — 시뮬 신뢰도 calibration (우리 고유 개념, 팔란티어보다 우리 문제에 fit)</li>
+    <li><strong>fragment-level AnchorBinding</strong> — god-method/generic 사각지대 흡수</li>
+    <li><strong>Method.role / Class.role 자동 분류</strong> — 매핑 사각지대 가시화</li>
+  </ol>
+  <p>
+    <strong>다음 작업:</strong> Step 1 (Code Layer + Java parser 보강) 부터 사용자 승인 후 시작.
+    한 step 끝날 때마다 보고, 다음 step 진행 결정.
+  </p>
+</div>
+
+<p class="source">
+  근거 자료 (5 라운드 토론):
+  <a href="./온톨로지-방식-고찰.html">v1</a> ·
+  <a href="./온톨로지-방식-고찰-v2.html">v2</a> ·
+  <a href="./온톨로지-방식-고찰-v3.html">v3</a> ·
+  <a href="./온톨로지-방식-고찰-v4.html">v4</a> ·
+  <a href="./온톨로지-방식-고찰-v5.html">v5</a>
+  <br>
+  외부:
+  <a href="https://www.palantir.com/docs/foundry/ontology/core-concepts">Palantir Ontology</a> ·
+  <a href="https://www.palantir.com/docs/foundry/workshop/scenarios-overview">Workshop Scenarios</a> ·
+  <a href="https://www.palantir.com/docs/foundry/object-link-types/structs-overview">Structs (depth 1)</a> ·
+  <a href="https://www.tandfonline.com/doi/full/10.1080/24751839.2019.1686681">UML→OWL inheritance</a>
+</p>
+
+</div>
+</body>
+</html>

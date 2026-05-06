@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>onTong Workbench — V2 Code-Domain Split</title>
+<link rel="stylesheet" href="_shared.css" />
+<style>
+  /* 좌 Code Tree | 중앙 Action 매핑 (수평 분할 위·아래 = code body / domain card) | 우 Domain Tree */
+  .app-shell {
+    grid-template-rows: 36px 1fr 24px;
+    grid-template-columns: 280px 1fr 280px;
+    grid-template-areas:
+      "top top top"
+      "left main right"
+      "status status status";
+  }
+  .topbar { grid-area: top; }
+  .left, .right {
+    background: var(--panel-2);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .left { grid-area: left; border-right: 1px solid var(--border); }
+  .right { grid-area: right; border-left: 1px solid var(--border); }
+  .main { grid-area: main; background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
+  .statusbar { grid-area: status; }
+
+  .panel-h .toggle {
+    color: var(--accent); cursor: pointer; font-size: 11px;
+  }
+
+  .tree { padding: 4px 4px; overflow-y: auto; flex: 1; font-size: 12px; }
+  .tree-node {
+    display: flex; align-items: center; gap: 5px;
+    padding: 2px 8px; border-radius: 3px; cursor: pointer;
+  }
+  .tree-node:hover { background: var(--panel-3); }
+  .tree-node.selected { background: rgba(56,189,248,0.12); color: var(--accent); }
+  .tree-indent { padding-left: 14px; }
+  .tree-node .caret { color: var(--text-faint); font-size: 9px; width: 10px; }
+
+  /* Code-side hint: extends/implements 시각화 */
+  .extends-line { color: var(--text-faint); font-size: 10.5px; padding-left: 24px; }
+  .extends-line .arrow { color: var(--accent); }
+
+  /* Search bars in panels */
+  .panel-search {
+    padding: 6px 8px; border-bottom: 1px solid var(--border);
+  }
+  .panel-search input { width: 100%; font-size: 11.5px; }
+  .panel-filters {
+    display: flex; gap: 3px; padding: 5px 8px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border); background: var(--panel-3);
+  }
+  .panel-filters button {
+    font-size: 10px; padding: 2px 6px;
+  }
+
+  /* MAIN — 매핑 split */
+  .main-header {
+    padding: 10px 18px; border-bottom: 1px solid var(--border);
+    background: var(--panel-2); display: flex; align-items: center; gap: 12px;
+    flex-shrink: 0;
+  }
+  .main-header h2 {
+    font-size: 14px; font-weight: 600; flex: 1;
+  }
+  .main-header .map-arrow {
+    font-size: 18px; color: var(--accent); margin: 0 8px;
+  }
+  .main-split {
+    display: grid; grid-template-rows: 1fr 1fr; flex: 1; overflow: hidden;
+  }
+  .map-pane {
+    overflow: auto; padding: 14px 20px; border-bottom: 1px solid var(--border);
+  }
+  .map-pane.bottom { border-bottom: 0; }
+  .map-pane h3 {
+    font-size: 11px; color: var(--text-faint); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  pre.code-snip {
+    background: var(--panel-3); border: 1px solid var(--border);
+    padding: 10px 14px; border-radius: 4px; overflow-x: auto;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+    color: var(--text); line-height: 1.55;
+  }
+  pre.code-snip .hi { background: rgba(56,189,248,0.18); padding: 0 2px; cursor: pointer; }
+  pre.code-snip .hi:hover { background: rgba(56,189,248,0.4); }
+
+  .anchor-tip {
+    background: var(--panel); border: 1px solid var(--accent);
+    padding: 8px 12px; border-radius: 4px; margin-top: 8px;
+    display: flex; gap: 10px; align-items: center;
+    font-size: 12px;
+  }
+  .anchor-tip strong { color: var(--accent); }
+
+  /* Domain card */
+  .action-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px 16px; margin-bottom: 12px;
+  }
+  .action-card .row { display: flex; gap: 8px; align-items: center; margin: 4px 0; }
+  .slot-row {
+    background: var(--panel-2); padding: 5px 10px; border-radius: 3px;
+    margin: 3px 0; display: grid; grid-template-columns: 90px 1fr auto;
+    gap: 8px; align-items: center; font-size: 12px;
+  }
+  .slot-row.target {
+    background: rgba(56,189,248,0.06);
+    border: 1px solid var(--accent);
+  }
+  .compose-icon {
+    color: var(--text-faint); margin: 0 4px;
+  }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+<header class="topbar">
+  <span class="brand"><span class="o">on</span>Tong</span>
+  <span class="repo">slab-design-real · main</span>
+  <span class="spacer"></span>
+  <span class="cmd-k">⌘K  검색 / 명령</span>
+  <button>Mapping Queue (23)</button>
+  <button class="primary">시뮬</button>
+</header>
+
+<!-- LEFT — Code Tree -->
+<aside class="left">
+  <div class="panel-h">
+    <span><span class="pill code">CODE</span> &nbsp;Java 클래스</span>
+    <span class="count">1786</span>
+  </div>
+  <div class="panel-search">
+    <input type="search" placeholder="🔍 com.scm.*" />
+  </div>
+  <div class="panel-filters">
+    <button class="primary" style="font-size: 10px; padding: 2px 6px; background: var(--panel); color: var(--accent); border-color: var(--accent);">domain</button>
+    <button>framework</button>
+    <button>infra</button>
+    <button>unknown <span style="color: var(--warn);">12</span></button>
+  </div>
+  <div class="tree">
+    <div class="tree-node"><span class="caret">▼</span><span>📦 com.scm</span></div>
+    <div class="tree-indent">
+      <div class="tree-node">
+        <span class="caret"></span><span class="pill code">A</span>Order
+      </div>
+      <div class="extends-line">
+        ↑ implements <em>Trackable</em>, <em>Auditable</em>
+      </div>
+      <div class="extends-line">
+        ↑ extended by ↓
+      </div>
+      <div class="tree-node selected" style="margin-left: 8px;">
+        <span class="caret"></span><span class="pill code">C</span>RushOrder
+      </div>
+      <div class="tree-node" style="margin-left: 8px;">
+        <span class="caret"></span><span class="pill code">C</span>StandardOrder
+      </div>
+      <div class="tree-node">
+        <span class="caret">▶</span><span class="pill code">C</span>OrderService
+        <span class="pill" style="font-size: 9px;">@Service</span>
+      </div>
+      <div class="tree-node">
+        <span class="caret">▶</span><span class="pill code">C</span>OrderRepository
+        <span class="pill" style="font-size: 9px; color: var(--text-faint);">infra</span>
+      </div>
+      <div class="tree-node">
+        <span class="caret">▶</span><span class="pill code">I</span>QualityValidator
+      </div>
+    </div>
+    <div class="tree-node"><span class="caret">▶</span><span>📦 com.quality</span></div>
+    <div class="tree-node"><span class="caret">▶</span><span>📦 com.production</span></div>
+    <div style="margin-top: 8px; padding: 6px 10px;">
+      <div style="font-size: 10.5px; color: var(--text-faint); margin-bottom: 4px;">A=abstract C=class I=interface E=enum</div>
+      <div style="font-size: 10.5px; color: var(--text-faint);">실선=extends 점선=implements</div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN — 매핑 split (Code body / Domain card 위·아래) -->
+<main class="main">
+  <div class="main-header">
+    <span><span class="pill code">com.scm.RushOrder.validate()</span></span>
+    <span class="map-arrow">↔</span>
+    <span><span class="pill action">action.scm.주문_검증</span></span>
+    <span class="spacer" style="flex: 1;"></span>
+    <span class="pill warn">SIGNATURE_LOCKED</span>
+    <button>다음 미매핑 →</button>
+  </div>
+  <div class="main-split">
+
+    <!-- TOP: Code body -->
+    <div class="map-pane">
+      <h3>Java 본체 <span class="pill" style="font-size: 9.5px; color: var(--text-faint);">RushOrder.java:5-15</span></h3>
+      <pre class="code-snip">@Override
+public ValidationResult validate() {
+  ChemComposition latest = comps.get(comps.size()-1);
+  if (latest.C &lt; <span class="hi">0.10</span> || latest.C &gt; <span class="hi">0.25</span>)
+    return fail("C 함량 위반");
+  if (priority &lt; <span class="hi">1</span> || priority &gt; <span class="hi">5</span>)
+    return fail("우선도 범위");
+  if (spec.diameter &gt; <span class="hi">200.0</span>)
+    return fail("긴급주문 직경 한도");
+  return ok();
+}</pre>
+      <div class="anchor-tip">
+        <strong>📍 anchor</strong>
+        <span><code style="font-size: 11.5px; color: var(--text-dim);">literal:200.0</code></span>
+        <span class="map-arrow">→</span>
+        <span class="path-token">params[0]<span class="subtype-cast">&lt;RushOrder&gt;</span>.spec.diameter.range[1]</span>
+        <button class="primary" style="font-size: 11px; margin-left: auto;">✓ 확정</button>
+      </div>
+    </div>
+
+    <!-- BOTTOM: Domain action card -->
+    <div class="map-pane bottom">
+      <h3>Action 카드</h3>
+      <div class="action-card">
+        <div class="row">
+          <strong style="font-size: 14px;">주문 검증</strong>
+          <span class="pill action">pure_function</span>
+          <span class="pill" style="color: var(--text-faint);">abstract</span>
+          <span class="spacer" style="flex: 1;"></span>
+          <span class="pill warn">SIGNATURE_LOCKED ●●●○○○</span>
+        </div>
+        <div style="color: var(--text-faint); font-size: 11.5px; margin: 4px 0;">
+          declared on <span class="path-token">term.scm.order</span>
+        </div>
+        <hr/>
+        <div style="margin: 6px 0; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;">params · 1</div>
+        <div class="slot-row">
+          <span class="k">params[0]</span>
+          <span><strong>주문</strong> <span class="compose-icon">↳</span> <span class="pill domain">term.scm.order</span></span>
+          <span class="pill good" style="font-size: 10px;">✓</span>
+        </div>
+        <div style="margin: 8px 0 6px; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;">realizations · 2 (다형성)</div>
+        <div class="slot-row">
+          <span><span class="pill code">code</span></span>
+          <span><span class="path-token">RushOrder.validate</span> on <span class="subtype-cast">&lt;RushOrder&gt;</span> <span class="pill" style="font-size: 9.5px;">single_impl</span></span>
+          <span class="pill good" style="font-size: 10px;">✓</span>
+        </div>
+        <div class="slot-row">
+          <span><span class="pill code">code</span></span>
+          <span><span class="path-token">StandardOrder.validate</span> on <span class="subtype-cast">&lt;StandardOrder&gt;</span> <span class="pill" style="font-size: 9.5px;">single_impl</span></span>
+          <span class="pill good" style="font-size: 10px;">✓</span>
+        </div>
+        <div style="margin: 8px 0 6px; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;">anchor bindings · 4 (2 미확정)</div>
+        <div class="slot-row target">
+          <span class="k">params[0]<span class="subtype-cast">&lt;RushOrder&gt;</span>.spec.diameter.range[1]</span>
+          <span style="color: var(--accent);">← 위 코드 literal:200.0 클릭하여 매핑 중</span>
+          <button class="primary" style="font-size: 11px;">✓ 확정</button>
+        </div>
+        <div class="slot-row">
+          <span class="k">params[0]<span class="subtype-cast">&lt;RushOrder&gt;</span>.priority.range[0]</span>
+          <span style="color: var(--text-dim);">literal:1 ✓</span>
+          <span class="pill good" style="font-size: 10px;">✓</span>
+        </div>
+        <div class="slot-row" style="border-left: 2px solid var(--warn); padding-left: 8px;">
+          <span class="k">미매핑</span>
+          <span style="color: var(--warn);">if (latest.C &gt; 0.25) — slot 선택 필요</span>
+          <button style="font-size: 11px;">선택...</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- RIGHT — Domain Tree -->
+<aside class="right">
+  <div class="panel-h">
+    <span><span class="pill domain">DOMAIN</span> &nbsp;BusinessTerm</span>
+    <span class="count">59</span>
+  </div>
+  <div class="panel-search">
+    <input type="search" placeholder="🔍 주문 / 화학..." />
+  </div>
+  <div class="panel-filters">
+    <button class="primary" style="font-size: 10px; padding: 2px 6px; background: var(--panel); color: var(--accent); border-color: var(--accent);">composite</button>
+    <button>atomic</button>
+    <button>+root</button>
+    <button>+abstract</button>
+  </div>
+  <div class="tree">
+    <div class="tree-node"><span class="caret">▼</span><span class="pill domain">T</span>주문 <span style="color: var(--text-faint); font-size: 10.5px;">(abstract, root)</span></div>
+    <div class="extends-line">⇒ implements <em>Trackable</em></div>
+    <div class="extends-line">↗ extended by 표준주문, 긴급주문</div>
+    <div class="tree-indent">
+      <div class="tree-node selected"><span class="caret">▼</span><span class="pill domain">T</span>주문스펙 <span style="color: var(--text-faint); font-size: 10px;">(struct, 1:1)</span></div>
+      <div class="tree-indent">
+        <div class="tree-node"><span class="caret"></span><span class="pill domain">a</span>품종 <span style="color: var(--text-faint); font-size: 10px;">str</span></div>
+        <div class="tree-node"><span class="caret"></span><span class="pill domain">a</span>강종 <span style="color: var(--text-faint); font-size: 10px;">str</span></div>
+        <div class="tree-node selected"><span class="caret"></span><span class="pill domain">a</span><strong>직경</strong> <span style="color: var(--text-faint); font-size: 10px;">float, mm, [0,300]</span></div>
+        <div class="tree-node"><span class="caret"></span><span class="pill domain">a</span>길이 <span style="color: var(--text-faint); font-size: 10px;">float, mm</span></div>
+      </div>
+      <div class="tree-node"><span class="caret">▶</span><span class="pill domain">T</span>화학성분 <span style="color: var(--text-faint); font-size: 10px;">(struct, 1:N)</span></div>
+      <div class="tree-node"><span class="caret">▶</span><span class="pill domain">T</span>진행관리정보</div>
+      <div class="tree-node"><span class="caret">▶</span><span class="pill domain">T</span>품질설계정보</div>
+    </div>
+    <div class="tree-node"><span class="caret">▶</span><span class="pill domain">T</span>표준주문 <span style="color: var(--text-faint); font-size: 10.5px;">(extends 주문)</span></div>
+    <div class="tree-node"><span class="caret">▶</span><span class="pill domain">T</span>긴급주문 <span style="color: var(--text-faint); font-size: 10.5px;">(extends 주문)</span></div>
+    <div class="tree-node"><span class="caret">▶</span><span class="pill domain">T</span>거래처 <span style="color: var(--text-faint); font-size: 10.5px;">(reference)</span></div>
+    <div style="margin-top: 8px; padding: 6px 10px;">
+      <div style="font-size: 10.5px; color: var(--text-faint); margin-bottom: 4px;">T=composite a=atomic</div>
+    </div>
+  </div>
+</aside>
+
+<footer class="statusbar">
+  <span class="verification">
+    <span class="pill bad" style="font-size: 9px;">U</span>16
+    <span class="pill warn" style="font-size: 9px;">D</span>18
+    <span class="pill" style="font-size: 9px;">SL</span>22
+    <span class="pill" style="font-size: 9px;">BA</span>47
+    <span class="pill good" style="font-size: 9px;">SV</span>31
+    <span class="pill good" style="font-size: 9px;">PR</span>8
+  </span>
+  <span>총 142 actions · BODY_ANCHORED+ <strong style="color: var(--good);">86</strong> (61%)</span>
+  <span class="spacer" style="flex: 1;"></span>
+  <span>Plugin: <span style="color: var(--text-faint);">simulation, change_pr, nl_impact</span></span>
+</footer>
+
+</div>
+</body>
+</html>

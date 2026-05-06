@@ -1,133 +1,72 @@
 {
-  "인프라/": {
-    "owner": "donghae",
-    "read": [
-      "all"
-    ],
-    "write": [
-      "@donghae",
-      "admin"
-    ],
-    "manage": [
-      "@donghae"
-    ],
+  "설비/": {
+    "owner": "admin",
+    "read": ["all"],
+    "write": ["all"],
+    "manage": ["admin"],
     "inherited": false
   },
-  "ERP/": {
+  "공정/": {
     "owner": "admin",
-    "read": [
-      "all"
-    ],
-    "write": [
-      "all"
-    ],
-    "manage": [
-      "admin"
-    ],
+    "read": ["all"],
+    "write": ["all"],
+    "manage": ["admin"],
     "inherited": false
   },
-  "MES/": {
+  "제품/": {
     "owner": "admin",
-    "read": [
-      "all"
-    ],
-    "write": [
-      "all"
-    ],
-    "manage": [
-      "admin"
-    ],
+    "read": ["all"],
+    "write": ["all"],
+    "manage": ["admin"],
     "inherited": false
   },
-  "SCM/": {
+  "표준/": {
     "owner": "admin",
-    "read": [
-      "all"
-    ],
-    "write": [
-      "all"
-    ],
-    "manage": [
-      "admin"
-    ],
+    "read": ["all"],
+    "write": ["all"],
+    "manage": ["admin"],
     "inherited": false
   },
-  "test_linage/": {
+  "이슈/": {
     "owner": "admin",
-    "read": [
-      "all"
-    ],
-    "write": [
-      "all"
-    ],
-    "manage": [
-      "admin"
-    ],
-    "inherited": false
-  },
-  "기획/": {
-    "owner": "admin",
-    "read": [
-      "all"
-    ],
-    "write": [
-      "all"
-    ],
-    "manage": [
-      "admin"
-    ],
-    "inherited": false
-  },
-  "인사/": {
-    "owner": "admin",
-    "read": [
-      "all"
-    ],
-    "write": [
-      "all"
-    ],
-    "manage": [
-      "admin"
-    ],
-    "inherited": false
-  },
-  "재무/": {
-    "owner": "admin",
-    "read": [
-      "all"
-    ],
-    "write": [
-      "all"
-    ],
-    "manage": [
-      "admin"
-    ],
+    "read": ["all"],
+    "write": ["@선우", "@윤재현", "admin"],
+    "manage": ["admin"],
     "inherited": false
   },
   "_skills/": {
     "owner": "admin",
-    "read": [
-      "all"
-    ],
-    "write": [
-      "all"
-    ],
-    "manage": [
-      "admin"
-    ],
+    "read": ["all"],
+    "write": ["all"],
+    "manage": ["admin"],
     "inherited": false
   },
   "_personas/": {
     "owner": "admin",
-    "read": [
-      "all"
-    ],
-    "write": [
-      "all"
-    ],
-    "manage": [
-      "admin"
-    ],
+    "read": ["all"],
+    "write": ["all"],
+    "manage": ["admin"],
+    "inherited": false
+  },
+  "@donghae/": {
+    "owner": "donghae",
+    "read": ["donghae"],
+    "write": ["donghae"],
+    "manage": ["donghae", "admin"],
+    "inherited": false
+  },
+  "@kim/": {
+    "owner": "kim",
+    "read": ["kim"],
+    "write": ["kim"],
+    "manage": ["kim", "admin"],
+    "inherited": false
+  },
+  "@lee/": {
+    "owner": "lee",
+    "read": ["lee"],
+    "write": ["lee"],
+    "manage": ["lee", "admin"],
     "inherited": false
   }
 }

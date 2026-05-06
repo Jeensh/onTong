@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Round 1 — 코드 쪽 온톨로지 스키마 + Spring 특화</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161a22;
+    --panel-2: #1d222d;
+    --border: #2a3142;
+    --text: #e6e8ee;
+    --muted: #9aa3b2;
+    --accent: #6ea8fe;
+    --accent-2: #7ee787;
+    --warn: #f2b35b;
+    --danger: #ff6b6b;
+    --code-bg: #0b0d13;
+
+    --code: #6ea8fe;       /* blue : 코드 구조 노드 */
+    --spring: #7ee787;     /* green : Spring 특화 노드 */
+    --db: #f2b35b;         /* orange : DB 노드 */
+    --cfg: #c792ea;        /* purple : Config 노드 */
+    --biz: #6b7380;        /* grey : 비즈니스(Round 2 preview) */
+    --edge: #9aa3b2;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, "SF Pro Display", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; line-height: 1.6; }
+  body { padding: 40px 24px 120px; }
+  .container { max-width: 1120px; margin: 0 auto; }
+  h1 { font-size: 34px; margin: 0 0 8px; letter-spacing: -0.3px; }
+  h2 { font-size: 24px; margin: 56px 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); letter-spacing: -0.2px; }
+  h3 { font-size: 18px; margin: 32px 0 10px; color: var(--text); }
+  h4 { font-size: 14px; margin: 20px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  p { margin: 10px 0; color: var(--text); }
+  a { color: var(--accent); text-decoration: none; }
+  code.inline { background: var(--code-bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; font-size: 13px; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; overflow: auto; font-size: 13px; line-height: 1.55; color: #c9d1d9; }
+  pre code { white-space: pre; }
+  .kw { color: #ff7b72; }
+  .an { color: #79c0ff; }
+  .tp { color: #d2a8ff; }
+  .st { color: #a5d6ff; }
+  .fn { color: #d2a8ff; }
+  .cm { color: #8b949e; font-style: italic; }
+
+  .lead { font-size: 17px; color: #cfd3db; background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--accent); padding: 16px 20px; border-radius: 10px; margin: 20px 0 10px; }
+  .callout { border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin: 14px 0; background: var(--panel); }
+  .callout.warn { border-left: 4px solid var(--warn); }
+  .callout.ok { border-left: 4px solid var(--accent-2); }
+  .callout.danger { border-left: 4px solid var(--danger); }
+  .muted { color: var(--muted); }
+  .hstack { display: flex; gap: 16px; flex-wrap: wrap; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; flex: 1; min-width: 260px; }
+  .card h4 { margin-top: 0; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--panel-2); color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  tr:last-child td { border-bottom: none; }
+  td code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; color: #c9d1d9; font-size: 12px; }
+
+  .chip { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); margin-right: 6px; }
+  .chip.code { color: var(--code); border-color: color-mix(in srgb, var(--code) 35%, var(--border)); }
+  .chip.spring { color: var(--spring); border-color: color-mix(in srgb, var(--spring) 35%, var(--border)); }
+  .chip.db { color: var(--db); border-color: color-mix(in srgb, var(--db) 35%, var(--border)); }
+  .chip.cfg { color: var(--cfg); border-color: color-mix(in srgb, var(--cfg) 35%, var(--border)); }
+  .chip.biz { color: var(--biz); border-color: color-mix(in srgb, var(--biz) 35%, var(--border)); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 20px; }
+  .legend .chip { font-size: 12px; padding: 4px 10px; }
+
+  /* SVG graph */
+  .svg-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; overflow-x: auto; }
+  svg text { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+  .node-label { fill: #e6e8ee; }
+  .edge-label { fill: var(--muted); font-size: 10px; }
+
+  .toc { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; font-size: 14px; }
+  .toc ol { margin: 6px 0 0 18px; padding: 0; }
+  .toc li { margin: 3px 0; color: var(--muted); }
+  .toc a { color: var(--text); }
+  .toc a:hover { color: var(--accent); }
+
+  .check { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+  .check:last-child { border-bottom: none; }
+  .check .box { font-weight: 700; color: var(--accent); min-width: 28px; }
+  .check .q { color: var(--text); }
+  .check .hint { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+  .walk-step { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin: 14px 0; }
+  .walk-step .step-title { font-size: 15px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+  .walk-step .step-title .num { display: inline-block; background: var(--accent); color: #0b0d13; border-radius: 6px; padding: 1px 8px; margin-right: 8px; font-weight: 700; }
+
+  .field-row { display: grid; grid-template-columns: 180px 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
+  .field-row:last-child { border-bottom: none; }
+  .field-row .k { color: var(--muted); }
+  .field-row .v { color: var(--text); }
+
+  .badge { display: inline-block; background: var(--panel-2); border: 1px solid var(--border); padding: 1px 8px; border-radius: 4px; font-size: 11px; color: var(--muted); margin-left: 6px; }
+
+  footer { margin-top: 80px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <div class="muted" style="font-size:12px; letter-spacing: 0.6px;">ONTONG · SECTION 2 · ROUND 1 · 2026-04-19 · rev.3</div>
+  <h1>코드 쪽 온톨로지 스키마 + Spring 특화</h1>
+  <p class="muted">레거시 Java/Spring 코드를 그래프로 어떻게 쪼갤 것인가. Round 1은 '코드 쪽'만. 비즈니스 개념(Round 2) / 기준서(Round 3)는 나중 라운드.</p>
+  <div class="callout ok" style="margin-top:18px;">
+    <strong>rev.3 — 사용자 Q1~Q11 피드백 모두 반영 (2026-04-19)</strong>
+    <ul style="margin:6px 0 0 18px; padding:0;">
+      <li><strong>Q1/Q2 (확장성)</strong> — 플러그인 레지스트리로 설계. <a href="#extensible">§3-A</a></li>
+      <li><strong>Q3 (필드 값 전파)</strong> — 데이터 계보(Data Lineage) 표현 추가. <a href="#lineage">§6-B</a></li>
+      <li><strong>Q4 (Reflection 런타임)</strong> — 1차 범위 안으로 승격. <a href="#s3">§5-3</a></li>
+      <li><strong>Q5 (precondition/postcondition)</strong> — Round 1 포함 이유 3가지. <a href="#method-fields-reason">§6 callout</a></li>
+      <li><strong>Q6 (hops)</strong> — 무제한 기본 + 사용자 조정. <a href="#impact">§7</a></li>
+      <li><strong>Q9 (동적 매핑)</strong> — MapStruct / BeanUtils / native SQL 3 분석기 모두 <em>1차 포함</em>. <a href="#lineage">§6-B-4</a></li>
+      <li><strong>Q10 (JVM Agent 시점)</strong> — 정식 Section 3가 아닌 <em>임시 섹션</em>에서 모델링 완성 후 실행. <a href="#temporary-section">§10</a></li>
+      <li><strong>Q11 (타겟)</strong> — 공정계획의 <em>slab 설계 엔진 (단순화)</em>. 사용자가 직접 제공. <a href="#target">§11</a></li>
+      <li><strong>Q7/Q8</strong> — 합의.</li>
+    </ul>
+  </div>
+</header>
+
+<div class="lead">
+  <strong>이 라운드의 한 줄</strong><br>
+  "<code class="inline">OrderController.place()</code>을 바꾸면 어디까지 영향을 받는가?"라는 질문에 <strong>결정적 그래프 탐색</strong>만으로 답할 수 있는 스키마를 확정한다. LLM은 개입하지 않는다.
+</div>
+
+<div class="toc">
+  <strong>목차</strong>
+  <ol>
+    <li><a href="#why">왜 Round 1은 '코드만'인가</a></li>
+    <li><a href="#nodes">노드 15종</a></li>
+    <li><a href="#edges">엣지 15종 (+ §6-B 에서 2종 추가 → 총 17종)</a></li>
+    <li><a href="#extensible">확장 설계 원칙 <span class="badge">Q1/Q2</span></a></li>
+    <li><a href="#walk">워킹 예시 — OrderController.place()</a></li>
+    <li><a href="#spring">Spring 8 난제 처리</a></li>
+    <li><a href="#method-fields">메서드 노드 상세 필드 (Test Generation 밑받침)</a></li>
+    <li><a href="#lineage">데이터 계보 — 필드 값 전파 <span class="badge">Q3/Q9</span></a></li>
+    <li><a href="#impact">Impact Analysis 질의 시뮬레이션 <span class="badge">Q6</span></a></li>
+    <li><a href="#temporary-section">실행 배치 경로 — 임시 섹션 <span class="badge">Q10</span></a></li>
+    <li><a href="#target">첫 PoC 타겟 — Slab 설계 엔진 <span class="badge">Q11</span></a></li>
+    <li><a href="#checklist">Round 1 합의 체크리스트 — Q1~Q11 최종</a></li>
+    <li><a href="#next">다음 라운드 예고</a></li>
+  </ol>
+</div>
+
+<!-- =================================================================== -->
+<h2 id="why">1. 왜 Round 1은 '코드만'인가</h2>
+
+<p>
+  10년 된 레거시에서 <strong>유일하게 안 거짓말하는 건 코드</strong>다. 기준서는 갱신이 안 돼 있고, 담당자 머릿속은 휘발성이다. 그래서 출발점은 코드.
+</p>
+<p>
+  그런데 Java 클래스 다이어그램만 보고는 "이 메서드를 바꾸면 어디에 영향이 가는가?"를 답할 수 없다. 이유는 3개:
+</p>
+<ul>
+  <li>Spring은 <strong>런타임 조립</strong>이 많다. <code class="inline">@Autowired</code> 인터페이스가 실제로 어느 구현과 바인딩되는지 AST엔 안 쓰여있다.</li>
+  <li>메서드 호출이 <strong>AOP 프록시</strong>를 거쳐가면 정적 호출 그래프에선 안 보인다.</li>
+  <li>HTTP 요청, 배치 스케줄, 카프카 리스너, 이벤트 퍼블리셔 — <strong>진입점이 다양</strong>하다.</li>
+</ul>
+<p>
+  그래서 Round 1은 <strong>Java AST + Spring 특화 분석기</strong> 두 레이어로 코드 그래프를 세운다. 이 그래프 위에서 결정적 BFS만 돌려도 Impact Analysis가 나오게 만드는 게 목표.
+</p>
+
+<div class="callout warn">
+  <strong>경계 선언.</strong> Round 1에서는 "비즈니스 용어 → 코드 위치" 매핑(Reverse Lookup)과 "기준서 갭 탐지"는 다루지 않는다. 각각 Round 2 / Round 3에서. 단, Round 1의 메서드 노드가 precondition/postcondition 필드를 가지는 것까지는 이번에 확정한다. Test Generation이 이 필드를 먹고 동작할 예정이라 Round 2/3에 미뤄두면 스키마 재공사가 생긴다.
+</div>
+
+<!-- =================================================================== -->
+<h2 id="nodes">2. 노드 15종</h2>
+
+<p>
+  Neo4j 레이블로 표현하지만, 구현은 <code class="inline">:CodeEntity{kind: "..."}</code>로 단일 레이블 + <code class="inline">kind</code> 속성으로 이미 잡혀 있다(삭제된 <code class="inline">parser_protocol.py</code>의 <code class="inline">EntityKind</code> enum 확장). 쿼리 단에서 kind 필터.
+</p>
+
+<div class="legend">
+  <span class="chip code">코드 구조</span>
+  <span class="chip spring">Spring 특화</span>
+  <span class="chip db">DB</span>
+  <span class="chip cfg">Config</span>
+</div>
+
+<table>
+  <thead>
+    <tr><th>kind</th><th>분류</th><th>정체</th><th>예시 (Java)</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>PACKAGE</code></td><td><span class="chip code">코드</span></td><td>자바 패키지</td><td><code>com.acme.order</code></td></tr>
+    <tr><td><code>CLASS</code></td><td><span class="chip code">코드</span></td><td>일반 클래스</td><td><code>OrderService</code></td></tr>
+    <tr><td><code>INTERFACE</code></td><td><span class="chip code">코드</span></td><td>인터페이스</td><td><code>PaymentGateway</code></td></tr>
+    <tr><td><code>ENUM</code></td><td><span class="chip code">코드</span></td><td>열거형</td><td><code>OrderStatus</code></td></tr>
+    <tr><td><code>METHOD</code></td><td><span class="chip code">코드</span></td><td>메서드 (⚠️ 매핑 1급 시민)</td><td><code>OrderService.place(Order)</code></td></tr>
+    <tr><td><code>FIELD</code></td><td><span class="chip code">코드</span></td><td>필드</td><td><code>Order.status</code></td></tr>
+    <tr><td><code>CONSTRUCTOR</code></td><td><span class="chip code">코드</span></td><td>생성자</td><td><code>Order(Customer, List&lt;Item&gt;)</code></td></tr>
+    <tr><td><code>SPRING_BEAN</code></td><td><span class="chip spring">Spring</span></td><td>Bean 인스턴스. 인터페이스↔구현 바인딩의 결과</td><td><code>orderServiceBean → OrderServiceImpl</code></td></tr>
+    <tr><td><code>HTTP_ENDPOINT</code></td><td><span class="chip spring">Spring</span></td><td><code>@RequestMapping</code> 계열. URL 진입점</td><td><code>POST /orders → OrderController.place()</code></td></tr>
+    <tr><td><code>ASPECT</code></td><td><span class="chip spring">Spring</span></td><td><code>@Around</code>/<code>@Transactional</code>/<code>@Cacheable</code> 등 AOP advice</td><td><code>LoggingAspect.log(...)</code></td></tr>
+    <tr><td><code>SCHEDULED_TASK</code></td><td><span class="chip spring">Spring</span></td><td><code>@Scheduled</code> 진입점</td><td><code>SettlementJob.runDaily()</code></td></tr>
+    <tr><td><code>MSG_LISTENER</code></td><td><span class="chip spring">Spring</span></td><td>Kafka / RabbitMQ <code>@KafkaListener</code> 등</td><td><code>OrderEventsListener.onPaid()</code></td></tr>
+    <tr><td><code>EVENT_TYPE</code></td><td><span class="chip spring">Spring</span></td><td><code>ApplicationEvent</code> 클래스. publisher/handler 브릿지</td><td><code>OrderPlacedEvent</code></td></tr>
+    <tr><td><code>DB_TABLE</code></td><td><span class="chip db">DB</span></td><td>JPA Entity/테이블</td><td><code>orders</code></td></tr>
+    <tr><td><code>DB_COLUMN</code></td><td><span class="chip db">DB</span></td><td>테이블 컬럼</td><td><code>orders.total_amount</code></td></tr>
+    <tr><td><code>CONFIG_PROPERTY</code></td><td><span class="chip cfg">Config</span></td><td><code>@ConfigurationProperties</code> / <code>@Value</code> 키</td><td><code>order.max-items</code></td></tr>
+  </tbody>
+</table>
+
+<p class="muted" style="font-size:13px;">
+  15개처럼 보이지만 <code class="inline">SPRING_BEAN</code>은 <code class="inline">CLASS</code>와 1:N이 아니라 1:1에 가까우니 실효는 14개 + 1개(Bean은 조립 결과 뷰). 나중에 1개 정도 빼거나 합치는 정도는 가능.
+</p>
+
+<!-- =================================================================== -->
+<h2 id="edges">3. 엣지 15종 (+ §6-B 데이터 계보 2종 → 17종)</h2>
+
+<p>Neo4j 관계 타입 = relation kind. 각 엣지는 방향이 있음. (source)-[:KIND]->(target). 아래 표는 기본 15종. 데이터 계보용 <code class="inline">DERIVES_FROM</code> / <code class="inline">PROPAGATES_TO</code> 는 §6-B에서 상세.</p>
+
+<table>
+  <thead><tr><th>kind</th><th>source → target</th><th>의미</th><th>파서 레이어</th></tr></thead>
+  <tbody>
+    <tr><td><code>CONTAINS</code></td><td>PACKAGE→CLASS, CLASS→METHOD/FIELD, ...</td><td>구문 소속</td><td>AST</td></tr>
+    <tr><td><code>CALLS</code></td><td>METHOD→METHOD</td><td>메서드 호출</td><td>AST (직접 호출만)</td></tr>
+    <tr><td><code>EXTENDS</code></td><td>CLASS→CLASS</td><td>상속</td><td>AST</td></tr>
+    <tr><td><code>IMPLEMENTS</code></td><td>CLASS→INTERFACE</td><td>구현</td><td>AST</td></tr>
+    <tr><td><code>DEPENDS_ON</code></td><td>CLASS→CLASS/INTERFACE</td><td>필드/파라미터 타입 참조</td><td>AST</td></tr>
+    <tr><td><code>READS</code></td><td>METHOD→FIELD</td><td>필드 읽기</td><td>AST</td></tr>
+    <tr><td><code>WRITES</code></td><td>METHOD→FIELD</td><td>필드 쓰기</td><td>AST</td></tr>
+    <tr><td><code>AUTOWIRES</code></td><td>SPRING_BEAN→SPRING_BEAN</td><td>DI 바인딩. 인터페이스 필드 → 실제 구현 Bean</td><td>Spring 분석기</td></tr>
+    <tr><td><code>INTERCEPTS</code></td><td>ASPECT→METHOD</td><td>AOP advice가 메서드를 가로챔</td><td>Spring 분석기</td></tr>
+    <tr><td><code>MAPS_URL</code></td><td>HTTP_ENDPOINT→METHOD</td><td>URL이 컨트롤러 메서드에 맵</td><td>Spring 분석기</td></tr>
+    <tr><td><code>PUBLISHES</code></td><td>METHOD→EVENT_TYPE</td><td><code>publisher.publishEvent(x)</code></td><td>Spring 분석기</td></tr>
+    <tr><td><code>HANDLES</code></td><td>METHOD→EVENT_TYPE</td><td><code>@EventListener</code> / <code>@KafkaListener</code></td><td>Spring 분석기</td></tr>
+    <tr><td><code>READS_TABLE</code></td><td>METHOD→DB_TABLE/DB_COLUMN</td><td>JPA 레포지토리 / 네이티브 쿼리에서 읽음</td><td>Spring Data 분석기</td></tr>
+    <tr><td><code>WRITES_TABLE</code></td><td>METHOD→DB_TABLE/DB_COLUMN</td><td>INSERT/UPDATE/DELETE</td><td>Spring Data 분석기</td></tr>
+    <tr><td><code>HAS_CONFIG</code></td><td>METHOD/CLASS→CONFIG_PROPERTY</td><td><code>@Value</code> / <code>@ConfigurationProperties</code> 주입</td><td>Spring 분석기</td></tr>
+  </tbody>
+</table>
+
+<p class="muted" style="font-size: 13px;">
+  파서 레이어 컬럼이 핵심. <strong>AST 레이어</strong>는 <code class="inline">java_parser.py</code> (tree-sitter) 재활용. <strong>Spring 분석기</strong>는 어노테이션/Bean 정의/AOP pointcut을 해석하는 별도 모듈. 둘이 각자 돌고 같은 그래프에 MERGE.
+</p>
+
+<!-- =================================================================== -->
+<h2 id="extensible">3-A. 확장 설계 원칙 (Q1 / Q2 응답)</h2>
+
+<p>
+  사용자 의견: "당장은 충분. 완성 후 추가 시 확장이 용이하도록."<br>
+  → 노드/엣지 kind 15종을 하드코드 enum으로 박지 않는다. <strong>플러그인 레지스트리</strong> 패턴으로 설계.
+</p>
+
+<div class="hstack">
+  <div class="card">
+    <h4>Neo4j 층</h4>
+    <p>이미 <code class="inline">:CodeEntity{kind: "..."}</code> 단일 레이블 + kind 속성. 새 kind 추가 시 <strong>스키마 마이그레이션 불필요</strong>. 쿼리 단에서 <code class="inline">WHERE n.kind = 'QUARTZ_JOB'</code> 로 필터만 추가하면 됨.</p>
+  </div>
+  <div class="card">
+    <h4>파서/분석기 층</h4>
+    <p><code class="inline">CodeParser</code> / <code class="inline">SpringAnalyzer</code> 프로토콜을 두고 각 kind를 담당하는 분석기를 <code class="inline">register(kind, analyzer)</code> 로 등록. 새 kind(예: <code class="inline">FEIGN_CLIENT</code>)를 추가할 때 기존 파일 수정 X, 새 파서 파일 1개만 추가.</p>
+  </div>
+  <div class="card">
+    <h4>API/프론트 층</h4>
+    <p>Impact Analysis 응답에 <code class="inline">kind</code>를 문자열로 그대로 반환. 프론트는 <code class="inline">KIND_STYLE_MAP</code> 딕셔너리로 색/아이콘 매핑. 새 kind 아이콘/라벨만 추가하면 노출.</p>
+  </div>
+</div>
+
+<pre><code><span class="cm"># backend/modeling/code_analysis/registry.py (확장 포인트)</span>
+<span class="kw">class</span> <span class="tp">EntityKindRegistry</span>:
+    _kinds: <span class="tp">dict</span>[<span class="tp">str</span>, <span class="tp">EntityKindSpec</span>] = {}
+
+    <span class="an">@classmethod</span>
+    <span class="kw">def</span> <span class="fn">register</span>(<span class="kw">cls</span>, kind: <span class="tp">str</span>, spec: <span class="tp">EntityKindSpec</span>):
+        <span class="kw">cls</span>._kinds[kind] = spec
+
+    <span class="an">@classmethod</span>
+    <span class="kw">def</span> <span class="fn">all</span>(<span class="kw">cls</span>) -> <span class="tp">list</span>[<span class="tp">str</span>]:
+        <span class="kw">return</span> <span class="tp">list</span>(<span class="kw">cls</span>._kinds.<span class="fn">keys</span>())
+
+<span class="cm"># 기본 15 kind는 부팅 시 기본 분석기 모듈이 register.</span>
+<span class="cm"># 신규 kind는 별도 모듈(예: plugins/feign_analyzer.py)에서 register.</span></code></pre>
+
+<div class="callout ok">
+  <strong>운영 가능성.</strong> Neo4j 그래프 DB 특성상 새 노드/엣지 종류가 추가돼도 기존 쿼리는 망가지지 않는다(존재 안 하면 skip). 즉 <strong>하방 호환 자동</strong>. Postgres 스키마처럼 ALTER TABLE이 필요 없다. 이건 Neo4j를 고른 실질적 이유 중 하나.
+</div>
+
+<!-- =================================================================== -->
+<h2 id="walk">4. 워킹 예시 — OrderController.place()</h2>
+
+<p>실제 Java/Spring 코드가 위 그래프로 어떻게 변환되는지 끝까지 따라간다.</p>
+
+<h3>4-1. 입력 코드</h3>
+<pre><code><span class="cm">// OrderController.java</span>
+<span class="an">@RestController</span>
+<span class="an">@RequestMapping</span>(<span class="st">"/orders"</span>)
+<span class="kw">public class</span> <span class="tp">OrderController</span> {
+
+  <span class="kw">private final</span> <span class="tp">OrderService</span> orderService;
+  <span class="kw">private final</span> <span class="tp">ApplicationEventPublisher</span> publisher;
+
+  <span class="an">@Autowired</span>
+  <span class="kw">public</span> <span class="fn">OrderController</span>(<span class="tp">OrderService</span> s, <span class="tp">ApplicationEventPublisher</span> p) { ... }
+
+  <span class="an">@PostMapping</span>
+  <span class="kw">public</span> <span class="tp">OrderResponse</span> <span class="fn">place</span>(<span class="an">@RequestBody</span> <span class="tp">OrderRequest</span> req) {
+    <span class="tp">Order</span> saved = orderService.<span class="fn">place</span>(req);
+    publisher.<span class="fn">publishEvent</span>(<span class="kw">new</span> <span class="tp">OrderPlacedEvent</span>(saved.getId()));
+    <span class="kw">return</span> <span class="tp">OrderResponse</span>.<span class="fn">from</span>(saved);
+  }
+}
+
+<span class="cm">// OrderService.java</span>
+<span class="kw">public interface</span> <span class="tp">OrderService</span> {
+  <span class="tp">Order</span> <span class="fn">place</span>(<span class="tp">OrderRequest</span> req);
+}
+
+<span class="cm">// OrderServiceImpl.java</span>
+<span class="an">@Service</span>
+<span class="kw">public class</span> <span class="tp">OrderServiceImpl</span> <span class="kw">implements</span> <span class="tp">OrderService</span> {
+
+  <span class="kw">private final</span> <span class="tp">OrderRepository</span> repo;
+  <span class="kw">private final</span> <span class="tp">InventoryClient</span> inventory;
+
+  <span class="an">@Transactional</span>
+  <span class="an">@Override</span>
+  <span class="kw">public</span> <span class="tp">Order</span> <span class="fn">place</span>(<span class="tp">OrderRequest</span> req) {
+    inventory.<span class="fn">reserve</span>(req.getItems());
+    <span class="tp">Order</span> o = <span class="kw">new</span> <span class="tp">Order</span>(req);
+    <span class="kw">return</span> repo.<span class="fn">save</span>(o);
+  }
+}
+
+<span class="cm">// OrderRepository.java</span>
+<span class="kw">public interface</span> <span class="tp">OrderRepository</span> <span class="kw">extends</span> <span class="tp">JpaRepository</span>&lt;<span class="tp">Order</span>, <span class="tp">Long</span>&gt; {
+  <span class="tp">List</span>&lt;<span class="tp">Order</span>&gt; <span class="fn">findByCustomerId</span>(<span class="tp">Long</span> customerId);
+}
+</code></pre>
+
+<h3>4-2. 이 코드가 만드는 그래프 (요약)</h3>
+
+<div class="svg-wrap">
+<svg viewBox="0 0 1040 520" width="100%" height="520" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#9aa3b2"/>
+    </marker>
+  </defs>
+
+  <!-- HTTP endpoint -->
+  <g>
+    <rect x="40" y="30" width="220" height="50" rx="8" fill="#1d222d" stroke="#7ee787" stroke-width="1.5"/>
+    <text x="150" y="50" text-anchor="middle" fill="#7ee787" font-size="10">HTTP_ENDPOINT</text>
+    <text x="150" y="68" text-anchor="middle" class="node-label">POST /orders</text>
+  </g>
+
+  <!-- Controller method -->
+  <g>
+    <rect x="40" y="130" width="220" height="50" rx="8" fill="#1d222d" stroke="#6ea8fe" stroke-width="1.5"/>
+    <text x="150" y="150" text-anchor="middle" fill="#6ea8fe" font-size="10">METHOD</text>
+    <text x="150" y="168" text-anchor="middle" class="node-label">OrderController.place</text>
+  </g>
+
+  <!-- OrderService interface method -->
+  <g>
+    <rect x="340" y="130" width="220" height="50" rx="8" fill="#1d222d" stroke="#6ea8fe" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="450" y="150" text-anchor="middle" fill="#6ea8fe" font-size="10">METHOD (interface)</text>
+    <text x="450" y="168" text-anchor="middle" class="node-label">OrderService.place</text>
+  </g>
+
+  <!-- Impl method -->
+  <g>
+    <rect x="640" y="130" width="240" height="50" rx="8" fill="#1d222d" stroke="#6ea8fe" stroke-width="1.5"/>
+    <text x="760" y="150" text-anchor="middle" fill="#6ea8fe" font-size="10">METHOD</text>
+    <text x="760" y="168" text-anchor="middle" class="node-label">OrderServiceImpl.place</text>
+  </g>
+
+  <!-- Aspect -->
+  <g>
+    <rect x="640" y="30" width="240" height="50" rx="8" fill="#1d222d" stroke="#7ee787" stroke-width="1.5"/>
+    <text x="760" y="50" text-anchor="middle" fill="#7ee787" font-size="10">ASPECT (@Transactional)</text>
+    <text x="760" y="68" text-anchor="middle" class="node-label">TransactionAspect</text>
+  </g>
+
+  <!-- Inventory client method -->
+  <g>
+    <rect x="640" y="230" width="240" height="50" rx="8" fill="#1d222d" stroke="#6ea8fe" stroke-width="1.5"/>
+    <text x="760" y="250" text-anchor="middle" fill="#6ea8fe" font-size="10">METHOD</text>
+    <text x="760" y="268" text-anchor="middle" class="node-label">InventoryClient.reserve</text>
+  </g>
+
+  <!-- Repository.save -->
+  <g>
+    <rect x="640" y="330" width="240" height="50" rx="8" fill="#1d222d" stroke="#6ea8fe" stroke-width="1.5"/>
+    <text x="760" y="350" text-anchor="middle" fill="#6ea8fe" font-size="10">METHOD</text>
+    <text x="760" y="368" text-anchor="middle" class="node-label">OrderRepository.save</text>
+  </g>
+
+  <!-- DB -->
+  <g>
+    <rect x="870" y="440" width="150" height="50" rx="8" fill="#1d222d" stroke="#f2b35b" stroke-width="1.5"/>
+    <text x="945" y="460" text-anchor="middle" fill="#f2b35b" font-size="10">DB_TABLE</text>
+    <text x="945" y="478" text-anchor="middle" class="node-label">orders</text>
+  </g>
+
+  <!-- Event -->
+  <g>
+    <rect x="340" y="330" width="220" height="50" rx="8" fill="#1d222d" stroke="#7ee787" stroke-width="1.5"/>
+    <text x="450" y="350" text-anchor="middle" fill="#7ee787" font-size="10">EVENT_TYPE</text>
+    <text x="450" y="368" text-anchor="middle" class="node-label">OrderPlacedEvent</text>
+  </g>
+
+  <!-- Edges -->
+  <!-- endpoint -> controller : MAPS_URL -->
+  <line x1="150" y1="80" x2="150" y2="130" stroke="#9aa3b2" marker-end="url(#arr)"/>
+  <text x="165" y="108" class="edge-label">MAPS_URL</text>
+
+  <!-- controller -> interface : CALLS -->
+  <line x1="260" y1="155" x2="340" y2="155" stroke="#9aa3b2" marker-end="url(#arr)"/>
+  <text x="280" y="148" class="edge-label">CALLS</text>
+
+  <!-- interface -> impl : via dispatch -->
+  <line x1="560" y1="155" x2="640" y2="155" stroke="#9aa3b2" stroke-dasharray="3 3" marker-end="url(#arr)"/>
+  <text x="580" y="148" class="edge-label">dispatches(AUTOWIRES)</text>
+
+  <!-- aspect -> impl : INTERCEPTS -->
+  <line x1="760" y1="80" x2="760" y2="130" stroke="#9aa3b2" marker-end="url(#arr)"/>
+  <text x="770" y="108" class="edge-label">INTERCEPTS</text>
+
+  <!-- impl -> inventory : CALLS -->
+  <line x1="760" y1="180" x2="760" y2="230" stroke="#9aa3b2" marker-end="url(#arr)"/>
+  <text x="770" y="210" class="edge-label">CALLS</text>
+
+  <!-- impl -> repo : CALLS -->
+  <path d="M 800 180 C 820 250 820 280 800 330" fill="none" stroke="#9aa3b2" marker-end="url(#arr)"/>
+  <text x="830" y="250" class="edge-label">CALLS</text>
+
+  <!-- repo -> table : WRITES_TABLE -->
+  <line x1="880" y1="365" x2="870" y2="450" stroke="#9aa3b2" marker-end="url(#arr)"/>
+  <text x="895" y="410" class="edge-label">WRITES_TABLE</text>
+
+  <!-- controller -> event : PUBLISHES -->
+  <path d="M 180 180 C 200 260 300 320 340 355" fill="none" stroke="#9aa3b2" marker-end="url(#arr)"/>
+  <text x="220" y="270" class="edge-label">PUBLISHES</text>
+</svg>
+</div>
+
+<p class="muted" style="font-size:13px;">
+  점선 테두리의 <code class="inline">OrderService.place</code>는 인터페이스 메서드. 실제 런타임에 <code class="inline">AUTOWIRES</code> 엣지가 연결한 Bean(<code class="inline">OrderServiceImpl</code>)로 디스패치된다. 이 '디스패치'를 그래프에서 어떻게 만들지가 <strong>Spring 8 난제 §5.1</strong>.
+</p>
+
+<div class="callout ok">
+  <strong>핵심 포인트.</strong> 정적 AST만 쓴 일반 Java 그래프라면 <code class="inline">OrderController.place</code> 다음이 <code class="inline">OrderService.place</code> (인터페이스)에서 끝난다. 그런데 Spring 분석기가 <code class="inline">AUTOWIRES</code> 엣지를 놓아주면 그래프 BFS가 자연스럽게 <code class="inline">OrderServiceImpl.place</code>로 이어진다. <strong>이게 우리가 Spring 전용 분석기를 따로 만드는 본질적인 이유.</strong>
+</div>
+
+<!-- =================================================================== -->
+<h2 id="spring">5. Spring 8 난제 처리</h2>
+
+<p>각 난제를 "왜 안 잡히는가 / 우리 스키마가 어떻게 잡을 것인가"로.</p>
+
+<h3 id="s1">5-1. <code>@Autowired</code> DI</h3>
+<div class="hstack">
+  <div class="card">
+    <h4>문제</h4>
+    <p>AST에는 <code class="inline">private final OrderService service</code> 필드만 있고, 이게 런타임에 어느 구현과 묶이는지 정보 없음.</p>
+  </div>
+  <div class="card">
+    <h4>처리</h4>
+    <p>Spring 분석기가 전체 프로젝트를 1번 훑어 Bean 카탈로그를 구축. 필드 타입 + <code class="inline">@Qualifier</code> + <code class="inline">@Primary</code> 규칙으로 후보 해석. 결과를 <code class="inline">SPRING_BEAN -AUTOWIRES-> SPRING_BEAN</code> 엣지로 저장.</p>
+  </div>
+  <div class="card">
+    <h4>잔여</h4>
+    <p><code class="inline">@Qualifier</code>가 런타임 profile에 의존하거나 <code class="inline">@ConditionalOnProperty</code>면 후보 다수. 엣지에 <code class="inline">condition</code> 속성으로 저장, 쿼리 시 프로파일 필터.</p>
+  </div>
+</div>
+
+<h3 id="s2">5-2. AOP 프록시 (<code>@Transactional</code> / <code>@Cacheable</code> / <code>@Around</code>)</h3>
+<p>
+  <code class="inline">OrderServiceImpl.place()</code>를 직접 호출해도 실제로는 CGLIB/JDK 프록시가 먼저 도는 것. 정적 호출 그래프엔 이게 안 보인다.
+</p>
+<p>
+  → <code class="inline">ASPECT</code> 노드를 만들고, advice가 적용되는 메서드마다 <code class="inline">ASPECT -INTERCEPTS-> METHOD</code> 엣지. 쿼리 시 "target 메서드의 in-edges에 INTERCEPTS 있으면 그 aspect도 영향 반경"으로 계산.
+</p>
+<p>
+  <code class="inline">@Transactional</code>은 파생 aspect 이름을 표준(<code class="inline">TransactionAspect</code>)으로 고정, <code class="inline">@Cacheable</code>은 <code class="inline">CacheAspect</code>.
+</p>
+
+<h3 id="s3">5-3. Reflection (<code>Method.invoke</code>, <code>Class.forName</code>) <span class="badge">rev.2 — 런타임 계측 1차 범위 내</span></h3>
+<p>
+  정적 추론 불가. 세 겹의 안전망으로 대응.
+</p>
+
+<table>
+  <thead><tr><th>레이어</th><th>처리</th><th>1차 범위?</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>L1. 정적 표식</strong></td>
+      <td>파서가 <code>.invoke(</code> / <code>Class.forName(</code> / <code>BeanFactory.getBean(</code> 호출을 감지하면 METHOD 노드에 <code>reflection_escape: true</code> + 쿼리 결과에 경고 표시</td>
+      <td>✅ 포함</td>
+    </tr>
+    <tr>
+      <td><strong>L2. 사람 주석</strong></td>
+      <td>"이 invoke 대상은 이 클래스 범위"를 사람이 명시 → <code>REFLECTS_AS</code> 엣지로 등록</td>
+      <td>✅ 포함</td>
+    </tr>
+    <tr>
+      <td><strong>L3. 런타임 계측</strong></td>
+      <td>JVM Java Agent 또는 APM 훅으로 실제 호출 쌍 수집 → <code>CALLS {source: "runtime"}</code> 엣지 추가</td>
+      <td>✅ <strong>스키마 + 수집기 인터페이스는 1차 포함</strong>. JVM Agent 실제 구현은 Section 2 모델링 완성 후 <em>임시 섹션</em>(§7-A)에서 수행.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout warn">
+  <strong>왜 처음엔 "1차 범위 밖"이라고 했나, 왜 바꿨나.</strong><br>
+  당초 근거: JVM Java Agent 개발은 바이트코드 계측이 들어가서 구현 비용이 크고, 운영 환경에 배포해야 데이터가 들어오므로 초기 도메인 데모에는 오버킬이라고 판단. 그래서 "스키마 자리만 마련"으로 축소 제안.<br><br>
+  반론(사용자): Reflection 누락 = Impact Analysis 신뢰성 상실. 레거시일수록 Reflection 많음. 대체 수단(사람 주석)만으론 10만 라인 레거시 전체 커버 불가.<br><br>
+  <strong>결론</strong>: 1차에 <em>스키마 엣지(<code>CALLS{source}</code>, <code>REFLECTS_AS</code>) + 수집기 인터페이스 + 로그 인제스트 파이프라인</em>까지 포함. 실제 JVM Agent 구현만 플러그인 형태로 분리 (에이전트는 1 프로젝트 만들면 여러 레거시 재사용). 즉 <strong>"준비는 지금, 연결은 선택"</strong>.
+</div>
+
+<h3 id="s4">5-4. Spring Data JPA 메서드 파생 (<code>findByCustomerId</code>)</h3>
+<p>
+  메서드 선언만 있고 쿼리 본문 없음. Spring이 메서드 이름에서 SQL을 만든다.
+</p>
+<p>
+  → Spring Data 전용 분석기가 메서드 이름 파싱(<code class="inline">findBy</code> / <code class="inline">existsBy</code> / <code class="inline">deleteBy</code> / <code class="inline">countBy</code> + 필드 조건)으로 <code class="inline">READS_TABLE</code> / <code class="inline">WRITES_TABLE</code> 엣지를 엔티티 클래스 매핑(<code class="inline">@Entity @Table(name=...)</code>)을 거쳐 <code class="inline">DB_TABLE</code>로 연결. 메서드 이름이 파싱 안되는 경우(<code class="inline">@Query</code>)는 native 쿼리를 SQL 파서로 추가 해석.
+</p>
+
+<h3 id="s5">5-5. <code>@Bean Configuration</code></h3>
+<p>
+  classpath 스캔 기반 Bean 외에, <code class="inline">@Configuration</code> 클래스의 <code class="inline">@Bean</code> 메서드가 Bean을 만든다. 이건 "메서드 반환값 = Bean 인스턴스"라는 비일상적 의미.
+</p>
+<p>
+  → Configuration 전용 패스가 <code class="inline">@Bean</code> 메서드마다 <code class="inline">SPRING_BEAN</code> 노드 생성 + 반환 타입을 실제 구현 클래스로 매핑 + 메서드 파라미터 → <code class="inline">AUTOWIRES</code> 엣지.
+</p>
+
+<h3 id="s6">5-6. <code>ApplicationEventPublisher</code></h3>
+<p>
+  발행자/구독자 사이에 직접 호출이 없다. 이벤트 타입이 유일한 연결고리.
+</p>
+<p>
+  → <code class="inline">EVENT_TYPE</code> 노드를 이벤트 클래스마다 생성. 호출 관계는 <code class="inline">publisher.publishEvent(new X())</code> → METHOD <code class="inline">-PUBLISHES-></code> EVENT_TYPE, <code class="inline">@EventListener</code> 메서드 → METHOD <code class="inline">-HANDLES-></code> EVENT_TYPE. BFS가 PUBLISHES → EVENT_TYPE → HANDLES 로 이어진다.
+</p>
+
+<h3 id="s7">5-7. <code>@Scheduled</code> / Kafka Listener</h3>
+<p>
+  HTTP 엔드포인트가 아닌 진입점. <code class="inline">HTTP_ENDPOINT</code>만 진입점으로 모델링하면 배치/리스너에서 시작되는 호출 체인이 고아가 된다.
+</p>
+<p>
+  → <code class="inline">SCHEDULED_TASK</code> / <code class="inline">MSG_LISTENER</code> 노드 kind로 진입점 3종을 모두 표현. Impact Analysis 출력에 "진입점 종류" 컬럼 자동 포함.
+</p>
+
+<h3 id="s8">5-8. <code>@ConditionalOnProperty</code> / 프로파일</h3>
+<p>
+  동일 Bean이 프로파일에 따라 다른 구현으로 바뀜. 단일 그래프로 표현 못 함.
+</p>
+<p>
+  → Bean 엣지에 <code class="inline">profile: ["prod", "legacy"]</code> / <code class="inline">condition: "order.legacy.enabled=true"</code> 속성 저장. 쿼리 시 <code class="inline">WHERE 'prod' IN r.profile</code> 로 필터. Impact Analysis 호출 시 프로파일이 기본 파라미터.
+</p>
+
+<!-- =================================================================== -->
+<h2 id="method-fields">6. 메서드 노드 상세 필드 (Test Generation 밑받침)</h2>
+
+<p>
+  METHOD kind 노드는 가장 많은 속성을 가진다. Test Generation 엔진이 이 노드만 보고 테스트 케이스를 만들 수 있도록 미리 넉넉히 정의.
+</p>
+
+<div class="card">
+<h4>METHOD 노드 속성</h4>
+<div class="field-row"><span class="k">qualified_name</span><span class="v"><code>com.acme.order.OrderService.place(OrderRequest)</code></span></div>
+<div class="field-row"><span class="k">signature_hash</span><span class="v">시그니처 SHA1 (변경 감지용)</span></div>
+<div class="field-row"><span class="k">body_hash</span><span class="v">본문 SHA1 (Change Detection 핵심)</span></div>
+<div class="field-row"><span class="k">return_type</span><span class="v"><code>com.acme.order.Order</code></span></div>
+<div class="field-row"><span class="k">params</span><span class="v">[{name: "req", type: "OrderRequest", nullable: false}]</span></div>
+<div class="field-row"><span class="k">annotations</span><span class="v">["@Transactional(readOnly=false)", "@Override"]</span></div>
+<div class="field-row"><span class="k">visibility</span><span class="v"><code>public|protected|private|package</code></span></div>
+<div class="field-row"><span class="k">is_abstract</span><span class="v">boolean (인터페이스/추상 메서드 구분)</span></div>
+<div class="field-row"><span class="k">reflection_escape</span><span class="v">boolean (5-3에서 사용)</span></div>
+<div class="field-row"><span class="k">source_location</span><span class="v">{path, start_line, end_line}</span></div>
+<div class="field-row"><span class="k">precondition</span><span class="v">선언식 (validator.py의 Sub-DSL). 예: <code>req.items != null AND size(req.items) > 0</code></span></div>
+<div class="field-row"><span class="k">postcondition</span><span class="v">선언식. 예: <code>result.status == "PENDING" AND result.id != null</code></span></div>
+<div class="field-row"><span class="k">input_domain</span><span class="v">파라미터별 값 범위. 예: <code>{"req.items.size": [1, 100]}</code></span></div>
+<div class="field-row"><span class="k">exception_paths</span><span class="v">["OutOfStockException", "InvalidItemException"]</span></div>
+</div>
+
+<div id="method-fields-reason" class="callout warn">
+  <strong>precondition / postcondition / input_domain 을 Round 1에 넣는 이유 (Q5 응답)</strong>
+  <p style="margin:8px 0 4px;">파서는 이 값들을 작성 못 한다. 사람이 Round 2/3에서 비즈니스 룰과 매핑하며 채워넣는 필드. 그런데도 <strong>스키마 자리</strong>는 Round 1에 확정해야 하는 이유 3가지:</p>
+  <ol style="margin:6px 0 0 18px; padding:0;">
+    <li><strong>재매핑 비용</strong> — Round 2/3에 가서 수백~수천 METHOD 노드에 사람이 매핑 작업을 해둔 상태다. 그 후 "precondition 필드가 빠져 있었네요, 다시 채워주세요"는 워크플로우 파괴. 자리를 비워두면 null 속성만 채우면 끝.</li>
+    <li><strong>Test Generation 엔진 설계 제약</strong> — 3대 기능 중 하나. precondition/postcondition/input_domain 없이는 테스트 케이스 생성 불가. 엔진을 나중에 붙이려면 스키마까지 재설계해야 함.</li>
+    <li><strong>Round 2/3 매핑 일체화</strong> — 비즈니스 룰이 "A이면 B여야 한다" 형태라면 그것은 precondition(A) / postcondition(B)로 메서드에 걸린다. precondition 슬롯이 없으면 룰을 어디에 매달지 불분명. 매핑 작업이 허공에 뜸.</li>
+  </ol>
+  <p style="margin:8px 0 0;">→ 자리만 미리 둔다. 초기 파싱 시엔 null. Round 2/3에서 채움. Test Generation은 Round 1~2 끝나고 Section 3에서 활용.</p>
+</div>
+
+<!-- =================================================================== -->
+<h2 id="lineage">6-B. 데이터 계보 — 필드 값이 타고 흐르는 경로 (Q3 응답)</h2>
+
+<p>
+  사용자 지적: <em>"필드까지 내려가야 하고, 이런저런 필드를 타고다니면서 만들어지는 값도 존재할텐데 그런 걸 잘 추적할 수 있어야 해."</em>
+</p>
+<p>
+  이것은 <strong>데이터 계보(Data Lineage)</strong> 문제. 예:
+</p>
+<pre><code><span class="tp">OrderRequest</span>.items           <span class="cm">// HTTP 진입값</span>
+  → <span class="tp">OrderServiceImpl</span>.place()  <span class="cm">// req.items → sum * item.price</span>
+    → <span class="tp">Order</span>.totalAmount        <span class="cm">// 도메인 필드</span>
+      → repo.save()             <span class="cm">// JPA</span>
+        → <span class="tp">orders</span>.total_amount   <span class="cm">// DB 컬럼</span>
+          → <span class="tp">SettlementJob</span>.calc()   <span class="cm">// 배치에서 이 컬럼 읽음</span>
+            → <span class="tp">Settlement</span>.netAmount
+              → <span class="tp">settlements</span>.net_amount
+              → Kafka <span class="tp">SettlementCalculatedEvent</span>
+                → 하위 시스템 ...</code></pre>
+<p>
+  "<code class="inline">OrderRequest.items</code> 가 잘못 들어오면 어디까지 영향이 갑니까?" 같은 질문에 답하려면 필드 단위 전파 추적이 필요하다.
+</p>
+
+<h3>6-B-1. 두 가지 표현 층</h3>
+<div class="hstack">
+  <div class="card">
+    <h4>메서드 <em>내부</em> 계보 (메서드 속성으로 압축)</h4>
+    <p>METHOD 노드에 <code class="inline">value_flow</code> 속성 추가. 형태:</p>
+    <pre style="font-size:12px;"><code>{
+  "req.items":      ["this.order.items"],
+  "req.totalAmount":["this.order.totalAmount"],
+  "this.order":     ["return"]
+}</code></pre>
+    <p>메서드 본문 안의 변수 대입/인자 전달을 tree-sitter로 추출. 노드/엣지 폭발 방지를 위해 <strong>노드 분리 대신 속성으로 압축</strong>.</p>
+  </div>
+  <div class="card">
+    <h4>메서드 <em>간</em> 계보 (엣지 + 필드 노드)</h4>
+    <p>기존 <code class="inline">READS</code> / <code class="inline">WRITES</code> 엣지에 추가로 <strong>필드-간 엣지</strong> 도입:</p>
+    <ul style="font-size:13px; margin:6px 0;">
+      <li><code class="inline">DERIVES_FROM</code> : FIELD → FIELD. "A 값은 B 값으로부터 계산됨" (CALCULATED 결과)</li>
+      <li><code class="inline">PROPAGATES_TO</code> : FIELD/DB_COLUMN → FIELD/DB_COLUMN. "A 값이 그대로 B에 복사됨" (PASSTHROUGH)</li>
+    </ul>
+    <p>두 엣지 모두 <code class="inline">via_methods: [qualified_name, ...]</code> 속성으로 <em>어느 메서드를 경유했는지</em> 기록.</p>
+  </div>
+</div>
+
+<h3>6-B-2. 엣지 kind 추가</h3>
+<p>§3 의 15종에 2종 추가 → 엣지 총 17종:</p>
+<table>
+  <thead><tr><th>kind</th><th>source → target</th><th>의미</th><th>파서 레이어</th></tr></thead>
+  <tbody>
+    <tr><td><code>DERIVES_FROM</code></td><td>FIELD/DB_COLUMN → FIELD/DB_COLUMN</td><td>값이 변환/계산을 거쳐 나옴</td><td>AST + Spring 분석기 조합</td></tr>
+    <tr><td><code>PROPAGATES_TO</code></td><td>FIELD/DB_COLUMN → FIELD/DB_COLUMN</td><td>값이 그대로 복사/전달</td><td>AST + Spring 분석기 조합</td></tr>
+  </tbody>
+</table>
+
+<h3>6-B-3. 역추적 질의 예</h3>
+<p><em>"<code class="inline">orders.total_amount</code> 컬럼 값은 어디서 기원하는가?"</em></p>
+<pre><code><span class="kw">MATCH</span> path = (src)-[:<span class="an">DERIVES_FROM</span>|<span class="an">PROPAGATES_TO</span>*1..]-&gt;(t:DB_COLUMN {name: <span class="st">"orders.total_amount"</span>})
+<span class="kw">WHERE</span> <span class="kw">NOT</span> (src)&lt;-[:<span class="an">DERIVES_FROM</span>|<span class="an">PROPAGATES_TO</span>]-()  <span class="cm">// 기원점만</span>
+<span class="kw">RETURN</span> src.qualified_name, path, <span class="fn">length</span>(path) <span class="kw">AS</span> hops</code></pre>
+<p>기대 출력: <code class="inline">OrderRequest.items</code>, <code class="inline">OrderRequest.promoCode</code>, <code class="inline">Configuration(order.tax-rate)</code> 등 진입점 필드.</p>
+
+<h3>6-B-4. 동적 매핑 3 전용 분석기 — 모두 1차 범위 포함 (Q9 응답)</h3>
+<p>데이터 계보에 구멍이 나면 Impact/Reverse Lookup 모두 허위 결과. 레거시에 흔한 3가지 동적 매핑 패턴을 전용 분석기로 1차 범위 안에 포함.</p>
+
+<table>
+  <thead><tr><th>패턴</th><th>문제</th><th>1차 분석기 전략</th><th>산출 엣지</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>MapStruct</strong></td>
+      <td>소스→타겟 필드 매핑이 인터페이스 + annotation으로 선언. AST엔 쿼리 없음.</td>
+      <td><code class="inline">@Mapper</code> 인터페이스에 선언된 <code class="inline">@Mapping(source=..., target=...)</code> 파싱. 생성된 impl 클래스도 병행 확인.</td>
+      <td><code class="inline">PROPAGATES_TO</code> (필드→필드), <code class="inline">DERIVES_FROM</code> (표현식 있는 경우)</td>
+    </tr>
+    <tr>
+      <td><strong>BeanUtils.copyProperties / ModelMapper / ObjectMapper</strong></td>
+      <td>소스·타겟 타입만 인자로 넘기고 런타임에 필드명 매칭. 정적 매핑 정보 없음.</td>
+      <td>호출 발견 시 소스/타겟 클래스의 필드 교집합을 <em>휴리스틱</em>으로 매핑. 확실성이 낮으므로 엣지에 <code class="inline">confidence: 0.7</code> 속성 + 쿼리에 경고 표시. 런타임 계측(§5-3 L3)으로 보강.</td>
+      <td><code class="inline">PROPAGATES_TO{confidence}</code></td>
+    </tr>
+    <tr>
+      <td><strong>Native SQL / JPQL</strong></td>
+      <td><code class="inline">@Query</code>, <code class="inline">entityManager.createNativeQuery</code>, MyBatis XML. 메서드명 파싱으로 못 잡음.</td>
+      <td>SQL 본문을 sqlparse 등으로 AST 파싱 → SELECT 절 컬럼 + FROM/JOIN 테이블 + INSERT/UPDATE 컬럼을 엔티티 매핑 거쳐 <code class="inline">DB_TABLE</code> / <code class="inline">DB_COLUMN</code> 연결.</td>
+      <td><code class="inline">READS_TABLE</code>, <code class="inline">WRITES_TABLE</code>, <code class="inline">READS</code> / <code class="inline">WRITES</code> (컬럼 단위)</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout ok">
+  <strong>왜 1차에 전부 포함.</strong> 레거시 Spring 애플리케이션은 이 3개가 전부 혹은 대부분 쓰인다. 하나라도 빠지면 Impact Analysis가 "이 필드가 어디로 흘렀는지 모릅니다" 구간을 쏟아내고, 그러면 결정적 그래프 탐색의 신뢰가 무너진다. <strong>신뢰성 &gt; 구현 무게.</strong>
+</div>
+
+<h3>6-B-5. 한계와 복잡 케이스</h3>
+<div class="callout warn">
+  <ul style="margin:4px 0 0 16px; padding:0;">
+    <li><strong>동적 SQL 빌더(QueryDSL / Criteria API / MyBatis <code>&lt;if&gt;</code>)</strong>: 분석기가 조건부 쿼리 조각 전부 분기 열거 → 가능한 모든 컬럼 합집합을 엣지로 등록. 불확실성은 <code>conditional: true</code> 속성.</li>
+    <li><strong>복잡 계산 체인</strong>: <code>a = f(b, c); d = g(a, e);</code> 라면 <code>d DERIVES_FROM b, c, e</code> (<code>a</code> 경유). 중간 변수는 접음. 경유 메서드는 <code>via_methods</code> 속성으로 추적 가능.</li>
+    <li><strong>String 기반 필드 접근</strong> (<code>obj.getProperty("name")</code>): 정적으론 못 잡음 → <code>reflection_escape: true</code> 표식 → 런타임 계측으로 보강.</li>
+  </ul>
+</div>
+
+<div class="callout ok">
+  <strong>왜 필드-노드 + 필드-엣지 둘 다 쓰는가.</strong><br>
+  순수 노드만으로 표현하면 "변수 X, 리턴값 Y, ..." 로 그래프가 폭발한다. 순수 속성만으로 표현하면 메서드 간 계보 추적이 속성을 수동 조합해야 해서 쿼리가 불가능하다. <strong>메서드 내부는 속성, 메서드 간은 엣지</strong> — 이게 확장성과 쿼리 성능의 균형점.
+</div>
+
+<!-- =================================================================== -->
+<h2 id="impact">7. Impact Analysis 질의 시뮬레이션</h2>
+
+<p>
+  질문: <strong>"OrderServiceImpl.place()의 로직을 바꾸려 한다. 영향 범위는?"</strong>
+</p>
+
+<div class="walk-step">
+  <div class="step-title"><span class="num">1</span>타겟 메서드 확정</div>
+  <p>입력 qualified name으로 노드 확정: <code class="inline">com.acme.order.OrderServiceImpl.place(OrderRequest)</code>.</p>
+</div>
+
+<div class="walk-step">
+  <div class="step-title"><span class="num">2</span>역방향 BFS — 누가 이걸 쓰는가</div>
+  <p>Cypher (개념, <code class="inline">$max_hops</code> 는 사용자 파라미터 — Q6 응답):</p>
+  <pre><code><span class="kw">MATCH</span> path = (src)-[:<span class="an">CALLS</span>|<span class="an">AUTOWIRES</span>|<span class="an">INTERCEPTS</span>|<span class="an">MAPS_URL</span>|<span class="an">PUBLISHES</span>*1..$max_hops]->(t {qualified_name: $q})
+<span class="kw">RETURN</span> <span class="kw">DISTINCT</span> src.kind, src.qualified_name, <span class="fn">length</span>(path) <span class="kw">AS</span> hops
+<span class="kw">ORDER BY</span> hops</code></pre>
+  <p>→ 결과 (이 예시):</p>
+  <ul>
+    <li><code class="inline">METHOD</code> <code class="inline">OrderController.place</code> (1 hop, via AUTOWIRES+CALLS)</li>
+    <li><code class="inline">HTTP_ENDPOINT</code> <code class="inline">POST /orders</code> (2 hops, MAPS_URL)</li>
+    <li><code class="inline">ASPECT</code> <code class="inline">TransactionAspect</code> (1 hop, INTERCEPTS)</li>
+  </ul>
+</div>
+
+<div class="walk-step">
+  <div class="step-title"><span class="num">3</span>정방향 BFS — 이 메서드가 뭘 건드리는가</div>
+  <pre><code><span class="kw">MATCH</span> path = (t {qualified_name: $q})-[:<span class="an">CALLS</span>|<span class="an">READS_TABLE</span>|<span class="an">WRITES_TABLE</span>|<span class="an">PUBLISHES</span>|<span class="an">HAS_CONFIG</span>|<span class="an">DERIVES_FROM</span>|<span class="an">PROPAGATES_TO</span>*1..$max_hops]->(dst)
+<span class="kw">RETURN</span> <span class="kw">DISTINCT</span> dst.kind, dst.qualified_name, <span class="fn">length</span>(path) <span class="kw">AS</span> hops</code></pre>
+  <p class="muted" style="font-size:13px;">정방향에 데이터 계보 엣지(<code class="inline">DERIVES_FROM</code>/<code class="inline">PROPAGATES_TO</code>) 포함 — §6-B 결과.</p>
+</div>
+
+<div class="walk-step">
+  <div class="step-title"><span class="num">3-A</span>Hops 제어 — 사용자 파라미터 (Q6 응답)</div>
+  <p>고정값 대신 사용자 조정 가능. API 설계:</p>
+  <table>
+    <thead><tr><th>파라미터</th><th>기본값</th><th>의미</th></tr></thead>
+    <tbody>
+      <tr><td><code>max_hops</code></td><td><strong>-1 (무제한)</strong></td><td>BFS 최대 깊이. 순환 방지는 visited-set으로 별도 처리되므로 무제한이 안전함. 사용자가 성능 이슈 있을 때만 제한 걸도록.</td></tr>
+      <tr><td><code>edge_kinds</code></td><td>전체</td><td>탐색할 엣지 kind 화이트리스트. 예: <code>CALLS,AUTOWIRES</code>만. "호출 그래프만 보고 싶다"는 요청용.</td></tr>
+      <tr><td><code>max_results</code></td><td>500</td><td>과도한 출력 방지. 결과 cutoff, 초과 시 "더 있음" 플래그.</td></tr>
+      <tr><td><code>include_lineage</code></td><td>true</td><td>데이터 계보 엣지 포함 여부.</td></tr>
+    </tbody>
+  </table>
+  <div class="callout ok" style="margin-top:12px;">
+    <strong>기본값 정책.</strong> 당초 제안한 "기본 8"은 철회. 이유: 사용자 지적대로 <em>영향 누락 &gt;&gt; 성능 이슈</em>. 무제한 기본값으로 시작, 사용자가 UI 슬라이더로 낮출 수 있게. 단 프론트는 응답 시간 2초 초과 시 자동으로 hops 경고 배너 표시 + 추천 값 제안.
+  </div>
+</div>
+  <p>→ 결과 (이 예시):</p>
+  <ul>
+    <li><code class="inline">METHOD</code> <code class="inline">InventoryClient.reserve</code> (1 hop, CALLS)</li>
+    <li><code class="inline">METHOD</code> <code class="inline">OrderRepository.save</code> (1 hop, CALLS)</li>
+    <li><code class="inline">DB_TABLE</code> <code class="inline">orders</code> (2 hops, WRITES_TABLE)</li>
+    <li><code class="inline">EVENT_TYPE</code> <code class="inline">OrderPlacedEvent</code> (2 hops — Controller에서 발행이지만 Impl 경유)</li>
+    <li><code class="inline">METHOD</code> <code class="inline">OrderEventsListener.onPlaced</code> (3 hops, via PUBLISHES→HANDLES)</li>
+  </ul>
+</div>
+
+<div class="walk-step">
+  <div class="step-title"><span class="num">4</span>리포트 생성</div>
+  <p>프론트에 테이블로:</p>
+  <table>
+    <thead><tr><th>방향</th><th>kind</th><th>이름</th><th>hops</th><th>경로</th></tr></thead>
+    <tbody>
+      <tr><td>upstream</td><td><span class="chip spring">HTTP_ENDPOINT</span></td><td>POST /orders</td><td>2</td><td>endpoint → controller.place → impl.place</td></tr>
+      <tr><td>upstream</td><td><span class="chip spring">ASPECT</span></td><td>TransactionAspect</td><td>1</td><td>aspect INTERCEPTS impl.place</td></tr>
+      <tr><td>downstream</td><td><span class="chip db">DB_TABLE</span></td><td>orders</td><td>2</td><td>impl.place → repo.save → orders</td></tr>
+      <tr><td>downstream</td><td><span class="chip spring">EVENT_TYPE</span></td><td>OrderPlacedEvent</td><td>2</td><td>impl.place → ... PUBLISHES → event</td></tr>
+      <tr><td>downstream</td><td><span class="chip code">METHOD</span></td><td>OrderEventsListener.onPlaced</td><td>3</td><td>event HANDLES → listener</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="callout ok">
+  <strong>이 전 과정에 LLM이 0회.</strong> term resolution(한국어 → qualified name) 단에서만 LLM이 붙고, 일단 qualified name이 잡힌 순간부터 끝까지 Cypher. 재현 가능 + 캐시 가능 + 감사 가능. 이것이 "Impact Analysis는 deterministic"의 구체적 의미.
+</div>
+
+<!-- =================================================================== -->
+<!-- =================================================================== -->
+<h2 id="temporary-section">7-A. 실행 배치 경로 — 임시 섹션 (Q10 응답)</h2>
+
+<p>
+  3대 기능(Impact / Reverse / Test Generation)은 원래 <strong>정식 Section 3의 책임</strong>이다. 하지만 Section 3 공식 신설까지 기다리면 Section 2 모델링 툴의 쓸모를 검증할 방법이 없다.
+</p>
+<p>
+  → 결정: Section 2 모델링이 완성되는 순간, <strong>임시 섹션</strong>을 하나 띄워 3대 기능 + JVM Agent + 런타임 계측을 실험한다. 정식 Section 3는 그 이후에 이 임시 섹션의 결과를 바탕으로 설계.
+</p>
+
+<h3>세 섹션의 역할 구분 (재정리)</h3>
+<div class="hstack">
+  <div class="card">
+    <h4>Section 2 (지금)</h4>
+    <p><strong>모델링 툴</strong>. 사용자가 레거시 코드를 불러와 직접 온톨로지를 빌드·수정·검증. 파서 초안 + 사람 주석 + 스키마 validation. 3대 기능은 <em>이 툴의 소비자</em>.</p>
+  </div>
+  <div class="card">
+    <h4>임시 섹션 (신규)</h4>
+    <p><strong>PoC 런타임</strong>. Section 2에서 완성된 온톨로지를 입력으로 받아 Impact / Reverse Lookup / Test Generation 3기능을 돌려보는 사용자 검증 환경. JVM Agent 런타임 계측도 이곳에서.</p>
+  </div>
+  <div class="card">
+    <h4>Section 3 (정식, 나중)</h4>
+    <p><strong>프로덕션 오퍼레이팅</strong>. 임시 섹션에서 확립된 패턴을 기반으로 여러 레거시에 적용 가능한 정식 플랫폼. 지금 범위 밖.</p>
+  </div>
+</div>
+
+<div class="callout ok">
+  <strong>왜 임시 섹션인가.</strong> "Section 3 정식 신설"과 "Section 2 검증"이 맞물려 있으면 어느 쪽도 앞으로 못 간다. 임시 섹션은 <em>throwaway 가능</em>을 전제로 만들어 의사결정 속도를 올리는 장치. 설계 결정이 안정된 뒤 필요한 것만 Section 3로 승격.
+</div>
+
+<h3>임시 섹션 구성 (초안)</h3>
+<ul>
+  <li>폴더: <code class="inline">toClaude/temp-runtime/</code> (세션 격리 대상 밖, 실험적 공간)</li>
+  <li>백엔드: <code class="inline">backend/temp_runtime/</code> — 3대 기능 API (<code class="inline">/temp/impact</code>, <code class="inline">/temp/reverse</code>, <code class="inline">/temp/testgen</code>) + JVM Agent 엔드포인트</li>
+  <li>프론트: <code class="inline">frontend/src/components/sections/temp-runtime/</code> — 간단한 질의 UI</li>
+  <li>데이터 원천: Section 2의 Neo4j 그래프를 그대로 읽음. 읽기 전용.</li>
+</ul>
+
+<!-- =================================================================== -->
+<h2 id="target">7-B. 첫 PoC 타겟 — Slab 설계 엔진 (Q11 응답)</h2>
+
+<p>
+  타겟 : <strong>공정계획 시스템의 slab 설계 엔진 (사용자가 단순화해 직접 제공)</strong>.
+</p>
+
+<div class="callout warn">
+  <strong>대기 사항 (사용자 → 다음 세션에 제공)</strong><br>
+  사용자가 직접 만들어 올 Slab 설계 엔진 sample repo의 형태:
+  <ul style="margin:6px 0 0 18px; padding:0;">
+    <li>Java / Spring Boot 프로젝트</li>
+    <li>적당한 규모 (수천 ~ 수만 라인 목표. 10만 라인+ 가정과는 별개로 PoC용 단순화)</li>
+    <li>3대 기능을 검증할 수 있는 도메인 특성:
+      <ul>
+        <li>Impact : 입력 파라미터(강종·두께·폭·온도 등) 1개 바꾸면 어디까지 영향?</li>
+        <li>Reverse Lookup : "슬랩 설계 규칙 이러 이러한 조건" → 관련 메서드</li>
+        <li>Test Generation : slab 생성 조건 자동 케이스화</li>
+      </ul>
+    </li>
+    <li>기준서도 함께 (있는 만큼. 없어도 Round 3 시작 전까진 진행 가능)</li>
+  </ul>
+</div>
+
+<h3>파서가 건드릴 지점 (slab 엔진 기준 사전 예상)</h3>
+<table>
+  <thead><tr><th>예상 요소</th><th>Round 1 스키마 매핑</th></tr></thead>
+  <tbody>
+    <tr><td>강종/두께/폭 등 입력 DTO</td><td><code>CLASS + FIELD</code> + <code>DERIVES_FROM</code> 체인</td></tr>
+    <tr><td>슬랩 규격 계산 공식 메서드</td><td><code>METHOD</code> + <code>precondition/postcondition</code> (비즈니스 룰이 여기에 걸림)</td></tr>
+    <tr><td>주문 → 슬랩 배치 서비스</td><td><code>METHOD</code> + <code>CALLS</code> 그래프 + <code>@Transactional</code> aspect</td></tr>
+    <tr><td>DB 저장 (slab_plan 테이블 등)</td><td><code>DB_TABLE</code> / <code>DB_COLUMN</code> + <code>WRITES_TABLE</code></td></tr>
+    <tr><td>REST API / 배치 진입점</td><td><code>HTTP_ENDPOINT</code> / <code>SCHEDULED_TASK</code></td></tr>
+    <tr><td>설정값 (공식 파라미터 튜닝용)</td><td><code>CONFIG_PROPERTY</code> + <code>HAS_CONFIG</code></td></tr>
+  </tbody>
+</table>
+
+<div class="callout ok">
+  <strong>왜 Slab 엔진이 적절한가.</strong> 공식과 파라미터가 분명하고(→ precondition/postcondition 테스트 표본), 입력-출력 필드 흐름이 명확하고(→ 데이터 계보 검증), 공정계획이라 배치/REST 모두 있을 가능성 큼(→ 진입점 다양성 커버). 동시에 규모가 제어 가능(→ 1 PoC).
+</div>
+
+<!-- =================================================================== -->
+<h2 id="checklist">8. Round 1 합의 체크리스트</h2>
+
+<p>Q1~Q11 답변 모두 반영 완료 (rev.3). Round 1 스키마 확정.</p>
+
+<div style="background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px;">
+  <div class="check"><span class="box" style="color:var(--accent-2);">Q1 ✓</span><span class="q"><s>노드 15종으로 충분한가?</s> → <strong>합의: 당장 충분, 완성 후 확장 용이하도록 설계.</strong> <span class="hint">§3-A 플러그인 레지스트리 + Neo4j 자유 스키마로 대응.</span></span></div>
+  <div class="check"><span class="box" style="color:var(--accent-2);">Q2 ✓</span><span class="q"><s>엣지 15종으로 충분한가?</s> → <strong>합의: Q1과 동일.</strong> <span class="hint">Q3 대응으로 <code>DERIVES_FROM</code> / <code>PROPAGATES_TO</code> 2종 추가 → 현재 17종. 플러그인 패턴 동일 적용.</span></span></div>
+  <div class="check"><span class="box" style="color:var(--accent-2);">Q3 ✓</span><span class="q"><s>매핑 단위를 "메서드"로 고정하되, 필요 시 필드 단위까지 내려도 되는가?</s> → <strong>합의: 필드까지 + 값 전파 추적 포함.</strong> <span class="hint">§6-B 데이터 계보 섹션 신설, <code>value_flow</code> 속성 + <code>DERIVES_FROM</code> / <code>PROPAGATES_TO</code> 엣지.</span></span></div>
+  <div class="check"><span class="box" style="color:var(--accent-2);">Q4 ✓</span><span class="q"><s>Spring 8 난제 중 런타임 계측(5-3 Reflection 보강용)은 1차 범위 밖으로 빼도 되는가?</s> → <strong>합의: 1차 범위 안으로 승격.</strong> <span class="hint">§5-3 재작성. 스키마 엣지 + 수집기 인터페이스 + 로그 인제스트까지 1차. JVM Agent 구현만 플러그인 후속.</span></span></div>
+  <div class="check"><span class="box" style="color:var(--accent-2);">Q5 ✓</span><span class="q"><s>메서드 노드의 <code>precondition</code>/<code>postcondition</code>/<code>input_domain</code> 필드를 Round 1에 포함한다는 결정 OK?</s> → <strong>합의: 포함. 이유 3가지 명시됨.</strong> <span class="hint">§6 callout 참조 (재매핑 비용 / Test Gen 엔진 제약 / Round 2-3 매핑 일체화).</span></span></div>
+  <div class="check"><span class="box" style="color:var(--accent-2);">Q6 ✓</span><span class="q"><s>BFS 최대 hops 기본 8로 시작?</s> → <strong>합의: 사용자 조정 가능 + 기본 무제한.</strong> <span class="hint">§7 step 3-A. 영향 누락 &gt;&gt; 성능. 응답 2초 초과 시 경고 배너.</span></span></div>
+  <div class="check"><span class="box" style="color:var(--accent-2);">Q7 ✓</span><span class="q"><s>프로파일별 분기를 엣지 속성(<code>condition</code>/<code>profile</code>)으로 표현?</s> → <strong>합의.</strong></span></div>
+  <div class="check"><span class="box" style="color:var(--accent-2);">Q8 ✓</span><span class="q"><s>Kotlin / Python / SQL 파일은 별도 레이어?</s> → <strong>합의: 현재 범위 밖.</strong></span></div>
+</div>
+
+<h3 style="margin-top:26px;">rev.3 신규 합의 (Q9~Q11)</h3>
+<div style="background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px;">
+  <div class="check"><span class="box" style="color:var(--accent-2);">Q9 ✓</span><span class="q"><s>동적 매핑 3 분석기(MapStruct/BeanUtils/native SQL) 1차 포함?</s> → <strong>합의: 전부 포함.</strong> <span class="hint">§6-B-4 참조. 신뢰성 &gt; 구현 무게.</span></span></div>
+  <div class="check"><span class="box" style="color:var(--accent-2);">Q10 ✓</span><span class="q"><s>JVM Agent 개발 시점?</s> → <strong>합의: Section 2 모델링 완성 후 <em>임시 섹션</em>에서. 정식 Section 3는 그 이후.</strong> <span class="hint">§7-A 임시 섹션 정의 참조.</span></span></div>
+  <div class="check"><span class="box" style="color:var(--accent-2);">Q11 ✓</span><span class="q"><s>최초 타겟?</s> → <strong>합의: 공정계획의 Slab 설계 엔진 (사용자 단순화 제공).</strong> <span class="hint">§7-B 참조. 사용자가 sample repo 준비 중. OD-11-B3 복원 이후 파서 가동 타이밍에 맞춰 투입.</span></span></div>
+</div>
+
+<div class="callout ok" style="margin-top:18px;">
+  <strong>Round 1 전체 합의 완료.</strong> 노드 15종 + 엣지 17종 + Spring 8 난제 + 데이터 계보 + 확장성 + 런타임 계측 + hops 자율 조정 + 임시 섹션 + slab 엔진 타겟 모두 확정. 다음 단계는 OD-11-B3 (코드 복원 + Spring kind 확장) 착수.
+</div>
+
+<!-- =================================================================== -->
+<h2 id="next">9. 다음 라운드 예고</h2>
+
+<div class="hstack">
+  <div class="card">
+    <h4>Round 2 — 비즈니스 개념 + 브릿지</h4>
+    <p>
+      <span class="chip biz">BusinessTerm</span>
+      <span class="chip biz">BusinessRule</span>
+      <span class="chip biz">BusinessProcess</span>
+      <span class="chip biz">Role</span>
+    </p>
+    <p>브릿지 엣지: <code class="inline">REALIZES</code>(코드 → 개념), <code class="inline">VALIDATES</code>(규칙 → 메서드), <code class="inline">DERIVED_FROM</code>(파생).</p>
+    <p>검증: "'안전재고'" → 관련 메서드/테이블/엔드포인트 묶음 역매핑. <strong>Reverse Lookup 요구 충족.</strong></p>
+  </div>
+  <div class="card">
+    <h4>Round 3 — 기준서 + 갭 탐지</h4>
+    <p>
+      <span class="chip biz">ManualDocument</span>
+      <span class="chip biz">ManualSection</span>
+      <span class="chip biz">ManualFragment</span>
+    </p>
+    <p>인제스트 엣지: <code class="inline">DESCRIBED_IN</code>, <code class="inline">CONFLICTS_WITH</code>, <code class="inline">MISSING_IN</code>.</p>
+    <p>PDF/PPT/이미지/Word → 마크다운 → 개념 매칭 제안 → 사람 검증. <strong>10년 드리프트 회수.</strong></p>
+  </div>
+</div>
+
+<div class="callout">
+  <strong>Round 2/3에서 자리를 비워 둘 뿐, Round 1 스키마만으로도 Impact Analysis 데모는 가능하다.</strong> 순서상 코드 → 개념 → 기준서로 쌓는 이유는 개념/기준서 쪽이 코드 노드가 안정되기 전엔 매핑 대상이 떠돌기 때문.
+</div>
+
+<!-- =================================================================== -->
+<footer>
+  <p>
+    <strong>파일.</strong> <code class="inline">toClaude/modeling/round1-code-schema.html</code><br>
+    <strong>선행 문서.</strong> <code class="inline">toClaude/modeling/OD-11-PLAN.md</code> §5 (스택) / §6 (Spring 8 난제) / §8 (3라운드) / §9 (복원 매트릭스)<br>
+    <strong>다음 작업.</strong> OD-11-B3 — Round 1 스키마 합의 완료. 사용자가 Slab 엔진 sample repo 준비 중. 코드 복원 순서: (1) <code class="inline">parser_protocol.py</code> 복원 + <code>EntityKind</code> enum을 <code>EntityKindRegistry</code>로 교체 + 15 kind 기본 등록 (2) <code class="inline">java_parser.py</code> 복원 + annotation 추출 Spring 분석기 분리 설계 (3) <code class="inline">graph_writer.py</code> 복원 + 17종 엣지 지원 (4) MapStruct / BeanUtils / native SQL 3 분석기 skeleton (5) Reflection 런타임 계측 수집기 인터페이스 (6) hops 자율 조정 API 스펙.
+  </p>
+</footer>
+
+</div>
+</body>
+</html>

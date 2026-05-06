@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     litellm_model: str = "ollama/llama3"
     litellm_api_key: str = ""       # Generic fallback API key
     anthropic_api_key: str = ""     # ANTHROPIC_API_KEY
+
+    # Authoring AI — 2-tier routing (Round 5 Step 15)
+    # HARD tier (hypothesis / option trade-off / gap detection / re-recommend)
+    authoring_opus_model: str = "anthropic/claude-opus-4-7"
+    # STANDARD tier (extraction / answer absorption / interview / pattern check / archive / naming)
+    authoring_sonnet_model: str = "anthropic/claude-sonnet-4-6"
     google_api_key: str = ""        # GOOGLE_API_KEY (Gemini)
     groq_api_key: str = ""          # GROQ_API_KEY
     azure_endpoint: str = ""        # AZURE_OPENAI_ENDPOINT

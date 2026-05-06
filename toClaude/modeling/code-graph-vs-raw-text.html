@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Authoring · Code Graph 활용 분석</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#111b2e; --line:#1f2a44; --fg:#e6edf7; --muted:#94a3b8;
+    --primary:#38bdf8; --emerald:#10b981; --amber:#f59e0b; --rose:#f43f5e; --violet:#8b5cf6;
+  }
+  body{margin:0;font:13px -apple-system,Pretendard,sans-serif;background:var(--bg);color:var(--fg);padding:24px;line-height:1.55;max-width:1100px;margin:0 auto}
+  h1{margin:0 0 6px 0;font-size:20px}
+  h2{font-size:15px;margin:24px 0 8px 0;padding:6px 0;border-bottom:1px solid var(--line)}
+  h3{font-size:13px;margin:14px 0 6px 0;color:var(--violet)}
+  h4{font-size:12.5px;margin:10px 0 4px 0;color:var(--primary)}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:16px}
+  pre{background:#0f172a;color:#e6edf7;padding:10px;border-radius:6px;overflow-x:auto;font-size:11.5px;line-height:1.5;border:1px solid var(--line);margin:6px 0}
+  code{background:rgba(56,189,248,0.1);color:var(--primary);padding:1px 6px;border-radius:3px;font-size:11.5px;font-family:ui-monospace,Consolas,monospace}
+  table{border-collapse:collapse;width:100%;margin:8px 0;font-size:12px}
+  th,td{padding:6px 8px;border:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:rgba(56,189,248,0.08);color:var(--primary);font-weight:600}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;margin:14px 0}
+  .panel.crit{border-color:rgba(244,63,94,0.5);background:rgba(244,63,94,0.04)}
+  .panel.warn{border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.04)}
+  .panel.ok{border-color:rgba(16,185,129,0.5);background:rgba(16,185,129,0.04)}
+  .panel.info{border-color:rgba(139,92,246,0.5);background:rgba(139,92,246,0.04)}
+  .quote{background:#0f172a;border-left:3px solid var(--rose);padding:8px 12px;margin:8px 0;font-style:italic;color:#e2e8f0;font-size:12.5px}
+  textarea{width:100%;box-sizing:border-box;background:#0f172a;color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-size:12px;font-family:inherit;line-height:1.4;min-height:50px;resize:vertical}
+  textarea:focus{outline:none;border-color:var(--primary)}
+  .field{margin:10px 0}
+  .field label{display:block;font-size:12px;margin-bottom:4px}
+  .field label .hint{display:block;font-size:11px;color:var(--muted);font-style:italic;margin-top:1px;font-weight:normal}
+  .form{background:rgba(56,189,248,0.04);border:1px solid rgba(56,189,248,0.2);border-radius:8px;padding:14px;margin:14px 0}
+  .form h4{color:var(--primary);margin-top:0}
+  .actions{display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap}
+  .btn{background:var(--primary);color:#0b1220;border:none;border-radius:4px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}
+  .btn:hover{opacity:0.9}
+  .btn.outline{background:transparent;border:1px solid var(--line);color:var(--fg)}
+  .btn.copied{background:var(--emerald);color:#fff}
+  .preview{display:none;background:#0f172a;border:1px solid var(--line);border-radius:6px;padding:10px;margin-top:8px;font-family:ui-monospace,Consolas,monospace;font-size:11px;white-space:pre-wrap;user-select:all;cursor:text}
+  .preview.visible{display:block}
+  .copy-status{font-size:10.5px;color:var(--muted);margin-left:8px}
+  .copy-status.ok{color:var(--emerald)}
+  .copy-status.err{color:var(--rose)}
+  .pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:600;margin-right:4px;vertical-align:middle}
+  .pill.violet{background:rgba(139,92,246,0.15);color:var(--violet);border:1px solid rgba(139,92,246,0.4)}
+  .pill.emerald{background:rgba(16,185,129,0.15);color:var(--emerald);border:1px solid rgba(16,185,129,0.4)}
+  .pill.amber{background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.4)}
+  .pill.rose{background:rgba(244,63,94,0.15);color:var(--rose);border:1px solid rgba(244,63,94,0.4)}
+  .ascii{font-family:ui-monospace,Consolas,monospace;background:#0f172a;padding:14px;border-radius:6px;color:#cbd5e1;font-size:11.5px;white-space:pre;overflow-x:auto;line-height:1.5;border:1px solid var(--line)}
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .compare>div{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:10px}
+</style>
+</head>
+<body>
+
+<h1>Authoring vs Code Graph — 현재 한계 + 개선안</h1>
+<div class="sub">2026-05-05 · 사용자 우려: "레거시는 자바독·주석 부족인데 AST 그래프 활용 안 하면 quality 어떡함?"</div>
+
+<div class="panel crit">
+  <strong>사용자 질문 (정확):</strong>
+  <div class="quote">"Authoring 에서 코드 추출하면, 우리가 기존에 AST 트리 만들어 놓은 것들, 즉 <strong>코드 그래프를 타고 연관관계를 잘 분석</strong>하는거야? 레거시 소스는 자바독이나 주석이 제대로 적혀있지 않은 것이 대부분이라 걱정."
+  </div>
+</div>
+
+<!-- ============================================== -->
+<h2>§1. 솔직한 진단 — 현재 cap 1 은 raw Java text 만 봄</h2>
+
+<div class="panel warn">
+  <strong>현재 상태 (코드 확인):</strong>
+  <pre>// backend/application/authoring/capabilities/code_extractor.py
+async def extract_jpo_from_file(
+    path: str,
+    content: str,                  # ← Java raw text 그대로
+    ...
+):
+    user_prompt = (
+        f"File: {path}\n\n"
+        "```java\n"
+        f"{content.rstrip()}\n"     # ← 이거 + system prompt 만 LLM 에 보냄
+        "```\n"
+    )</pre>
+  <p style="font-size:12px;margin:6px 0">
+    cap 1 은 <strong>Java 파일 텍스트 1개만</strong> Sonnet 에 통째로 넣음.
+    onTong 이 미리 추출해둔 <code>CodeType</code> / <code>CodeMethod</code> / <code>CodeField</code> /
+    <code>inheritance_edges</code> / 호출 관계 등 <strong>AST 그래프 정보 모두 미활용</strong>.
+  </p>
+</div>
+
+<div class="panel">
+  <h4>onTong 이 이미 가지고 있지만 안 쓰는 정보</h4>
+  <table>
+    <tr><th>테이블</th><th>내용</th><th>현재 활용?</th></tr>
+    <tr><td><code>code_types</code></td><td>class fqn / extends / implements / annotations / role</td><td>❌</td></tr>
+    <tr><td><code>code_methods</code></td><td>method 시그니처 / return / params / body fragments / line range</td><td>❌</td></tr>
+    <tr><td><code>code_fields</code></td><td>field name / type / annotations</td><td>❌ (LLM 이 텍스트에서 직접 추출)</td></tr>
+    <tr><td><code>inheritance_edges</code></td><td>extends / implements 그래프</td><td>❌</td></tr>
+    <tr><td>호출 관계</td><td>method A calls method B</td><td>❌</td></tr>
+  </table>
+</div>
+
+<!-- ============================================== -->
+<h2>§2. 사용자 우려가 정확한 이유 — 실제 영향</h2>
+
+<div class="compare">
+  <div>
+    <h4 style="color:var(--rose)">현재 (raw text only)</h4>
+    <p style="font-size:11.5px">예: HrSpecJpo 인터뷰 시 LLM 이 보는 것:</p>
+    <pre style="font-size:10.5px">@Entity
+@Table(name = "HR_SPEC")
+public class HrSpecJpo {
+  @Id @Column(...) String cmpCd;
+  @Column(...) BigDecimal widthLow;
+  ...
+}</pre>
+    <p style="font-size:11.5px">→ JPO 1개의 자체 정보만. <strong>"이걸 누가 사용하나? 어디서 호출되나? 다른 entity 와 어떻게 연결되나?"</strong> 모름.</p>
+    <p style="font-size:11.5px;color:var(--rose)">레거시에서 주석마저 부족하면 LLM 은 정말 단순 column 명만 보고 추측.</p>
+  </div>
+  <div>
+    <h4 style="color:var(--emerald)">개선 후 (graph context)</h4>
+    <p style="font-size:11.5px">LLM 이 봐야 할 것:</p>
+    <pre style="font-size:10.5px">// JPO 자체
+HrSpecJpo + Java text + 한국어 주석
+
+// + 그래프 컨텍스트
+extends:    BaseJpo
+PK class:   HrSpecPK (4 fields)
+호출자:     HrSpecRepository.findById
+            HrSpecService.lookup(cmpCd, orgCd, ...)
+사용처:     SdWidthRangeAction.execute()
+            SdLengthRangeAction.execute()
+호출 패턴:  Service.lookup → Action 의 step 2/3
+형제 JPO:   HrMaxWgtJpo (HR_CD 같은 의미)
+            HrMinWgtJpo</pre>
+    <p style="font-size:11.5px;color:var(--emerald)">→ 도메인 추론 가능: "HrSpec 이 폭/길이 step 의 룩업 표 — 즉 표준 데이터"</p>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<h2>§3. 개선 옵션 (3 단계)</h2>
+
+<div class="panel info">
+  <h4 style="margin-top:0">★ 옵션 G1 — 인접 metadata 자동 첨부 (작은 작업, 즉시 효과)</h4>
+  <p style="font-size:12px">cap 1 backend 가 fqn 받을 때 자동으로 다음 정보를 추출해서 prompt 에 추가:</p>
+  <ul style="font-size:11.5px">
+    <li>이 class 의 extends / implements (parent class 의 fqn)</li>
+    <li>이 class 를 사용하는 다른 class 의 fqn list (max ~10)</li>
+    <li>이 class 의 method 시그니처 (전체 body 아닌 시그니처만)</li>
+    <li>형제 class (같은 패키지의 비슷한 이름)</li>
+    <li>관련된 PK class (HrSpecPK 같은) 의 field 정보</li>
+  </ul>
+  <p style="font-size:11.5px;color:var(--muted)">예상 비용 증가: token ~30% ↑ ($0.025/call → $0.033/call). quality ↑↑↑.</p>
+</div>
+
+<div class="panel">
+  <h4>옵션 G2 — 호출 그래프 traversal (중간 작업)</h4>
+  <p style="font-size:12px">G1 + 호출 관계까지 1-hop traverse:</p>
+  <ul style="font-size:11.5px">
+    <li>HrSpecRepository.findById ← HrSpecService.lookup ← SdWidthRangeAction.execute</li>
+    <li>각 hop 의 method 시그니처 + 핵심 fragment (if/return) 발췌</li>
+  </ul>
+  <p style="font-size:11.5px;color:var(--muted)">cap 1 이 entity 1개 추출해도 도메인 호출 패턴까지 함께 — Action 작성 시 큰 도움.</p>
+</div>
+
+<div class="panel">
+  <h4>옵션 G3 — 다중 파일 인터뷰 (큰 작업)</h4>
+  <p style="font-size:12px">단일 JPO 가 아닌 <strong>관련 파일들 묶어서</strong> 한 번에 인터뷰:</p>
+  <ul style="font-size:11.5px">
+    <li>JPO + PK class + Service + Action 4-5 파일을 한 prompt 에</li>
+    <li>cap 1 이 entity 1개 + 관련 Action 후보까지 동시 추출</li>
+    <li>도메인 인터뷰가 1 turn 으로 묶임</li>
+  </ul>
+  <p style="font-size:11.5px;color:var(--muted)">비용 ↑↑ (token large), 시간 ↑. 하지만 도메인 정확도 최고.</p>
+</div>
+
+<!-- ============================================== -->
+<h2>§4. 추천 — 옵션 G1 즉시 적용</h2>
+
+<div class="panel ok">
+  <strong>이유:</strong>
+  <ol style="font-size:12px;margin:6px 0">
+    <li>onTong 이 이미 모든 metadata 를 DB 에 가지고 있음 (extra import 없음)</li>
+    <li>backend SQL 쿼리 1~2회 추가 + prompt 에 inject 만 하면 됨 — ~30분 작업</li>
+    <li>token 비용 +30% 정도. <strong>quality 는 도메인 인터뷰의 시작점이 자체적으로 의미 있어짐</strong></li>
+    <li>레거시 시 주석 부족 시 가장 강한 hint 가 "이 class 가 어디서 호출되나"</li>
+  </ol>
+</div>
+
+<h4>구체 변경 사항 (G1 구현 시)</h4>
+<table>
+<tr><th>변경</th><th>위치</th></tr>
+<tr><td>backend `_resolve_source_from_fqn` 이 metadata 도 함께 fetch</td><td><code>backend/api/authoring.py</code></td></tr>
+<tr><td><code>extract_jpo_from_file</code> 에 <code>graph_context</code> 옵션 추가</td><td><code>capabilities/code_extractor.py</code></td></tr>
+<tr><td>system prompt 에 "graph context 가 있으면 이를 우선 신뢰" 가이드 추가</td><td><code>prompts/code_extraction.md</code></td></tr>
+<tr><td>cap 2 (hypothesis) 도 graph context 받음 — 더 정확한 가설</td><td><code>capabilities/hypothesis.py</code></td></tr>
+</table>
+
+<!-- ============================================== -->
+<h2>§5. Round 5 와의 비교 (사용자 협업 시 우리가 한 일)</h2>
+
+<div class="panel">
+  Round 5 에서 우리는 어떻게 했나?
+  <ul style="font-size:12px">
+    <li>HrSpecJpo 한 개만 보지 않았음. 사용자가 <code>SdWidthRangeAction</code>, <code>HrSpecService</code>, <code>HrSpecPK</code> 등 호출 chain 을 같이 봐가며 인터뷰</li>
+    <li>"EDGING_SPEC.PK 에 HR_PLANT_CD 누락" 발견은 <strong>EDGING_SPEC + EDGING_GROUP + SdWidthRangeAction 다 봐서</strong> 가능했음 — 단일 JPO 만 봤다면 갭 못 발견</li>
+    <li>즉 우리 협업의 quality 는 <strong>multi-file context</strong> 에서 나온 것</li>
+  </ul>
+  <p style="font-size:11.5px;color:var(--rose);margin:6px 0">
+    현재 cap 1 + cap 2 는 단일 JPO 만 봐서 Round 5 의 quality 를 재현하기 어려움 — 사용자 우려 정확.
+  </p>
+</div>
+
+<!-- ============================================== -->
+<h2>§6. 답변 폼</h2>
+
+<div class="form">
+  <h4>각 질문 1-2 줄 OK</h4>
+
+  <div class="field">
+    <label>Q1. <strong>현재 한계 인지됐나?</strong>
+      <span class="hint">cap 1 이 raw Java text 만 보고 AST graph 미활용. 레거시 시 quality 우려 정확.</span>
+    </label>
+    <textarea name="q1_acknowledged" placeholder="예: 인지됨"></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q2. <strong>옵션 선택</strong>
+      <span class="hint">★ G1 (인접 metadata 자동 첨부, ~30분, +30% 비용) / G2 (호출 그래프 traversal) / G3 (다중 파일 인터뷰)</span>
+    </label>
+    <textarea name="q2_choice" placeholder="예: G1 동의 / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q3. <strong>R2 진행 vs 이 detour</strong>
+      <span class="hint">R2 의 다른 항목 먼저 / G1 즉시 / G1 후 다음 R2 진행</span>
+    </label>
+    <textarea name="q3_priority" placeholder="예: G1 즉시"></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q4. <strong>관련 metadata 의 깊이</strong>
+      <span class="hint">G1 시 어디까지 포함? — extends/implements / 호출자 / 피호출자 / sibling class / annotations / method 시그니처 / PK class field / 한국어 주석 보존 / 모두 / 일부만</span>
+    </label>
+    <textarea name="q4_depth" placeholder="예: 모두 포함 / 또는 호출자만"></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q5. <strong>cap 2 (hypothesis) 도 graph context 받기?</strong>
+      <span class="hint">cap 1 만 받으면 일부 정보 손실. cap 2 도 받으면 가설 quality 더 ↑.</span>
+    </label>
+    <textarea name="q5_cap2_too" placeholder="예: Yes 둘 다"></textarea>
+  </div>
+
+  <div class="actions">
+    <button class="btn" data-action="copy">📋 답변 복사</button>
+    <button class="btn outline" data-action="preview">미리보기</button>
+    <span class="copy-status" id="copyStatus"></span>
+  </div>
+
+  <div class="preview" id="preview"></div>
+</div>
+
+<script>
+const fields = [
+  ["q1_acknowledged", "Q1. 현재 한계 인지"],
+  ["q2_choice",       "Q2. 옵션 선택 (G1/G2/G3)"],
+  ["q3_priority",     "Q3. R2 vs G detour"],
+  ["q4_depth",        "Q4. metadata 깊이"],
+  ["q5_cap2_too",     "Q5. cap 2 도 graph context"],
+];
+
+function buildText() {
+  const out = ["[Code Graph 활용 — 사용자 답변]"];
+  for (const [k, label] of fields) {
+    const v = (document.querySelector(`textarea[name="${k}"]`)?.value ?? "").trim();
+    if (v) out.push(`\n## ${label}\n${v}`);
+  }
+  return out.join("\n");
+}
+
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return "modern";
+    }
+  } catch {}
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;opacity:0;left:-9999px;top:0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok ? "fallback" : "failed";
+  } catch {
+    return "failed";
+  }
+}
+
+function showPreview(text) {
+  const slot = document.getElementById("preview");
+  slot.textContent = text;
+  slot.classList.add("visible");
+}
+
+document.querySelector('[data-action="preview"]').addEventListener("click", () => {
+  showPreview(buildText());
+});
+
+document.querySelector('[data-action="copy"]').addEventListener("click", async (e) => {
+  const txt = buildText();
+  showPreview(txt);
+  const result = await copyText(txt);
+  const btn = e.currentTarget;
+  const status = document.getElementById("copyStatus");
+  if (result === "modern" || result === "fallback") {
+    const orig = btn.textContent;
+    btn.textContent = `✓ 복사됨 (${result})`;
+    btn.classList.add("copied");
+    status.textContent = "";
+    status.classList.remove("err");
+    status.classList.add("ok");
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove("copied"); }, 2000);
+  } else {
+    status.textContent = "✕ 복사 실패 — 미리보기 클릭 시 전체 선택";
+    status.classList.remove("ok");
+    status.classList.add("err");
+  }
+});
+
+document.getElementById("preview").addEventListener("click", () => {
+  const slot = document.getElementById("preview");
+  const range = document.createRange();
+  range.selectNodeContents(slot);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+});
+</script>
+
+</body>
+</html>

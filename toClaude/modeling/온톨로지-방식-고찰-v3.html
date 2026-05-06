@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>onTong — Action 모델 v3 · Q1·Q2·Q4·Q7 심층 재고찰</title>
+<style>
+  :root {
+    --bg: #0b1018; --panel: #111827; --panel-2: #0f172a; --panel-3: #0a0f1a;
+    --border: #1f2937; --border-2: #334155;
+    --text: #e5e7eb; --text-dim: #94a3b8; --text-faint: #64748b;
+    --accent: #38bdf8; --accent-2: #818cf8;
+    --warn: #f59e0b; --bad: #f87171; --good: #34d399;
+    --code-bg: #0a0f1a;
+    --layer-noun: #a78bfa; --layer-verb: #fb923c; --layer-link: #38bdf8; --layer-fn: #34d399;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.65 -apple-system, BlinkMacSystemFont, "SF Pro Text",
+      "Segoe UI", "Helvetica Neue", "Pretendard", sans-serif;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 48px 32px 96px; }
+  header.top { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 32px; }
+  h1 { font-size: 28px; margin: 0 0 8px; font-weight: 700; letter-spacing: -0.02em; }
+  h1 .badge {
+    display: inline-block; margin-left: 12px; padding: 4px 10px;
+    background: var(--panel); border: 1px solid var(--border-2);
+    color: var(--accent); font-size: 11px; font-weight: 500;
+    border-radius: 4px; vertical-align: middle;
+  }
+  h2 {
+    font-size: 22px; margin: 56px 0 18px; padding-top: 14px;
+    border-top: 1px solid var(--border); color: var(--accent); font-weight: 600;
+  }
+  h3 { font-size: 17px; margin: 28px 0 10px; color: var(--text); font-weight: 600; }
+  h4 {
+    font-size: 13px; margin: 16px 0 6px; color: var(--text-dim);
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  p { margin: 8px 0; } ul, ol { margin: 8px 0; padding-left: 22px; } li { margin: 4px 0; }
+  code {
+    background: var(--code-bg); border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 3px;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--accent);
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    padding: 14px 16px; border-radius: 6px; overflow-x: auto;
+    font-size: 12.5px; line-height: 1.55;
+  }
+  pre code { background: none; border: none; padding: 0; color: var(--text); }
+  .lead { font-size: 15px; color: var(--text-dim); margin-top: 8px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 18px 22px; margin: 14px 0; }
+  .panel.warn { border-left: 3px solid var(--warn); }
+  .panel.good { border-left: 3px solid var(--good); }
+  .panel.bad  { border-left: 3px solid var(--bad); }
+  .panel.info { border-left: 3px solid var(--accent); }
+  .panel h3:first-child, .panel h4:first-child { margin-top: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--panel-2); color: var(--text-dim); font-weight: 600; }
+  tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+  .pill {
+    display: inline-block; padding: 1px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; vertical-align: middle;
+    border: 1px solid var(--border-2);
+  }
+  .pill.noun { color: var(--layer-noun); border-color: var(--layer-noun); background: rgba(167,139,250,0.08); }
+  .pill.verb { color: var(--layer-verb); border-color: var(--layer-verb); background: rgba(251,146,60,0.08); }
+  .pill.link { color: var(--layer-link); border-color: var(--layer-link); background: rgba(56,189,248,0.08); }
+  .pill.fn   { color: var(--layer-fn);   border-color: var(--layer-fn);   background: rgba(52,211,153,0.08); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: rgba(245,158,11,0.08); }
+  .pill.good { color: var(--good); border-color: var(--good); background: rgba(52,211,153,0.08); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: rgba(248,113,113,0.08); }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 32px 0; }
+  .quote { border-left: 3px solid var(--accent-2); padding: 4px 14px; color: var(--text-dim); font-style: italic; margin: 12px 0; }
+  .toc { color: var(--text-dim); font-size: 13px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .small { font-size: 12px; color: var(--text-faint); }
+  details { margin: 10px 0; }
+  summary { cursor: pointer; color: var(--accent); font-weight: 500; padding: 6px 0; }
+  summary:hover { color: var(--accent-2); }
+  .source { font-size: 12px; color: var(--text-faint); }
+  .source a { color: var(--text-dim); }
+
+  .qcard {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent); border-radius: 8px;
+    padding: 18px 22px; margin: 18px 0;
+  }
+  .qcard h3 {
+    margin-top: 0; color: var(--accent); font-size: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .qcard h3 .qid {
+    background: var(--panel-3); border: 1px solid var(--border-2);
+    color: var(--text-dim); padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600;
+  }
+  .qcard .ctx {
+    color: var(--text-dim); font-size: 13px;
+    background: rgba(56,189,248,0.04); border-left: 2px solid var(--border-2);
+    padding: 8px 12px; margin: 10px 0;
+  }
+  .qcard .ctx strong { color: var(--text); }
+  .options { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+  .options label {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 12px; border-radius: 6px;
+    background: var(--panel-3); border: 1px solid var(--border);
+    cursor: pointer; transition: background 0.1s, border-color 0.1s;
+  }
+  .options label:hover { background: rgba(56,189,248,0.05); border-color: var(--border-2); }
+  .options input[type=radio] { margin-top: 4px; flex-shrink: 0; accent-color: var(--accent); }
+  .options label:has(input:checked) { background: rgba(56,189,248,0.08); border-color: var(--accent); }
+  .options .opt-text { flex: 1; line-height: 1.5; }
+  .options .opt-text .lbl { font-weight: 600; color: var(--text); margin-right: 4px; }
+  .options .opt-text .desc { color: var(--text-dim); font-size: 12.5px; }
+  .qcard textarea {
+    width: 100%; margin-top: 8px; padding: 10px 12px;
+    background: var(--panel-3); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-family: inherit;
+    font-size: 13px; line-height: 1.55; resize: vertical; min-height: 60px;
+  }
+  .qcard textarea:focus { outline: none; border-color: var(--accent); }
+  .qcard textarea::placeholder { color: var(--text-faint); }
+
+  .copybar {
+    position: sticky; bottom: 16px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--border-2);
+    border-radius: 10px; padding: 14px 18px; margin: 32px 0 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .copybar .progress { color: var(--text-dim); font-size: 13px; flex: 1; }
+  .copybar .progress strong { color: var(--accent); }
+  button.primary {
+    background: var(--accent); color: var(--bg); border: none;
+    padding: 9px 18px; border-radius: 6px; font-size: 13px;
+    font-weight: 600; cursor: pointer;
+  }
+  button.primary:hover { background: var(--accent-2); }
+  button.secondary {
+    background: transparent; color: var(--text-dim);
+    border: 1px solid var(--border-2); padding: 9px 14px;
+    border-radius: 6px; font-size: 12px; cursor: pointer;
+  }
+  button.secondary:hover { color: var(--text); border-color: var(--text-dim); }
+  #copy-status { font-size: 12px; color: var(--good); font-weight: 600; opacity: 0; transition: opacity 0.2s; }
+  #copy-status.show { opacity: 1; }
+
+  /* settled answers banner */
+  .settled {
+    background: rgba(52,211,153,0.05); border: 1px solid rgba(52,211,153,0.3);
+    border-radius: 8px; padding: 14px 18px; margin: 16px 0;
+  }
+  .settled h4 { color: var(--good); margin-top: 0; }
+  .settled .row { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; }
+  .settled .row span {
+    background: var(--panel-3); border: 1px solid var(--border);
+    padding: 4px 10px; border-radius: 4px;
+  }
+  .settled .row span b { color: var(--good); }
+
+  /* mini scenario diagram */
+  .scenario-viz {
+    display: grid; grid-template-columns: 1fr; gap: 8px;
+    background: var(--panel-3); border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px; margin: 12px 0;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+  }
+  .scenario-viz .step {
+    display: grid; grid-template-columns: 30px 1fr 1fr; gap: 8px;
+    padding: 8px 12px; background: var(--panel); border-radius: 4px;
+    border-left: 2px solid var(--accent);
+  }
+  .scenario-viz .step .num { color: var(--accent); font-weight: 600; }
+  .scenario-viz .step .name { color: var(--text); }
+  .scenario-viz .step .delta { color: var(--good); font-size: 11px; }
+  .scenario-viz .arrow { text-align: center; color: var(--text-faint); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>Action 모델 심층 재고찰 <span class="badge">v3 · Q1·Q2·Q4·Q7 DEEP DIVE</span></h1>
+  <p class="lead">
+    사용자 답변 (2026-05-01) 반영. 확정된 6개는 정리만 하고,
+    남은 4개 — <strong>Q1 (Function 분리)</strong>, <strong>Q2/Q4 (매핑 못 하는 코드)</strong>, <strong>Q7 (Workflow)</strong> —
+    를 시뮬레이션 정확도와 사용자 직접 검증 가능한 UI/UX 관점에서 깊게 파고든다.
+    문서 끝에 갱신된 결정 폼 4개.
+  </p>
+</header>
+
+<div class="settled">
+  <h4>✓ 확정된 답변 (이번 라운드 재논의 안 함)</h4>
+  <div class="row">
+    <span><b>Q3</b> Action ↔ Process: <b>A</b> · Process 폐기, Action 단일 동사 노드</span>
+    <span><b>Q5</b> pre/post-condition: <b>C</b> · 자동 추출 + 사용자 confirm (혼합)</span>
+    <span><b>Q6</b> naming: <b>B</b> · 영문 fqn + 한국어 label</span>
+    <span><b>Q8</b> signature lock: <b>A</b> · Strict — 미확정 시 시뮬 거부</span>
+    <span><b>Q9</b> effects: <b>C</b> · 정형 effect (op + target_term + target_attr)</span>
+    <span><b>Q10</b> 마이그레이션: <b>D</b> · 데모 reset 후 새 모델로</span>
+  </div>
+</div>
+
+<nav class="toc panel info">
+  <strong>이 문서가 다루는 것</strong>
+  <ol>
+    <li><a href="#q1deep">Q1 — 우리는 왜 Action/Function 분리를 안 해도 되나? 우리만의 개념은?</a></li>
+    <li><a href="#q2q4deep">Q2 + Q4 — "코드는 있는데 매핑 안 되는 경우" 4 패턴과 처리 전략</a></li>
+    <li><a href="#q7deep">Q7 — 팔란티어 Scenario 패턴 + 우리 SimulationScenario + UI/UX 3안</a></li>
+    <li><a href="#consolidated">종합 — 모든 결정 합친 최종 모델 윤곽</a></li>
+    <li><a href="#requestion">갱신된 결정 질문 4개 (Q1' · Q2' · Q4' · Q7')</a></li>
+    <li><a href="#next">다음 단계</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================== -->
+<h2 id="q1deep">1. Q1 심층 — 우리는 왜 분리 안 해도 되나, 그리고 우리만의 개념</h2>
+
+<h3>1.1 사용자 직관 검증 — "코드라는 결정론적 기반" 가설</h3>
+
+<div class="quote">
+  사용자 메모: "팔란티어처럼 나눌 필요 없다는게, 우리는 코드라는 결정론적인 기반이 있으니까 매핑하는 순간 확정을 해줘서 그런건가?"
+</div>
+
+<p>
+  <strong>거의 정확합니다.</strong> 정확하게 짚으면 — 팔란티어가 Function 을 분리한 것은
+  "logic 의 재사용 (compose) 을 위해" 이고, Action 을 분리한 것은 "권한·감사·side effect 의 거버넌스 boundary" 때문입니다.
+  우리 환경에서는 둘 다 <strong>약하게만 필요</strong>합니다:
+</p>
+
+<table>
+  <thead><tr><th>팔란티어 분리 이유</th><th>우리 환경에서 의미</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Logic 재사용 — Function 을 여러 Action 이 합성</td>
+      <td>Java 메서드 자체가 logic. private helper 도 코드에 이미 존재. <strong>로직 단위는 코드가 ground truth</strong>(v3 결정), 재정의 불필요.</td>
+    </tr>
+    <tr>
+      <td>거버넌스 — Action 별 권한·승인·notification</td>
+      <td>SCM 분석가 1~3명 팀 환경. 권한 모델 상세 X. PR 자동 생성 (Q-E=E2) 이 사실상 단일 거버넌스 boundary — 한 단계로 충분.</td>
+    </tr>
+    <tr>
+      <td>End-user mutation 안전성</td>
+      <td>우리 mutation = 시뮬레이션 (read-only) + draft PR (사람이 merge). 트랜잭션 atomicity 같은 강건성 불필요.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+  결론: 단일 <code>Action</code> 노드 + <code>kind</code> 필드 (pure_function/effectful/workflow → Q7 결정 후 단순화 가능)
+  로 충분. 단, 사용자가 던진 두 번째 질문이 더 중요합니다 →
+</p>
+
+<h3>1.2 사용자 직관 2 — "우리 문제 해결에 맞는 별도의 구성이 있는지?"</h3>
+
+<p>
+  팔란티어의 Action/Function 구분은 그들의 문제 (멀티-tenant 운영 데이터 변경 거버넌스) 에서 자연스럽게 도출된 것입니다.
+  <strong>우리 문제는 다릅니다 — "이 시뮬레이션 결과를 사용자가 신뢰할 수 있는가?"</strong> 입니다.
+  여기에 맞는 우리만의 1급 개념을 제안합니다:
+</p>
+
+<div class="panel good">
+  <h3>제안 — <code>VerificationLevel</code> (검증 등급)</h3>
+  <p>
+    Action 의 시뮬레이션 신뢰도를 나타내는 enum. UI 가 시뮬 결과를 표시할 때
+    이 등급에 따라 다르게 보여주고, 시뮬레이션 거부 여부도 등급으로 결정.
+  </p>
+  <pre><code>class VerificationLevel(StrEnum):
+    UNMAPPED       = "unmapped"     # 메서드 발견했으나 Action 매핑 0
+    DRAFT          = "draft"        # Action 후보만 있음, 시그니처 미확정
+    SIGNATURE_LOCKED = "signature_locked"  # params/output 확정, 본체 anchor 미완
+    BODY_ANCHORED  = "body_anchored"  # 본체 anchor 도 모두 confirmed
+    SIM_VERIFIED   = "sim_verified" # 위 + 시뮬레이션 1회 이상 통과
+    PR_PROVEN      = "pr_proven"    # 위 + draft PR 까지 만들어져본 적 있음</code></pre>
+  <h4>왜 1급이어야 하나</h4>
+  <ul>
+    <li>시뮬레이션 결과 화면에 등급 배지 → 사용자 신뢰 calibration ("이건 sim_verified 라 믿을 만"<br/>vs "이건 draft 라 추정치")</li>
+    <li>"몇 % 가 SIM_VERIFIED?" 같은 진척 메트릭이 자연스럽게 나옴 — 매뉴얼·코드 매핑 진척 KPI</li>
+    <li>Q8(=A) Strict signature lock 게이트의 정확한 정의: <code>level &gt;= SIGNATURE_LOCKED</code> 이어야 시뮬 가능</li>
+    <li>팔란티어 권한 모델의 "function-backed Action approval" 위치를 우리 식 (검증 진척) 으로 대체</li>
+  </ul>
+</div>
+
+<h3>1.3 확장성 / 고도화 관점 — 단일 vs 분리 long-term</h3>
+
+<table>
+  <thead><tr><th>고도화 시나리오</th><th>단일 Action + VerificationLevel</th><th>Action+Function 분리</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>AI 에이전트가 Action 을 호출해 시뮬 자동화</td>
+      <td>Action.kind 만 보면 됨 (pure 자동, effectful 신중)</td>
+      <td>Function 호출은 자유, Action 만 정책 거침 — 더 유연 but 모델 복잡</td>
+    </tr>
+    <tr>
+      <td>복잡 도메인 (재무 / 주문 / 생산) 까지 확장</td>
+      <td>kind 분화 (pure / effectful / approval-needed / external) 로 흡수</td>
+      <td>Function library 가 커져 reusable component 화에 유리</td>
+    </tr>
+    <tr>
+      <td>다른 언어 (Python / Kotlin) 추가 매핑</td>
+      <td>realized_by 안에 language 필드만 추가 (이미 있음)</td>
+      <td>구조 같음, but Function-side 도 듀얼 매핑</td>
+    </tr>
+    <tr>
+      <td>사용자 권한·승인 워크플로우 추가</td>
+      <td>Action 에 approval_required 필드 + 정책 룰</td>
+      <td>Action 에만 박으면 됨 — 이게 분리의 원래 가치</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+  요약: <strong>단일 Action + VerificationLevel</strong> 이 우리 문제 (시뮬레이션 신뢰)에 더 정확히 맞고,
+  팔란티어식 분리는 우리가 멀티-tenant 운영 도구가 되는 시점 (현재 로드맵 밖) 에 가서야 가치가 나옵니다.
+  Phase 후반에 필요해지면 Action 의 kind=pure_function 들을 별도 Function 노드로 강등하는 마이그레이션은 어렵지 않습니다.
+</p>
+
+<!-- ============================================== -->
+<h2 id="q2q4deep">2. Q2 · Q4 심층 — "코드는 있는데 우리 구성이 매핑 못 하는 경우"</h2>
+
+<div class="quote">
+  사용자 메모: "가장 무서운거는 코드는 존재하는데, 우리 구성이 매핑을 제대로 할 수 없는 경우야."
+</div>
+
+<p>
+  이건 모델이 절대 가져선 안 되는 사각지대입니다. 시뮬레이션이 "이 변경의 영향" 을 보여줄 때
+  매핑 못 한 코드 영역이 있으면 결과는 partial 이고 사용자는 그걸 알 길이 없습니다.
+  실제 Java 코드베이스에서 매핑 곤란한 메서드는 4 가지 패턴으로 나옵니다.
+</p>
+
+<h3>2.1 매핑 곤란 4 패턴</h3>
+
+<table>
+  <thead><tr><th>패턴</th><th>예시</th><th>문제</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>① Helper / Util</strong></td>
+      <td><code>StringUtils.normalize()</code>, <code>private void validateOrderInternal(...)</code></td>
+      <td>독립된 Action 도 아니고, 어느 Action 에 속하는지도 1개로 안 정해짐. 여러 Action body 안에서 호출됨</td>
+    </tr>
+    <tr>
+      <td><strong>② Composite / God-method</strong></td>
+      <td><code>processDailyClose()</code> 하나가 발주 + 정산 + 알림 다 함</td>
+      <td>한 메서드 = 여러 Action 의 일부. 1:N (Q2=B) 도 안 맞음 — 메서드 내부가 조각남</td>
+    </tr>
+    <tr>
+      <td><strong>③ Glue / Adapter</strong></td>
+      <td><code>OrderDtoMapper.toEntity()</code>, repository 호출 wrapping</td>
+      <td>비즈니스 의미 없음. Action 후보가 아닌 인프라</td>
+    </tr>
+    <tr>
+      <td><strong>④ Generic / Generic-typed</strong></td>
+      <td><code>&lt;T&gt; List&lt;T&gt; findByCondition(Class&lt;T&gt;, Spec)</code></td>
+      <td>다양한 도메인에서 호출. 어느 Action 의 일부인지 호출 시점에만 결정됨</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>2.2 처리 전략 — Q2 사용자 답변 (M:N) 이 옳은 이유 + 보강</h3>
+
+<p>
+  사용자가 Q2=C (M:N) 를 고른 것은 정확합니다. 하지만 M:N 만으로는 ②, ③, ④ 가 깨끗히 안 잡힙니다.
+  4 가지 보강 메커니즘을 더해야 사각지대가 사라집니다.
+</p>
+
+<div class="panel">
+  <h3>전략 1 — <code>Method.role</code> 자동 분류</h3>
+  <p>
+    Java parser 단계에서 메서드를 4 종으로 자동 분류:
+  </p>
+  <pre><code>class MethodRole(StrEnum):
+    BUSINESS  = "business"   # Action 매핑 후보 (default — public, 비-getter, 비즈니스 의미 있는 이름)
+    HELPER    = "helper"     # private util, "Internal" / "Util" 이름 패턴
+    ADAPTER   = "adapter"    # repository / mapper / DTO 변환 — Action 매핑 면제
+    UNKNOWN   = "unknown"    # 자동 분류 실패 — 사용자 큐</code></pre>
+  <p>
+    HELPER / ADAPTER 는 Action 매핑 안 된다고 경고 안 함. BUSINESS 인데 Action 0 인 경우만 "unmapped" 큐.
+  </p>
+  <p class="small">
+    이미 java_parser 가 modifier (public/private/static) 를 추출하고 있으므로 base 정보는 있음. 룰 기반 + LLM 보강.
+  </p>
+</div>
+
+<div class="panel">
+  <h3>전략 2 — Composite 메서드는 <code>kind=workflow</code> Action 으로 흡수</h3>
+  <p>
+    ② 같은 god-method 는 <strong>workflow Action</strong> 으로 만들고,
+    그 안에서 호출하는 sub-method 들이 각각의 atomic Action 이 됨. workflow 는 Q7 의 Scenario 와 다름:
+    workflow Action = "이 메서드는 다른 Action 들을 호출한다" 라는 코드 사실, Scenario = "사용자가 시뮬레이션을 위해 만든 가설".
+  </p>
+  <pre><code>Action(processDailyClose, kind=workflow, sub_actions=[
+    Action(reconcileOrders, kind=effectful, ...),
+    Action(settleAccounts, kind=effectful, ...),
+    Action(sendDailyNotifications, kind=effectful, ...),
+])</code></pre>
+</div>
+
+<div class="panel">
+  <h3>전략 3 — Anchor 는 fragment-level 로 자유 binding (Q4=A 보강)</h3>
+  <p>
+    한 메서드의 anchor 들이 <strong>각각 다른 Action 슬롯에 매핑되도록 허용</strong>. 즉 메서드가 Action A 의 primary 가 아니어도,
+    그 메서드 body 의 literal 하나는 Action A 의 <code>params[0].range</code> 에 binding 가능.
+  </p>
+  <pre><code>class AnchorBinding:
+    anchor_locator: str          # method body 안의 위치 (param idx, local name, branch path)
+    method_fqn: str              # 어느 메서드의 anchor 인가
+    target_action_fqn: str       # 어느 Action 의 슬롯에 매핑되는가
+    target_slot: str             # "params[0].range" / "preconditions[2]" / "effects[1].target_term"
+    confidence: float
+    confirmed: bool</code></pre>
+  <p>
+    이렇게 하면 Q4=A ("Action.params/output 1급 + 별도 AnchorBinding 테이블") 가 자연스럽게
+    god-method / generic 메서드의 사각지대를 흡수합니다. <strong>매핑 단위가 메서드가 아니라 anchor</strong> 라서
+    "메서드는 매핑 못 했지만 그 안의 literal/branch 는 Action 의 슬롯에 묶임" 가능.
+  </p>
+</div>
+
+<div class="panel">
+  <h3>전략 4 — Workbench 의 "Unmapped Methods" 패널 (사각지대 가시화)</h3>
+  <p>
+    role=BUSINESS 이면서 Action 0 인 메서드 + role=UNKNOWN 메서드를
+    Workbench 사이드 패널에 한 곳으로 모아 진척 KPI 로 표시. <strong>매핑 못 했다는 사실 자체를 1급 시민으로</strong>.
+  </p>
+  <p>
+    시뮬레이션 시 만약 호출 chain 에 unmapped 메서드가 끼어 있으면 결과 화면에
+    "이 시뮬은 unmapped {N} 개 메서드를 mock_* 로 처리했음. 결과 신뢰도: 부분." 표시.
+    VerificationLevel(§1.2) 와 정확히 연결됨.
+  </p>
+</div>
+
+<h3>2.3 결론 — Q2 와 Q4 답변 보강</h3>
+<ul>
+  <li><strong>Q2 (M:N) 유지</strong> + <code>Method.role</code> 자동 분류 (helper/adapter 면제)</li>
+  <li><strong>Q4 (params/output 1급 + 별도 AnchorBinding) 유지</strong> + fragment-level anchor binding 허용 (메서드 매핑 없이도 anchor 만 매핑 가능)</li>
+  <li>Workbench 에 "Unmapped Methods" 패널 + VerificationLevel 표기 → 사각지대 가시화</li>
+</ul>
+
+<!-- ============================================== -->
+<h2 id="q7deep">3. Q7 심층 — Workflow 표현 + UI/UX</h2>
+
+<div class="quote">
+  사용자 메모: "팔란티어가 잘 해놨을 것 같은데, 시뮬레이션을 잘 돌리려면 어떤 게 제일 좋아? 사용자가 눈으로 확인하는 UI/UX 에서 가장 명확하게 표현할 수 있는 방법은?"
+</div>
+
+<h3>3.1 팔란티어가 실제로 어떻게 푸나 — Scenario 패턴</h3>
+
+<p>
+  조사 결과: 팔란티어는 Workflow 를 별도 노드 타입으로 두지 않습니다.
+  대신 <strong>Scenario</strong> 라는 첫째급 개념이 있고, 다음 특징을 가집니다 — Workshop Scenarios 공식 문서 기준
+  <span class="source">(<a href="https://www.palantir.com/docs/foundry/workshop/scenarios-concepts">scenarios-concepts</a>,
+  <a href="https://www.palantir.com/docs/foundry/workshop/scenarios-overview">overview</a>,
+  <a href="https://www.palantir.com/docs/foundry/vertex/scenarios-overview">Vertex</a>)</span>:
+</p>
+
+<ul>
+  <li><strong>Scenario = Ontology 의 fork/branch</strong> — 하나 이상의 Action 을 적용한 가설 분기</li>
+  <li>Scenario infrastructure 는 Action 위에 빌드 ("built on top of Actions")</li>
+  <li>한 Scenario 는 최대 50 Actions / 30,000 edits</li>
+  <li>UI: Scenario Manager widget + Scenario-aware Object Table — 같은 데이터 그리드가 "어느 시나리오 보기" 로 토글</li>
+  <li>Vertex 도구는 "key parameter 를 override 해서 alternative Action 결과를 시각화"</li>
+</ul>
+
+<div class="panel info">
+  <h4>핵심 통찰</h4>
+  <p>
+    팔란티어는 Action 을 atomic 으로 유지하고, <strong>compose 는 Scenario 라는 별도 모델로</strong> 빼냈습니다.
+    이게 우리 v2 § 6 P5 ("workflow 는 Action.kind=workflow") 보다 더 깨끗합니다 —
+    Action 의 의미를 단일 commit 단위로 보존.
+  </p>
+</div>
+
+<h3>3.2 우리에게 맞는 모델 — <code>SimulationScenario</code> 신설</h3>
+
+<pre><code>class SimulationScenario:
+    id: str
+    name: str                            # "리드타임 14→21 시뮬"
+    description: str
+    base_repo_id: str                    # ontology fork 의 base
+    initial_state: dict                  # 시뮬 시작 시점 데이터 (필요 시)
+    steps: list[ScenarioStep]            # ordered
+    created_at, created_by
+
+class ScenarioStep:
+    order: int
+    action_fqn: str                      # 호출할 Action
+    inputs: dict[str, ScenarioInput]     # param_name → 값 출처
+
+class ScenarioInput:
+    kind: Literal["literal", "term_ref", "from_step"]
+    value: Any | None                    # literal 일 때
+    term_fqn: str | None                 # term_ref 일 때 (현 ontology 의 default)
+    source_step: int | None              # from_step 일 때 — 이전 step 의 output
+    source_path: str | None              # ".output.value" 같은 dotted 경로</code></pre>
+
+<div class="panel good">
+  <h4>왜 별도 모델인가 — 4가지 이유</h4>
+  <ol>
+    <li><strong>Action 은 코드 사실, Scenario 는 사용자 가설</strong> — 두 종류의 데이터가 섞이면 마이그레이션·버전닝 다 꼬임</li>
+    <li><strong>한 Scenario 가 여러 ChangeSpec 을 묶음</strong> — 현 ChangeSpec 모델이 다중 변경의 batch 가 되어줌 (kind 분류 그대로 유지)</li>
+    <li><strong>Reproducibility</strong> — Scenario 는 frozen 후 share / replay 가능. P7 (signature_locked 시 새 version) 과 정합</li>
+    <li><strong>UI 분리 자연스러움</strong> — 시뮬 drawer 가 Scenario 빌더, Ontology editor 는 Action 카드. 모드 분리가 깨끗함 (v3.1 §6 5-mode rail 정합)</li>
+  </ol>
+</div>
+
+<p>
+  단, §2.2 전략 2 의 <strong>"Action.kind=workflow" 는 그대로 유지</strong>합니다 — 그건 코드 사실 (god-method),
+  Scenario 는 사용자 가설. 둘은 다른 계층:
+</p>
+
+<table>
+  <thead><tr><th></th><th>Action.kind=workflow</th><th>SimulationScenario</th></tr></thead>
+  <tbody>
+    <tr><td>출처</td><td>Java god-method 발견</td><td>사용자가 시뮬을 위해 직접 만듦</td></tr>
+    <tr><td>변경 가능?</td><td>코드 변경 시만</td><td>언제든 자유</td></tr>
+    <tr><td>저장 단위</td><td>Ontology</td><td>Scenario store (별도)</td></tr>
+    <tr><td>Trigger</td><td>—</td><td>"시뮬 실행" 버튼</td></tr>
+  </tbody>
+</table>
+
+<h3>3.3 UI/UX — 사용자가 가장 명확하게 보는 방법 3안 비교</h3>
+
+<div class="grid-2">
+  <div class="panel">
+    <h4>안 1 — Step List + State Inspector (수직)</h4>
+    <div class="scenario-viz">
+      <div class="step">
+        <span class="num">1</span>
+        <span class="name">리드타임 변경 (set leadTime=21)</span>
+        <span class="delta">→ leadTime: 14→21</span>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="step">
+        <span class="num">2</span>
+        <span class="name">안전재고_계산</span>
+        <span class="delta">→ 안전재고: 100→142 (+42)</span>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="step">
+        <span class="num">3</span>
+        <span class="name">발주수량_재산정</span>
+        <span class="delta">→ 발주수량: 280→322 (+42)</span>
+      </div>
+    </div>
+    <p class="small">
+      장점: 5+ step 도 가독성 유지, 순서가 명확, 각 step 클릭 시 파라미터·effect 패널 확장.<br>
+      단점: 분기·병렬 표현 어려움.
+    </p>
+  </div>
+
+  <div class="panel">
+    <h4>안 2 — Sankey / 흐름 다이어그램 (수평)</h4>
+    <pre><code>입력            Action               output
+─────           ──────────            ──────
+leadTime=21 ──→ 안전재고_계산 ──→ 안전재고=142
+                           │
+demand_stdev─→             ─→ 발주수량_재산정 ──→ 발주수량=322</code></pre>
+    <p class="small">
+      장점: 분기·병렬·데이터 흐름이 시각적으로 강력.<br>
+      단점: 가로 폭 한계, step 5+ 가면 빠르게 복잡, 모바일 어려움.
+    </p>
+  </div>
+</div>
+
+<div class="panel">
+  <h4>안 3 — Spreadsheet-Like Side-by-Side Diff (Vertex 패턴)</h4>
+  <pre><code>          | Baseline      | Scenario "리드타임 21일" | Δ
+──────────┼───────────────┼──────────────────────────┼──────
+leadTime  | 14            | 21                       | +7
+안전재고  | 100           | 142                      | +42
+발주수량  | 280           | 322                      | +42
+주문비용  | ₩2,800,000    | ₩3,220,000               | +₩420k</code></pre>
+  <p class="small">
+    장점: 비교가 가장 쉬움, 의사결정자에게 친숙한 표 형식. 팔란티어 Vertex 가 이걸 씀.<br>
+    단점: 시간 순서·인과 흐름이 안 보임. step list 와 함께 써야 완성.
+  </p>
+</div>
+
+<div class="panel info">
+  <h4>권장 조합 — 안 1 + 안 3 동시 표시</h4>
+  <p>
+    좌측 (60%) Step List (실행 순서·인과), 우측 (40%) Side-by-side Diff (최종 영향).
+    안 2 (Sankey) 는 보너스 — 분기 있는 복잡 시나리오에서 별도 모달.
+    이 조합은 <strong>시뮬 drawer 의 "full mode" 단계</strong>(v3.1: 280→480→full) 에서 자연스러움.
+  </p>
+</div>
+
+<!-- ============================================== -->
+<h2 id="consolidated">4. 종합 — 모든 결정 합친 최종 모델 윤곽</h2>
+
+<p>지금까지 결정·제안 합치면 다음 6 노드가 도출됨:</p>
+
+<table>
+  <thead><tr><th>노드</th><th>역할</th><th>주요 필드</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="pill noun">BusinessTerm</span></td>
+      <td>명사 (entity / property)</td>
+      <td>fqn, label, aliases, domain, description</td>
+    </tr>
+    <tr>
+      <td><span class="pill verb">Action</span> <span class="small">(NEW)</span></td>
+      <td>동사 — 호출 계약 + 코드 매핑</td>
+      <td>fqn, label, kind(pure/effectful/workflow), params, output, pre/post, effects, realized_by[], <strong>verification_level</strong></td>
+    </tr>
+    <tr>
+      <td><span class="pill warn">BusinessRule</span></td>
+      <td>제약</td>
+      <td>statement, severity, terms_ref</td>
+    </tr>
+    <tr>
+      <td><span class="pill link">BusinessProcess</span></td>
+      <td>조직 허브</td>
+      <td>fqn, label, parent_process</td>
+    </tr>
+    <tr>
+      <td><span class="pill link">Role</span></td>
+      <td>팀</td>
+      <td>fqn (team.*), kind, contact</td>
+    </tr>
+    <tr>
+      <td><span class="pill fn">SimulationScenario</span> <span class="small">(NEW, 별도 store)</span></td>
+      <td>사용자 가설 — Action 시퀀스 + state fork</td>
+      <td>steps[], initial_state, base_repo_id</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>4.1 코드 매핑 보강 (Q2/Q4 결과)</h3>
+<ul>
+  <li><code>Method.role</code> 자동 분류: business / helper / adapter / unknown</li>
+  <li><code>AnchorBinding</code> 별도 테이블: anchor 가 어떤 Action 슬롯에 binding 되는지 (메서드 매핑 없이 가능)</li>
+  <li>Workbench "Unmapped Methods" 패널 + VerificationLevel 진척률</li>
+</ul>
+
+<h3>4.2 흐름</h3>
+<pre><code>Java code ─ parse ─→ Method (role 자동) ─┐
+                                          ├─→ Action 후보 ──→ params/output anchors confirm
+매뉴얼 ─ parse ─→ 동사 추출 ──────────────┘                    └→ signature_locked
+                                                              └→ body anchored
+                                                              └→ sim_verified
+                                                              └→ pr_proven
+
+User: "leadTime 21 시뮬" ──→ SimulationScenario (Action 시퀀스 빌더)
+                              └→ ChangeSpec 1+ 생성
+                              └→ PythonGenerator (locked signature 사용)
+                              └→ SandboxRunner
+                              └→ Diff (Step List + Side-by-side)
+                              └→ PR draft 생성 (Action 슬롯 단위 patch)</code></pre>
+
+<!-- ============================================== -->
+<h2 id="requestion">5. 갱신된 결정 질문 4 개</h2>
+
+<p class="lead">
+  위 분석 결과로 Q1 / Q2 / Q4 / Q7 을 더 좁혀서 다시 묻습니다. 페이지 안 라디오 + 메모, 자동 저장, 하단 복사 버튼.
+</p>
+
+<form id="answers-form">
+
+<!-- Q1' -->
+<div class="qcard" data-q="Q1">
+  <h3><span class="qid">Q1'</span> <span id="Q1-title">단일 Action 모델 + VerificationLevel 신설?</span></h3>
+  <div class="ctx">
+    §1 결론: 팔란티어식 Action/Function 분리는 우리 환경에 과함. 대신 <strong>VerificationLevel</strong>
+    (UNMAPPED/DRAFT/SIGNATURE_LOCKED/BODY_ANCHORED/SIM_VERIFIED/PR_PROVEN) 을 1급 시민으로.
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="Q1" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> 단일 Action + VerificationLevel 신설 <span class="desc">(권장 — 우리 문제 fit)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q1" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> 단일 Action, VerificationLevel 은 derived 필드로만 (별도 enum 없이) <span class="desc">(가벼움, but UI 표기·KPI 약화)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q1" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> 그래도 Function 분리 — 팔란티어식 충실 <span class="desc">(extensibility 우선)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q1" value="D">
+      <span class="opt-text"><span class="lbl">D.</span> 다른 안 (메모로 제안)</span>
+    </label>
+  </div>
+  <textarea name="Q1_note" placeholder="VerificationLevel 의 단계 수·이름 의견, 또는 다른 안 (선택)"></textarea>
+</div>
+
+<!-- Q2' -->
+<div class="qcard" data-q="Q2">
+  <h3><span class="qid">Q2'</span> <span id="Q2-title">매핑 못 하는 코드 — Method.role 자동 분류 채택?</span></h3>
+  <div class="ctx">
+    §2 보강: Q2(M:N) 유지하되, helper/adapter 메서드는 Action 매핑 면제 + Workbench unmapped 패널로 사각지대 가시화.
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="Q2" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> 4종 자동 분류 (business/helper/adapter/unknown) + 사용자 큐 (unknown만) <span class="desc">(권장)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q2" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> 2종만 (business/non-business) — 사용자가 non-business 안 받으면 매핑 면제 <span class="desc">(단순)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q2" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> 자동 분류 안 함 — 모든 메서드가 unmapped 상태로 시작, 사용자가 직접 매핑 <span class="desc">(가장 보수적, 노동 ↑)</span></span>
+    </label>
+  </div>
+  <textarea name="Q2_note" placeholder="role 분류 룰에 추가 패턴 / 도메인 특수 케이스 의견 (선택)"></textarea>
+</div>
+
+<!-- Q4' -->
+<div class="qcard" data-q="Q4">
+  <h3><span class="qid">Q4'</span> <span id="Q4-title">Anchor fragment-level binding 허용?</span></h3>
+  <div class="ctx">
+    §2.2 전략 3: 메서드가 Action 에 매핑 안 됐어도 그 안의 anchor 는 Action 슬롯에 직접 binding 가능.
+    이게 god-method / generic 메서드 사각지대를 흡수.
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="Q4" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> 허용 — 메서드 매핑 없이도 anchor 만 Action 슬롯에 binding 가능 <span class="desc">(권장 — 사각지대 해소)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q4" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> 금지 — anchor binding 은 메서드가 Action 에 매핑된 후에만 가능 <span class="desc">(invariant 단순, but god-method 처리 어려움)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q4" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> 조건부 허용 — Method.role=business 인 메서드만 fragment-level 가능, helper/adapter 는 금지</span>
+    </label>
+  </div>
+  <textarea name="Q4_note" placeholder="..."></textarea>
+</div>
+
+<!-- Q7' -->
+<div class="qcard" data-q="Q7">
+  <h3><span class="qid">Q7'</span> <span id="Q7-title">Workflow 표현 — SimulationScenario 별도 모델?</span></h3>
+  <div class="ctx">
+    §3 결론: 팔란티어 Scenario 패턴 차용. Action 은 atomic 유지, compose 는 SimulationScenario 별도 모델로.
+    UI 는 Step List(좌) + Side-by-side Diff(우) 조합.
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="Q7" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> SimulationScenario 별도 모델 (steps + initial_state) + UI = Step List + Diff 조합 <span class="desc">(권장 — 팔란티어 검증된 패턴)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q7" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> SimulationScenario 별도 모델 + UI = Sankey 다이어그램 우선 <span class="desc">(시각적 강력, but 복잡 시 가독성 ↓)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q7" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> SimulationScenario 모델 + UI = Side-by-side Diff 만 (Step List 없음) <span class="desc">(의사결정자 친화, 인과 약함)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q7" value="D">
+      <span class="opt-text"><span class="lbl">D.</span> Action.kind=workflow 만 사용, SimulationScenario 신설 안 함 <span class="desc">(v2 P5 원안 — 모델 1종 통일, but Scenario 사용자 가설 표현 약함)</span></span>
+    </label>
+  </div>
+  <textarea name="Q7_note" placeholder="Scenario 보존 / 공유 / replay 같은 부가 기능 의견 (선택)"></textarea>
+</div>
+
+</form>
+
+<div class="copybar">
+  <div class="progress">진행: <strong id="progress-count">0</strong> / 4 응답</div>
+  <button type="button" class="secondary" id="clear-btn">초기화</button>
+  <button type="button" class="primary" id="copy-btn">📋 답변 4 개 복사</button>
+  <span id="copy-status">✓ 클립보드에 복사됨</span>
+</div>
+
+<details>
+  <summary>복사 결과 미리보기</summary>
+  <pre id="preview-output">(아직 응답 없음)</pre>
+</details>
+
+<!-- ============================================== -->
+<h2 id="next">6. 다음 단계</h2>
+
+<ol>
+  <li>위 4 개 답변 확정 → <code>온톨로지-방식-결정.html</code> (확정 결정 12 개 → 16 개로 확장된 v3.5)</li>
+  <li>스키마 신설:
+    <ul>
+      <li><code>backend/modeling/ontology/action_schema.py</code> — Action / ActionParam / ActionEffect / VerificationLevel</li>
+      <li><code>backend/modeling/mapping/anchor_binding.py</code> — fragment-level AnchorBinding</li>
+      <li><code>backend/modeling/simulation/scenario.py</code> — SimulationScenario / ScenarioStep</li>
+    </ul>
+  </li>
+  <li><code>java_parser.py</code> 에 <code>Method.role</code> 자동 분류 룰 추가 + LLM 보강 hook</li>
+  <li><code>change_spec.py</code> 의 <code>target_method_fqn</code> → <code>target_action_fqn</code> + payload 안 슬롯 path</li>
+  <li><code>python_generator.py</code> 입력에 ActionSignature (locked) 추가</li>
+  <li>Workbench: Action 카드 / Unmapped Methods 패널 / Scenario 빌더 (sim drawer 안)</li>
+  <li>마이그레이션: Q10=D (데모 reset 후 새 모델로) — 기존 BusinessTerm 데이터는 archive</li>
+  <li>CHECKLIST.md / TODO.md / demo_guide.md / HANDOFF.md 동시 갱신</li>
+</ol>
+
+<p class="source">
+  근거 자료:
+  <a href="https://www.palantir.com/docs/foundry/workshop/scenarios-overview">Palantir · Workshop Scenarios Overview</a> ·
+  <a href="https://www.palantir.com/docs/foundry/workshop/scenarios-concepts">Scenarios Core Concepts</a> ·
+  <a href="https://www.palantir.com/docs/foundry/vertex/scenarios-overview">Vertex Scenarios</a> ·
+  <a href="https://www.palantir.com/docs/foundry/ontology/core-concepts">Ontology Core Concepts</a>
+</p>
+
+</div>
+
+<script>
+(function () {
+  const STORAGE_KEY = 'ontong-action-answers-v3';
+  const QIDS = ['Q1','Q2','Q4','Q7'];
+  const form = document.getElementById('answers-form');
+  const progressEl = document.getElementById('progress-count');
+  const previewEl = document.getElementById('preview-output');
+  const statusEl = document.getElementById('copy-status');
+
+  function readAnswers() {
+    const out = {};
+    for (const q of QIDS) {
+      const radio = form.querySelector('input[name="' + q + '"]:checked');
+      const note = form.querySelector('textarea[name="' + q + '_note"]');
+      const choice = radio ? radio.value : null;
+      const noteVal = note ? note.value.trim() : '';
+      if (choice || noteVal) out[q] = { choice, note: noteVal };
+    }
+    return out;
+  }
+
+  function persist() {
+    const ans = readAnswers();
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ans)); } catch (e) {}
+    refreshProgress(ans);
+    refreshPreview(ans);
+  }
+
+  function restore() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) { saved = {}; }
+    for (const q of QIDS) {
+      const a = saved[q];
+      if (!a) continue;
+      if (a.choice) {
+        const radio = form.querySelector('input[name="' + q + '"][value="' + a.choice + '"]');
+        if (radio) radio.checked = true;
+      }
+      if (a.note) {
+        const note = form.querySelector('textarea[name="' + q + '_note"]');
+        if (note) note.value = a.note;
+      }
+    }
+    refreshProgress(saved);
+    refreshPreview(saved);
+  }
+
+  function refreshProgress(ans) {
+    let count = 0;
+    for (const q of QIDS) if (ans[q] && (ans[q].choice || ans[q].note)) count++;
+    progressEl.textContent = count;
+  }
+
+  function buildMarkdown(ans) {
+    let md = '# onTong Action 모델 v3 — Q1·Q2·Q4·Q7 갱신 답변\n\n';
+    md += '_답변 기준일: ' + new Date().toISOString().slice(0,10) + '_\n\n';
+    for (const q of QIDS) {
+      const titleEl = document.getElementById(q + '-title');
+      const title = titleEl ? titleEl.textContent : q;
+      const a = ans[q];
+      md += '## ' + q + "'. " + title + '\n';
+      if (!a) { md += '_(미응답)_\n\n'; continue; }
+      md += '- **선택**: ' + (a.choice || '_(없음)_') + '\n';
+      if (a.note) md += '- **메모**: ' + a.note.replace(/\n/g, '\n  ') + '\n';
+      md += '\n';
+    }
+    return md;
+  }
+
+  function refreshPreview(ans) {
+    if (!Object.keys(ans).length) { previewEl.textContent = '(아직 응답 없음)'; return; }
+    previewEl.textContent = buildMarkdown(ans);
+  }
+
+  document.getElementById('copy-btn').addEventListener('click', async function () {
+    const md = buildMarkdown(readAnswers());
+    try {
+      await navigator.clipboard.writeText(md);
+      statusEl.classList.add('show');
+      setTimeout(function () { statusEl.classList.remove('show'); }, 2200);
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = md; document.body.appendChild(ta);
+      ta.select(); try { document.execCommand('copy'); } catch (e2) {}
+      document.body.removeChild(ta);
+      statusEl.textContent = '✓ 복사됨 (fallback)';
+      statusEl.classList.add('show');
+      setTimeout(function () {
+        statusEl.classList.remove('show');
+        statusEl.textContent = '✓ 클립보드에 복사됨';
+      }, 2200);
+    }
+  });
+
+  document.getElementById('clear-btn').addEventListener('click', function () {
+    if (!confirm('응답 4개를 초기화할까요?')) return;
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    for (const r of form.querySelectorAll('input[type=radio]')) r.checked = false;
+    for (const t of form.querySelectorAll('textarea')) t.value = '';
+    refreshProgress({}); refreshPreview({});
+  });
+
+  form.addEventListener('change', persist);
+  form.addEventListener('input', persist);
+  restore();
+})();
+</script>
+
+</body>
+</html>

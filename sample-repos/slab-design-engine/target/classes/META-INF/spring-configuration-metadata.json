@@ -1,0 +1,42 @@
+{
+  "groups": [
+    {
+      "name": "slab.equipment",
+      "type": "com.ontong.slab.config.EquipmentProperties",
+      "sourceType": "com.ontong.slab.config.EquipmentProperties"
+    }
+  ],
+  "properties": [
+    {
+      "name": "slab.equipment.crane-max-load-kg",
+      "type": "java.lang.Double",
+      "description": "크레인 최대 하중 (kg). Slab 중량이 이 값을 넘으면 취급 불가.",
+      "sourceType": "com.ontong.slab.config.EquipmentProperties"
+    },
+    {
+      "name": "slab.equipment.furnace-max-length-mm",
+      "type": "java.lang.Double",
+      "description": "가열로 최대 길이 (mm). 이 값보다 긴 Slab 는 가열로 진입 불가.",
+      "sourceType": "com.ontong.slab.config.EquipmentProperties"
+    },
+    {
+      "name": "slab.equipment.max-thickness-mm",
+      "type": "java.lang.Double",
+      "description": "최대 허용 두께 (mm). 현재 설비 한계 기준. NOTE: 운영 기준서와 불일치 가능 구간 — 현장 압연 한계치 문의 필요.",
+      "sourceType": "com.ontong.slab.config.EquipmentProperties"
+    },
+    {
+      "name": "slab.equipment.min-thickness-mm",
+      "type": "java.lang.Double",
+      "description": "최소 허용 두께 (mm).",
+      "sourceType": "com.ontong.slab.config.EquipmentProperties"
+    },
+    {
+      "name": "slab.equipment.rolling-mill-max-width-mm",
+      "type": "java.lang.Double",
+      "description": "압연기 최대 폭 (mm). 이 값보다 큰 Slab 는 압연 불가.",
+      "sourceType": "com.ontong.slab.config.EquipmentProperties"
+    }
+  ],
+  "hints": []
+}

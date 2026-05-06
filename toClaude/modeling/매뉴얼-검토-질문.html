@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>슬랩 설계 매뉴얼 검토 — 5 핵심 질문</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { font-family: -apple-system, "SF Pro Text", "Helvetica Neue", "Apple SD Gothic Neo", sans-serif; line-height: 1.55; color: #222; background: #fafafa; }
+  body { max-width: 880px; margin: 0 auto; padding: 32px 24px 80px; }
+  header { border-bottom: 2px solid #222; padding-bottom: 16px; margin-bottom: 32px; }
+  header h1 { font-size: 22px; font-weight: 700; }
+  header p { color: #666; font-size: 14px; margin-top: 4px; }
+  .meta { background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px 16px; margin-bottom: 32px; font-size: 13px; color: #555; }
+  .meta strong { color: #222; }
+
+  .card { background: #fff; border: 1px solid #d8d8d8; border-radius: 8px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  .card.critical { border-left: 4px solid #d32f2f; }
+  .card.normal { border-left: 4px solid #1976d2; }
+
+  .q-num { display: inline-block; background: #222; color: #fff; padding: 2px 10px; border-radius: 4px; font-weight: 700; font-size: 12px; margin-right: 8px; vertical-align: middle; }
+  .q-importance { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 8px; vertical-align: middle; }
+  .q-importance.critical { background: #fee; color: #c00; }
+  .q-importance.normal { background: #e3f2fd; color: #1565c0; }
+  .q-title { font-size: 17px; font-weight: 600; margin-bottom: 12px; line-height: 1.3; }
+  .q-context { background: #f8f8f8; border-left: 3px solid #ccc; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #555; }
+  .q-context strong { color: #222; }
+
+  .auto-result { background: #f1f8e9; border: 1px solid #c5e1a5; border-radius: 4px; padding: 12px 14px; margin: 12px 0; font-size: 13px; }
+  .auto-result h4 { font-size: 12px; font-weight: 600; color: #558b2f; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+  table th, table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #ddd; }
+  table th { background: #f5f5f5; font-weight: 600; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+  .badge.victim { background: #ffebee; color: #c62828; }
+  .badge.normal { background: #e3f2fd; color: #1565c0; }
+  code { font-family: "SF Mono", "Menlo", monospace; font-size: 0.92em; background: #eee; padding: 1px 5px; border-radius: 3px; }
+
+  .question-prompt { font-weight: 600; margin-top: 16px; margin-bottom: 8px; color: #1565c0; font-size: 14px; }
+  .answer-options { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+  .opt { padding: 8px 14px; border: 1.5px solid #999; border-radius: 6px; cursor: pointer; background: #fff; font-size: 13px; transition: all 0.15s; }
+  .opt:hover { background: #f0f0f0; }
+  .opt.selected { background: #1976d2; color: #fff; border-color: #1976d2; }
+  .opt.selected.no { background: #d32f2f; border-color: #d32f2f; }
+
+  textarea { width: 100%; min-height: 60px; border: 1px solid #ccc; border-radius: 6px; padding: 8px 12px; font-family: inherit; font-size: 13px; resize: vertical; }
+  input[type=text] { width: 100%; border: 1px solid #ccc; border-radius: 6px; padding: 8px 12px; font-family: inherit; font-size: 13px; }
+
+  .checkbox-list { margin: 8px 0; }
+  .checkbox-list label { display: block; padding: 6px 0; cursor: pointer; font-size: 13px; }
+  .checkbox-list input { margin-right: 8px; vertical-align: middle; }
+
+  footer { position: sticky; bottom: 0; background: #222; color: #fff; padding: 16px 20px; margin-top: 32px; border-radius: 8px 8px 0 0; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 -2px 12px rgba(0,0,0,0.15); }
+  footer button { background: #4caf50; color: #fff; border: 0; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; }
+  footer button:hover { background: #43a047; }
+  footer .progress { font-size: 13px; color: #ccc; }
+
+  #copyResult { position: fixed; top: 20px; right: 20px; background: #1976d2; color: #fff; padding: 12px 20px; border-radius: 6px; font-size: 13px; opacity: 0; transition: opacity 0.3s; z-index: 100; }
+  #copyResult.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔬 슬랩 설계 매뉴얼 검토 — 5 핵심 질문</h1>
+  <p>도구가 자동으로 잡은 결과를 사용자가 확정해야 시나리오 1·2·10의 정답이 됩니다.<br>
+     5분 정도면 끝날 양입니다. 답변 후 우측 하단 버튼으로 결과 복사 → 채팅에 붙여넣기.</p>
+</header>
+
+<div class="meta">
+  <strong>입력 데이터</strong> : 122 java files / 14 JPA entities / 1774 entities / 38 BusinessRule (Javadoc 추출)<br>
+  <strong>자동 추출 도구</strong> : 12-analyzer + JpaAnnotationExtractor (length/precision 포함) + JavadocRuleExtractor + cluster heuristic<br>
+  <strong>이 검토의 목적</strong> : 22 시드 중 ⭐ <em>시연 victim cluster</em> 의 정답 + canonical 명칭 + 추가 cluster 발견 + 시연 우선순위
+</div>
+
+<!-- ============================ Q1 ============================ -->
+<div class="card critical">
+  <div>
+    <span class="q-num">Q1</span>
+    <span class="q-importance critical">⭐ 가장 중요</span>
+    <span style="color:#666; font-size:12px;">시나리오 1 정답지</span>
+  </div>
+  <div class="q-title">"품종/품명코드" — 6 컬럼이 정말 동일 도메인 개념인가요?</div>
+
+  <div class="q-context">
+    시나리오 1 (해커톤 영상 첫 1분) 의 핵심. 도구가 매핑 제안 → 사용자가 승인 → ConceptBinding 생성 흐름의 정답.<br>
+    <strong>이게 yes 라야 시나리오 1 시연이 의미가 있습니다.</strong>
+  </div>
+
+  <div class="auto-result">
+    <h4>🔍 도구가 자동 추출한 6 컬럼</h4>
+    <table>
+      <tr><th>테이블</th><th>컬럼명</th><th>length</th><th>비표준 정도</th></tr>
+      <tr><td>order_om</td><td><code>PRODUCT_TYPE_CD</code></td><td>4</td><td><span class="badge normal">표준</span></td></tr>
+      <tr><td>cast_spec</td><td><code>PRODUCT_TYPE_CD</code></td><td>4</td><td><span class="badge normal">표준</span></td></tr>
+      <tr><td>hr_spec</td><td><code>PRODUCT_TYPE_CD</code></td><td>4</td><td><span class="badge normal">표준</span></td></tr>
+      <tr><td>edging_group</td><td><code>PRODUCT_TYPE_CD</code></td><td>4</td><td><span class="badge normal">표준</span></td></tr>
+      <tr><td>customer_std</td><td><code>PRODUCT_NAME_CD</code></td><td><b>3</b></td><td><span class="badge victim">⚠ 다른 이름·다른 길이</span></td></tr>
+      <tr><td>sd_productivity_std</td><td><code>PROD_KIND_CD</code></td><td>4</td><td><span class="badge victim">⚠ 또 다른 이름</span></td></tr>
+    </table>
+  </div>
+
+  <div class="question-prompt">1-1. 이 6 컬럼이 동일 도메인 개념이 맞나요?</div>
+  <div class="answer-options" data-q="q1_match">
+    <div class="opt" data-v="yes">✅ 예 — 모두 동일</div>
+    <div class="opt" data-v="partial">🟡 일부만</div>
+    <div class="opt no" data-v="no">❌ 아님</div>
+  </div>
+
+  <div class="question-prompt">1-2. canonical 명칭 (한국어 정식 이름) 은?</div>
+  <input type="text" id="q1_canonical" placeholder="예: 품명코드, 품종코드, 제품종류코드" value="품명코드">
+
+  <div class="question-prompt">1-3. 별칭 (aliases, 매핑 시 인식되어야 할 표현들) - 콤마로 구분</div>
+  <input type="text" id="q1_aliases" placeholder="예: 품종, 품명, product_type, product_name, prod_kind" value="품종, 품명, product_type, product_name, prod_kind">
+
+  <div class="question-prompt">1-4. (1-1 이 partial / no 인 경우만) 어느 것은 다른 의미인지?</div>
+  <input type="text" id="q1_exception" placeholder="예: PROD_KIND_CD 는 사실 다른 의미">
+</div>
+
+<!-- ============================ Q2 ============================ -->
+<div class="card critical">
+  <div>
+    <span class="q-num">Q2</span>
+    <span class="q-importance critical">⭐ 중요</span>
+    <span style="color:#666; font-size:12px;">시나리오 2 정답지</span>
+  </div>
+  <div class="q-title">"열연공장코드" — HR_PLANT_CD 와 HR_CD 가 동일 도메인인가요?</div>
+
+  <div class="q-context">
+    시나리오 2 (열연 코드 mismatch) 의 정답. 도구는 동의어 매핑까지 잡아야 함.
+  </div>
+
+  <div class="auto-result">
+    <h4>🔍 자동 추출한 2 컬럼</h4>
+    <table>
+      <tr><th>테이블</th><th>컬럼명</th><th>length</th></tr>
+      <tr><td>hr_spec</td><td><code>HR_PLANT_CD</code></td><td>1</td></tr>
+      <tr><td>hr_max_wgt</td><td><code>HR_CD</code></td><td>1</td></tr>
+      <tr><td>hr_min_wgt</td><td><code>HR_CD</code></td><td>1</td></tr>
+    </table>
+  </div>
+
+  <div class="question-prompt">2-1. 동일 도메인 개념인가요?</div>
+  <div class="answer-options" data-q="q2_match">
+    <div class="opt" data-v="yes">✅ 예</div>
+    <div class="opt no" data-v="no">❌ 아님</div>
+  </div>
+
+  <div class="question-prompt">2-2. canonical 명칭은?</div>
+  <input type="text" id="q2_canonical" placeholder="예: 열연공장코드" value="열연공장코드">
+
+  <div class="question-prompt">2-3. 별칭들?</div>
+  <input type="text" id="q2_aliases" placeholder="예: 열연, hr_plant, hr_cd, HR_PLANT_CD, HR_CD" value="열연, hr_plant, hr_cd">
+</div>
+
+<!-- ============================ Q3 ============================ -->
+<div class="card normal">
+  <div>
+    <span class="q-num">Q3</span>
+    <span class="q-importance normal">📋 추가 cluster 검토</span>
+    <span style="color:#666; font-size:12px;">시나리오 5·10·12</span>
+  </div>
+  <div class="q-title">도구가 추가로 잡은 의심 패턴 — BusinessTerm 으로 등록할까요?</div>
+
+  <div class="q-context">
+    DRAMA_DNA / scenarios.md 보면 다음 두 패턴도 시연 가치 있음. 등록할지 사용자 결정.
+  </div>
+
+  <div class="auto-result">
+    <h4>🔍 패턴 A — 8 공정 DUE 컬럼 (시나리오 12 의 victim)</h4>
+    <p style="margin: 6px 0; font-size: 13px;">8개 별도 컬럼 (배열 대신). 도메인적으로는 단일 개념 "공정별 작업기한일" 의 8 instance.</p>
+    <table>
+      <tr><th>테이블</th><th>컬럼</th><th>비고</th></tr>
+      <tr><td>order_os</td><td><code>SM_DUE / HR_DUE / HRF_DUE / CR_DUE / ANL1_DUE / ANL2_DUE / GAL_DUE / CRF_DUE</code></td><td>8 공정 위치별</td></tr>
+      <tr><td>order_om</td><td><code>WORK_DUE / PROD_DUE / DELIVERY_DUE</code></td><td>주문 단계 종류</td></tr>
+    </table>
+  </div>
+
+  <div class="question-prompt">3-1. 8 공정 DUE 를 단일 BusinessTerm "공정별 작업기한일" 로 묶을까요?</div>
+  <div class="answer-options" data-q="q3a_due">
+    <div class="opt" data-v="yes">✅ 예, 묶기</div>
+    <div class="opt" data-v="separate">🔁 8개 각각 별 BusinessTerm</div>
+    <div class="opt no" data-v="skip">❌ 시연 안 함</div>
+  </div>
+
+  <div class="auto-result" style="margin-top: 18px;">
+    <h4>🔍 패턴 B — _1 suffix 원본/조정 짝 (시나리오 10 의 victim)</h4>
+    <p style="margin: 6px 0; font-size: 13px;">10개 컬럼이 같은 테이블 안에서 _1 suffix 짝을 이룸 (원본 ↔ 조정). 도메인 의미 = 동일하지만 라이프사이클 다름.</p>
+    <table>
+      <tr><th>테이블</th><th>짝</th></tr>
+      <tr><td>slab_result</td><td><code>SLAB_WIDTH ↔ SLAB_WIDTH_1</code>, <code>SLAB_LENGTH ↔ SLAB_LENGTH_1</code>, <code>SLAB_WGT ↔ SLAB_WGT_1</code> + LOW/HIGH 변종</td></tr>
+      <tr><td>order_qd</td><td><code>HR_TGT_WIDTH_1</code> (단독 _1, 원본 컬럼 부재?)</td></tr>
+    </table>
+  </div>
+
+  <div class="question-prompt">3-2. _1 suffix 짝을 BusinessTerm + "원본/조정 관계" 메타로 등록할까요?</div>
+  <div class="answer-options" data-q="q3b_suffix">
+    <div class="opt" data-v="yes">✅ 예, 등록 + 짝 관계 표현</div>
+    <div class="opt" data-v="single">🔁 짝 관계 X, 단일 등록만</div>
+    <div class="opt no" data-v="skip">❌ 시연 안 함</div>
+  </div>
+
+  <div class="question-prompt">3-3. 도구가 못 잡은 다른 victim cluster 가 있나요? 자유 입력</div>
+  <textarea id="q3_other" placeholder="예: confirmedPlantCd 8자리 위치 ↔ HR_PLANT_CD 1자리 — 사실 동일 데이터의 다른 표현"></textarea>
+</div>
+
+<!-- ============================ Q4 ============================ -->
+<div class="card normal">
+  <div>
+    <span class="q-num">Q4</span>
+    <span class="q-importance normal">📋 시연 우선순위</span>
+    <span style="color:#666; font-size:12px;">22 시드 중 영상 등장 5~10 선택</span>
+  </div>
+  <div class="q-title">22개 BusinessTerm 시드 중 해커톤 영상에 등장할 핵심 5~10개는?</div>
+
+  <div class="q-context">
+    영상 5분에 모든 BusinessTerm 다루기는 힘들고 핵심만 시연. 사용자 우선순위 확정.
+  </div>
+
+  <div class="checkbox-list">
+    <label><input type="checkbox" name="q4_terms" value="품명코드" checked>품명코드 <span style="color:#c00; font-size:11px;">(시나리오 1, 필수)</span></label>
+    <label><input type="checkbox" name="q4_terms" value="열연공장코드" checked>열연공장코드 <span style="color:#c00; font-size:11px;">(시나리오 2, 필수)</span></label>
+    <label><input type="checkbox" name="q4_terms" value="우선순위">우선순위 <span style="color:#666; font-size:11px;">(시나리오 3, EDGING_GROUP/CUSTOMER_STD)</span></label>
+    <label><input type="checkbox" name="q4_terms" value="확정통과공장코드">확정통과공장코드 (8자리) <span style="color:#666; font-size:11px;">(시나리오 5·12)</span></label>
+    <label><input type="checkbox" name="q4_terms" value="설계대기량">설계대기량 <span style="color:#666; font-size:11px;">(시나리오 5·9, DG004)</span></label>
+    <label><input type="checkbox" name="q4_terms" value="포장단중하한">포장단중 (하/상한) <span style="color:#666; font-size:11px;">(시나리오 9, DG003·DG004)</span></label>
+    <label><input type="checkbox" name="q4_terms" value="강종코드">강종코드</label>
+    <label><input type="checkbox" name="q4_terms" value="고객사코드">고객사코드</label>
+    <label><input type="checkbox" name="q4_terms" value="두께">두께 (HR_MIN/MAX_WGT 2D sheet 축) <span style="color:#666; font-size:11px;">(시나리오 4)</span></label>
+    <label><input type="checkbox" name="q4_terms" value="폭">폭 (HR_MIN/MAX_WGT 2D sheet 축) <span style="color:#666; font-size:11px;">(시나리오 4)</span></label>
+    <label><input type="checkbox" name="q4_terms" value="Edging그룹코드">Edging 그룹코드 + '*' wildcard <span style="color:#666; font-size:11px;">(시나리오 6)</span></label>
+    <label><input type="checkbox" name="q4_terms" value="회사코드">회사·소 코드 (composite PK)</label>
+    <label><input type="checkbox" name="q4_terms" value="주문번호">주문번호</label>
+  </div>
+</div>
+
+<!-- ============================ Q5 ============================ -->
+<div class="card normal">
+  <div>
+    <span class="q-num">Q5</span>
+    <span class="q-importance normal">📋 누락 룰 보강</span>
+    <span style="color:#666; font-size:12px;">38 BusinessRule 검토</span>
+  </div>
+  <div class="q-title">21단계 알고리즘 중 시연에 핵심인데 자동추출 안 된 룰이 있나요?</div>
+
+  <div class="q-context">
+    JavadocRuleExtractor 가 38 룰 추출함 (대부분 step 공식 + DG003/004). 한국어 자연어 + 수량 표현 잘 잡힘.<br>
+    자동 추출 안 된 룰이 있으면 (예: 코드 안 주석에 없는 운영 룰) 사용자 추가 입력 필요.
+  </div>
+
+  <div class="auto-result">
+    <h4>🔍 자동 추출된 38 BusinessRule 분포</h4>
+    <table>
+      <tr><th>위치</th><th>룰 수</th><th>예시</th></tr>
+      <tr><td>SdFinalLengthRangeAction (step 17)</td><td>2</td><td>slab길이하한 = max(...)</td></tr>
+      <tr><td>SdFinalWidthRangeAction (step 16)</td><td>2</td><td>slab폭하한 = ceil(...)</td></tr>
+      <tr><td>SdFirstWeightAction (step 4)</td><td>2</td><td>단중하한 = 1차두께 × 1차폭하한 × ...</td></tr>
+      <tr><td>SdLengthRangeAction (step 3)</td><td>2</td><td>길이하한 = max(연주, 열연)</td></tr>
+      <tr><td>SdOrderValidator (DG003·004·005)</td><td>3+</td><td>설계대기량 양수 + 상한 ≥ 포장단중하한</td></tr>
+      <tr><td>기타 (각 step)</td><td>27</td><td>...</td></tr>
+    </table>
+  </div>
+
+  <div class="question-prompt">5-1. 영상에서 시연할 핵심 BusinessRule 이 누락됐나요?</div>
+  <div class="answer-options" data-q="q5_missing">
+    <div class="opt" data-v="ok">✅ 충분 — 자동 추출로 OK</div>
+    <div class="opt" data-v="add">➕ 추가 룰 있음 (아래 입력)</div>
+  </div>
+
+  <div class="question-prompt">5-2. 추가할 룰 (있는 경우, 자유 형식)</div>
+  <textarea id="q5_additional" placeholder="예: SdSecondWgtHighAction 의 ABSOLUTE_MAX_KG = 999999.999 매직넘버 — 추출 안 됐을 수도"></textarea>
+
+  <div class="question-prompt">5-3. 영상 5 시나리오 우선순위 확정 (PROJECT_OVERVIEW 권장 = #1, #3, #5, #8, #10)</div>
+  <div class="answer-options" data-q="q5_priority">
+    <div class="opt" data-v="default">✅ 권장 그대로 (#1, #3, #5, #8, #10)</div>
+    <div class="opt" data-v="custom">🔁 다르게 (아래 입력)</div>
+  </div>
+  <input type="text" id="q5_custom_priority" placeholder="예: #1, #2, #5, #8, #10 (시나리오 3 대신 2)">
+</div>
+
+<footer>
+  <div class="progress" id="progress">답변 진행 0 / 5</div>
+  <button id="exportBtn">📋 답변 정리해서 복사</button>
+</footer>
+
+<div id="copyResult">✅ 클립보드로 복사됨 — 채팅에 붙여넣기 하세요</div>
+
+<script>
+// 답변 옵션 toggle
+document.querySelectorAll('.answer-options').forEach(group => {
+  group.addEventListener('click', e => {
+    const opt = e.target.closest('.opt');
+    if (!opt) return;
+    group.querySelectorAll('.opt').forEach(o => o.classList.remove('selected'));
+    opt.classList.add('selected');
+    updateProgress();
+  });
+});
+
+document.querySelectorAll('input, textarea').forEach(el => {
+  el.addEventListener('input', updateProgress);
+});
+
+function updateProgress() {
+  const required = ['q1_match', 'q2_match', 'q3a_due', 'q3b_suffix', 'q5_missing'];
+  const answered = required.filter(q =>
+    document.querySelector(`[data-q="${q}"] .opt.selected`)
+  ).length;
+  document.getElementById('progress').textContent = `답변 진행 ${answered} / 5`;
+}
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const get = id => (document.getElementById(id)?.value || '').trim();
+  const opt = q => {
+    const sel = document.querySelector(`[data-q="${q}"] .opt.selected`);
+    return sel ? sel.dataset.v : '(미답변)';
+  };
+  const checkboxes = Array.from(
+    document.querySelectorAll('input[name="q4_terms"]:checked')
+  ).map(c => c.value);
+
+  const summary = `# 슬랩 매뉴얼 검토 답변
+
+## Q1 — 품명코드 cluster
+- 매칭 여부 : ${opt('q1_match')}
+- canonical : ${get('q1_canonical')}
+- aliases : ${get('q1_aliases')}
+- 예외 (있는 경우) : ${get('q1_exception') || '(없음)'}
+
+## Q2 — 열연공장코드 cluster
+- 매칭 여부 : ${opt('q2_match')}
+- canonical : ${get('q2_canonical')}
+- aliases : ${get('q2_aliases')}
+
+## Q3 — 추가 cluster 검토
+- 8 공정 DUE 묶기 : ${opt('q3a_due')}
+- _1 suffix 원본/조정 짝 : ${opt('q3b_suffix')}
+- 추가 victim cluster (자유) : ${get('q3_other') || '(없음)'}
+
+## Q4 — 시연 핵심 BusinessTerm 선택
+${checkboxes.length ? checkboxes.map(t => `- ${t}`).join('\n') : '- (선택 없음)'}
+
+## Q5 — 누락 룰 / 시연 우선순위
+- 누락 룰 여부 : ${opt('q5_missing')}
+- 추가할 룰 : ${get('q5_additional') || '(없음)'}
+- 시연 시나리오 우선순위 : ${opt('q5_priority')}${
+    opt('q5_priority') === 'custom' ? ` — ${get('q5_custom_priority')}` : ''
+  }
+`;
+
+  navigator.clipboard.writeText(summary).then(() => {
+    const toast = document.getElementById('copyResult');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2200);
+  }).catch(err => {
+    alert('복사 실패 — 콘솔에 출력합니다');
+    console.log(summary);
+  });
+});
+</script>
+</body>
+</html>

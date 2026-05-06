@@ -14,8 +14,9 @@ import { SearchCommandPalette } from "@/components/search/SearchCommandPalette";
 import { useSearchStore } from "@/lib/search/useSearchStore";
 import { useWorkspaceStore } from "@/lib/workspace/useWorkspaceStore";
 import { SectionNav } from "@/components/sections/SectionNav";
-import { SimulationSection } from "@/components/simulation/SimulationSection";
 import { ModelingSection } from "@/components/sections/ModelingSection";
+import { useUrlSync } from "@/components/sections/modeling/useUrlSync";
+// 2026-05-02 C6 Phase 1: Modeling Workbench React 구현 시작.
 import { FolderTree, Sparkles, PanelRightClose, FileText, MessageSquare } from "lucide-react";
 
 function readBool(key: string, fallback: boolean): boolean {
@@ -25,6 +26,9 @@ function readBool(key: string, fallback: boolean): boolean {
 }
 
 export default function Home() {
+  // R4-T2.3 — URL ↔ store 양방향 sync (workspace section + graph state)
+  useUrlSync();
+
   const toggle = useSearchStore((s) => s.toggle);
   const activeSection = useWorkspaceStore((s) => s.activeSection);
 
@@ -281,8 +285,6 @@ export default function Home() {
         ))}
 
         {activeSection === "modeling" && <ModelingSection />}
-
-        {activeSection === "simulation" && <SimulationSection />}
       </div>
 
       {/* Floating popout AI window */}

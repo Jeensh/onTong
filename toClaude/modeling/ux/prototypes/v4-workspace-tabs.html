@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>onTong Workbench — V4 Workspace Tabs</title>
+<link rel="stylesheet" href="_shared.css" />
+<style>
+  /* Browser-like 다중 탭. 각 탭 = 1 작업 (Action 매핑 / Term 편집 / 대시보드 등).
+     사용자는 여러 작업 켜놓고 빠르게 switch. 한 탭 안은 focused single-task UI. */
+  .app-shell {
+    grid-template-rows: 36px 32px 1fr 24px;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "top"
+      "tabs"
+      "main"
+      "status";
+  }
+  .topbar { grid-area: top; }
+  .tabbar {
+    grid-area: tabs; background: var(--panel-2); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 8px; gap: 1px; overflow-x: auto;
+  }
+  .tab {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px; height: 26px;
+    background: var(--panel-3); border: 1px solid var(--border);
+    border-bottom: 0; border-radius: 5px 5px 0 0;
+    margin-bottom: -1px;
+    font-size: 11.5px; color: var(--text-dim);
+    cursor: pointer; transition: all 0.1s; max-width: 240px;
+  }
+  .tab:hover { background: var(--panel); color: var(--text); }
+  .tab.active {
+    background: var(--bg); color: var(--text);
+    border-bottom: 1px solid var(--bg);
+  }
+  .tab .x {
+    color: var(--text-faint); padding: 0 2px; opacity: 0;
+    transition: opacity 0.1s;
+  }
+  .tab:hover .x { opacity: 1; }
+  .tab .x:hover { color: var(--bad); }
+  .tab .icon { font-size: 13px; }
+  .tab .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tab.unsaved::after {
+    content: '●'; color: var(--accent); font-size: 14px; margin-left: 2px;
+  }
+  .tab-add {
+    background: transparent; border: 0; color: var(--text-faint);
+    padding: 5px 10px; font-size: 16px; cursor: pointer;
+  }
+  .tab-add:hover { color: var(--accent); }
+
+  .main {
+    grid-area: main; background: var(--bg); overflow: auto;
+    padding: 22px 36px; max-width: 1100px; margin: 0 auto; width: 100%;
+  }
+  .statusbar { grid-area: status; }
+
+  /* Focus mode — 한 작업, 여백 충분히 */
+  .focus-header {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 6px;
+  }
+  .focus-header h1 {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.01em;
+  }
+  .focus-sub {
+    color: var(--text-dim); font-size: 13px; margin-bottom: 24px;
+  }
+  .focus-sub code {
+    font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+    color: var(--text-faint);
+  }
+
+  .focus-section {
+    margin: 20px 0 28px;
+  }
+  .focus-section h2 {
+    font-size: 13px; font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    margin-bottom: 10px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Workflow steps */
+  .step-row {
+    display: grid; grid-template-columns: 30px 1fr; gap: 14px;
+    margin-bottom: 10px; align-items: flex-start;
+  }
+  .step-num {
+    background: var(--panel); border: 1px solid var(--border-2);
+    border-radius: 50%; width: 24px; height: 24px; line-height: 22px;
+    text-align: center; color: var(--text-dim); font-weight: 600; font-size: 11px;
+  }
+  .step-row.done .step-num { background: var(--good); color: var(--bg); border-color: var(--good); }
+  .step-row.current .step-num { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .step-content { padding: 2px 0; }
+  .step-row .step-content p {
+    color: var(--text); font-size: 13px;
+  }
+  .step-row .step-content small { color: var(--text-faint); font-size: 11.5px; }
+
+  /* Param table */
+  .param-table {
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    overflow: hidden; margin: 8px 0;
+  }
+  .param-table th, .param-table td {
+    padding: 8px 14px; text-align: left; font-size: 12.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  .param-table th {
+    background: var(--panel-2); color: var(--text-dim); font-weight: 600;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .param-table tr:last-child td { border-bottom: 0; }
+
+  pre.code-snip {
+    background: var(--panel-3); border: 1px solid var(--border);
+    padding: 12px 16px; border-radius: 4px; overflow-x: auto;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12.5px;
+    color: var(--text); line-height: 1.6;
+  }
+  pre.code-snip .hi { background: rgba(56,189,248,0.18); padding: 0 2px; }
+
+  .verification-large {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px 20px; margin: 12px 0;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .verification-large .ring {
+    width: 64px; height: 64px; border-radius: 50%;
+    border: 4px solid var(--panel-3);
+    border-top-color: var(--warn); border-right-color: var(--warn);
+    transform: rotate(-45deg); position: relative;
+  }
+  .verification-large .ring-text {
+    position: absolute; inset: 0; transform: rotate(45deg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: var(--warn);
+  }
+
+  .progress-list {
+    flex: 1; font-size: 12px; line-height: 1.9;
+  }
+  .progress-list .done { color: var(--good); }
+  .progress-list .now { color: var(--accent); font-weight: 600; }
+  .progress-list .later { color: var(--text-faint); }
+
+  .keyboard-strip {
+    margin-top: 30px; padding: 12px 16px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
+    display: flex; gap: 18px; flex-wrap: wrap;
+    font-size: 11px; color: var(--text-faint);
+  }
+  .keyboard-strip kbd {
+    background: var(--panel); border: 1px solid var(--border-2);
+    padding: 1px 6px; border-radius: 3px;
+    font-size: 10.5px; margin-right: 3px; color: var(--text-dim);
+  }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+<header class="topbar">
+  <span class="brand"><span class="o">on</span>Tong</span>
+  <span class="repo">slab-design-real · main</span>
+  <span class="spacer"></span>
+  <span class="cmd-k">⌘K  검색 / 명령</span>
+  <button>🌳 트리</button>
+  <button>📥 큐 (23)</button>
+</header>
+
+<!-- Tab bar (browser-like) -->
+<div class="tabbar">
+  <div class="tab active unsaved">
+    <span class="icon">📋</span>
+    <span class="title">주문_검증 매핑</span>
+    <span class="x">×</span>
+  </div>
+  <div class="tab">
+    <span class="icon">📋</span>
+    <span class="title">안전재고_계산 매핑</span>
+    <span class="x">×</span>
+  </div>
+  <div class="tab">
+    <span class="icon">📦</span>
+    <span class="title">주문스펙 편집</span>
+    <span class="x">×</span>
+  </div>
+  <div class="tab">
+    <span class="icon">📊</span>
+    <span class="title">진척 대시보드</span>
+    <span class="x">×</span>
+  </div>
+  <div class="tab">
+    <span class="icon">🔍</span>
+    <span class="title">검색: "직경"</span>
+    <span class="x">×</span>
+  </div>
+  <button class="tab-add" title="새 탭 (⌘T)">+</button>
+</div>
+
+<!-- MAIN — focused single task -->
+<main class="main">
+
+  <div class="focus-header">
+    <h1>주문 검증 매핑</h1>
+    <span class="pill warn">SIGNATURE_LOCKED ●●●○○○</span>
+    <span class="spacer" style="flex: 1;"></span>
+    <button>← 큐 이전</button>
+    <button>큐 다음 →</button>
+  </div>
+  <div class="focus-sub">
+    <code>action.scm.주문_검증</code> · pure_function · abstract · declared on
+    <code>term.scm.order</code>
+  </div>
+
+  <!-- VERIFICATION 진척 대형 시각 -->
+  <div class="verification-large">
+    <div class="ring"><div class="ring-text">3/6</div></div>
+    <div class="progress-list">
+      <div class="done">✓ params 모두 confirmed (1/1)</div>
+      <div class="done">✓ realizations primary 확정 (2/2 — RushOrder + StandardOrder)</div>
+      <div class="now">→ anchor 4개 중 2 미확정 (BODY_ANCHORED 까지 2 남음)</div>
+      <div class="later">○ 시뮬 통과 (SIM_VERIFIED)</div>
+      <div class="later">○ PR draft 생성 (PR_PROVEN)</div>
+    </div>
+  </div>
+
+  <!-- 작업 단계 워크플로우 -->
+  <div class="focus-section">
+    <h2>매핑 워크플로우</h2>
+
+    <div class="step-row done">
+      <div class="step-num">✓</div>
+      <div class="step-content">
+        <p>1. Action 시그니처 확정</p>
+        <small>params: <code style="font-size: 11.5px;">주문 → term.scm.order</code> · output: <code style="font-size: 11.5px;">검증결과 → term.scm.validation_result</code></small>
+      </div>
+    </div>
+
+    <div class="step-row done">
+      <div class="step-num">✓</div>
+      <div class="step-content">
+        <p>2. Realization 확정 (다형성)</p>
+        <small>RushOrder.validate (primary) · StandardOrder.validate (primary). 모두 SINGLE_IMPL 자동 추론.</small>
+      </div>
+    </div>
+
+    <div class="step-row current">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <p>3. Anchor binding — <strong style="color: var(--accent);">진행 중 · 2 미확정</strong></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 현재 작업: anchor binding -->
+  <div class="focus-section">
+    <h2>코드 anchor (4 / 2 미확정)</h2>
+    <pre class="code-snip">// RushOrder.validate
+@Override public ValidationResult validate() {
+  if (priority &lt; <span class="hi" style="background: rgba(52,211,153,0.18);">1</span> || priority &gt; <span class="hi" style="background: rgba(52,211,153,0.18);">5</span>)  // ✓ params[0]&lt;RushOrder&gt;.priority.range
+    return fail("우선도");
+  if (spec.diameter &gt; <span class="hi">200.0</span>)                                                  // ⚠ 매핑 필요
+    return fail("긴급주문 직경");
+  ChemComposition latest = comps.get(comps.size()-1);
+  if (latest.C &lt; 0.10 || latest.C &gt; <span class="hi">0.25</span>)                                        // ⚠ 매핑 필요
+    return fail("C 함량");
+  return ok();
+}</pre>
+    <p style="margin-top: 8px; color: var(--text-dim); font-size: 12px;">
+      💡 코드의 hi-light 된 literal/branch 클릭 → slot 매핑 화면 (다음 탭).
+      또는 <kbd style="background: var(--panel-3); border: 1px solid var(--border); padding: 1px 6px; border-radius: 3px; font-size: 10.5px;">N</kbd> 으로 다음 미확정으로.
+    </p>
+  </div>
+
+  <div class="focus-section">
+    <h2>params 시그니처</h2>
+    <table class="param-table">
+      <thead>
+        <tr>
+          <th>idx</th><th>name</th><th>type</th><th>BusinessTerm</th>
+          <th style="text-align: center;">confirmed</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code style="font-size: 11.5px; color: var(--text-faint);">[0]</code></td>
+          <td><strong>주문</strong></td>
+          <td>object_ref</td>
+          <td><code style="font-size: 11.5px;">term.scm.order</code></td>
+          <td style="text-align: center;"><span class="pill good" style="font-size: 10px;">✓</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="focus-section">
+    <h2>realizations · 2 (다형성)</h2>
+    <table class="param-table">
+      <thead>
+        <tr>
+          <th>코드 메서드</th><th>applies to</th><th>dispatch</th><th>scope</th>
+          <th style="text-align: center;">conf</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code style="font-size: 11.5px;">com.scm.RushOrder.validate</code></td>
+          <td><span class="path-token">&lt;RushOrder&gt;</span></td>
+          <td><span class="pill" style="font-size: 9.5px;">single_impl</span></td>
+          <td>primary</td>
+          <td style="text-align: center;"><span class="pill good" style="font-size: 10px;">1.0 ✓</span></td>
+        </tr>
+        <tr>
+          <td><code style="font-size: 11.5px;">com.scm.StandardOrder.validate</code></td>
+          <td><span class="path-token">&lt;StandardOrder&gt;</span></td>
+          <td><span class="pill" style="font-size: 9.5px;">single_impl</span></td>
+          <td>primary</td>
+          <td style="text-align: center;"><span class="pill good" style="font-size: 10px;">1.0 ✓</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="keyboard-strip">
+    <span><kbd>N</kbd> 다음 미확정 anchor</span>
+    <span><kbd>↵</kbd> 추천 채택</span>
+    <span><kbd>⌘S</kbd> 저장</span>
+    <span><kbd>⌘W</kbd> 탭 닫기</span>
+    <span><kbd>⌘T</kbd> 새 탭</span>
+    <span><kbd>⌘1-5</kbd> 탭 전환</span>
+    <span><kbd>⌘K</kbd> 검색 / 명령</span>
+  </div>
+</main>
+
+<footer class="statusbar">
+  <span class="verification">
+    <span class="pill bad" style="font-size: 9px;">U</span>16
+    <span class="pill warn" style="font-size: 9px;">D</span>18
+    <span class="pill" style="font-size: 9px;">SL</span>22
+    <span class="pill" style="font-size: 9px;">BA</span>47
+    <span class="pill good" style="font-size: 9px;">SV</span>31
+    <span class="pill good" style="font-size: 9px;">PR</span>8
+  </span>
+  <span>총 142 actions · BODY_ANCHORED+ <strong style="color: var(--good);">86</strong> (61%)</span>
+  <span class="spacer" style="flex: 1;"></span>
+  <span>5 탭 열림 · 오늘 작업 <strong style="color: var(--good);">+12 매핑</strong></span>
+</footer>
+
+</div>
+</body>
+</html>

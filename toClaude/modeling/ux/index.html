@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>onTong Workbench — 통합 화면 design 안 비교 (C6 1차 사이클)</title>
+<style>
+  :root {
+    --bg: #0b1018; --panel: #111827; --panel-2: #0f172a; --panel-3: #0a0f1a;
+    --border: #1f2937; --border-2: #334155;
+    --text: #e5e7eb; --text-dim: #94a3b8; --text-faint: #64748b;
+    --accent: #38bdf8; --accent-2: #818cf8; --good: #34d399;
+    --bad: #f87171; --warn: #f59e0b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 14px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text",
+      "Segoe UI", "Helvetica Neue", "Pretendard", sans-serif;
+    padding: 32px 24px 80px;
+  }
+  .wrap { max-width: 1400px; margin: 0 auto; }
+  h1 {
+    font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px;
+  }
+  h1 .badge {
+    display: inline-block; margin-left: 12px; padding: 4px 10px;
+    background: rgba(56,189,248,0.1); border: 1px solid var(--accent);
+    color: var(--accent); font-size: 11px; font-weight: 500;
+    border-radius: 4px; vertical-align: middle;
+  }
+  .lead { font-size: 14px; color: var(--text-dim); margin-bottom: 24px; }
+  .lead strong { color: var(--text); }
+  h2 {
+    font-size: 18px; font-weight: 600; margin: 32px 0 12px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    color: var(--accent);
+  }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    background: var(--panel-3); padding: 1px 6px; border-radius: 3px;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12.5px;
+    color: var(--accent); border: 1px solid var(--border);
+  }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px 20px; margin: 12px 0;
+  }
+  .panel.info { border-left: 3px solid var(--accent); }
+  .panel.warn { border-left: 3px solid var(--warn); }
+
+  /* 4 variant grid */
+  .variants {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0;
+  }
+  @media (max-width: 900px) { .variants { grid-template-columns: 1fr; } }
+  .variant {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px 20px;
+  }
+  .variant h3 {
+    font-size: 16px; font-weight: 600; margin-bottom: 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .variant h3 .v-num {
+    background: var(--accent); color: var(--bg); padding: 2px 8px;
+    border-radius: 4px; font-size: 11px;
+  }
+  .variant .tag-line {
+    color: var(--text-dim); font-size: 12px; margin-bottom: 10px;
+  }
+  .variant .desc { color: var(--text-dim); font-size: 12.5px; line-height: 1.6; margin-bottom: 12px; }
+  .variant .pros, .variant .cons {
+    display: flex; align-items: flex-start; gap: 6px; margin: 4px 0; font-size: 12px;
+  }
+  .variant .pros::before { content: "✓"; color: var(--good); font-weight: 600; }
+  .variant .cons::before { content: "✗"; color: var(--bad); font-weight: 600; }
+  .variant .open-btn {
+    display: inline-block; margin-top: 10px; padding: 7px 14px;
+    background: var(--accent); color: var(--bg); border-radius: 4px;
+    font-weight: 600; font-size: 12.5px;
+  }
+  .variant .open-btn:hover { background: var(--accent-2); text-decoration: none; }
+
+  /* 비교 매트릭스 */
+  table {
+    width: 100%; border-collapse: collapse; margin: 14px 0;
+    font-size: 12.5px;
+  }
+  th, td {
+    padding: 8px 10px; text-align: left; border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    background: var(--panel-2); color: var(--text-dim); font-weight: 600;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  td.dim { color: var(--text-faint); font-size: 11.5px; }
+
+  /* qcard form */
+  .qcard {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent); border-radius: 8px;
+    padding: 16px 20px; margin: 16px 0;
+  }
+  .qcard h3 {
+    margin-top: 0; color: var(--accent); font-size: 15px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .qcard h3 .qid {
+    background: var(--panel-3); border: 1px solid var(--border-2);
+    color: var(--text-dim); padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600;
+  }
+  .qcard .ctx {
+    color: var(--text-dim); font-size: 12.5px;
+    background: rgba(56,189,248,0.04); border-left: 2px solid var(--border-2);
+    padding: 8px 12px; margin: 10px 0;
+  }
+  .options { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+  .options label {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 12px; border-radius: 6px;
+    background: var(--panel-3); border: 1px solid var(--border);
+    cursor: pointer; transition: background 0.1s, border-color 0.1s;
+  }
+  .options label:hover { background: rgba(56,189,248,0.05); border-color: var(--border-2); }
+  .options input[type=radio], .options input[type=checkbox] {
+    margin-top: 4px; accent-color: var(--accent);
+  }
+  .options label:has(input:checked) { background: rgba(56,189,248,0.08); border-color: var(--accent); }
+  .options .opt-text { flex: 1; line-height: 1.5; font-size: 13px; }
+  .options .opt-text .lbl { font-weight: 600; color: var(--text); margin-right: 4px; }
+  .options .opt-text .desc { color: var(--text-dim); font-size: 12px; }
+  textarea {
+    width: 100%; margin-top: 8px; padding: 10px 12px;
+    background: var(--panel-3); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-family: inherit;
+    font-size: 13px; line-height: 1.55; resize: vertical; min-height: 60px;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  textarea::placeholder { color: var(--text-faint); }
+
+  /* sticky copybar */
+  .copybar {
+    position: sticky; bottom: 16px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--border-2);
+    border-radius: 10px; padding: 14px 18px; margin: 32px 0 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .copybar .progress { color: var(--text-dim); font-size: 13px; flex: 1; }
+  .copybar .progress strong { color: var(--accent); }
+  button.primary {
+    background: var(--accent); color: var(--bg); border: none;
+    padding: 9px 18px; border-radius: 6px; font-size: 13px;
+    font-weight: 600; cursor: pointer;
+  }
+  button.primary:hover { background: var(--accent-2); }
+  button.secondary {
+    background: transparent; color: var(--text-dim);
+    border: 1px solid var(--border-2); padding: 9px 14px;
+    border-radius: 6px; font-size: 12px; cursor: pointer;
+  }
+  button.secondary:hover { color: var(--text); border-color: var(--text-dim); }
+  #copy-status { font-size: 12px; color: var(--good); font-weight: 600; opacity: 0; transition: opacity 0.2s; }
+  #copy-status.show { opacity: 1; }
+  details { margin: 10px 0; }
+  summary {
+    cursor: pointer; color: var(--accent); font-weight: 500; padding: 6px 0;
+  }
+  summary:hover { color: var(--accent-2); }
+  pre {
+    background: var(--panel-3); border: 1px solid var(--border);
+    padding: 12px 14px; border-radius: 4px; overflow-x: auto;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+    line-height: 1.5; color: var(--text-dim);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Workbench 통합 화면 — design 안 비교 <span class="badge">C6 · 1차 사이클</span></h1>
+<p class="lead">
+  5-mode rail 폐기 (O4=D) + 모든 기존 모델링 UI archive (C1) 후 새 통합 화면 design.
+  <strong>같은 시나리오 (S3 — Action 매핑 큐 처리)</strong> 을 4 가지 다른 layout 으로 구현.
+  결정 = 사용자 직접 비교 + 선택 + 보강 의견.
+</p>
+
+<div class="panel info">
+  <strong>비교 방법</strong>:
+  <ol style="margin-top: 6px;">
+    <li>각 안 새 탭에서 열어서 같은 시나리오 (anchor 매핑) 가 어떻게 보이는지 확인</li>
+    <li>scenarios.md 의 4 시나리오 (S1 import / S2 매뉴얼 / S3 매핑 / S4 진척) 중 어느 게 잘 / 못 보이는지 머릿속 simulate</li>
+    <li>아래 폼 채우고 복사 버튼 → 답변 주시면 다음 사이클</li>
+  </ol>
+  <p style="margin-top: 8px; color: var(--text-faint); font-size: 12px;">
+    🔗 시나리오 + persona: <a href="scenarios.md">scenarios.md</a>
+  </p>
+</div>
+
+<h2>4 design 안 (모두 같은 시나리오)</h2>
+
+<div class="variants">
+  <div class="variant">
+    <h3><span class="v-num">V1</span> Three-pane (좌트리·중앙·우컨텍스트)</h3>
+    <div class="tag-line">전통적인 IDE 레이아웃 · "안전한 선택"</div>
+    <div class="desc">
+      좌측 트리 (Code/Domain/Action/Queue 탭 전환) + 중앙 detail 카드 + 우측 컨텍스트 (코드/매뉴얼/호출지점/영향 탭).
+      한 화면에 모든 정보. 익숙한 패턴.
+    </div>
+    <div class="pros">3-pane 익숙 → 학습 곡선 낮음</div>
+    <div class="pros">컨텍스트 우측 패널이 풍부</div>
+    <div class="pros">action 탐색 위주 작업에 적합</div>
+    <div class="cons">정보 밀도 높음 → 5분만 봐도 피로</div>
+    <div class="cons">큐 작업 (반복) 에는 효율 X</div>
+    <a href="prototypes/v1-three-pane.html" class="open-btn" target="_blank">▶ V1 열기</a>
+  </div>
+
+  <div class="variant">
+    <h3><span class="v-num">V2</span> Code-Domain Split (수평 분할)</h3>
+    <div class="tag-line">매핑 자체가 first-class · "two worlds 가운데서"</div>
+    <div class="desc">
+      좌 Code Tree | 우 Domain Tree | 가운데는 매핑 split (위 = Java body / 아래 = Action 카드).
+      코드와 도메인 동시 보면서 매핑. 코드 literal 클릭 → slot 매핑.
+    </div>
+    <div class="pros">Code ↔ Domain 매핑이 시각적으로 자연</div>
+    <div class="pros">두 트리 동시 → 상호 참조 빠름</div>
+    <div class="pros">코드 본체에서 직접 anchor 클릭 → 매핑 흐름 직관</div>
+    <div class="cons">screen real estate 빡빡 (3 영역 + split)</div>
+    <div class="cons">큐 (Unmapped 등) 가 메인이 아님 — 별도 모달</div>
+    <a href="prototypes/v2-code-domain-split.html" class="open-btn" target="_blank">▶ V2 열기</a>
+  </div>
+
+  <div class="variant">
+    <h3><span class="v-num">V3</span> Activity Feed (큐 우선)</h3>
+    <div class="tag-line">"오늘 처리할 N 개" · "이메일 inbox 같은"</div>
+    <div class="desc">
+      좌측 큐가 메인 (anchor / callsite / unmapped 통합 feed). 중앙 = 현재 작업 1개에 fully focus +
+      AI 추천 + 후보 list. 우측 컨텍스트. 키보드 navigate 강조.
+    </div>
+    <div class="pros">큐 처리 효율 ↑ (반복 작업 빠름)</div>
+    <div class="pros">AI 추천 + 컨텍스트가 메인 view 에 통합</div>
+    <div class="pros">키보드만으로 작업 가능</div>
+    <div class="pros">매뉴얼 + 영향 + 컨텍스트 한 자리</div>
+    <div class="cons">탐색 (Code/Domain tree 보기) 가 부수적 → 별도 탭</div>
+    <div class="cons">"바라보기 / 이해하기" 작업에는 부적합</div>
+    <a href="prototypes/v3-activity-feed.html" class="open-btn" target="_blank">▶ V3 열기</a>
+  </div>
+
+  <div class="variant">
+    <h3><span class="v-num">V4</span> Workspace Tabs (브라우저-like)</h3>
+    <div class="tag-line">"Chrome 탭처럼" · 여러 작업 동시 진행</div>
+    <div class="desc">
+      각 작업 = 1 탭. 한 탭은 fully focused single-task UI (정보 밀도 낮음). 탭 ⌘1-5 빠른 전환.
+      내용은 큰 글자 + 여백 충분 + 진척 큰 시각.
+    </div>
+    <div class="pros">한 작업에 100% 집중 → 피로 적음</div>
+    <div class="pros">여러 작업 띄워놓고 빠르게 switch</div>
+    <div class="pros">핸드오프 / 멈췄다 다시 시작 자연 (탭 보존)</div>
+    <div class="pros">진척 ring 같은 시각이 큰 화면에 잘 어울림</div>
+    <div class="cons">탭 많아지면 관리 부담</div>
+    <div class="cons">컨텍스트 panel 없음 (메인 안에 흡수) → 동시 비교 X</div>
+    <a href="prototypes/v4-workspace-tabs.html" class="open-btn" target="_blank">▶ V4 열기</a>
+  </div>
+</div>
+
+<h2>비교 매트릭스</h2>
+<table>
+  <thead><tr>
+    <th>차원</th><th>V1 Three-pane</th><th>V2 Split</th><th>V3 Activity</th><th>V4 Tabs</th>
+  </tr></thead>
+  <tbody>
+    <tr><td>정보 밀도</td><td>★★★★★ 매우 높음</td><td>★★★★ 높음</td><td>★★★ 적당</td><td>★★ 낮음</td></tr>
+    <tr><td>큐 작업 효율</td><td>★★ 보통</td><td>★ 약함</td><td>★★★★★ 매우 높음</td><td>★★★ 적당</td></tr>
+    <tr><td>탐색 (Code/Domain 트리)</td><td>★★★★ 좋음</td><td>★★★★★ 매우 좋음</td><td>★★ 약함 (별도 탭)</td><td>★★ 약함 (별도 탭)</td></tr>
+    <tr><td>키보드 친화</td><td>★★★ 보통</td><td>★★ 약함</td><td>★★★★★ 매우 좋음</td><td>★★★★ 좋음</td></tr>
+    <tr><td>매핑 직관성 (코드↔도메인)</td><td>★★★ 보통</td><td>★★★★★ 매우 좋음</td><td>★★★★ 좋음</td><td>★★★ 보통</td></tr>
+    <tr><td>5시간 사용 시 피로</td><td>★ 높음</td><td>★★ 중상</td><td>★★★★ 낮음</td><td>★★★★★ 매우 낮음</td></tr>
+    <tr><td>5000+ class 환경 적합</td><td>★★★ 보통</td><td>★★★★ 좋음</td><td>★★★★★ 매우 좋음</td><td>★★★★ 좋음</td></tr>
+    <tr><td>plugin (sim/PR/NL) 추가 자리</td><td>★★ 사이드 패널 비좁음</td><td>★ 빠듯</td><td>★★★★ 큐 종류 추가</td><td>★★★★★ 새 탭 종류</td></tr>
+  </tbody>
+</table>
+
+<details>
+  <summary>📐 설계 차원 — 어느 안이 어디 위치하나</summary>
+  <pre>
+정보 밀도   대시보드 ◄───────────── focus
+            V1  V2  ─  V3  ─────  V4
+
+큐 우선     Yes ───────────── tree 우선
+            V3  ─  V4  ─  V1  V2
+
+Code/Dom    수평 분할  ─  단일 mode 토글
+            V2     ─    V1  V3  V4
+
+Inline 편집 카드 안 inline  ─  드로어/모달 분리
+            V2  V4  ─  V1  ─  V3
+  </pre>
+</details>
+
+<h2>당신의 판단을 받습니다</h2>
+
+<form id="answers-form">
+
+<div class="qcard" data-q="P1">
+  <h3><span class="qid">P1</span> 가장 끌리는 안 1차 선택</h3>
+  <div class="ctx">
+    "신선한 사용자가 처음 봤을 때" + "5시간 후 피로감" 둘 다 고려해서. 직감 OK.
+  </div>
+  <div class="options">
+    <label><input type="radio" name="P1" value="V1"><span class="opt-text"><span class="lbl">V1.</span> Three-pane <span class="desc">(전통, 안전)</span></span></label>
+    <label><input type="radio" name="P1" value="V2"><span class="opt-text"><span class="lbl">V2.</span> Code-Domain Split <span class="desc">(매핑이 핵심)</span></span></label>
+    <label><input type="radio" name="P1" value="V3"><span class="opt-text"><span class="lbl">V3.</span> Activity Feed <span class="desc">(큐 우선, 키보드)</span></span></label>
+    <label><input type="radio" name="P1" value="V4"><span class="opt-text"><span class="lbl">V4.</span> Workspace Tabs <span class="desc">(focus, 여러 작업)</span></span></label>
+    <label><input type="radio" name="P1" value="HYBRID"><span class="opt-text"><span class="lbl">하이브리드.</span> 두 안 조합 <span class="desc">(메모로 어떤 조합 설명)</span></span></label>
+    <label><input type="radio" name="P1" value="NEITHER"><span class="opt-text"><span class="lbl">전부 다.</span> 새 안 필요 <span class="desc">(메모로 방향 설명)</span></span></label>
+  </div>
+  <textarea name="P1_note" placeholder="선택 이유 / 보강 / 새 방향 (선택)"></textarea>
+</div>
+
+<div class="qcard" data-q="P2">
+  <h3><span class="qid">P2</span> 각 안에서 가장 좋았던 요소 (다중 선택)</h3>
+  <div class="ctx">
+    선택한 메인 안에 흡수하고 싶은 요소들. 다중 선택 가능.
+  </div>
+  <div class="options">
+    <label><input type="checkbox" name="P2" value="V1_right_context"><span class="opt-text">V1 의 우측 컨텍스트 패널 (코드/매뉴얼/호출/영향 탭 전환)</span></label>
+    <label><input type="checkbox" name="P2" value="V1_action_card"><span class="opt-text">V1 의 Action 카드 sectioned layout (params / output / realizations / preconditions / anchors 분리)</span></label>
+    <label><input type="checkbox" name="P2" value="V2_split"><span class="opt-text">V2 의 Code Body / Domain Card 수평 split (매핑 시각적 직관)</span></label>
+    <label><input type="checkbox" name="P2" value="V2_dual_tree"><span class="opt-text">V2 의 좌·우 Code Tree + Domain Tree 동시 표시 (extends/implements 시각)</span></label>
+    <label><input type="checkbox" name="P2" value="V2_clickable_anchor"><span class="opt-text">V2 의 코드 본체에서 hi-light literal 직접 클릭 → 매핑</span></label>
+    <label><input type="checkbox" name="P2" value="V3_queue"><span class="opt-text">V3 의 좌측 통합 큐 (anchor/callsite/unmapped 한 자리, 시간순)</span></label>
+    <label><input type="checkbox" name="P2" value="V3_ai_recommend"><span class="opt-text">V3 의 AI 추천 banner + 후보 grid (1-4 단축키)</span></label>
+    <label><input type="checkbox" name="P2" value="V3_keyboard_first"><span class="opt-text">V3 의 키보드 first (↵/N/S/↑↓ 단축키)</span></label>
+    <label><input type="checkbox" name="P2" value="V4_tabs"><span class="opt-text">V4 의 브라우저-like 탭 (여러 작업 보존, ⌘1-5 전환)</span></label>
+    <label><input type="checkbox" name="P2" value="V4_focus"><span class="opt-text">V4 의 focus 모드 (큰 글자, 여백, ring 시각)</span></label>
+    <label><input type="checkbox" name="P2" value="V4_workflow_steps"><span class="opt-text">V4 의 워크플로우 step 표시 (1✓ 2✓ 3현재)</span></label>
+    <label><input type="checkbox" name="P2" value="cmd_k"><span class="opt-text">⌘K 통합 검색/명령 palette (모든 안 공통)</span></label>
+    <label><input type="checkbox" name="P2" value="status_progress"><span class="opt-text">하단 status bar 의 verification 진척 (UDSL/BA/SV/PR 카운트)</span></label>
+  </div>
+  <textarea name="P2_note" placeholder="기타 좋은 요소 / 빠진 것"></textarea>
+</div>
+
+<div class="qcard" data-q="P3">
+  <h3><span class="qid">P3</span> 빠진 / 추가하고 싶은 영역</h3>
+  <div class="ctx">
+    4 안 모두 빠진 게 있으면. 또는 시나리오 (S1~S4) 중 잘 안 표현된 것.
+  </div>
+  <textarea name="P3_note" placeholder="예: S2 매뉴얼 등록 흐름 / 그래프 시각화 / 매핑 history / undo / 다국어 ..."></textarea>
+</div>
+
+<div class="qcard" data-q="P4">
+  <h3><span class="qid">P4</span> 다음 사이클 우선순위</h3>
+  <div class="ctx">
+    1차 사이클 끝. 다음 사이클에 어떤 영역을 더 다듬을지.
+  </div>
+  <div class="options">
+    <label><input type="radio" name="P4" value="refine_main"><span class="opt-text"><span class="lbl">A.</span> 메인 안 한 더 다듬기 (선택안 + P2 요소 합쳐 v5 생성, 다시 비교)</span></label>
+    <label><input type="radio" name="P4" value="implement_react"><span class="opt-text"><span class="lbl">B.</span> 메인 안을 React 로 실제 구현 (실제 데이터 연결, /browse 로 dogfooding)</span></label>
+    <label><input type="radio" name="P4" value="explore_specific"><span class="opt-text"><span class="lbl">C.</span> 특정 위젯 deep dive (예: Path Picker 자동완성 / Term tree 그래프 / Action 카드)</span></label>
+    <label><input type="radio" name="P4" value="other"><span class="opt-text"><span class="lbl">D.</span> 다른 방향 (메모)</span></label>
+  </div>
+  <textarea name="P4_note" placeholder="..."></textarea>
+</div>
+
+</form>
+
+<div class="copybar">
+  <div class="progress">진행: <strong id="progress-count">0</strong> / 4 응답</div>
+  <button type="button" class="secondary" id="clear-btn">초기화</button>
+  <button type="button" class="primary" id="copy-btn">📋 답변 복사</button>
+  <span id="copy-status">✓ 클립보드에 복사됨</span>
+</div>
+
+<details>
+  <summary>복사 결과 미리보기</summary>
+  <pre id="preview-output">(아직 응답 없음)</pre>
+</details>
+
+<h2>다음</h2>
+<p>
+  답변 주시면 1차 사이클 끝. 사용자 선택에 따라:
+</p>
+<ul>
+  <li><strong>P4=A</strong> → 보강 v5 prototype 생성 후 다시 비교</li>
+  <li><strong>P4=B</strong> → 메인 안 React 구현 시작 (frontend/src/components/sections/modeling/)</li>
+  <li><strong>P4=C</strong> → 특정 위젯 deep dive prototype</li>
+</ul>
+
+</div>
+
+<script>
+(function () {
+  const STORAGE_KEY = 'ontong-c6-cycle1';
+  const QIDS = ['P1','P2','P3','P4'];
+  const form = document.getElementById('answers-form');
+  const progressEl = document.getElementById('progress-count');
+  const previewEl = document.getElementById('preview-output');
+  const statusEl = document.getElementById('copy-status');
+
+  function readAnswers() {
+    const out = {};
+    for (const q of QIDS) {
+      const note = form.querySelector('textarea[name="' + q + '_note"]');
+      const noteVal = note ? note.value.trim() : '';
+      let value = null;
+      const radio = form.querySelector('input[type=radio][name="' + q + '"]:checked');
+      if (radio) {
+        value = radio.value;
+      } else {
+        const checks = form.querySelectorAll('input[type=checkbox][name="' + q + '"]:checked');
+        if (checks.length) value = Array.from(checks).map(c => c.value);
+      }
+      if (value || noteVal) out[q] = { value, note: noteVal };
+    }
+    return out;
+  }
+
+  function persist() {
+    const ans = readAnswers();
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ans)); } catch (e) {}
+    refreshProgress(ans); refreshPreview(ans);
+  }
+
+  function restore() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) { saved = {}; }
+    for (const q of QIDS) {
+      const a = saved[q]; if (!a) continue;
+      if (Array.isArray(a.value)) {
+        for (const v of a.value) {
+          const cb = form.querySelector(`input[type=checkbox][name="${q}"][value="${v}"]`);
+          if (cb) cb.checked = true;
+        }
+      } else if (a.value) {
+        const r = form.querySelector(`input[type=radio][name="${q}"][value="${a.value}"]`);
+        if (r) r.checked = true;
+      }
+      if (a.note) {
+        const n = form.querySelector(`textarea[name="${q}_note"]`);
+        if (n) n.value = a.note;
+      }
+    }
+    refreshProgress(saved); refreshPreview(saved);
+  }
+
+  function refreshProgress(ans) {
+    let c = 0;
+    for (const q of QIDS) if (ans[q] && (ans[q].value || ans[q].note)) c++;
+    progressEl.textContent = c;
+  }
+
+  function buildMarkdown(ans) {
+    let md = '# C6 1차 사이클 — design 안 비교 답변\n\n';
+    md += '_답변 기준일: ' + new Date().toISOString().slice(0, 10) + '_\n\n';
+    const titles = {
+      P1: '가장 끌리는 안',
+      P2: '각 안에서 가장 좋았던 요소',
+      P3: '빠진 / 추가하고 싶은 영역',
+      P4: '다음 사이클 우선순위',
+    };
+    for (const q of QIDS) {
+      const a = ans[q];
+      md += '## ' + q + '. ' + titles[q] + '\n';
+      if (!a) { md += '_(미응답)_\n\n'; continue; }
+      if (Array.isArray(a.value)) md += '- **선택**: ' + a.value.join(', ') + '\n';
+      else if (a.value) md += '- **선택**: ' + a.value + '\n';
+      if (a.note) md += '- **메모**: ' + a.note.replace(/\n/g, '\n  ') + '\n';
+      md += '\n';
+    }
+    return md;
+  }
+
+  function refreshPreview(ans) {
+    if (!Object.keys(ans).length) { previewEl.textContent = '(아직 응답 없음)'; return; }
+    previewEl.textContent = buildMarkdown(ans);
+  }
+
+  document.getElementById('copy-btn').addEventListener('click', async function () {
+    const md = buildMarkdown(readAnswers());
+    try {
+      await navigator.clipboard.writeText(md);
+      statusEl.classList.add('show');
+      setTimeout(function () { statusEl.classList.remove('show'); }, 2200);
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = md; document.body.appendChild(ta);
+      ta.select(); try { document.execCommand('copy'); } catch (e2) {}
+      document.body.removeChild(ta);
+      statusEl.textContent = '✓ 복사됨 (fallback)';
+      statusEl.classList.add('show');
+      setTimeout(function () {
+        statusEl.classList.remove('show');
+        statusEl.textContent = '✓ 클립보드에 복사됨';
+      }, 2200);
+    }
+  });
+
+  document.getElementById('clear-btn').addEventListener('click', function () {
+    if (!confirm('응답을 초기화할까요?')) return;
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    for (const r of form.querySelectorAll('input')) r.checked = false;
+    for (const t of form.querySelectorAll('textarea')) t.value = '';
+    refreshProgress({}); refreshPreview({});
+  });
+
+  form.addEventListener('change', persist);
+  form.addEventListener('input', persist);
+  restore();
+})();
+</script>
+
+</body>
+</html>

@@ -73,6 +73,8 @@ def _parse_frontmatter(raw: str) -> tuple[DocumentMetadata, str]:
         updated=str(data.get("updated", "")),
         created_by=str(created_by),
         updated_by=str(data.get("updated_by", "")),
+        doc_type=str(data.get("doc_type", "") or data.get("type", "")),
+        authors=data.get("authors", []) or [],
     )
     return meta, body
 
@@ -97,6 +99,8 @@ def _serialize_frontmatter(meta: DocumentMetadata, body: str) -> str:
         lines.append(f"created_by: {meta.created_by}")
     if meta.updated_by:
         lines.append(f"updated_by: {meta.updated_by}")
+    if meta.doc_type:
+        lines.append(f"doc_type: {meta.doc_type}")
     if meta.created:
         lines.append(f"created: '{meta.created}'")
     if meta.updated:
@@ -116,6 +120,11 @@ def _serialize_frontmatter(meta: DocumentMetadata, body: str) -> str:
         lines.append("related:")
         for r in meta.related:
             lines.append(f"  - {r}")
+
+    if meta.authors:
+        lines.append("authors:")
+        for a in meta.authors:
+            lines.append(f"  - {a}")
 
     if not lines:
         return body

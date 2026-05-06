@@ -1,0 +1,5 @@
+com\example\slabdesign\boot\config\DataSourceConfig.class
+com\example\slabdesign\boot\config\MyBatisConfig.class
+com\example\slabdesign\boot\SlabDesignApplication.class
+com\example\slabdesign\boot\config\KafkaConfig.class
+com\example\slabdesign\boot\config\JpaConfig.class

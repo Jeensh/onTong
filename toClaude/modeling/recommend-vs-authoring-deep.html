@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Recommend vs Authoring · 실측 비교 + Hybrid 고찰</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#111b2e; --line:#1f2a44; --fg:#e6edf7; --muted:#94a3b8;
+    --primary:#38bdf8; --emerald:#10b981; --amber:#f59e0b; --rose:#f43f5e; --violet:#8b5cf6;
+  }
+  body{margin:0;font:13px -apple-system,Pretendard,sans-serif;background:var(--bg);color:var(--fg);padding:24px;line-height:1.55;max-width:1100px;margin:0 auto}
+  h1{margin:0 0 6px 0;font-size:20px}
+  h2{font-size:15px;margin:24px 0 8px 0;padding:6px 0;border-bottom:1px solid var(--line)}
+  h3{font-size:13px;margin:14px 0 6px 0;color:var(--violet)}
+  h4{font-size:12.5px;margin:10px 0 4px 0;color:var(--primary)}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:16px}
+  pre{background:#0f172a;color:#e6edf7;padding:10px;border-radius:6px;overflow-x:auto;font-size:11.5px;line-height:1.5;border:1px solid var(--line)}
+  code{background:rgba(56,189,248,0.1);color:var(--primary);padding:1px 5px;border-radius:3px;font-size:11.5px;font-family:ui-monospace,Consolas,monospace}
+  table{border-collapse:collapse;width:100%;margin:8px 0;font-size:12px}
+  th,td{padding:6px 8px;border:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:rgba(56,189,248,0.08);color:var(--primary);font-weight:600}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;margin:14px 0}
+  .panel.ok{border-color:rgba(16,185,129,0.5);background:rgba(16,185,129,0.04)}
+  .panel.info{border-color:rgba(139,92,246,0.5);background:rgba(139,92,246,0.04)}
+  .panel.warn{border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.04)}
+  .panel.crit{border-color:rgba(244,63,94,0.5);background:rgba(244,63,94,0.04)}
+  textarea{width:100%;box-sizing:border-box;background:#0f172a;color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-size:12px;font-family:inherit;line-height:1.4;min-height:50px;resize:vertical}
+  textarea:focus{outline:none;border-color:var(--primary)}
+  .field{margin:10px 0}
+  .field label{display:block;font-size:12px;margin-bottom:4px}
+  .field label .hint{display:block;font-size:11px;color:var(--muted);font-style:italic;margin-top:1px;font-weight:normal}
+  .form{background:rgba(56,189,248,0.04);border:1px solid rgba(56,189,248,0.2);border-radius:8px;padding:14px;margin:14px 0}
+  .form h4{color:var(--primary);margin-top:0}
+  .actions{display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap}
+  .btn{background:var(--primary);color:#0b1220;border:none;border-radius:4px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}
+  .btn:hover{opacity:0.9}
+  .btn.outline{background:transparent;border:1px solid var(--line);color:var(--fg)}
+  .btn.copied{background:var(--emerald);color:#fff}
+  .preview{display:none;background:#0f172a;border:1px solid var(--line);border-radius:6px;padding:10px;margin-top:8px;font-family:ui-monospace,Consolas,monospace;font-size:11px;white-space:pre-wrap;user-select:all;cursor:text}
+  .preview.visible{display:block}
+  .pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:600;margin-right:4px;vertical-align:middle}
+  .pill.violet{background:rgba(139,92,246,0.15);color:var(--violet);border:1px solid rgba(139,92,246,0.4)}
+  .pill.emerald{background:rgba(16,185,129,0.15);color:var(--emerald);border:1px solid rgba(16,185,129,0.4)}
+  .pill.amber{background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.4)}
+  .pill.rose{background:rgba(244,63,94,0.15);color:var(--rose);border:1px solid rgba(244,63,94,0.4)}
+  .pill.muted{background:rgba(148,163,184,0.1);color:var(--muted);border:1px solid rgba(148,163,184,0.3)}
+  .ascii{font-family:ui-monospace,Consolas,monospace;background:#0f172a;padding:14px;border-radius:6px;color:#cbd5e1;font-size:11.5px;white-space:pre;overflow-x:auto;line-height:1.5;border:1px solid var(--line)}
+  .copy-status{font-size:10.5px;color:var(--muted);margin-left:8px}
+  .copy-status.ok{color:var(--emerald)}
+  .copy-status.err{color:var(--rose)}
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}
+  .compare>div{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:10px}
+  .quote{background:#0f172a;border-left:3px solid var(--rose);padding:8px 12px;margin:8px 0;font-style:italic;color:#e2e8f0;font-size:12.5px}
+</style>
+</head>
+<body>
+
+<h1>Recommend vs Authoring — 실측 비교 + Hybrid 고찰</h1>
+<div class="sub">2026-05-05 · slab-design-real 에서 직접 실행 + quality 분석</div>
+
+<div class="panel info">
+  <strong>이번에 한 일:</strong> recommend endpoint 를 실제로 호출 (persist=true) 해서 무엇을 만들어주는지 확인. quality 측정 + Authoring 결과와 비교.
+</div>
+
+<!-- ============================================== -->
+<h2>§1. Recommend 실측 결과</h2>
+
+<div class="panel ok">
+  <strong>1회 호출로 ontology DB 에 저장된 것:</strong>
+  <ul style="font-size:12px;margin:6px 0">
+    <li><strong>29 BusinessTerm</strong></li>
+    <li><strong>36 Action</strong></li>
+    <li><strong>34 type_realizations</strong> (Action 의 다형성 실현)</li>
+  </ul>
+  <p style="font-size:11px;color:var(--muted);margin:4px 0">호출 시간 ~1초. LLM 비용 0 (heuristic glossary 매칭).</p>
+</div>
+
+<h3>실제 생성된 Term 예시 (첫 5개)</h3>
+<table>
+<tr><th>Korean label</th><th>derived_from</th><th>reason</th></tr>
+<tr><td>에러코드</td><td>SdErrorCode</td><td>glossary 정확 매칭 (ErrorCode → 에러코드)</td></tr>
+<tr><td>검증결과</td><td>ValidationResult</td><td>glossary 정확 매칭 (ValidationResult → 검증결과)</td></tr>
+<tr><td>이력</td><td>SlabDesignHist</td><td>글로서리 매칭</td></tr>
+<tr><td>주조스펙</td><td>CastSpec</td><td>glossary 매칭</td></tr>
+<tr><td>고객표준</td><td>CustomerStd</td><td>glossary 매칭</td></tr>
+</table>
+
+<h3>실제 생성된 Action 예시 (첫 5개)</h3>
+<table>
+<tr><th>label</th><th>derived_from</th><th>형식</th></tr>
+<tr><td>슬랩설계_실행</td><td>SdDesigner.execute()</td><td>methodName + "_실행"</td></tr>
+<tr><td>final_length_range_실행</td><td>FinalLengthRange.execute()</td><td>동일 패턴</td></tr>
+<tr><td>final_width_range_실행</td><td>...</td><td>동일</td></tr>
+<tr><td>first_weight_실행</td><td>...</td><td>동일</td></tr>
+<tr><td>initial_slab_wgt_실행</td><td>...</td><td>동일</td></tr>
+</table>
+
+<div class="panel warn">
+  <strong>Recommend 의 quality 한계 (실측):</strong>
+  <ul style="font-size:12px;margin:6px 0">
+    <li>Term 은 <strong>class 1개 = entity 1개</strong> 의 단순 매핑. <code>HrSpec → HrSpec</code> (Korean: "열연표준") 같이.</li>
+    <li><strong>"Plant + Constraint" 같은 분리 모델링 X</strong> — 옵션 trade-off 없음.</li>
+    <li>Action 이름이 <code>method_name + "_실행"</code> 단순 변환. "슬랩설계_실행" 식으로 자연어 X.</li>
+    <li>도메인 인터뷰 X — 코드 metadata (class 명, glossary) 만 본 것.</li>
+    <li>composition / 와일드카드 / matchPattern 등의 facet 정보 X.</li>
+  </ul>
+</div>
+
+<!-- ============================================== -->
+<h2>§2. Authoring vs Recommend 직접 비교 (HrSpec 케이스)</h2>
+
+<div class="compare">
+  <div>
+    <h4 style="color:var(--emerald)">Recommend (자동, ~1초)</h4>
+    <pre style="font-size:11px">label: 열연표준
+fqn: term.scm.hr_spec
+kind: composite
+description: "자동 추천 —
+   ...HrSpec"
+confirmed: false
+source: auto
+
+(facets: 없음)
+(composition: 없음)</pre>
+    <p style="font-size:11px;color:var(--muted)">
+      → "열연표준 (HrSpec)" 1 entity. Class 명 그대로. 도메인 의미 미파악.
+    </p>
+  </div>
+
+  <div>
+    <h4 style="color:var(--violet)">Authoring (인터뷰, ~3분, ~$0.5)</h4>
+    <pre style="font-size:11px">root: HrPlant (열연공장)
+  is_root_entity: true
+
+child: HrPlantConstraint (열연공장제약)
+  parent: HrPlant
+  facets:
+    - 폭 LOW/HIGH
+    - 길이 LOW/HIGH
+    - matchPattern: EXACT
+  errorOnMiss: DG107
+
+(2 entity composition)
+(인터뷰 5건 archive)
+(갭 4건 자동 검출)</pre>
+    <p style="font-size:11px;color:var(--muted)">
+      → "HrPlant + HrPlantConstraint" 분리. 도메인 정확. composition + facets + 갭.
+    </p>
+  </div>
+</div>
+
+<div class="panel info">
+  <strong>quality vs cost trade-off:</strong>
+  <table style="margin:6px 0">
+    <tr><th>측면</th><th>Recommend</th><th>Authoring</th></tr>
+    <tr><td>비용</td><td><span class="pill emerald">$0 (heuristic)</span></td><td><span class="pill amber">$0.5/entity</span></td></tr>
+    <tr><td>시간</td><td><span class="pill emerald">전체 1초</span></td><td><span class="pill amber">entity 당 3분</span></td></tr>
+    <tr><td>도메인 정확성</td><td><span class="pill rose">낮음</span></td><td><span class="pill emerald">높음</span></td></tr>
+    <tr><td>composition 모델링</td><td><span class="pill rose">없음</span></td><td><span class="pill emerald">있음</span></td></tr>
+    <tr><td>적합 시나리오</td><td>대량 1차 분류·라벨링</td><td>핵심 entity 깊은 정의</td></tr>
+  </table>
+</div>
+
+<!-- ============================================== -->
+<h2>§3. 사용자 흐름 (큐 UI)</h2>
+
+<div class="ascii">[1단계] 코드 import (자동)
+   slab-design-real 의 123 class 자동 추출
+                                    ↓
+[2단계] Recommend 실행 (수동 trigger 필요)
+   POST /api/ontology/repos/slab-design-real/recommend?persist=true
+                                    ↓
+   29 BusinessTerm + 36 Action + 34 realizations 생성 (모두 confirmed=false)
+                                    ↓
+[3단계] 좌측 📥큐 탭 → 4 sub-section
+   ┌──────────────┬───────────────┬─────────────────┬──────────┐
+   │ Term         │ Action        │ Realization     │ Legacy   │
+   │ (29 pending) │ (36 pending)  │ (34 pending)    │          │
+   └──────────────┴───────────────┴─────────────────┴──────────┘
+                                    ↓
+[4단계] 사용자가 각 row 의 ✓ confirm 또는 ✗ reject 클릭
+   confirmed → ontology DB 영구 (Detail/Split mode 에서 보임)
+   rejected → DB 에서 삭제
+                                    ↓
+[5단계] AnchorBinding (Detail/Split)
+   Action 이 confirmed 됐으니 그 Action 의 fragment 매핑 가능</div>
+
+<div class="panel">
+  <strong>큐 row 예상 모습 (코드 추정):</strong> 각 행에:
+  <ul style="font-size:11.5px;margin:4px 0">
+    <li>Korean label + English fqn</li>
+    <li>derived_from class (예: <code>HrSpec → 열연표준</code>)</li>
+    <li>confidence + reason</li>
+    <li>✓ Confirm / ✗ Reject 버튼</li>
+  </ul>
+</div>
+
+<!-- ============================================== -->
+<h2>§4. Authoring + Recommend Hybrid — 4 가지 전략</h2>
+
+<div class="panel">
+  <h4>★ 전략 1 — "큰 그림 먼저, 세부는 깊게" (가장 자연)</h4>
+  <ol style="font-size:12px">
+    <li>recommend 1회 → 큐에 29 term 채움 (1차 라벨링)</li>
+    <li>사용자가 큐에서 명확한 것 (검증결과, 에러코드 등) ✓ confirm — 빠름</li>
+    <li>중요한 entity (HrSpec, EdgingSpec, CastSpec) 는 ✗ reject → Authoring 으로 깊게 재작성</li>
+    <li>Authoring 으로 만든 것은 새 fqn (HrPlant + HrPlantConstraint) 이라 충돌 X</li>
+  </ol>
+  <p style="font-size:11px;color:var(--muted)">시간: recommend 1초 + 큐 confirm 30분 + Authoring 3개 (HrPlant + 단중표 + Edging) ~30분</p>
+</div>
+
+<div class="panel">
+  <h4>전략 2 — "Authoring 먼저, recommend 보충"</h4>
+  <ol style="font-size:12px">
+    <li>핵심 entity (HrPlant, slab, 주문) Authoring 으로 깊게 (현재 진행)</li>
+    <li>그 외 부속 entity (검증결과, 에러코드 등) recommend bulk + 큐 confirm</li>
+  </ol>
+  <p style="font-size:11px;color:var(--muted)">단점: 사용자가 Authoring 후 어떤 entity 가 부족한지 일일이 판단 필요</p>
+</div>
+
+<div class="panel">
+  <h4>전략 3 — "동시 사용" (병렬)</h4>
+  <ol style="font-size:12px">
+    <li>recommend 백그라운드 실행 (큐 채워둠)</li>
+    <li>Authoring 으로 핵심 작업 (앞단)</li>
+    <li>큐는 시간 날 때 정리</li>
+  </ol>
+</div>
+
+<div class="panel">
+  <h4>전략 4 — "Authoring 단독" (현재 우리)</h4>
+  <ol style="font-size:12px">
+    <li>모든 entity 를 Authoring 으로</li>
+  </ol>
+  <p style="font-size:11px;color:var(--muted)">100+ entity 시 시간·비용 ↑↑. 현실적이지 않음.</p>
+</div>
+
+<div class="panel ok">
+  <strong>내 추천: 전략 1</strong> — recommend 의 빠른 1차 채우기 + Authoring 으로 핵심 깊이. 비용·시간 효율 최고.
+  <ul style="font-size:11.5px;margin:4px 0">
+    <li>실제로 Round 5 의 8 표준 중 (HrSpec, CastSpec, HrMin/MaxWgt, EdgingGroup, EdgingSpec, CustomerStd, ProductivityStd) — 4~5 개는 recommend 의 1:1 매핑이면 충분 (CustomerStd, ProductivityStd 등)</li>
+    <li>HrSpec, CastSpec, EdgingSpec — composition 분리가 필요해서 Authoring 가 필요</li>
+    <li>즉 <strong>50% 는 recommend, 50% 는 Authoring</strong> 같은 분포</li>
+  </ul>
+</div>
+
+<!-- ============================================== -->
+<h2>§5. 사용자 직접 실행 가능 — 지금 큐가 채워져 있음</h2>
+
+<div class="panel ok">
+  <strong>이미 실행해뒀습니다</strong> — recommend 가 persist=true 로 호출돼서 ontology DB 에 29+36+34 후보가 들어가 있는 상태. 사용자가 페이지 새로고침 후 좌측 <strong>📥큐</strong> 탭으로 가면 그 후보들이 list 로 보일 것.
+  <ul style="font-size:11.5px;margin:4px 0">
+    <li>Term 29건 (검증결과, 에러코드, 이력, 주조스펙, 고객표준 등)</li>
+    <li>Action 36건 (슬랩설계_실행, validate_실행 등)</li>
+    <li>Realization 34건</li>
+  </ul>
+</div>
+
+<!-- ============================================== -->
+<h2>§6. 답변 폼 (clipboard fallback 적용)</h2>
+
+<div class="form">
+  <h4>각 질문 1-2 줄 OK</h4>
+
+  <div class="field">
+    <label>Q1. <strong>Recommend 의 quality 한계</strong> 명확해졌나?
+      <span class="hint">class 1개 = entity 1개의 단순 매핑이고 composition / 옵션 / 도메인 인터뷰 모두 없음</span>
+    </label>
+    <textarea name="q1_quality" placeholder="예: 명확 / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q2. <strong>Hybrid 전략 선택</strong>
+      <span class="hint">★ 전략 1 (recommend 먼저 + Authoring 깊게) / 2 (Authoring 먼저) / 3 (병렬) / 4 (Authoring 단독)</span>
+    </label>
+    <textarea name="q2_strategy" placeholder="예: 전략 1 동의 / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q3. <strong>지금 큐 탭 보러 갈까?</strong>
+      <span class="hint">29+36+34 후보가 이미 들어가 있음. 페이지 새로고침 → 좌측 📥큐</span>
+    </label>
+    <textarea name="q3_visit_queue" placeholder="예: 가본다 / 또는 R2 마무리 후"></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q4. <strong>R2-W2 (피드백 루프 F3) 진행 vs 큐 detour</strong>
+      <span class="hint">F3 (피드백 루프 cascading) 그대로 진행 / 또는 큐 정리에 시간 우선</span>
+    </label>
+    <textarea name="q4_next" placeholder="예: F3 진행 / 또는 ..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>Q5. <strong>Clipboard 복사</strong> 작동 확인
+      <span class="hint">이번 HTML 의 📋 답변 복사 버튼이 잘 동작하는지</span>
+    </label>
+    <textarea name="q5_clipboard" placeholder="예: OK / 또는 여전히 실패"></textarea>
+  </div>
+
+  <div class="actions">
+    <button class="btn" data-action="copy">📋 답변 복사</button>
+    <button class="btn outline" data-action="preview">미리보기</button>
+    <span class="copy-status" id="copyStatus"></span>
+  </div>
+
+  <div class="preview" id="preview"></div>
+</div>
+
+<script>
+const fields = [
+  ["q1_quality",     "Q1. Recommend quality 한계 이해"],
+  ["q2_strategy",    "Q2. Hybrid 전략 선택"],
+  ["q3_visit_queue", "Q3. 큐 탭 방문"],
+  ["q4_next",        "Q4. R2 진행 vs 큐 detour"],
+  ["q5_clipboard",   "Q5. Clipboard 작동 확인"],
+];
+
+function buildText() {
+  const out = ["[Recommend vs Authoring — 사용자 답변]"];
+  for (const [k, label] of fields) {
+    const v = (document.querySelector(`textarea[name="${k}"]`)?.value ?? "").trim();
+    if (v) out.push(`\n## ${label}\n${v}`);
+  }
+  return out.join("\n");
+}
+
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return "modern";
+    }
+  } catch {}
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;opacity:0;left:-9999px;top:0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok ? "fallback" : "failed";
+  } catch {
+    return "failed";
+  }
+}
+
+function showPreview(text) {
+  const slot = document.getElementById("preview");
+  slot.textContent = text;
+  slot.classList.add("visible");
+}
+
+document.querySelector('[data-action="preview"]').addEventListener("click", () => {
+  showPreview(buildText());
+});
+
+document.querySelector('[data-action="copy"]').addEventListener("click", async (e) => {
+  const txt = buildText();
+  showPreview(txt);
+  const result = await copyText(txt);
+  const btn = e.currentTarget;
+  const status = document.getElementById("copyStatus");
+  if (result === "modern" || result === "fallback") {
+    const orig = btn.textContent;
+    btn.textContent = `✓ 복사됨 (${result})`;
+    btn.classList.add("copied");
+    status.textContent = "";
+    status.classList.remove("err");
+    status.classList.add("ok");
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove("copied"); }, 2000);
+  } else {
+    status.textContent = "✕ 복사 실패 — 미리보기 영역 클릭하면 전체 선택됨";
+    status.classList.remove("ok");
+    status.classList.add("err");
+  }
+});
+
+document.getElementById("preview").addEventListener("click", () => {
+  const slot = document.getElementById("preview");
+  const range = document.createRange();
+  range.selectNodeContents(slot);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+});
+</script>
+
+</body>
+</html>

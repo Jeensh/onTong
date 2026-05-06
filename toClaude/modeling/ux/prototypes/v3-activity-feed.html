@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>onTong Workbench — V3 Activity Feed</title>
+<link rel="stylesheet" href="_shared.css" />
+<style>
+  /* 좌 큐 (활동 피드) | 중앙 detail editor (현재 작업) | 우 컨텍스트 */
+  .app-shell {
+    grid-template-rows: 36px 1fr 24px;
+    grid-template-columns: 360px 1fr 320px;
+    grid-template-areas:
+      "top top top"
+      "feed main right"
+      "status status status";
+  }
+  .topbar { grid-area: top; }
+  .feed { grid-area: feed; background: var(--panel-2); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .main { grid-area: main; background: var(--bg); overflow: auto; padding: 18px 24px; }
+  .right { grid-area: right; background: var(--panel-2); border-left: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }
+  .statusbar { grid-area: status; }
+
+  .feed-tabs {
+    display: flex; padding: 6px 8px 0; border-bottom: 1px solid var(--border);
+    flex-shrink: 0; gap: 0;
+  }
+  .feed-tabs button {
+    border: 0; border-radius: 4px 4px 0 0; padding: 5px 8px;
+    color: var(--text-faint); border-bottom: 2px solid transparent;
+    font-size: 11.5px;
+  }
+  .feed-tabs button.active {
+    color: var(--text); border-bottom-color: var(--accent);
+  }
+  .feed-tabs .badge {
+    background: var(--bad); color: #fff; font-size: 9px; font-weight: 700;
+    padding: 1px 5px; border-radius: 7px; margin-left: 4px;
+  }
+  .feed-list {
+    overflow-y: auto; flex: 1; padding: 4px 0;
+  }
+  .feed-item {
+    padding: 10px 14px; border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background 0.1s;
+  }
+  .feed-item:hover { background: var(--panel-3); }
+  .feed-item.current {
+    background: rgba(56,189,248,0.08); border-left: 3px solid var(--accent);
+    padding-left: 11px;
+  }
+  .feed-item .type-row {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+  }
+  .feed-item .title {
+    font-size: 12.5px; color: var(--text); font-weight: 500;
+    line-height: 1.4;
+  }
+  .feed-item .desc {
+    font-size: 11px; color: var(--text-dim); margin-top: 4px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .feed-item .meta {
+    font-size: 10.5px; color: var(--text-faint); margin-top: 5px;
+    display: flex; gap: 8px;
+  }
+
+  /* MAIN — 작업 카드 */
+  .work-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+  }
+  .work-header h1 { font-size: 18px; font-weight: 600; }
+  .work-header .status-pill { margin-left: auto; }
+  .work-header .actions { display: flex; gap: 6px; }
+
+  .work-banner {
+    background: rgba(56,189,248,0.06); border: 1px solid var(--accent);
+    border-radius: 4px; padding: 10px 14px; margin-bottom: 14px;
+    font-size: 12.5px; color: var(--text); display: flex; gap: 10px; align-items: center;
+  }
+  .work-banner .ai-tag {
+    background: var(--accent); color: var(--bg); padding: 2px 7px;
+    border-radius: 3px; font-size: 10px; font-weight: 700;
+  }
+
+  .candidate-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0;
+  }
+  .candidate {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 4px; padding: 10px 12px;
+    cursor: pointer; transition: border-color 0.1s;
+  }
+  .candidate:hover { border-color: var(--accent-2); }
+  .candidate.selected {
+    border-color: var(--accent); background: rgba(56,189,248,0.06);
+  }
+  .candidate .name {
+    font-family: "SF Mono", Menlo, monospace; font-size: 12px; color: var(--text);
+  }
+  .candidate .reason {
+    color: var(--text-dim); font-size: 11px; margin-top: 4px;
+  }
+  .candidate .conf {
+    color: var(--good); font-size: 11px; margin-top: 4px;
+  }
+
+  pre.code-snip {
+    background: var(--panel-3); border: 1px solid var(--border);
+    padding: 10px 14px; border-radius: 4px; overflow-x: auto;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+    color: var(--text); line-height: 1.55;
+  }
+  pre.code-snip .hi { background: rgba(56,189,248,0.18); padding: 0 2px; }
+  pre.code-snip .picked { background: rgba(52,211,153,0.25); padding: 0 2px; border-bottom: 2px solid var(--good); }
+
+  .section-h {
+    font-size: 11px; color: var(--text-dim); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    margin: 16px 0 6px;
+  }
+
+  /* RIGHT */
+  .right-tabs {
+    display: flex; padding: 6px 8px 0; border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .right-tabs button {
+    border: 0; border-radius: 4px 4px 0 0; padding: 5px 10px;
+    color: var(--text-faint); border-bottom: 2px solid transparent;
+    font-size: 11.5px;
+  }
+  .right-tabs button.active {
+    color: var(--text); border-bottom-color: var(--accent);
+  }
+  .right-content { padding: 12px 14px; overflow-y: auto; flex: 1; font-size: 12px; }
+  .ctx-block { margin-bottom: 14px; }
+  .ctx-block h4 {
+    font-size: 11px; color: var(--text-faint); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;
+  }
+
+  /* Keyboard hint */
+  .kbhint {
+    color: var(--text-faint); font-size: 10.5px;
+    display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap;
+  }
+  .kbhint kbd {
+    background: var(--panel-3); border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 3px; font-size: 10px; margin-right: 3px;
+  }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+<header class="topbar">
+  <span class="brand"><span class="o">on</span>Tong</span>
+  <span class="repo">slab-design-real · main</span>
+  <span class="spacer"></span>
+  <span class="cmd-k">⌘K  검색 / 명령</span>
+  <button>📊 진척 (61%)</button>
+  <button class="primary">시뮬</button>
+</header>
+
+<!-- LEFT — Activity Queue (가장 큰 패널) -->
+<aside class="feed">
+  <div class="feed-tabs">
+    <button class="active">📥 큐 <span class="badge">23</span></button>
+    <button>🌳 트리</button>
+    <button>📜 활동</button>
+  </div>
+  <div style="padding: 6px 10px; border-bottom: 1px solid var(--border); display: flex; gap: 4px; flex-wrap: wrap;">
+    <button style="font-size: 10px; padding: 2px 6px;" class="primary">전체</button>
+    <button style="font-size: 10px; padding: 2px 6px;">🔴 anchor (8)</button>
+    <button style="font-size: 10px; padding: 2px 6px;">🟡 callsite (5)</button>
+    <button style="font-size: 10px; padding: 2px 6px;">🟠 unmapped (10)</button>
+  </div>
+
+  <div class="feed-list">
+    <div class="feed-item current">
+      <div class="type-row">
+        <span class="pill bad" style="font-size: 9.5px;">🔴 ANCHOR</span>
+        <span style="color: var(--text-faint); font-size: 10.5px;">·  지금</span>
+      </div>
+      <div class="title">RushOrder.validate:8 의 <code style="color: var(--text-dim); font-size: 11.5px;">literal:200.0</code> 슬롯 매핑 필요</div>
+      <div class="desc">→ 후보: <code>params[0]&lt;RushOrder&gt;.spec.diameter.range[1]</code> · 84%</div>
+      <div class="meta">
+        <span>📋 주문_검증</span>
+        <span>📁 com.scm.RushOrder</span>
+      </div>
+    </div>
+
+    <div class="feed-item">
+      <div class="type-row">
+        <span class="pill bad" style="font-size: 9.5px;">🔴 ANCHOR</span>
+        <span style="color: var(--text-faint); font-size: 10.5px;">·  3분 전</span>
+      </div>
+      <div class="title">RushOrder.validate:11 의 <code style="color: var(--text-dim); font-size: 11.5px;">if (latest.C &gt; 0.25)</code> branch 매핑</div>
+      <div class="desc">→ slot 후보 3개</div>
+      <div class="meta"><span>📋 주문_검증</span></div>
+    </div>
+
+    <div class="feed-item">
+      <div class="type-row">
+        <span class="pill warn" style="font-size: 9.5px;">🟡 CALLSITE</span>
+        <span style="color: var(--text-faint); font-size: 10.5px;">·  5분 전</span>
+      </div>
+      <div class="title">BatchValidator.runAll:120 — validate() 모호 dispatch</div>
+      <div class="desc">→ 후보: RushOrder / StandardOrder (Strategy Map)</div>
+      <div class="meta"><span>🔧 STATIC_UNRESOLVED</span></div>
+    </div>
+
+    <div class="feed-item">
+      <div class="type-row">
+        <span class="pill" style="font-size: 9.5px; color: var(--action-fg); border-color: var(--action-fg); background: rgba(251,146,60,0.1);">🟠 UNMAPPED</span>
+        <span style="color: var(--text-faint); font-size: 10.5px;">·  10분 전</span>
+      </div>
+      <div class="title">PriceCalculator.compute(Order, double)</div>
+      <div class="desc">→ Action 후보: <strong>가격_계산</strong> (LLM 추천 92%)</div>
+      <div class="meta"><span>📁 com.scm</span></div>
+    </div>
+
+    <div class="feed-item">
+      <div class="type-row">
+        <span class="pill" style="font-size: 9.5px; color: var(--action-fg); border-color: var(--action-fg); background: rgba(251,146,60,0.1);">🟠 UNMAPPED</span>
+        <span style="color: var(--text-faint); font-size: 10.5px;">·  12분 전</span>
+      </div>
+      <div class="title">InventoryChecker.check(Item)</div>
+      <div class="desc">→ 후보 없음 (LLM 67% 미만)</div>
+      <div class="meta"><span>📁 com.scm</span></div>
+    </div>
+
+    <div class="feed-item">
+      <div class="type-row">
+        <span class="pill warn" style="font-size: 9.5px;">🟡 CALLSITE</span>
+        <span style="color: var(--text-faint); font-size: 10.5px;">·  20분 전</span>
+      </div>
+      <div class="title">OrderService.process — process() 다중 impl</div>
+      <div class="desc">→ 후보: 4개 (Generic Bound)</div>
+      <div class="meta"><span>🔧 GENERIC_BOUND</span></div>
+    </div>
+
+    <div class="feed-item">
+      <div class="type-row">
+        <span class="pill bad" style="font-size: 9.5px;">🔴 ANCHOR</span>
+        <span style="color: var(--text-faint); font-size: 10.5px;">·  35분 전</span>
+      </div>
+      <div class="title">StandardOrder.validate:6 의 <code style="color: var(--text-dim); font-size: 11.5px;">literal:240.0</code></div>
+      <div class="desc">→ 후보: params[0]&lt;StandardOrder&gt;.spec.diameter.range[1] · 90%</div>
+      <div class="meta"><span>📋 주문_검증</span></div>
+    </div>
+
+    <div class="feed-item">
+      <div class="type-row">
+        <span class="pill" style="font-size: 9.5px; color: var(--text-faint);">⚙ TYPE</span>
+        <span style="color: var(--text-faint); font-size: 10.5px;">·  1시간 전</span>
+      </div>
+      <div class="title">com.scm.QualityCheck → 도메인 term 매핑 필요</div>
+      <div class="desc">→ 후보: 품질검사 (term.scm.quality_check) 90%</div>
+      <div class="meta"><span>📁 com.scm</span></div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN — 현재 작업 -->
+<main class="main">
+  <div class="work-header">
+    <h1>RushOrder.validate:8 anchor 매핑</h1>
+    <span class="pill bad" class="status-pill">🔴 처리 필요</span>
+    <div class="actions" style="margin-left: auto; display: flex; gap: 6px;">
+      <button>← 이전</button>
+      <button>다음 →</button>
+      <button>건너뜀</button>
+    </div>
+  </div>
+
+  <div class="work-banner">
+    <span class="ai-tag">🤖 AI 추천</span>
+    <span><strong>params[0]&lt;RushOrder&gt;.spec.diameter.range[1]</strong> 신뢰도 84% — 매뉴얼 §3.2 "긴급주문 직경 상한 200.0mm" 와 정확히 일치</span>
+    <button class="primary" style="margin-left: auto;">✓ 추천 채택</button>
+  </div>
+
+  <div class="section-h">코드 anchor</div>
+  <pre class="code-snip">@Override
+public ValidationResult validate() {
+  ChemComposition latest = comps.get(comps.size()-1);
+  if (latest.C &lt; 0.10 || latest.C &gt; 0.25)
+    return fail("C 함량 위반");
+  if (priority &lt; 1 || priority &gt; 5)
+    return fail("우선도 범위");
+  if (spec.diameter &gt; <span class="picked">200.0</span>)  // ← 매핑 중
+    return fail("긴급주문 직경 한도");
+  return ok();
+}</pre>
+
+  <div class="section-h">slot 후보 (Action <code style="color: var(--text-dim); font-size: 11.5px;">action.scm.주문_검증</code> 의 path)</div>
+  <div class="candidate-grid">
+    <div class="candidate selected">
+      <div class="name">params[0]<span class="subtype-cast">&lt;RushOrder&gt;</span>.spec.diameter.range[1]</div>
+      <div class="conf">✓ 84% — AI 추천 (매뉴얼 §3.2 매칭)</div>
+      <div class="reason">RushOrder 의 spec.diameter 의 max 값. 200.0 = literal 정확히 일치.</div>
+    </div>
+    <div class="candidate">
+      <div class="name">params[0].spec.diameter.range[1]</div>
+      <div class="conf" style="color: var(--text-faint);">42% — base Order 의 max</div>
+      <div class="reason">subtype cast 없이 base 슬롯. RushOrder 만에 적용되니 위가 더 정확.</div>
+    </div>
+    <div class="candidate">
+      <div class="name">preconditions[2]</div>
+      <div class="conf" style="color: var(--text-faint);">21% — rule 추가</div>
+      <div class="reason">rule.scm.diameter_max 새 BusinessRule 로 분리해도 OK.</div>
+    </div>
+    <div class="candidate">
+      <div class="name">+ 새 path 만들기</div>
+      <div class="reason" style="color: var(--text-faint);">위 후보 다 안 맞으면 직접 입력</div>
+    </div>
+  </div>
+
+  <div style="margin-top: 16px; display: flex; gap: 8px; align-items: center;">
+    <button class="primary" style="padding: 7px 16px;">✓ 매핑 확정 + 다음 작업으로</button>
+    <button>건너뜀 — 나중에</button>
+    <button>매핑 X — anchor 무시</button>
+    <span class="spacer" style="flex: 1;"></span>
+    <span style="color: var(--text-faint); font-size: 11.5px;">처리 시 +1 (BODY_ANCHORED 까지 anchor 1개 남음)</span>
+  </div>
+
+  <div class="kbhint">
+    <span><kbd>↵</kbd> 추천 채택</span>
+    <span><kbd>1-4</kbd> 후보 선택</span>
+    <span><kbd>S</kbd> 건너뜀</span>
+    <span><kbd>↑↓</kbd> 큐 navigate</span>
+    <span><kbd>⌘K</kbd> 검색</span>
+  </div>
+</main>
+
+<!-- RIGHT — 컨텍스트 -->
+<aside class="right">
+  <div class="right-tabs">
+    <button class="active">🎯 컨텍스트</button>
+    <button>📖 매뉴얼</button>
+    <button>🌊 영향</button>
+  </div>
+  <div class="right-content">
+    <div class="ctx-block">
+      <h4>이 anchor 가 속한 Action</h4>
+      <div style="background: var(--panel); padding: 8px 10px; border-radius: 4px;">
+        <div><strong>주문 검증</strong> <span class="pill action" style="font-size: 9.5px;">pure_function</span></div>
+        <div style="font-size: 11px; color: var(--text-dim); margin-top: 3px;">
+          <code>action.scm.주문_검증</code>
+        </div>
+        <div style="margin-top: 6px;">
+          <span class="pill warn" style="font-size: 9.5px;">SIGNATURE_LOCKED ●●●○○○</span>
+        </div>
+        <div style="margin-top: 6px; font-size: 11px; color: var(--text-faint);">
+          이 anchor 매핑하면 → <span style="color: var(--good);">BODY_ANCHORED</span> 도달
+        </div>
+      </div>
+    </div>
+
+    <div class="ctx-block">
+      <h4>매뉴얼 (slab-design.md §3.2)</h4>
+      <p style="color: var(--text-dim); line-height: 1.55;">
+        <strong>긴급주문 (Rush Order)</strong> 의 직경 상한은 <strong>200.0 mm</strong>.
+        표준주문 (240.0mm) 보다 엄격하게 관리. 우선도 1~5 (1=긴급, 5=보통).
+      </p>
+      <button style="font-size: 11px; margin-top: 6px;">전체 보기</button>
+    </div>
+
+    <div class="ctx-block">
+      <h4>이 변경의 영향 (predicted)</h4>
+      <ul style="padding-left: 16px; color: var(--text-dim); line-height: 1.7;">
+        <li>주문_검증 의 BODY_ANCHORED 도달 → 시뮬 가능</li>
+        <li>다른 4 anchor (priority, C, Mn) 도 같은 방식으로 처리 가능</li>
+        <li>이 매핑이 BatchValidator.runAll 의 호출 모호성 해결에 단서 제공</li>
+      </ul>
+    </div>
+  </div>
+</aside>
+
+<footer class="statusbar">
+  <span class="verification">
+    <span class="pill bad" style="font-size: 9px;">U</span>16
+    <span class="pill warn" style="font-size: 9px;">D</span>18
+    <span class="pill" style="font-size: 9px;">SL</span>22
+    <span class="pill" style="font-size: 9px;">BA</span>47
+    <span class="pill good" style="font-size: 9px;">SV</span>31
+    <span class="pill good" style="font-size: 9px;">PR</span>8
+  </span>
+  <span>총 142 actions · BODY_ANCHORED+ <strong style="color: var(--good);">86</strong> (61%)</span>
+  <span class="spacer" style="flex: 1;"></span>
+  <span>큐 23개 · 오늘 처리 <strong style="color: var(--good);">+12</strong></span>
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>onTong — 작업 플랜 v2 (Clean Slate · Section 2/3 만)</title>
+<style>
+  :root {
+    --bg: #0b1018; --panel: #111827; --panel-2: #0f172a; --panel-3: #0a0f1a;
+    --border: #1f2937; --border-2: #334155;
+    --text: #e5e7eb; --text-dim: #94a3b8; --text-faint: #64748b;
+    --accent: #38bdf8; --accent-2: #818cf8;
+    --warn: #f59e0b; --bad: #f87171; --good: #34d399;
+    --code-bg: #0a0f1a;
+    --core: #38bdf8; --agent: #fb923c; --ux: #a78bfa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.65 -apple-system, BlinkMacSystemFont, "SF Pro Text",
+      "Segoe UI", "Helvetica Neue", "Pretendard", sans-serif;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 48px 32px 96px; }
+  header.top { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 32px; }
+  h1 { font-size: 28px; margin: 0 0 8px; font-weight: 700; letter-spacing: -0.02em; }
+  h1 .badge {
+    display: inline-block; margin-left: 12px; padding: 5px 12px;
+    background: rgba(52,211,153,0.1); border: 1px solid var(--good);
+    color: var(--good); font-size: 11px; font-weight: 600;
+    border-radius: 4px; vertical-align: middle;
+  }
+  h2 {
+    font-size: 22px; margin: 56px 0 18px; padding-top: 14px;
+    border-top: 1px solid var(--border); color: var(--accent); font-weight: 600;
+  }
+  h3 { font-size: 17px; margin: 28px 0 10px; color: var(--text); font-weight: 600; }
+  h4 {
+    font-size: 13px; margin: 16px 0 6px; color: var(--text-dim);
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  p { margin: 8px 0; } ul, ol { margin: 8px 0; padding-left: 22px; } li { margin: 4px 0; }
+  code {
+    background: var(--code-bg); border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 3px;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--accent);
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    padding: 14px 16px; border-radius: 6px; overflow-x: auto;
+    font-size: 12.5px; line-height: 1.55;
+  }
+  pre code { background: none; border: none; padding: 0; color: var(--text); }
+  .lead { font-size: 15px; color: var(--text-dim); margin-top: 8px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 18px 22px; margin: 14px 0; }
+  .panel.warn { border-left: 3px solid var(--warn); }
+  .panel.good { border-left: 3px solid var(--good); }
+  .panel.bad  { border-left: 3px solid var(--bad); }
+  .panel.info { border-left: 3px solid var(--accent); }
+  .panel.principle { border-left: 3px solid var(--accent-2); background: rgba(129,140,248,0.04); }
+  .panel.boundary { border-left: 3px solid var(--bad); background: rgba(248,113,113,0.04); }
+  .panel h3:first-child, .panel h4:first-child { margin-top: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--panel-2); color: var(--text-dim); font-weight: 600; }
+  tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+  .pill {
+    display: inline-block; padding: 1px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; vertical-align: middle;
+    border: 1px solid var(--border-2);
+  }
+  .pill.core  { color: var(--core);  border-color: var(--core);  background: rgba(56,189,248,0.08); }
+  .pill.agent { color: var(--agent); border-color: var(--agent); background: rgba(251,146,60,0.08); }
+  .pill.ux    { color: var(--ux);    border-color: var(--ux);    background: rgba(167,139,250,0.08); }
+  .pill.delete { color: var(--bad); border-color: var(--bad); background: rgba(248,113,113,0.08); }
+  .pill.keep { color: var(--good); border-color: var(--good); background: rgba(52,211,153,0.08); }
+  .pill.locked { color: var(--bad); border-color: var(--bad); background: rgba(248,113,113,0.08); font-weight: 700; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 32px 0; }
+  .toc { color: var(--text-dim); font-size: 13px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .small { font-size: 12px; color: var(--text-faint); }
+
+  .step-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-left: 4px solid;
+    border-radius: 8px;
+    padding: 16px 20px; margin: 14px 0;
+  }
+  .step-card.core  { border-left-color: var(--core); }
+  .step-card.agent { border-left-color: var(--agent); }
+  .step-card.ux    { border-left-color: var(--ux); }
+  .step-card .step-head {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 10px; flex-wrap: wrap;
+  }
+  .step-card .step-num {
+    color: var(--bg);
+    padding: 4px 10px; border-radius: 4px;
+    font-weight: 700; font-size: 12px;
+    font-family: "SF Mono", Menlo, monospace;
+  }
+  .step-card.core  .step-num { background: var(--core); }
+  .step-card.agent .step-num { background: var(--agent); }
+  .step-card.ux    .step-num { background: var(--ux); }
+  .step-card .step-title { font-size: 16px; font-weight: 600; flex: 1; }
+  .step-card .step-meta {
+    color: var(--text-faint); font-size: 11px;
+    background: var(--panel-3); padding: 2px 8px; border-radius: 4px;
+  }
+  .step-card .step-deliverables {
+    background: var(--panel-2); border-radius: 4px;
+    padding: 10px 14px; margin: 8px 0;
+    font-size: 12.5px;
+  }
+  .step-card .step-deliverables strong { color: var(--accent); }
+
+  .substep {
+    background: var(--panel-3); border-left: 2px solid var(--ux);
+    border-radius: 0 4px 4px 0;
+    padding: 10px 14px; margin: 6px 0 6px 16px;
+    font-size: 13px;
+  }
+  .substep .stitle { color: var(--ux); font-weight: 600; font-size: 12.5px; }
+  .substep .sdesc { color: var(--text-dim); font-size: 12px; margin-top: 4px; }
+
+  .iter-loop {
+    background: rgba(167,139,250,0.05);
+    border: 1px dashed var(--ux);
+    border-radius: 6px; padding: 12px 16px; margin: 10px 0;
+  }
+  .iter-loop .label {
+    color: var(--ux); font-weight: 700; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+
+  .source { font-size: 12px; color: var(--text-faint); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>작업 플랜 v2 — Clean Slate <span class="badge">FINAL · 2026-05-01</span></h1>
+  <p class="lead">
+    O1·O2·O3·O4 답변 확정. <strong>Section 1 (wiki) 절대 안 건드림.</strong>
+    Section 2 (modeling) + Section 3 (simulation) 스캐폴딩 — 기존 agent + UI 폐기, 새 온톨로지 기반 Plugin agent + UI/UX 완전 재구성.
+    UI 는 브라우저 기반 사용자 관점 이터레이션으로 고도화.
+  </p>
+</header>
+
+<!-- ============================================== -->
+<h2 id="boundary">1. Section 경계 — 절대 침범 금지</h2>
+
+<div class="panel boundary">
+  <h3>🔒 OFF LIMITS — Section 1 (wiki, 다른 세션 소유)</h3>
+  <p>아래는 wiki Claude 세션의 작업 영역. 절대 read-only:</p>
+  <ul>
+    <li><code>backend/wiki/</code>, <code>backend/application/wiki/</code></li>
+    <li><code>backend/application/agent/*</code> — wiki RAG agent (rag_agent / react_agent / pydantic_tools / wiki_search 등)</li>
+    <li><code>backend/api/search.py</code> — wiki 검색 endpoint</li>
+    <li><code>backend/application/metadata/*</code> — wiki 메타데이터</li>
+    <li>frontend 의 wiki 섹션 컴포넌트</li>
+    <li><code>toClaude/wiki/</code></li>
+  </ul>
+  <p class="small">
+    git status 의 modified 표시는 wiki 세션 작업이지 우리 것이 아님. 우리는 read-only 참조만.
+  </p>
+</div>
+
+<div class="panel info">
+  <h4>O2=A 의 정확한 의미 (정정)</h4>
+  <p>
+    "Section 1 그대로 유지" 정합. "에이전트 다 없애" 의 메모는 <strong>모델링 측 agent 만</strong>.
+    Section 1 의 wiki/RAG 는 그대로 운영. 우리 NL Agent (A4) 는 모델링 측 별도 agent 로 처음부터.
+  </p>
+</div>
+
+<!-- ============================================== -->
+<h2 id="discard">2. 폐기 대상 (Section 2 + 3 만, 타협 없음)</h2>
+
+<table>
+  <thead><tr><th>대상</th><th>분류</th><th>이유</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>BusinessTerm / BusinessRule / ConceptBinding 데이터 (DB)</td>
+      <td><span class="pill delete">삭제</span></td>
+      <td>새 schema 호환 X (Q10=D)</td>
+    </tr>
+    <tr>
+      <td><code>backend/modeling/mapping/*</code> (mapping_models / concept_store / business_term_registry / anchor_binding_suggester / rule_suggester / term_suggester / propose_bindings_service / context_bundler / audit_store / rule_source)</td>
+      <td><span class="pill delete">삭제</span></td>
+      <td>새 Mapping Layer 로 치환</td>
+    </tr>
+    <tr>
+      <td><code>backend/modeling/ontology/*</code> (schema / ontology_store / builder_service / validator / loader)</td>
+      <td><span class="pill delete">삭제</span></td>
+      <td>새 Domain Layer 로 치환</td>
+    </tr>
+    <tr>
+      <td><code>backend/modeling/simulation/*</code> (sandbox_runner / python_generator / change_spec / pr_creator / diff_reporter)</td>
+      <td><span class="pill delete">삭제</span></td>
+      <td>새 Simulation Agent (A2) 에서 처음부터 재작성</td>
+    </tr>
+    <tr>
+      <td><code>backend/modeling/query/*</code>, <code>backend/modeling/impact/*</code>, <code>backend/modeling/sweepers/*</code>, <code>backend/modeling/gap_detection/*</code>, <code>backend/modeling/manuals/*</code>, <code>backend/modeling/manual_ingest/*</code>, <code>backend/modeling/demo/*</code></td>
+      <td><span class="pill delete">삭제</span></td>
+      <td>모두 기존 BusinessTerm 모델 의존. 새 모델 위에서 필요 시 agent 로 부활</td>
+    </tr>
+    <tr>
+      <td><code>backend/modeling/api/*</code> (modeling / ontology_api 외 다수)</td>
+      <td><span class="pill delete">삭제</span></td>
+      <td>새 Query API (C5) 로 치환</td>
+    </tr>
+    <tr>
+      <td>Section 3 — <code>backend/simulation/*</code> (스캐폴딩 + MockClient + 3 시나리오)</td>
+      <td><span class="pill delete">삭제</span></td>
+      <td>O3=A — Simulation Agent (A2) 가 통째 대체</td>
+    </tr>
+    <tr>
+      <td>Frontend Section 2 모델링 컴포넌트 (<code>frontend/src/components/sections/ModelingSection.tsx</code> + 모든 modeling 하위)</td>
+      <td><span class="pill delete">삭제</span></td>
+      <td>O4=D — Mode rail 자체 폐기, UI/UX 완전 재구성</td>
+    </tr>
+    <tr>
+      <td>Frontend Section 3 (<code>SimulationSection.tsx</code> + 하위)</td>
+      <td><span class="pill delete">삭제</span></td>
+      <td>O3=A 정합</td>
+    </tr>
+    <tr>
+      <td><code>frontend/sections/SectionNav.tsx</code> (3-탭 네비게이션)</td>
+      <td><span class="pill delete">재구성</span></td>
+      <td>O4=D — section 탭은 유지하되 mode rail 없는 통합 화면으로</td>
+    </tr>
+    <tr>
+      <td>OD-11 Phase B 잔여 (B8 query engine / B9 Slab E2E)</td>
+      <td><span class="pill delete">폐기</span></td>
+      <td>O1=A — C2 (새 Code Layer) 에서 처음부터</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== -->
+<h2 id="keep">3. 보존 / 부분 재활용</h2>
+
+<table>
+  <thead><tr><th>대상</th><th>분류</th><th>방식</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Section 1 전체 (wiki/RAG/UI)</td>
+      <td><span class="pill locked">🔒 LOCKED</span></td>
+      <td>건드리지 않음 (다른 세션 소유)</td>
+    </tr>
+    <tr>
+      <td><code>backend/modeling/code_analysis/*</code> (java_parser, parser_protocol, method_anchor, graph_writer, cross_file_enricher, reflection_*, spring/* 10 analyzer)</td>
+      <td><span class="pill keep">로직 유지 + 출력 어댑터</span></td>
+      <td>Java 분석 가치 큼. 출력만 새 CodeType 모델로 매핑 (graph_writer 출력은 폐기)</td>
+    </tr>
+    <tr>
+      <td><code>backend/modeling/persistence/*</code> (database, models)</td>
+      <td><span class="pill keep">유지 + 신 테이블</span></td>
+      <td>SQLAlchemy 어댑터 인프라. 새 schema 모듈만 추가</td>
+    </tr>
+    <tr>
+      <td><code>backend/modeling/infrastructure/*</code> (git_connector 등)</td>
+      <td><span class="pill keep">유지</span></td>
+      <td>인프라 — 모델 변경 무관</td>
+    </tr>
+    <tr>
+      <td><code>backend/shared/agent_framework/</code></td>
+      <td><span class="pill keep">유지 + Plugin 패턴 보강</span></td>
+      <td>이미 있는 base. A1 에서 Plugin contract 보강</td>
+    </tr>
+    <tr>
+      <td><code>backend/shared/contracts/*</code></td>
+      <td><span class="pill keep">유지</span></td>
+      <td>새 Query API contract 가 여기 추가</td>
+    </tr>
+    <tr>
+      <td><code>backend/main.py</code></td>
+      <td><span class="pill keep">수정</span></td>
+      <td>모델링 측 라우터 등록 다시 (Section 1 부분은 그대로)</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== -->
+<h2 id="core">4. CORE Phase — 온톨로지 자체 (C1 ~ C6)</h2>
+
+<div class="step-card core">
+  <div class="step-head">
+    <span class="step-num">C1</span>
+    <span class="step-title">기존 archive + drop (clean slate, Section 2/3 만)</span>
+    <span class="step-meta">의존 없음 · 가장 먼저</span>
+  </div>
+  <ul>
+    <li><code>git tag pre-clean-slate-2026-05-01</code> — rollback 보장</li>
+    <li><code>archive/2026-05-pre-clean-slate/</code> 폴더에 §2 폐기 대상 모두 이동
+      <ul>
+        <li>backend/modeling 의 mapping / ontology / simulation / query / impact / sweepers / gap_detection / manuals / manual_ingest / demo / api</li>
+        <li>backend/simulation (Section 3 전체)</li>
+        <li>frontend Section 2/3 컴포넌트</li>
+      </ul>
+    </li>
+    <li><strong>Section 1 절대 안 건드림</strong> — backend/wiki, backend/application/{wiki,agent,metadata}, backend/api/search.py, frontend wiki 섹션</li>
+    <li>SQLite 의 모델링 측 테이블 drop (BusinessTerm/Rule/ConceptBinding/Process 등). wiki 측 테이블 무관</li>
+    <li>backend/main.py 의 모델링 측 라우터 include 제거. Section 1 라우터는 그대로</li>
+    <li>UI 가 깨지는 건 의도. 다음 step 에서 새로 구축</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: archive 폴더 + drop 스크립트 + git tag + "삭제 완료" 보고서 (지운 파일 수, 라인 수, 영향 받은 endpoint)
+  </div>
+</div>
+
+<div class="step-card core">
+  <div class="step-head">
+    <span class="step-num">C2</span>
+    <span class="step-title">Code Layer — Java 충실 mirror + CallSiteAnalyzer</span>
+    <span class="step-meta">의존: C1</span>
+  </div>
+  <ul>
+    <li>SQLite: <code>CodeType</code> / <code>CodeField</code> / <code>CodeMethod</code> / <code>CallSite</code></li>
+    <li>기존 java_parser + Spring 10 analyzer 의 출력을 새 모델로 매핑하는 <code>code_layer_adapter.py</code></li>
+    <li>Class.role / Method.role 자동 분류 (annotation + 이름 패턴 + LLM unknown 처리)</li>
+    <li>CallSiteAnalyzer Case 1~4 자동 (single_impl / instanceof_guard / annotation / factory_branch)</li>
+    <li>Case 5~7 (generic / Strategy Map / Reflection) 은 <code>analysis_source="static_unresolved"</code> 마킹 + 사용자 큐 데이터 채움</li>
+    <li>tests + Java 샘플 (abstract Order + StandardOrder + RushOrder + 화학성분)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>backend/modeling/code_layer/{schema,store,adapter,callsite_analyzer,role_classifier}.py</code> + tests + Java 샘플 분석 리포트
+  </div>
+</div>
+
+<div class="step-card core">
+  <div class="step-head">
+    <span class="step-num">C3</span>
+    <span class="step-title">Domain Layer — BusinessTerm 신모델</span>
+    <span class="step-meta">의존: C1</span>
+  </div>
+  <ul>
+    <li>SQLite: <code>BusinessTerm</code> (kind=atomic|composite + facets) / <code>Inheritance</code> (extends/implements) / <code>Composition</code></li>
+    <li><code>BusinessRule</code> 도 함께 신설</li>
+    <li><code>effective_parts</code> resolver (transitive closure, 사이클 방지)</li>
+    <li>Validator: kind=atomic 의 parts 금지 / parents 사이클 금지 / facet 일관성</li>
+    <li>tests + 샘플 도메인 (주문 / 주문스펙 / 화학성분정보 / 진행관리정보 등)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>backend/modeling/domain_layer/{schema,store,resolver,validator}.py</code> + tests + 샘플 도메인 데이터
+  </div>
+</div>
+
+<div class="step-card core">
+  <div class="step-head">
+    <span class="step-num">C4</span>
+    <span class="step-title">Mapping Layer — TypeRealization + Action + Realization + AnchorBinding</span>
+    <span class="step-meta">의존: C2, C3</span>
+  </div>
+  <ul>
+    <li>SQLite: <code>TypeRealization</code> (CodeType↔Term) / <code>Action</code> / <code>Realization</code> (다형성, dispatch_source) / <code>AnchorBinding</code> (fragment-level, composite path with subtype cast)</li>
+    <li><code>VerificationLevel</code> state machine</li>
+    <li>Path syntax parser/validator (<code>params[0]&lt;Subtype&gt;.spec.diameter.range[1]</code>)</li>
+    <li>Action 후보 자동 추출 (Method.role=business 마다)</li>
+    <li>Realization 자동 binding — CallSiteAnalyzer Case 1~4 그대로</li>
+    <li>모호 case (Case 5~7) 사용자 confirm 큐 — 후보 + 컨텍스트 + LLM 추천</li>
+    <li>Anchor 자동 binding (혼합 큐) — alias/literal 자동 confirmed, branch/lookup 큐</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>backend/modeling/mapping_layer/{schema,store,action,realization,anchor_binding,path_parser,verification_level}.py</code> + tests
+  </div>
+</div>
+
+<div class="step-card core">
+  <div class="step-head">
+    <span class="step-num">C5</span>
+    <span class="step-title">Query API — Agent boundary 확정</span>
+    <span class="step-meta">의존: C2, C3, C4 · 가장 중요한 boundary</span>
+  </div>
+  <ul>
+    <li>Python facade <code>OntologyQueryClient</code> + REST endpoints</li>
+    <li>모든 응답 frozen pydantic DTO (Core 내부 ORM 노출 X)</li>
+    <li>Query 종류:
+      <ul>
+        <li>Term: <code>get / list / effective_parts / resolve_path</code></li>
+        <li>Code: <code>get_code_type / list_code_types / get_call_sites</code></li>
+        <li>Action: <code>get / list / get_realizations(input_type)</code> — input type 주면 dispatch 결과</li>
+        <li>Anchor: <code>get_anchor_bindings / find_anchor_at_slot</code></li>
+        <li>Mapping queue: <code>get_unmapped_methods / get_ambiguous_call_sites / get_verification_progress</code></li>
+        <li>Search: FTS5 (Term/Action/CodeType/CodeMethod 통합)</li>
+      </ul>
+    </li>
+    <li>OpenAPI spec 자동 생성</li>
+    <li>Agent 작성 가이드 markdown</li>
+    <li>정적 검사 도구 <code>tools/check_agent_isolation.py</code> — Agent 가 Core internal import 시 build 실패</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>backend/modeling/api/ontology_query_api.py</code> + <code>backend/shared/contracts/ontology_query.py</code> (DTO + client interface) + OpenAPI spec + 정적 검사 도구
+  </div>
+</div>
+
+<div class="step-card ux">
+  <div class="step-head">
+    <span class="step-num">C6</span>
+    <span class="step-title">Workbench UI — 통합 화면 (mode rail 폐기) + 이터레이션 고도화</span>
+    <span class="step-meta">의존: C5 · UX 탐구 단계 다중 이터레이션</span>
+  </div>
+  <p>
+    O4=D 정합. 사용자 메모: "<em>브라우저를 보면서 사용자 관점으로 하나씩 편하게 할 수 있는 방법을 여러번 탐구하면서 고도화</em>".
+    아래 6 sub-step + N 회 이터레이션 루프.
+  </p>
+
+  <div class="substep">
+    <div class="stitle">C6-1 · 사용자 시나리오 + Persona 정의</div>
+    <div class="sdesc">
+      4 가지 핵심 시나리오 (Java repo import → 매핑 → simulation 까지의 흐름) 와 핵심 Persona (SCM 분석가) 의 하루 work-flow 작성. 도큐먼트 기반.
+    </div>
+  </div>
+
+  <div class="substep">
+    <div class="stitle">C6-2 · /design-shotgun · /design-consultation · /office-hours 로 안 다중 생성</div>
+    <div class="sdesc">
+      gstack 의 design-shotgun skill 로 4~6 가지 통합 화면 디자인 안 생성. 디자인 시스템 (color/typo/spacing) 은 design-consultation 으로. 통합 화면 구조 후보들 — 좌측 트리·중앙·우측 / Pretext-style / Code-Domain split / focus mode / etc.
+    </div>
+  </div>
+
+  <div class="substep">
+    <div class="stitle">C6-3 · /browse 로 사용자에게 안 시연 + 선택</div>
+    <div class="sdesc">
+      각 안의 prototype HTML 을 gstack /browse 로 직접 띄워 사용자에게 비교 시연. 사용자가 1 안 선택 또는 안 들의 부분 조합 지정.
+    </div>
+  </div>
+
+  <div class="substep">
+    <div class="stitle">C6-4 · 선택안 React 구현 + browser dogfooding</div>
+    <div class="sdesc">
+      선택된 안을 React 로 구현. 핵심 위젯: Code Tree / Term Tree / Action Card / Path Picker / Mapping Queues / VerificationLevel 대시보드. 구현 동시에 /browse 로 자기 dogfooding.
+    </div>
+  </div>
+
+  <div class="substep">
+    <div class="stitle">C6-5 · /design-review · /qa 로 visual + UX 검증</div>
+    <div class="sdesc">
+      gstack /design-review 로 visual 일관성·spacing·hierarchy 점검 + iteratively 수정. /qa 로 사용 흐름 끝-끝 테스트, bug 발견 + 수정.
+    </div>
+  </div>
+
+  <div class="iter-loop">
+    <span class="label">↻ ITERATION LOOP</span>
+    <div class="substep">
+      <div class="stitle">C6-6 · 사용자 피드백 + N 회 이터레이션</div>
+      <div class="sdesc">
+        사용자 시연 → "이 부분이 불편" 피드백 → 해당 영역 design-shotgun 미니 (3~4 안) → /browse 비교 → 선택 → 구현 → /design-review.
+        <strong>한 사이클 = 1~2일 단위</strong>. 사용자가 "이만하면 됐다" 할 때까지 반복. 예상 4~6 사이클.
+      </div>
+    </div>
+  </div>
+
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>frontend/src/components/sections/modeling/*</code> 통합 화면 (Code Tree / Term Tree / Action Card / Path Picker / Mapping Queues / VerificationLevel 대시보드) + 디자인 시스템 doc + 이터레이션 로그 (each cycle 의 before/after screenshot)
+  </div>
+</div>
+
+<div class="panel good">
+  <h4>CORE 완료 = "온톨로지 product" standalone 가능</h4>
+  <p>여기까지면 Java repo import → 매핑 큐 처리 → 깨끗한 온톨로지 보유. Agent 없이 온톨로지만으로 가치. 첫 데모 분기점.</p>
+</div>
+
+<!-- ============================================== -->
+<h2 id="agent">5. AGENT Phase — 부착식 Plugin (A1 ~ A4)</h2>
+
+<div class="step-card agent">
+  <div class="step-head">
+    <span class="step-num">A1</span>
+    <span class="step-title">Agent Framework + Plugin contract</span>
+    <span class="step-meta">의존: C5</span>
+  </div>
+  <ul>
+    <li>기존 <code>backend/shared/agent_framework/</code> 위에 Plugin 패턴 추가</li>
+    <li><code>OntologyAgent</code> base — Query API client 자동 주입</li>
+    <li>Agent 등록·해제 (entry-point + 환경변수 toggle)</li>
+    <li>Agent 자기 SQLite store: <code>backend/agents/&lt;name&gt;/store.db</code></li>
+    <li>Agent 자기 REST: <code>/agents/&lt;name&gt;/...</code> 자동 라우팅</li>
+    <li>Agent 자기 frontend: <code>frontend/agents/&lt;name&gt;/</code> lazy load</li>
+    <li>정적 검사 도구 활성화 (C5 의 check_agent_isolation 가동)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: agent_framework 보강 + agent 작성 가이드 + plugin loader
+  </div>
+</div>
+
+<div class="step-card agent">
+  <div class="step-head">
+    <span class="step-num">A2</span>
+    <span class="step-title">Simulation Agent — Scenario + Sandbox + Diff (Section 3 대체)</span>
+    <span class="step-meta">의존: A1</span>
+  </div>
+  <ul>
+    <li><code>backend/agents/simulation/</code> + 자체 SQLite</li>
+    <li>SimulationScenario / ScenarioStep 모델</li>
+    <li>ScenarioInputAdapter Protocol — 1단계 FormInputAdapter + FixtureInputAdapter</li>
+    <li>PythonGenerator 신작성 — Query API 로 Term 그래프 → nested dataclass + Realization 다중 → dispatcher 자동 생성</li>
+    <li>SandboxRunner (RestrictedPython, Q-A=A2)</li>
+    <li>Diff reporter (Step List + Side-by-side)</li>
+    <li>VerificationLevel 갱신 — sim 통과 시 SIM_VERIFIED</li>
+    <li>Frontend: <code>frontend/agents/simulation/</code> — Scenario builder + Diff viewer (C6 의 통합 화면 구조 안에 lazy load)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: backend + frontend agent + e2e 데모 (주문 검증 시뮬). 두 번째 데모 분기점.
+  </div>
+</div>
+
+<div class="step-card agent">
+  <div class="step-head">
+    <span class="step-num">A3</span>
+    <span class="step-title">ChangeSpec + DraftPR Agent</span>
+    <span class="step-meta">의존: A2</span>
+  </div>
+  <ul>
+    <li><code>backend/agents/change_pr/</code> + 자체 SQLite (ChangeSpec)</li>
+    <li>ChangeSpec 모델 (target_action_fqn + slot path) + 5종 kind</li>
+    <li>Action 슬롯 변경 → Java patch 템플릿 → GitHub draft PR</li>
+    <li>VerificationLevel → PR_PROVEN</li>
+    <li>Simulation Agent 결과를 input 으로 (agent 간 통신 = Query API 또는 명시적 contract)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: backend + frontend agent + GitHub draft PR 데모
+  </div>
+</div>
+
+<div class="step-card agent">
+  <div class="step-head">
+    <span class="step-num">A4</span>
+    <span class="step-title">NL 영향 분석 Agent (모델링 측 — Section 1 wiki RAG 와 별개)</span>
+    <span class="step-meta">의존: A1</span>
+  </div>
+  <ul>
+    <li><code>backend/agents/nl_impact/</code></li>
+    <li>"이 변경의 영향은?" 자연어 질의 → Query API 로 Action 의존 그래프 + Anchor binding traversal</li>
+    <li>LLM 으로 자연어 보고서 생성</li>
+    <li>Frontend: 채팅 패널 (통합 화면 우측 drawer 또는 별도 panel — C6 이터레이션에서 결정)</li>
+    <li>Section 1 wiki RAG 와 별개 — 모델링 도메인 전용</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: backend + frontend agent + NL 질의 데모
+  </div>
+</div>
+
+<!-- ============================================== -->
+<h2 id="ux-method">6. C6 UX 탐구 방법론 (gstack skill 활용)</h2>
+
+<table>
+  <thead><tr><th>Skill</th><th>언제</th><th>산출물</th></tr></thead>
+  <tbody>
+    <tr><td><code>/office-hours</code></td><td>C6-1 — 사용자 페르소나 + 시나리오 design 사고</td><td>design 문서 1종</td></tr>
+    <tr><td><code>/design-consultation</code></td><td>C6-2 — 디자인 시스템 (color/typo/spacing/motion)</td><td>DESIGN.md + font/color preview</td></tr>
+    <tr><td><code>/design-shotgun</code></td><td>C6-2 / C6-6 — 다중 디자인 안 생성</td><td>4~6 variant HTML 비교 보드</td></tr>
+    <tr><td><code>/design-html</code></td><td>C6-2 — 안 finalize 시 production HTML 생성</td><td>준비된 HTML</td></tr>
+    <tr><td><code>/browse</code></td><td>C6-3 / C6-4 — 사용자 시연 + dogfooding</td><td>스크린샷 + 사용 흐름 비디오</td></tr>
+    <tr><td><code>/design-review</code></td><td>C6-5 — visual 일관성 audit + iteratively 수정</td><td>before/after 스크린샷 + 커밋</td></tr>
+    <tr><td><code>/qa</code></td><td>C6-5 — 사용 흐름 bug 찾고 수정</td><td>QA 리포트 + 수정 커밋</td></tr>
+    <tr><td><code>/plan-design-review</code></td><td>C6-6 사이클 시작 시 — 다음 이터레이션 plan 검토</td><td>이터레이션 design 점수표</td></tr>
+  </tbody>
+</table>
+
+<div class="panel principle">
+  <h4>이터레이션 사이클 (1~2일 단위)</h4>
+  <ol>
+    <li>사용자가 현재 화면에서 불편한 영역 지적</li>
+    <li>해당 영역 <code>/design-shotgun</code> 미니 (3~4 안)</li>
+    <li><code>/browse</code> 로 사용자에게 비교 시연</li>
+    <li>선택안 구현</li>
+    <li><code>/design-review</code> + <code>/qa</code> 검증</li>
+    <li>"이만하면 됐다" → 다음 영역으로. "더 다듬자" → 1로 돌아가기</li>
+  </ol>
+  <p>예상 4~6 사이클. C6 step 자체가 다른 step 보다 가장 길어질 수 있음 — 사용자 만족이 기준.</p>
+</div>
+
+<!-- ============================================== -->
+<h2 id="ordering">7. 진행 순서 + 시연 분기점</h2>
+
+<table>
+  <thead><tr><th>순서</th><th>Step</th><th>예상 단위</th><th>분기점</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><span class="pill core">C1</span> archive + drop</td><td>0.5~1일</td><td>—</td></tr>
+    <tr><td>2</td><td><span class="pill core">C2</span> Code Layer</td><td>2~3일</td><td>—</td></tr>
+    <tr><td>3</td><td><span class="pill core">C3</span> Domain Layer</td><td>1~2일 (C2 와 병렬 가능)</td><td>—</td></tr>
+    <tr><td>4</td><td><span class="pill core">C4</span> Mapping Layer</td><td>3~4일</td><td>—</td></tr>
+    <tr><td>5</td><td><span class="pill core">C5</span> Query API</td><td>1~2일</td><td>—</td></tr>
+    <tr><td>6</td><td><span class="pill ux">C6</span> Workbench UI (이터레이션)</td><td>1~3주 (사용자 만족 기준)</td><td>★ 1차 데모</td></tr>
+    <tr><td>7</td><td><span class="pill agent">A1</span> Plugin framework</td><td>1일</td><td>—</td></tr>
+    <tr><td>8</td><td><span class="pill agent">A2</span> Simulation Agent</td><td>3~5일</td><td>★ 2차 데모</td></tr>
+    <tr><td>9</td><td><span class="pill agent">A3</span> ChangeSpec + PR Agent</td><td>2~3일</td><td>—</td></tr>
+    <tr><td>10</td><td><span class="pill agent">A4</span> NL 영향 분석 Agent</td><td>2~3일</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<div class="panel info">
+  <p class="small">기간은 reference 일뿐 — feedback_no_schedule_talk 정합. 실제 일정은 사용자가 결정. 위는 step 간 상대적 크기 비교용.</p>
+</div>
+
+<hr>
+
+<div class="panel good">
+  <h3>요약</h3>
+  <ul>
+    <li><strong>Section 1 (wiki) 절대 안 건드림</strong> — 다른 세션 소유</li>
+    <li><strong>Section 2 (modeling) + Section 3 (simulation 스캐폴딩) 폐기</strong> — Java 분석 로직 + persistence + agent_framework + Section 1 만 보존</li>
+    <li><strong>CORE 6 step</strong> — clean slate → Code Layer → Domain Layer → Mapping Layer → Query API → Workbench UI (이터레이션)</li>
+    <li><strong>AGENT 4 step</strong> — Plugin framework → Simulation → ChangeSpec+PR → NL 영향 분석</li>
+    <li><strong>C6 UI 는 브라우저 기반 이터레이션</strong> — gstack design-shotgun / browse / design-review / qa 활용</li>
+    <li><strong>두 시연 분기점</strong> — C6 (온톨로지 standalone), A2 (시뮬 위 onTong)</li>
+  </ul>
+  <p>
+    <strong>승인 시 즉시 C1 (archive + drop) 부터 시작.</strong>
+  </p>
+</div>
+
+<p class="source">
+  관련: <a href="./온톨로지-방식-결정.html">최종 결정 16개</a> · <a href="./온톨로지-방식-플랜.html">플랜 v1 (open 질문 폼)</a> · v1~v5 토론
+</p>
+
+</div>
+</body>
+</html>

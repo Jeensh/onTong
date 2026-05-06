@@ -8,33 +8,7 @@ Validates:
 5. ontong.md contains continuation instruction rules
 """
 
-import sys
-import types
 import pytest
-
-# Stub heavy dependencies so rag_agent can be imported without chromadb etc.
-_STUBS = [
-    "chromadb", "chromadb.config", "chromadb.utils", "chromadb.utils.batch_utils",
-    "pydantic_ai", "litellm",
-    "backend.infrastructure.vectordb.chroma",
-    "backend.infrastructure.storage.base",
-    "backend.infrastructure.storage.local_fs",
-    "backend.core.session",
-    "backend.application.agent.context",
-]
-for mod_name in _STUBS:
-    if mod_name not in sys.modules:
-        stub = types.ModuleType(mod_name)
-        if "vectordb.chroma" in mod_name:
-            stub.ChromaWrapper = type("ChromaWrapper", (), {})
-        if "storage.base" in mod_name:
-            stub.StorageProvider = type("StorageProvider", (), {})
-        if "session" in mod_name:
-            stub.session_store = type("SS", (), {"add_pending_action": lambda *a: "id"})()
-            stub.SessionStore = type("SessionStore", (), {})
-        if "context" in mod_name:
-            stub.AgentContext = type("AgentContext", (), {})
-        sys.modules[mod_name] = stub
 
 from backend.application.agent.rag_agent import (
     build_history_window,

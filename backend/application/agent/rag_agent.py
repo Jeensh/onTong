@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import AsyncGenerator
 
 from backend.core.schemas import (
+    AppliedFiltersEvent,
     ApprovalRequestEvent,
     ChatRequest,
     ClarificationRequestEvent,
@@ -535,6 +536,22 @@ class RAGAgent:
                 ctx.path_preference = None
                 ctx.path_preferences = []
 
+        # NL → FilterSpec (folders/authors/types/mtime). Rule-based, deterministic.
+        from backend.application.agent.nl_filter_extractor import extract_filter_spec as _extract_nl_filters
+        nl_filter_spec = _extract_nl_filters(query) or {}
+        if nl_filter_spec:
+            try:
+                setattr(ctx, "applied_filters", nl_filter_spec)
+            except Exception:
+                pass
+            yield self._thinking("vector_search", "info", "자연어 필터 추출", str(nl_filter_spec))
+            # Surface to the UI so it can (a) render chips and (b) offer a
+            # "검색창에서 계속" handoff with the same filters pre-applied.
+            yield self._sse(
+                "applied_filters",
+                AppliedFiltersEvent(filters=nl_filter_spec, source="nl").model_dump_json(),
+            )
+
         if ctx:
             # ReAct loop: search → evaluate → re-search if insufficient
             tried_queries: list[str] = []
@@ -544,6 +561,7 @@ class RAGAgent:
                     query=search_query,
                     n_results=8,
                     metadata_filter=metadata_filter,
+                    filters=nl_filter_spec or None,
                     user_roles=user_roles,
                     path_preference=ctx.path_preference if ctx else None,
                     user_scope=ctx.user_scope if ctx else None,

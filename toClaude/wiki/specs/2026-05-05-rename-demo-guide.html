@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>위키 Rename / 삭제 / 경로 변경 — 데모 가이드</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --bg-card: #1e293b;
+    --bg-input: #0b1220;
+    --bg-soft: #172033;
+    --border: #334155;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --accent: #60a5fa;
+    --accent-hover: #93c5fd;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --ok: #34d399;
+    --rec: #a78bfa;
+    --code-bg: #0b1220;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f8fafc; --bg-card: #ffffff; --bg-input: #f1f5f9; --bg-soft: #f8fafc;
+      --border: #cbd5e1; --text: #0f172a; --text-dim: #475569;
+      --accent: #2563eb; --accent-hover: #1d4ed8;
+      --warn: #d97706; --danger: #dc2626; --ok: #059669; --rec: #7c3aed;
+      --code-bg: #f1f5f9;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 32px 24px 140px; }
+  header { margin-bottom: 24px; }
+  h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .subtitle { color: var(--text-dim); font-size: 14px; }
+
+  details {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    margin-bottom: 16px; overflow: hidden;
+  }
+  details > summary {
+    cursor: pointer; padding: 16px 20px; font-weight: 600; font-size: 16px;
+    list-style: none; user-select: none; transition: background .15s;
+  }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::before {
+    content: "▶"; display: inline-block; margin-right: 10px; transition: transform .15s;
+    color: var(--accent); font-size: 12px;
+  }
+  details[open] > summary::before { transform: rotate(90deg); }
+  details > summary:hover { background: rgba(96,165,250,.05); }
+  details > .body { padding: 0 20px 20px; }
+  details > .body > *:first-child { margin-top: 0; }
+
+  .recap, .impl-banner {
+    background: var(--bg-soft); border-left: 4px solid var(--ok);
+    border-radius: 0 10px 10px 0; padding: 16px 20px; margin-bottom: 20px;
+  }
+  .impl-banner { border-left-color: var(--rec); background: linear-gradient(135deg, rgba(167,139,250,.06), rgba(96,165,250,.06)); }
+  .impl-banner h3 { margin: 0 0 10px; font-size: 16px; color: var(--rec); }
+  .recap h3 { margin: 0 0 8px; font-size: 15px; color: var(--ok); }
+  .recap p, .impl-banner p { margin: 4px 0; font-size: 13px; }
+  .recap code, .impl-banner code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text-dim); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+
+  code, pre {
+    font-family: "JetBrains Mono", "Fira Code", monospace; font-size: 13px;
+    background: var(--code-bg); border-radius: 4px;
+  }
+  code { padding: 2px 6px; }
+  pre { padding: 12px 14px; overflow-x: auto; border: 1px solid var(--border); }
+
+  .scenario {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 0; margin-bottom: 18px; overflow: hidden;
+  }
+  .scenario-head {
+    padding: 14px 20px; background: var(--bg-soft); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .scenario-id {
+    display: inline-block; padding: 3px 10px; background: rgba(96,165,250,.15);
+    color: var(--accent); border-radius: 6px; font-size: 12px; font-weight: 700;
+  }
+  .scenario-title { font-size: 16px; font-weight: 600; flex: 1; }
+  .scenario-h { font-size: 11px; color: var(--text-dim); padding: 2px 8px; background: rgba(248,113,113,.1); color: var(--danger); border-radius: 4px; }
+  .scenario-body { padding: 16px 20px; }
+
+  .step { margin: 12px 0; }
+  .step-label { font-weight: 600; font-size: 13px; color: var(--accent); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .05em; }
+  .step-content { font-size: 14px; }
+  .step-content ul { margin: 4px 0 4px 20px; padding: 0; }
+  .step-content li { margin: 3px 0; font-size: 14px; }
+
+  .expect-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 12px; margin: 6px 0;
+    background: var(--bg-input); border-radius: 6px;
+    border-left: 3px solid var(--border);
+  }
+  .expect-row.ok { border-left-color: var(--ok); }
+  .expect-row.warn { border-left-color: var(--warn); }
+  .expect-row.bug { border-left-color: var(--danger); }
+  .expect-icon { font-size: 16px; flex-shrink: 0; }
+  .expect-icon.ok { color: var(--ok); }
+  .expect-icon.warn { color: var(--warn); }
+  .expect-icon.bug { color: var(--danger); }
+  .expect-text { flex: 1; font-size: 13px; }
+  .expect-text .phase { color: var(--rec); font-weight: 600; font-size: 11px; padding: 1px 6px; background: rgba(167,139,250,.12); border-radius: 3px; margin-left: 4px; }
+
+  .result-form {
+    margin-top: 14px; padding: 12px 14px; background: var(--bg-soft);
+    border-radius: 8px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .result-form .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .result-form label.choice {
+    padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px;
+    cursor: pointer; font-size: 13px; transition: all .1s;
+  }
+  .result-form label.choice:hover { border-color: var(--accent); }
+  .result-form input[type="radio"] { display: none; }
+  .result-form input[type="radio"]:checked + .label-text { color: white; }
+  .result-form label.choice:has(input[value="pass"]:checked) { background: var(--ok); border-color: var(--ok); color: white; }
+  .result-form label.choice:has(input[value="fail"]:checked) { background: var(--danger); border-color: var(--danger); color: white; }
+  .result-form label.choice:has(input[value="na"]:checked) { background: var(--text-dim); border-color: var(--text-dim); color: white; }
+  .result-form textarea {
+    width: 100%; padding: 8px 10px; background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-family: inherit; font-size: 13px;
+    resize: vertical; min-height: 50px;
+  }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .badge.ok { background: rgba(52,211,153,.15); color: var(--ok); }
+  .badge.warn { background: rgba(251,191,36,.15); color: var(--warn); }
+  .badge.bug { background: rgba(248,113,113,.15); color: var(--danger); }
+  .badge.phase { background: rgba(167,139,250,.18); color: var(--rec); }
+
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap; margin: 8px 0 18px; font-size: 12px; color: var(--text-dim);
+    padding: 12px 14px; background: var(--bg-soft); border-radius: 8px;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+
+  .actions {
+    position: sticky; bottom: 0; background: var(--bg); padding: 16px 0 0;
+    margin-top: 24px; border-top: 1px solid var(--border); display: flex; gap: 10px;
+  }
+  button {
+    padding: 12px 24px; border-radius: 8px; border: none; font-weight: 600; font-size: 15px;
+    cursor: pointer; transition: all .1s; font-family: inherit;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-secondary { background: var(--bg-card); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--bg-input); }
+  .btn-success { background: var(--ok); color: white; }
+
+  #output-modal {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 100;
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  #output-modal.active { display: flex; }
+  .modal-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+    width: 100%; max-width: 900px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .modal-head { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .modal-head h3 { margin: 0; font-size: 18px; }
+  .modal-body { padding: 0; flex: 1; overflow: auto; }
+  #output-text {
+    width: 100%; height: 100%; min-height: 500px; padding: 16px 20px;
+    background: var(--code-bg); border: none; color: var(--text);
+    font-family: "JetBrains Mono", "Fira Code", monospace; font-size: 13px; line-height: 1.5; resize: none;
+  }
+  #output-text:focus { outline: none; }
+  .modal-foot { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+  .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; background: var(--ok); color: white; border-radius: 8px; opacity: 0; transition: opacity .2s; z-index: 200; }
+  .toast.show { opacity: 1; }
+
+  .checklist { background: var(--bg-soft); padding: 14px 18px; border-radius: 8px; margin-bottom: 12px; }
+  .checklist h4 { margin: 0 0 8px; font-size: 13px; color: var(--accent); }
+  .checklist ul { margin: 0; padding-left: 18px; }
+  .checklist li { font-size: 13px; margin: 4px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>위키 Rename / 삭제 / 경로 변경 — 데모 가이드</h1>
+    <div class="subtitle">2026-05-05 · 현재 동작 (baseline) + Phase 0 회귀 확인 + Phase 1~6 가 무엇을 고칠지 명시 · 사용자 직접 수행 · 결과 기록 후 마크다운 복사</div>
+  </header>
+
+  <div class="impl-banner">
+    <h3>⚠️ 중요 전제</h3>
+    <p>Phase 0 는 <b>인프라 추상화 (Profile / 백엔드 팩토리 / Postgres 스키마 / Arq / Redis 어댑터)</b> 만 했고, <b>실제 rename·delete·move 로직은 변경 없음</b>입니다.</p>
+    <p>이 데모는 다음 두 갈래 동시 검증:</p>
+    <ul style="margin: 6px 0 0 18px; padding: 0; font-size: 13px;">
+      <li>① <b>현재 rename/delete 의 알려진 깨짐</b> 직접 재현 (라운드 1 의 가설 H1~H16)</li>
+      <li>② <b>Phase 0 변경 후 기능 회귀 없음</b> 확인 (편집 락, 검색, 그래프, SSE)</li>
+    </ul>
+    <p style="margin-top: 8px; color: var(--text-dim);">각 시나리오의 <span class="badge bug">BUG (현재)</span> 표시 = 의도된 깨짐 (Phase 1~6 에서 수정). <span class="badge ok">OK</span> = 정상 동작 (Phase 0 후에도 유지).</p>
+  </div>
+
+  <details open>
+    <summary>1. 환경 준비</summary>
+    <div class="body">
+      <div class="checklist">
+        <h4>데모 위치 선택</h4>
+        <ul>
+          <li><b>옵션 A (권장)</b> — Phase 0 worktree: <code>.worktrees/phase0-rename-concurrency</code><br>→ 베이스라인 깨짐 + Phase 0 인프라 변경 후 회귀 둘 다 확인</li>
+          <li><b>옵션 B</b> — main 체크아웃: <code>/Users/donghae/workspace/ai/onTong</code><br>→ Phase 0 미머지 상태. modeling 세션 WIP 가 함께 있어 환경 불안정 가능.</li>
+        </ul>
+      </div>
+
+      <div class="step">
+        <div class="step-label">1.1 백엔드 실행</div>
+        <pre><code>cd /Users/donghae/workspace/ai/onTong/.worktrees/phase0-rename-concurrency
+.venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8001 --log-level info
+# 다른 터미널에서 헬스체크
+curl http://localhost:8001/api/wiki/profile-status -H "X-User-Id: demo" | python -m json.tool</code></pre>
+        <div class="expect-row ok">
+          <span class="expect-icon ok">✅</span>
+          <span class="expect-text">응답 JSON: <code>{"profile":"dev","backends":{...all healthy...}}</code> <span class="phase">Phase 0 회귀</span></span>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-label">1.2 프론트엔드 실행</div>
+        <pre><code>cd /Users/donghae/workspace/ai/onTong/.worktrees/phase0-rename-concurrency/frontend
+npm install            # 처음 한 번
+npm run dev            # http://localhost:3000</code></pre>
+      </div>
+
+      <div class="step">
+        <div class="step-label">1.3 사용자 식별</div>
+        <p style="font-size:13px;">noop 인증 사용. 브라우저에서 <code>localStorage.setItem("ontong_user_id", "demo")</code> 또는 UI 의 사용자 전환 메뉴.</p>
+      </div>
+    </div>
+  </details>
+
+  <details open>
+    <summary>2. 사전 데이터 준비</summary>
+    <div class="body">
+      <p style="font-size: 13px;">아래 5 개 테스트 문서를 위키에 만들어주세요. UI 우클릭 → "새 문서" 또는 직접 마크다운 편집.</p>
+
+      <div class="step">
+        <div class="step-label">파일 1 — <code>데모/A.md</code></div>
+        <pre><code>---
+domain: ops
+related:
+  - 데모/B.md
+  - 데모/sub/C.md
+tags:
+  - demo
+  - rename-test
+---
+# 문서 A
+
+이 문서는 [B를 참조]([데모/B.md])하고 [C도 참조]([데모/sub/C.md])합니다.
+
+또한 [[B]] 와 [[sub/C]] wikilink 도 가집니다.</code></pre>
+      </div>
+
+      <div class="step">
+        <div class="step-label">파일 2 — <code>데모/B.md</code></div>
+        <pre><code>---
+domain: ops
+related:
+  - 데모/A.md
+tags:
+  - demo
+---
+# 문서 B
+
+[A로 돌아가기](데모/A.md). [[A]] wikilink.</code></pre>
+      </div>
+
+      <div class="step">
+        <div class="step-label">파일 3 — <code>데모/sub/C.md</code></div>
+        <pre><code>---
+domain: ops
+tags:
+  - demo
+---
+# 문서 C
+
+상위 폴더의 [A](../A.md) 와 [[A]] 참조.</code></pre>
+      </div>
+
+      <div class="step">
+        <div class="step-label">파일 4 — <code>데모/D.md</code> (단독, 참조 없음)</div>
+        <pre><code>---
+domain: ops
+tags:
+  - demo
+---
+# 문서 D — 고립
+
+다른 문서와 연결 없음.</code></pre>
+      </div>
+
+      <div class="step">
+        <div class="step-label">파일 5 — <code>데모/sub/E.md</code> (D 가 참조하는 대상)</div>
+        <pre><code>---
+domain: ops
+related:
+  - 데모/D.md
+tags:
+  - demo
+---
+# 문서 E
+
+[D 참조](../D.md)</code></pre>
+        <p style="font-size: 12px; color: var(--text-dim);">참고: D ↔ E 의 양방향 만들기 — D 의 frontmatter 에도 <code>related: [데모/sub/E.md]</code> 추가 권장.</p>
+      </div>
+
+      <div class="checklist">
+        <h4>준비 확인</h4>
+        <ul>
+          <li>UI 트리에 <code>데모/A.md, B.md, D.md, sub/C.md, sub/E.md</code> 5 개 보임</li>
+          <li>그래프 탭에서 A↔B, A→C, A→B(related), D↔E 연결 표시</li>
+          <li>BG 인덱싱 완료 (오른쪽 상단 indexing pending 0)</li>
+        </ul>
+      </div>
+    </div>
+  </details>
+
+  <div class="legend">
+    <span><span class="badge ok">OK</span> 정상 동작 — Phase 0 후 유지</span>
+    <span><span class="badge warn">WARN</span> 부분 작동 — 불완전</span>
+    <span><span class="badge bug">BUG (현재)</span> 깨짐 — Phase 1~6 에서 수정</span>
+    <span><span class="badge phase">P1~P6</span> 향후 개선 phase</span>
+  </div>
+
+  <h2 style="font-size: 22px; margin: 32px 0 12px;">시나리오</h2>
+
+  <form id="form">
+
+    <!-- ───── S1: 단일 파일 rename ───── -->
+    <div class="scenario">
+      <div class="scenario-head">
+        <span class="scenario-id">S1</span>
+        <span class="scenario-title">단일 파일 rename — A.md → A_renamed.md (같은 폴더)</span>
+        <span class="scenario-h">H1, H2, H5</span>
+      </div>
+      <div class="scenario-body">
+        <div class="step">
+          <div class="step-label">절차</div>
+          <div class="step-content">
+            <ul>
+              <li>UI 트리에서 <code>데모/A.md</code> 우클릭 → "이름 바꾸기" → <code>A_renamed.md</code> 입력 → 적용</li>
+              <li>또는 API: <code>curl -X PATCH http://localhost:8001/api/wiki/file/데모/A.md -H "X-User-Id: demo" -H "Content-Type: application/json" -d '{"new_path":"데모/A_renamed.md"}'</code></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-label">기대 결과</div>
+          <div class="expect-row ok">
+            <span class="expect-icon ok">✅</span>
+            <span class="expect-text">파일 시스템: <code>데모/A.md</code> → <code>데모/A_renamed.md</code> 이동</span>
+          </div>
+          <div class="expect-row warn">
+            <span class="expect-icon warn">⚠️</span>
+            <span class="expect-text">B.md frontmatter <code>related: [데모/A.md]</code> → <code>[데모/A_renamed.md]</code> 자동 갱신 (단순 <code>raw.replace</code> 방식 → 부분 매칭 위험)</span>
+          </div>
+          <div class="expect-row bug">
+            <span class="expect-icon bug">❌</span>
+            <span class="expect-text">B.md 본문 <code>[A로 돌아가기](데모/A.md)</code> <b>그대로 유지</b> → 클릭 시 404 <span class="phase">→ Phase 1+3 수정 (ReferenceIndex L3)</span></span>
+          </div>
+          <div class="expect-row bug">
+            <span class="expect-icon bug">❌</span>
+            <span class="expect-text">B.md 본문 <code>[[A]]</code> wikilink 깨짐 (stem 'A' → 'A_renamed' 변경) <span class="phase">→ Phase 3 수정 (L2)</span></span>
+          </div>
+          <div class="expect-row bug">
+            <span class="expect-icon bug">❌</span>
+            <span class="expect-text">C.md 본문 <code>[A](../A.md)</code> 그대로 → 404 <span class="phase">→ Phase 1+3</span></span>
+          </div>
+          <div class="expect-row warn">
+            <span class="expect-icon warn">⚠️</span>
+            <span class="expect-text">ChromaDB chunk metadata 의 <code>file_path</code> 신규 path 로 갱신 (BG indexing). 단, chunk 본문 안에 박힌 <code>[분류: 데모] [문서: A]</code> prefix 는 <b>다음 reindex 까지 stale</b> <span class="phase">→ Phase 3 (OQ-4=A)</span></span>
+          </div>
+          <div class="expect-row ok">
+            <span class="expect-icon ok">✅</span>
+            <span class="expect-text">트리 SSE 이벤트 (<code>tree_change</code>) → 다른 클라 즉시 트리 갱신 <span class="phase">Phase 0 회귀 OK</span></span>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-label">확인 방법</div>
+          <div class="step-content">
+            <ul>
+              <li>B.md 열어서 <code>[A로 돌아가기]</code> 링크 클릭 → 404 페이지</li>
+              <li>그래프 탭: A_renamed ↔ B 연결 보이지만 (frontmatter 갱신 덕) ↔ C 는 깨짐 (C 의 markdown link 갱신 안됨)</li>
+              <li><code>curl http://localhost:8001/api/wiki/file/데모/B.md -H "X-User-Id: demo" | python -m json.tool</code> 후 본문에 <code>(데모/A.md)</code> 검색 → <b>그대로 남아있음</b> (BUG 재현)</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="result-form">
+          <div class="row">
+            <span style="font-size:13px; font-weight:600;">결과:</span>
+            <label class="choice"><input type="radio" name="s1" value="pass"><span class="label-text">기대대로 (BUG 재현 OK)</span></label>
+            <label class="choice"><input type="radio" name="s1" value="fail"><span class="label-text">예상과 다름</span></label>
+            <label class="choice"><input type="radio" name="s1" value="na"><span class="label-text">건너뜀</span></label>
+          </div>
+          <textarea name="s1_notes" placeholder="(선택) 관찰한 차이점, 예상 못한 동작, 화면 캡처 위치 등"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── S2: 단일 파일 이동 ───── -->
+    <div class="scenario">
+      <div class="scenario-head">
+        <span class="scenario-id">S2</span>
+        <span class="scenario-title">단일 파일 이동 — A_renamed.md → 다른폴더/A_renamed.md (다른 폴더)</span>
+        <span class="scenario-h">H2, H4</span>
+      </div>
+      <div class="scenario-body">
+        <div class="step">
+          <div class="step-label">절차</div>
+          <div class="step-content">
+            <ul>
+              <li>UI 트리에서 <code>다른폴더/</code> 폴더 생성 (트리 우클릭 → "새 폴더")</li>
+              <li><code>데모/A_renamed.md</code> 를 드래그하여 <code>다른폴더/</code> 로 드롭</li>
+              <li>또는 API: <code>PATCH /api/wiki/file/데모/A_renamed.md</code> with <code>{"new_path":"다른폴더/A_renamed.md"}</code></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-label">기대 결과</div>
+          <div class="expect-row ok">
+            <span class="expect-icon ok">✅</span>
+            <span class="expect-text">파일 이동 성공</span>
+          </div>
+          <div class="expect-row warn">
+            <span class="expect-icon warn">⚠️</span>
+            <span class="expect-text">B.md frontmatter <code>related</code> 가 <code>다른폴더/A_renamed.md</code> 로 갱신 (raw.replace 잘 작동했을 경우)</span>
+          </div>
+          <div class="expect-row bug">
+            <span class="expect-icon bug">❌</span>
+            <span class="expect-text">B.md 본문 markdown link 깨짐 <span class="phase">→ Phase 1+3</span></span>
+          </div>
+          <div class="expect-row warn">
+            <span class="expect-icon warn">⚠️</span>
+            <span class="expect-text">B.md 본문 <code>[[A_renamed]]</code> wikilink — <b>같은 stem 이 다른 폴더에 없으면 우연히 작동</b> (stem 기반 resolve). 충돌 시 잘못된 문서를 가리킴 <span class="phase">→ H3, Phase 3</span></span>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-label">확인 방법</div>
+          <div class="step-content">
+            <ul>
+              <li>같은 stem 'A_renamed' 가진 문서를 다른 폴더에도 만들어 → wikilink 가 어느 쪽 가리키는지 확인 (H3 재현)</li>
+              <li>그래프 탭에서 B ↔ A_renamed 연결 정확성 확인</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="result-form">
+          <div class="row">
+            <span style="font-size:13px; font-weight:600;">결과:</span>
+            <label class="choice"><input type="radio" name="s2" value="pass"><span class="label-text">기대대로</span></label>
+            <label class="choice"><input type="radio" name="s2" value="fail"><span class="label-text">예상과 다름</span></label>
+            <label class="choice"><input type="radio" name="s2" value="na"><span class="label-text">건너뜀</span></label>
+          </div>
+          <textarea name="s2_notes"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── S3: 폴더 rename ───── -->
+    <div class="scenario">
+      <div class="scenario-head">
+        <span class="scenario-id">S3</span>
+        <span class="scenario-title">폴더 이름 변경 — 데모/ → 데모2/ (자식 4 개 포함)</span>
+        <span class="scenario-h">H4 (가장 심각)</span>
+      </div>
+      <div class="scenario-body">
+        <div class="step">
+          <div class="step-label">절차</div>
+          <div class="step-content">
+            <ul>
+              <li>S1, S2 를 되돌려 데이터를 초기 상태 (파일 5 개 in <code>데모/</code>) 로 복구</li>
+              <li>UI: <code>데모/</code> 폴더 우클릭 → "이름 바꾸기" → <code>데모2</code></li>
+              <li>또는 API: <code>PATCH /api/wiki/folder/데모</code> with <code>{"new_path":"데모2"}</code></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-label">기대 결과 (현재 — 매우 깨짐)</div>
+          <div class="expect-row ok">
+            <span class="expect-icon ok">✅</span>
+            <span class="expect-text">폴더 + 자식 4 개 모두 이동</span>
+          </div>
+          <div class="expect-row bug">
+            <span class="expect-icon bug">❌</span>
+            <span class="expect-text"><b>모든 inbound 참조 0 갱신</b> — <code>move_folder</code> 가 <code>_update_references</code> 호출 안 함 <span class="phase">→ Phase 4 가 P3 batch 로 수정</span></span>
+          </div>
+          <div class="expect-row bug">
+            <span class="expect-icon bug">❌</span>
+            <span class="expect-text">A.md 의 frontmatter <code>related: [데모/B.md, 데모/sub/C.md]</code> 그대로 → 깨진 link</span>
+          </div>
+          <div class="expect-row bug">
+            <span class="expect-icon bug">❌</span>
+            <span class="expect-text">A.md, B.md, C.md, D.md, E.md 의 <b>모든 본문 link 깨짐</b></span>
+          </div>
+          <div class="expect-row warn">
+            <span class="expect-icon warn">⚠️</span>
+            <span class="expect-text">전체 reindex 트리거 (BG) — 비싸지만 본문 link 는 못 고침</span>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-label">확인 방법</div>
+          <div class="step-content">
+            <ul>
+              <li><code>cat wiki/데모2/A.md | grep "데모/"</code> → frontmatter related 에 <b>옛 경로 그대로</b> 보이는지 확인</li>
+              <li>그래프 탭에서 A 클릭 시 B/C 노드를 못 찾음 (broken edges)</li>
+              <li>검색에서 <code>"문서 B"</code> 검색 후 결과 클릭 → 새 경로로 이동되지만 inbound 참조는 모두 끊김</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="result-form">
+          <div class="row">
+            <span style="font-size:13px; font-weight:600;">결과:</span>
+            <label class="choice"><input type="radio" name="s3" value="pass"><span class="label-text">기대대로 (대규모 깨짐)</span></label>
+            <label class="choice"><input type="radio" name="s3" value="fail"><span class="label-text">예상과 다름</span></label>
+            <label class="choice"><input type="radio" name="s3" value="na"><span class="label-text">건너뜀</span></label>
+          </div>
+          <textarea name="s3_notes" placeholder="끊긴 참조 개수, 깨진 본문 link 위치 등"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── S4: 폴더 이동 (계층 변경) ───── -->
+    <div class="scenario">
+      <div class="scenario-head">
+        <span class="scenario-id">S4</span>
+        <span class="scenario-title">폴더 이동 — 데모2/sub/ → 데모2/ (서브폴더 승격)</span>
+        <span class="scenario-h">H4</span>
+      </div>
+      <div class="scenario-body">
+        <div class="step">
+          <div class="step-label">절차</div>
+          <div class="step-content">
+            <ul>
+              <li>S3 후 상태에서: <code>데모2/sub/</code> 의 자식 (<code>C.md, E.md</code>) 을 <code>데모2/</code> 직접 자식으로 이동</li>
+              <li>UI 드래그 또는 API: <code>PATCH /api/wiki/folder/데모2/sub</code> with <code>{"new_path":"데모2/sub_promoted"}</code> 등</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-label">기대 결과</div>
+          <div class="expect-row bug">
+            <span class="expect-icon bug">❌</span>
+            <span class="expect-text">S3 와 동일 — inbound 참조 0 갱신 <span class="phase">→ Phase 4</span></span>
+          </div>
+          <div class="expect-row bug">
+            <span class="expect-icon bug">❌</span>
+            <span class="expect-text">상대 경로 link <code>(../A.md)</code> 의 의미가 변함 (sub/ 가 한 단계 올라가서 ../A.md 는 이제 다른 폴더의 A 를 가리킴) — 더 미묘한 깨짐</span>
+          </div>
+        </div>
+
+        <div class="result-form">
+          <div class="row">
+            <span style="font-size:13px; font-weight:600;">결과:</span>
+            <label class="choice"><input type="radio" name="s4" value="pass"><span class="label-text">기대대로</span></label>
+            <label class="choice"><input type="radio" name="s4" value="fail"><span class="label-text">예상과 다름</span></label>
+            <label class="choice"><input type="radio" name="s4" value="na"><span class="label-text">건너뜀</span></label>
+          </div>
+          <textarea name="s4_notes"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── S5: 그래프 연결 있는 문서 삭제 (G7 정책) ───── -->
+    <div class="scenario">
+      <div class="scenario-head">
+        <span class="scenario-id">S5</span>
+        <span class="scenario-title">그래프 연결 있는 문서 삭제 — B.md 삭제 시도 (A 가 인용 중)</span>
+        <span class="scenario-h">G7 (R3 추가)</span>
+      </div>
+      <div class="scenario-body">
+        <div class="step">
+          <div class="step-label">절차</div>
+          <div class="step-content">
+            <ul>
+              <li>S3 / S4 작업 되돌려 깨끗한 상태로 복구</li>
+              <li>UI: <code>데모/B.md</code> 우클릭 → 삭제</li>
+              <li>또는 API: <code>curl -X DELETE http://localhost:8001/api/wiki/file/데모/B.md -H "X-User-Id: demo"</code></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-label">기대 결과 (현재)</div>
+          <div class="expect-row warn">
+            <span class="expect-icon warn">⚠️</span>
+            <span class="expect-text"><b>현재 동작</b>: <code>delete_file</code> 가 <code>get_referencing_files</code> 호출 → frontmatter <code>related</code> 만 검사. A.md 의 <code>related: [데모/B.md]</code> 발견 → <code>409 Conflict</code> + <code>{"referenced_by":["데모/A.md"]}</code> 반환</span>
+          </div>
+          <div class="expect-row warn">
+            <span class="expect-icon warn">⚠️</span>
+            <span class="expect-text">UI: "이 문서는 N 개 문서에 참조되고 있습니다. 그래도 삭제?" 확인 → <code>?force=true</code> 로 우회 가능 (G7 정책 위반!)</span>
+          </div>
+          <div class="expect-row bug">
+            <span class="expect-icon bug">❌</span>
+            <span class="expect-text">현재는 <b>L1 frontmatter related 만 검사</b>. 본문 <code>[[B]]</code> 나 <code>[B](데모/B.md)</code> 같은 inbound 무시 — A 가 frontmatter 에 B 안 적었으면 검사 통과 <span class="phase">→ Phase 1 작업 1-7 (G7 강화)</span></span>
+          </div>
+          <div class="expect-row bug">
+            <span class="expect-icon bug">❌</span>
+            <span class="expect-text">G7 정책: <b>force 우회 금지</b>가 결정됐지만 현재 코드는 force=true 허용 <span class="phase">→ Phase 1 작업 1-7</span></span>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-label">확인 방법</div>
+          <div class="step-content">
+            <ul>
+              <li>먼저 force=false (기본): 409 응답 확인</li>
+              <li>그 다음 <code>?force=true</code> 추가: 200 + 삭제 진행 (현재는 우회 가능 — Phase 1 후 차단될 예정)</li>
+              <li>대조: D.md (참조 0) 삭제 시도 → 200, 즉시 삭제</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="result-form">
+          <div class="row">
+            <span style="font-size:13px; font-weight:600;">결과:</span>
+            <label class="choice"><input type="radio" name="s5" value="pass"><span class="label-text">기대대로 (force 우회 됨)</span></label>
+            <label class="choice"><input type="radio" name="s5" value="fail"><span class="label-text">예상과 다름</span></label>
+            <label class="choice"><input type="radio" name="s5" value="na"><span class="label-text">건너뜀</span></label>
+          </div>
+          <textarea name="s5_notes"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── S6: 동시 편집 + rename race ───── -->
+    <div class="scenario">
+      <div class="scenario-head">
+        <span class="scenario-id">S6</span>
+        <span class="scenario-title">편집 중 rename — race (두 브라우저 탭)</span>
+        <span class="scenario-h">H6, H15</span>
+      </div>
+      <div class="scenario-body">
+        <div class="step">
+          <div class="step-label">절차</div>
+          <div class="step-content">
+            <ul>
+              <li>탭 1 (사용자 alice): <code>데모/A.md</code> 열기 → 편집 모드 진입 (lock 자동 획득)</li>
+              <li>탭 2 (사용자 bob): 같은 <code>데모/A.md</code> 우클릭 → "이름 바꾸기" → <code>A_by_bob.md</code></li>
+            </ul>
+            <p style="font-size:12px;color:var(--text-dim);">사용자 전환: 브라우저 시크릿 모드 또는 다른 사용자 ID 로 다시 로그인.</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-label">기대 결과 (현재)</div>
+          <div class="expect-row bug">
+            <span class="expect-icon bug">❌</span>
+            <span class="expect-text"><b>현재 코드</b>: <code>PATCH /api/wiki/file/{path}</code> 가 편집 락을 검사하지 않음 → bob 의 rename 성공 <span class="phase">→ Phase 3 의 RenameOrchestrator 가 lock check 추가</span></span>
+          </div>
+          <div class="expect-row bug">
+            <span class="expect-icon bug">❌</span>
+            <span class="expect-text">alice 입장: 편집 중 파일이 사라짐 → 저장 시 404 또는 새 빈 파일 생성</span>
+          </div>
+          <div class="expect-row warn">
+            <span class="expect-icon warn">⚠️</span>
+            <span class="expect-text">SSE <code>tree_change</code> 이벤트로 alice 트리는 갱신되지만 편집 중인 탭은 stale</span>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-label">확인 방법</div>
+          <div class="step-content">
+            <ul>
+              <li>alice 가 편집 중일 때 <code>curl http://localhost:8001/api/lock/status?path=데모/A.md</code> → <code>{"locked":true,"user":"alice"}</code> 확인</li>
+              <li>bob 의 rename 성공 응답 확인</li>
+              <li>alice 가 저장 누름 → 어떻게 실패하는지 관찰</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="result-form">
+          <div class="row">
+            <span style="font-size:13px; font-weight:600;">결과:</span>
+            <label class="choice"><input type="radio" name="s6" value="pass"><span class="label-text">기대대로 (race 재현)</span></label>
+            <label class="choice"><input type="radio" name="s6" value="fail"><span class="label-text">예상과 다름</span></label>
+            <label class="choice"><input type="radio" name="s6" value="na"><span class="label-text">건너뜀</span></label>
+          </div>
+          <textarea name="s6_notes" placeholder="alice 의 저장 실패 메시지, 데이터 손실 여부"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── S7: rename 후 검색 / 그래프 ───── -->
+    <div class="scenario">
+      <div class="scenario-head">
+        <span class="scenario-id">S7</span>
+        <span class="scenario-title">rename 후 검색 + 그래프 회귀 — chunk 본문 path stale</span>
+        <span class="scenario-h">L5, OQ-4</span>
+      </div>
+      <div class="scenario-body">
+        <div class="step">
+          <div class="step-label">절차</div>
+          <div class="step-content">
+            <ul>
+              <li>S1 처럼 <code>데모/A.md</code> → <code>데모/A_v2.md</code> 이름 변경</li>
+              <li>BG 인덱싱 완료 대기 (UI 우상단 pending 0)</li>
+              <li>검색: <code>"문서 A"</code> 입력</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-label">기대 결과</div>
+          <div class="expect-row ok">
+            <span class="expect-icon ok">✅</span>
+            <span class="expect-text">검색 결과 <b>최상위에 A_v2.md 표시</b> (chunk metadata file_path 신규로 갱신됨)</span>
+          </div>
+          <div class="expect-row warn">
+            <span class="expect-icon warn">⚠️</span>
+            <span class="expect-text">검색 결과의 chunk 본문 표시에 <code>[분류: 데모] [문서: A]</code> (옛 path) 가 보일 수 있음 — chunk 본문 자체는 reindex 까지 stale <span class="phase">→ Phase 3 (OQ-4=A: 본문 prefix 재생성 + 임베딩 재생성)</span></span>
+          </div>
+          <div class="expect-row ok">
+            <span class="expect-icon ok">✅</span>
+            <span class="expect-text">검색 latency 정상 (Phase 0 가 BM25 변경 안 했으니 회귀 없음) <span class="phase">Phase 0 회귀 OK</span></span>
+          </div>
+          <div class="expect-row warn">
+            <span class="expect-icon warn">⚠️</span>
+            <span class="expect-text">RAG 채팅: <code>"A 문서 알려줘"</code> 질문 시 답변에 인용된 경로가 <b>새 path 또는 옛 path 혼재</b> 가능 (citation 캐시 stale)</span>
+          </div>
+        </div>
+
+        <div class="result-form">
+          <div class="row">
+            <span style="font-size:13px; font-weight:600;">결과:</span>
+            <label class="choice"><input type="radio" name="s7" value="pass"><span class="label-text">기대대로</span></label>
+            <label class="choice"><input type="radio" name="s7" value="fail"><span class="label-text">예상과 다름</span></label>
+            <label class="choice"><input type="radio" name="s7" value="na"><span class="label-text">건너뜀</span></label>
+          </div>
+          <textarea name="s7_notes"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── S8: 동시 저장 충돌 (load↔save 불일치) ───── -->
+    <div class="scenario">
+      <div class="scenario-head">
+        <span class="scenario-id">S8</span>
+        <span class="scenario-title">두 사용자 동시 편집 → 저장 — 한 명 작업 사일런트 손실</span>
+        <span class="scenario-h">R1 추가 요구 → Phase 2 (OCC + 3-way diff)</span>
+      </div>
+      <div class="scenario-body">
+        <div class="step">
+          <div class="step-label">절차</div>
+          <div class="step-content">
+            <ul>
+              <li>탭 1 (alice), 탭 2 (bob) 모두 <code>데모/D.md</code> 열기</li>
+              <li>alice 가 본문 끝에 <code>"alice line"</code> 추가 → 저장</li>
+              <li>(bob 탭에서 reload 안 한 상태) bob 이 본문 끝에 <code>"bob line"</code> 추가 → 저장</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-label">기대 결과 (현재)</div>
+          <div class="expect-row bug">
+            <span class="expect-icon bug">❌</span>
+            <span class="expect-text"><b>현재</b>: bob 의 저장이 alice 의 변경을 통째로 덮어씀 (last-write-wins). alice line 영구 손실 <span class="phase">→ Phase 2 의 OCC + 409 + 3-way diff</span></span>
+          </div>
+          <div class="expect-row warn">
+            <span class="expect-icon warn">⚠️</span>
+            <span class="expect-text">자동 저장 없으니 alice 가 다시 저장하지 않으면 손실 인지 못 함</span>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-label">확인 방법</div>
+          <div class="step-content">
+            <ul>
+              <li>저장 후 D.md 파일 내용 확인 → bob line 만 보임 (alice line 없음)</li>
+              <li>git history 확인 (만약 위키가 git 저장이라면) — alice 의 commit 이 있어야 하는데 없음</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="result-form">
+          <div class="row">
+            <span style="font-size:13px; font-weight:600;">결과:</span>
+            <label class="choice"><input type="radio" name="s8" value="pass"><span class="label-text">기대대로 (사일런트 손실)</span></label>
+            <label class="choice"><input type="radio" name="s8" value="fail"><span class="label-text">예상과 다름</span></label>
+            <label class="choice"><input type="radio" name="s8" value="na"><span class="label-text">건너뜀</span></label>
+          </div>
+          <textarea name="s8_notes"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── S9: Phase 0 회귀 — profile-status + 기본 CRUD ───── -->
+    <div class="scenario">
+      <div class="scenario-head">
+        <span class="scenario-id">S9</span>
+        <span class="scenario-title">Phase 0 회귀 확인 — profile-status, 편집 락, 검색, 그래프, SSE</span>
+        <span class="scenario-h">Phase 0</span>
+      </div>
+      <div class="scenario-body">
+        <div class="step">
+          <div class="step-label">검사 항목</div>
+          <div class="expect-row ok">
+            <span class="expect-icon ok">✅</span>
+            <span class="expect-text"><code>GET /api/wiki/profile-status</code> → <code>{"profile":"dev", "backends":{...all healthy...}}</code></span>
+          </div>
+          <div class="expect-row ok">
+            <span class="expect-icon ok">✅</span>
+            <span class="expect-text">편집 락 정상 (Phase 0 가 lock_service 만 추상화) — <code>POST /api/lock</code> 으로 락 획득 / 해제</span>
+          </div>
+          <div class="expect-row ok">
+            <span class="expect-icon ok">✅</span>
+            <span class="expect-text">SSE 트리 변경 이벤트 정상 (Phase 0 EventBus refactor 후에도) — 두 탭 띄우고 한 쪽에서 새 문서 만들 때 다른 쪽 트리 갱신</span>
+          </div>
+          <div class="expect-row ok">
+            <span class="expect-icon ok">✅</span>
+            <span class="expect-text">메타데이터 검색 / DSL 필터 정상 (Phase 1 메타데이터 검색 산출물 회귀 없음) — <code>"folder:데모 author:demo"</code> 등</span>
+          </div>
+          <div class="expect-row ok">
+            <span class="expect-icon ok">✅</span>
+            <span class="expect-text">RAG 채팅 정상 — 위키 컨텐츠 기반 답변 생성</span>
+          </div>
+          <div class="expect-row ok">
+            <span class="expect-icon ok">✅</span>
+            <span class="expect-text">그래프 시각화 정상 (현재 frontmatter related 기반) — Phase 1 의 ReferenceIndex 도입 전까지는 변화 없음</span>
+          </div>
+          <div class="expect-row ok">
+            <span class="expect-icon ok">✅</span>
+            <span class="expect-text">충돌 검사 정상 (Phase 1 의 conflict_check skill)</span>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-label">측정 명령 (curl 시리즈)</div>
+          <pre><code>BASE=http://localhost:8001
+USER="X-User-Id: demo"
+curl -s "$BASE/api/wiki/profile-status" -H "$USER" | python -m json.tool
+curl -s "$BASE/api/wiki/tree?depth=2" -H "$USER" | python -m json.tool | head -30
+curl -s "$BASE/api/lock/status?path=데모/A.md" | python -m json.tool
+curl -sN "$BASE/api/events" -H "$USER" &  # SSE — 다른 탭에서 트리 변경 시 이벤트 흘러나옴
+sleep 5; kill %1
+curl -s "$BASE/api/wiki/search?q=demo&filters={}" -H "$USER" | python -m json.tool | head -20
+curl -s "$BASE/api/graph/데모/A.md?depth=1" -H "$USER" | python -m json.tool</code></pre>
+        </div>
+
+        <div class="result-form">
+          <div class="row">
+            <span style="font-size:13px; font-weight:600;">전체 회귀 결과:</span>
+            <label class="choice"><input type="radio" name="s9" value="pass"><span class="label-text">전부 정상</span></label>
+            <label class="choice"><input type="radio" name="s9" value="fail"><span class="label-text">회귀 발견</span></label>
+            <label class="choice"><input type="radio" name="s9" value="na"><span class="label-text">건너뜀</span></label>
+          </div>
+          <textarea name="s9_notes" placeholder="회귀 발견 시 어떤 기능 / 어떤 에러 메시지 / 재현 단계"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── 종합 ───── -->
+    <div class="scenario">
+      <div class="scenario-head">
+        <span class="scenario-id">종합</span>
+        <span class="scenario-title">전체 의견 / 다음 우선순위</span>
+      </div>
+      <div class="scenario-body">
+        <textarea name="overall" placeholder="데모를 통해 가장 시급한 깨짐 / 가장 위험한 시나리오 / Phase 1~6 우선순위 의견 / 추가로 발견한 미문서화 깨짐 등" style="min-height: 100px;"></textarea>
+      </div>
+    </div>
+
+  </form>
+
+  <div class="actions">
+    <button type="button" class="btn-primary" onclick="generate()">결과 생성 → 복사</button>
+    <button type="button" class="btn-secondary" onclick="document.getElementById('form').reset()">초기화</button>
+  </div>
+</div>
+
+<div id="output-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>아래 텍스트를 복사해 Claude 에 붙여넣기</h3>
+      <button class="btn-secondary" onclick="closeModal()" style="padding:6px 12px; font-size:13px;">닫기</button>
+    </div>
+    <div class="modal-body">
+      <textarea id="output-text" readonly></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-success" onclick="copyOut()">📋 클립보드에 복사</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">복사됨</div>
+
+<script>
+const SCENARIOS = [
+  ["s1", "S1 단일 파일 rename"],
+  ["s2", "S2 단일 파일 이동"],
+  ["s3", "S3 폴더 이름 변경"],
+  ["s4", "S4 폴더 이동"],
+  ["s5", "S5 그래프 연결 문서 삭제 (G7)"],
+  ["s6", "S6 편집 중 rename race"],
+  ["s7", "S7 rename 후 검색 / chunk stale"],
+  ["s8", "S8 동시 저장 사일런트 손실"],
+  ["s9", "S9 Phase 0 회귀"],
+];
+
+const RESULT_LABEL = {
+  pass: "✅ 기대대로",
+  fail: "❌ 예상과 다름",
+  na: "⏭️ 건너뜀",
+};
+
+function getR(n) { const e = document.querySelector(`input[name="${n}"]:checked`); return e ? e.value : ""; }
+function getT(n) { const e = document.querySelector(`[name="${n}"]`); return e ? e.value.trim() : ""; }
+
+function generate() {
+  let lines = ["# 위키 Rename / 삭제 / 경로 변경 — 데모 결과", "", "일자: 2026-05-05  ", "환경: (worktree phase0-rename-concurrency / main)  ", "", "## 시나리오 결과", ""];
+  for (const [id, label] of SCENARIOS) {
+    const r = getR(id);
+    const notes = getT(id + "_notes");
+    lines.push(`### ${label}`);
+    lines.push(`- 결과: ${RESULT_LABEL[r] || "(미응답)"}`);
+    if (notes) {
+      lines.push(`- 메모:`);
+      for (const ln of notes.split("\n")) lines.push(`  > ${ln}`);
+    }
+    lines.push("");
+  }
+  const overall = getT("overall");
+  lines.push("## 종합 의견 / 다음 우선순위");
+  lines.push(overall || "(없음)");
+  lines.push("");
+  lines.push("---");
+  lines.push("이걸 바탕으로 다음 단계 진행해줘.");
+
+  document.getElementById("output-text").value = lines.join("\n");
+  document.getElementById("output-modal").classList.add("active");
+}
+function closeModal() { document.getElementById("output-modal").classList.remove("active"); }
+async function copyOut() {
+  const ta = document.getElementById("output-text");
+  ta.select();
+  try { await navigator.clipboard.writeText(ta.value); }
+  catch (e) { document.execCommand("copy"); }
+  const t = document.getElementById("toast");
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1500);
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+</script>
+</body>
+</html>

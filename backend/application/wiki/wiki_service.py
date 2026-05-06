@@ -181,6 +181,10 @@ class WikiService:
         # Update materialized metadata index (sync, fast)
         if self._meta_index:
             m = wiki_file.metadata
+            from backend.application.wiki.wiki_indexer import (
+                compute_effective_authors,
+                compute_mtime_epoch,
+            )
             self._meta_index.on_file_saved(
                 path, m.domain, m.process, m.tags,
                 updated=m.updated,
@@ -190,6 +194,9 @@ class WikiService:
                 status=m.status,
                 supersedes=m.supersedes,
                 superseded_by=m.superseded_by,
+                authors=compute_effective_authors(m),
+                doc_type=m.doc_type,
+                mtime_epoch=compute_mtime_epoch(m),
             )
 
         # Deprecation side effects: auto-resolve conflicts involving this file

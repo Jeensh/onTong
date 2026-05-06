@@ -24,6 +24,8 @@ class DocumentMetadata(BaseModel):
     updated: str = ""         # ISO date — refreshed on every save
     created_by: str = ""      # original author (user name)
     updated_by: str = ""      # last modifier (user name)
+    doc_type: str = ""        # free-form type label: sop | spec | incident | meeting | ...
+    authors: list[str] = []   # explicit @mentions for multi-author docs; falls back to created_by/updated_by at index time
 
     @computed_field
     @property
@@ -281,6 +283,15 @@ class ClarificationRequestEvent(BaseModel):
 class DoneEvent(BaseModel):
     event: Literal["done"] = "done"
     usage: TokenUsage | None = None
+
+
+class AppliedFiltersEvent(BaseModel):
+    """Emitted after NL → FilterSpec extraction so the UI can (a) show which
+    filters the agent applied, and (b) offer a "검색창에서 계속" handoff that
+    opens SearchCommandPalette with the same filters pre-selected."""
+    event: Literal["applied_filters"] = "applied_filters"
+    filters: dict          # FilterSpec dict (folders/authors/types/mtime_from/mtime_to/tags/...)
+    source: str = "nl"     # "nl" (rule-based extractor) | "llm" (tool-call) | "manual"
 
 
 # ── Human-in-the-loop ─────────────────────────────────────────────────

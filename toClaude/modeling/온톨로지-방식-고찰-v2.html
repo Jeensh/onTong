@@ -1,0 +1,992 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>onTong — Action 도입 확정 + 시뮬레이션 정합성 재고찰 v2</title>
+<style>
+  :root {
+    --bg: #0b1018;
+    --panel: #111827;
+    --panel-2: #0f172a;
+    --panel-3: #0a0f1a;
+    --border: #1f2937;
+    --border-2: #334155;
+    --text: #e5e7eb;
+    --text-dim: #94a3b8;
+    --text-faint: #64748b;
+    --accent: #38bdf8;
+    --accent-2: #818cf8;
+    --warn: #f59e0b;
+    --bad: #f87171;
+    --good: #34d399;
+    --code-bg: #0a0f1a;
+    --layer-noun: #a78bfa;
+    --layer-verb: #fb923c;
+    --layer-link: #38bdf8;
+    --layer-fn:   #34d399;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.65 -apple-system, BlinkMacSystemFont, "SF Pro Text",
+      "Segoe UI", "Helvetica Neue", "Pretendard", sans-serif;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 48px 32px 96px; }
+  header.top { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 32px; }
+  h1 { font-size: 28px; margin: 0 0 8px; font-weight: 700; letter-spacing: -0.02em; }
+  h1 .badge {
+    display: inline-block; margin-left: 12px; padding: 4px 10px;
+    background: var(--panel); border: 1px solid var(--border-2);
+    color: var(--accent); font-size: 11px; font-weight: 500;
+    border-radius: 4px; vertical-align: middle;
+  }
+  h2 {
+    font-size: 22px; margin: 56px 0 18px; padding-top: 14px;
+    border-top: 1px solid var(--border); color: var(--accent); font-weight: 600;
+  }
+  h3 { font-size: 17px; margin: 28px 0 10px; color: var(--text); font-weight: 600; }
+  h4 {
+    font-size: 13px; margin: 16px 0 6px; color: var(--text-dim);
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  code {
+    background: var(--code-bg); border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 3px;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--accent);
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    padding: 14px 16px; border-radius: 6px; overflow-x: auto;
+    font-size: 12.5px; line-height: 1.55;
+  }
+  pre code { background: none; border: none; padding: 0; color: var(--text); }
+  .lead { font-size: 15px; color: var(--text-dim); margin-top: 8px; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 18px 22px; margin: 14px 0;
+  }
+  .panel.warn { border-left: 3px solid var(--warn); }
+  .panel.good { border-left: 3px solid var(--good); }
+  .panel.bad  { border-left: 3px solid var(--bad); }
+  .panel.info { border-left: 3px solid var(--accent); }
+  .panel h3:first-child, .panel h4:first-child { margin-top: 0; }
+  table {
+    width: 100%; border-collapse: collapse; margin: 14px 0;
+    font-size: 13px;
+  }
+  th, td {
+    border: 1px solid var(--border); padding: 8px 12px; text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--panel-2); color: var(--text-dim); font-weight: 600; }
+  tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+  .pill {
+    display: inline-block; padding: 1px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; vertical-align: middle;
+    border: 1px solid var(--border-2);
+  }
+  .pill.noun { color: var(--layer-noun); border-color: var(--layer-noun); background: rgba(167,139,250,0.08); }
+  .pill.verb { color: var(--layer-verb); border-color: var(--layer-verb); background: rgba(251,146,60,0.08); }
+  .pill.link { color: var(--layer-link); border-color: var(--layer-link); background: rgba(56,189,248,0.08); }
+  .pill.fn   { color: var(--layer-fn);   border-color: var(--layer-fn);   background: rgba(52,211,153,0.08); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: rgba(245,158,11,0.08); }
+  .pill.good { color: var(--good); border-color: var(--good); background: rgba(52,211,153,0.08); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: rgba(248,113,113,0.08); }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 32px 0; }
+  .quote {
+    border-left: 3px solid var(--accent-2); padding: 4px 14px;
+    color: var(--text-dim); font-style: italic; margin: 12px 0;
+  }
+  .toc { color: var(--text-dim); font-size: 13px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .small { font-size: 12px; color: var(--text-faint); }
+
+  /* ---- Q form ---- */
+  .qcard {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent); border-radius: 8px;
+    padding: 18px 22px; margin: 18px 0;
+  }
+  .qcard h3 {
+    margin-top: 0; color: var(--accent); font-size: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .qcard h3 .qid {
+    background: var(--panel-3); border: 1px solid var(--border-2);
+    color: var(--text-dim); padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600;
+  }
+  .qcard .ctx {
+    color: var(--text-dim); font-size: 13px;
+    background: rgba(56,189,248,0.04); border-left: 2px solid var(--border-2);
+    padding: 8px 12px; margin: 10px 0;
+  }
+  .qcard .ctx strong { color: var(--text); }
+  .options { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+  .options label {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 12px; border-radius: 6px;
+    background: var(--panel-3); border: 1px solid var(--border);
+    cursor: pointer; transition: background 0.1s, border-color 0.1s;
+  }
+  .options label:hover { background: rgba(56,189,248,0.05); border-color: var(--border-2); }
+  .options input[type=radio] { margin-top: 4px; flex-shrink: 0; accent-color: var(--accent); }
+  .options input[type=radio]:checked + .opt-text { color: var(--accent); }
+  .options label:has(input:checked) {
+    background: rgba(56,189,248,0.08); border-color: var(--accent);
+  }
+  .options .opt-text { flex: 1; line-height: 1.5; }
+  .options .opt-text .lbl {
+    font-weight: 600; color: var(--text); margin-right: 4px;
+  }
+  .options .opt-text .desc { color: var(--text-dim); font-size: 12.5px; }
+  .qcard textarea {
+    width: 100%; margin-top: 8px; padding: 10px 12px;
+    background: var(--panel-3); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-family: inherit;
+    font-size: 13px; line-height: 1.55; resize: vertical; min-height: 60px;
+  }
+  .qcard textarea:focus { outline: none; border-color: var(--accent); }
+  .qcard textarea::placeholder { color: var(--text-faint); }
+
+  .copybar {
+    position: sticky; bottom: 16px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--border-2);
+    border-radius: 10px; padding: 14px 18px; margin: 32px 0 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .copybar .progress {
+    color: var(--text-dim); font-size: 13px; flex: 1;
+  }
+  .copybar .progress strong { color: var(--accent); }
+  button.primary {
+    background: var(--accent); color: var(--bg); border: none;
+    padding: 9px 18px; border-radius: 6px; font-size: 13px;
+    font-weight: 600; cursor: pointer;
+  }
+  button.primary:hover { background: var(--accent-2); }
+  button.secondary {
+    background: transparent; color: var(--text-dim);
+    border: 1px solid var(--border-2); padding: 9px 14px;
+    border-radius: 6px; font-size: 12px; cursor: pointer;
+  }
+  button.secondary:hover { color: var(--text); border-color: var(--text-dim); }
+  #copy-status {
+    font-size: 12px; color: var(--good); font-weight: 600;
+    opacity: 0; transition: opacity 0.2s;
+  }
+  #copy-status.show { opacity: 1; }
+
+  details { margin: 10px 0; }
+  summary {
+    cursor: pointer; color: var(--accent); font-weight: 500; padding: 6px 0;
+  }
+  summary:hover { color: var(--accent-2); }
+  .source { font-size: 12px; color: var(--text-faint); }
+  .source a { color: var(--text-dim); }
+
+  .pipeline {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    margin: 14px 0; font-size: 12.5px;
+  }
+  .pipeline .step {
+    background: var(--panel-3); border: 1px solid var(--border);
+    padding: 8px 12px; border-radius: 6px; color: var(--text-dim);
+  }
+  .pipeline .step.cur { border-color: var(--accent); color: var(--accent); }
+  .pipeline .arrow { color: var(--text-faint); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>온톨로지 방식 재고찰 <span class="badge">v2 · ACTION 확정 · 시뮬레이션 정합성</span></h1>
+  <p class="lead">
+    Action 도입 결정 (사용자 2026-05-01). 이제 우리의 진짜 목적인
+    <strong>시뮬레이션 (Python 생성 → RestrictedPython 실행 → diff → draft PR)</strong>
+    이 더 정확하고 신뢰 가능하게 돌아가도록 Action 모델을 설계해야 한다.
+    이 문서는 그 설계의 근거와 결정 질문이다.
+  </p>
+</header>
+
+<nav class="toc panel info">
+  <strong>목차</strong>
+  <ol>
+    <li><a href="#premise">결정 전제 — Action 도입이 시뮬레이션에 의미하는 것</a></li>
+    <li><a href="#pipeline">시뮬레이션 파이프라인 — Before / After</a></li>
+    <li><a href="#model">Action 데이터 모델 (시뮬레이션 입력 관점)</a></li>
+    <li><a href="#kinds">Pure Function · Effectful Action · Workflow — 3분류</a></li>
+    <li><a href="#lifecycle">Action 라이프사이클 — Discovery → 시뮬 → PR</a></li>
+    <li><a href="#principles">시뮬레이션 정확도를 위한 7 설계 원칙</a></li>
+    <li><a href="#changespec">기존 ChangeSpec 5종이 Action 모델에서 어떻게 살아남나</a></li>
+    <li><a href="#questions">결정 질문 10개 (페이지 내 입력 + 복사)</a></li>
+    <li><a href="#next">사용자 답변 받은 후 다음 단계</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================== -->
+<h2 id="premise">1. 결정 전제 — Action 도입이 시뮬레이션에 의미하는 것</h2>
+
+<div class="panel good">
+  <h4>확정 사항 (v1 § 7 옵션 중)</h4>
+  <ul>
+    <li><strong>Action 을 1급 시민으로 추가</strong>한다 (옵션 C 또는 B 확장).</li>
+    <li>메서드는 <code>BusinessTerm</code> (명사) 에 직접 매핑되지 않고, <strong>Action</strong> 을 거쳐 매핑된다.</li>
+    <li>이 결정의 진짜 가치는 "온톨로지 깔끔함" 이 아니라, <strong>시뮬레이션 정확도</strong> 다.</li>
+  </ul>
+</div>
+
+<h3>1.1 시뮬레이션이 지금 부정확한 4 가지 이유 (Action 부재로)</h3>
+
+<table>
+  <thead><tr><th>현 증상</th><th>Action 부재로 인한 원인</th><th>Action 도입 시 해소</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>같은 메서드에 매번 LLM 이 시그니처 재추론 → 비결정적</td>
+      <td>params/output 타입이 노드에 없음 — body 만 있음</td>
+      <td>Action.params/output 이 1급 → 캐시·재사용</td>
+    </tr>
+    <tr>
+      <td>"이 input 으로 호출하면 된다" 를 안 보장</td>
+      <td>BusinessTerm 매핑은 단방향 라벨일 뿐, 호출 계약 아님</td>
+      <td>Action 시그니처 = 호출 계약</td>
+    </tr>
+    <tr>
+      <td>`ChangeSpec.target_method_fqn` 가 "이 method body 어딘가" 를 가리킬 뿐</td>
+      <td>변경의 대상이 메서드 본체 텍스트라 anchor·rule 분리 약함</td>
+      <td>ChangeSpec 이 Action 의 어느 슬롯을 변경하는지 정확히 지목</td>
+    </tr>
+    <tr>
+      <td>여러 메서드 chain (workflow) 시뮬레이션 안 됨 — 단일 메서드만</td>
+      <td>chain 의 각 단계가 같은 평면에 묶일 수가 없음</td>
+      <td>Action chain 으로 multi-step 시뮬</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== -->
+<h2 id="pipeline">2. 시뮬레이션 파이프라인 — Before / After</h2>
+
+<h3>2.1 Before (현재)</h3>
+<div class="pipeline">
+  <div class="step">User: ChangeSpec 입력</div>
+  <span class="arrow">→</span>
+  <div class="step">target_method_fqn (메서드 1개)</div>
+  <span class="arrow">→</span>
+  <div class="step">Java body + Anchor + BusinessTerm</div>
+  <span class="arrow">→</span>
+  <div class="step">PythonGenerator (LLM 매번 시그니처 추론)</div>
+  <span class="arrow">→</span>
+  <div class="step">SandboxRunner</div>
+  <span class="arrow">→</span>
+  <div class="step">Diff</div>
+  <span class="arrow">→</span>
+  <div class="step">PR draft</div>
+</div>
+<p>
+  <strong>약점:</strong> ① 메서드 단위라 chain 시뮬 불가 ② 시그니처 재추론 비결정적 ③ Term 매핑이 호출 계약 보장 안 함 ④ ChangeSpec.target = method, kind 별로 변경 단위가 method body 텍스트 또는 룰 — Action 슬롯이 없어 PR 단위가 명확하지 않음.
+</p>
+
+<h3>2.2 After (Action 도입)</h3>
+<div class="pipeline">
+  <div class="step">User: Scenario 입력</div>
+  <span class="arrow">→</span>
+  <div class="step cur">Action 1개 또는 chain 식별</div>
+  <span class="arrow">→</span>
+  <div class="step cur">Action.params/output/effects (이미 typed, frozen)</div>
+  <span class="arrow">→</span>
+  <div class="step">PythonGenerator (시그니처는 Action 에서, body 만 변환)</div>
+  <span class="arrow">→</span>
+  <div class="step">SandboxRunner (input → Action → output)</div>
+  <span class="arrow">→</span>
+  <div class="step">Diff (Action 의 effect 단위)</div>
+  <span class="arrow">→</span>
+  <div class="step">PR draft (Action 의 어느 슬롯 변경)</div>
+</div>
+<p>
+  <strong>강점:</strong> ① Action 시그니처가 lock 되면 LLM 호출 1회로 충분 ② chain 표현 가능 ③ ChangeSpec 이 "Action.precondition[2] 의 statement" 같은 슬롯을 정확히 가리킴 ④ PR 단위가 Action 슬롯 단위로 명확.
+</p>
+
+<!-- ============================================== -->
+<h2 id="model">3. Action 데이터 모델 (시뮬레이션 입력 관점)</h2>
+
+<p>
+  단순히 "메서드 1개 = Action 1개" 로 두면 의미가 부족하다. <strong>시뮬레이션이 호출 계약으로 신뢰할 수 있을 만큼</strong> 무엇을 박아둘지가 모델 설계의 진짜 질문이다.
+</p>
+
+<pre><code>class Action:
+    # — 식별
+    qualified_name: str            # "action.scm.calculate_safety_stock"
+    canonical_label: str           # "안전재고 계산" (한국어)
+    aliases: list[str]
+    domain: str                    # "scm" / "purchasing" / ...
+
+    # — 호출 계약 (시뮬레이션 핵심)
+    kind: Literal["pure_function", "effectful", "workflow"]
+    params: list[ActionParam]      # typed (name, type, range, unit, term_ref?)
+    output: ActionOutput | None    # typed
+    preconditions: list[BusinessRule_fqn]
+    postconditions: list[BusinessRule_fqn]
+    effects: list[ActionEffect]    # creates / mutates / reads, target term
+
+    # — 매핑 (코드 측)
+    realized_by: list[CodeBinding] # METHOD fqn + scope (primary/partial)
+    anchors_locked: list[AnchorRef] # 확정된 anchor (param→term, return→term, branch literal)
+
+    # — 매뉴얼 측 연계
+    parent_process: BusinessProcess_fqn | None  # 조직 허브 소속
+    sourced_from_manual: list[str]              # 매뉴얼 fragment ref
+
+    # — 워크플로우 (선택)
+    sub_actions: list[Action_fqn]  # workflow 일 때만
+
+    # — 거버넌스
+    confirmed: bool                # 시뮬레이션 가능 여부 게이트
+    signature_locked_at: datetime | None  # signature 확정 시각
+    confirmed_by: str | None
+    created_at: datetime</code></pre>
+
+<div class="panel info">
+  <h4>핵심 invariant (시뮬레이션과 직결)</h4>
+  <ol>
+    <li><code>signature_locked_at != None</code> 이어야 시뮬레이션 가능. signature lock = params/output/preconditions 형식 확정.</li>
+    <li><code>kind == "pure_function"</code> 이면 <code>effects</code> 가 비어 있어야 함. 있으면 의미 충돌 → kind 자동 강등.</li>
+    <li><code>kind == "workflow"</code> 이면 <code>realized_by</code> 가 비어 있고 <code>sub_actions</code> 가 비지 않아야 함.</li>
+    <li>한 METHOD 는 <code>realized_by</code> 의 <strong>primary scope</strong> 로 최대 1 개 Action 에 묶인다 (현 ConceptBindingSet 의 invariant 계승).</li>
+  </ol>
+</div>
+
+<h3>3.1 ActionParam — anchor 와의 연결</h3>
+<pre><code>class ActionParam:
+    name: str                  # 한국어 또는 영어
+    type: ValueType            # int/float/string/bool/object_ref
+    object_ref_term: str | None  # type=object_ref 시 BusinessTerm fqn
+    unit: str | None
+    range: list[float] | None
+    nullable: bool = False
+    description: str = ""
+
+    # — anchor 연결 (시뮬레이션이 신뢰하는 부분)
+    anchor_locator: str        # method body 안의 어느 anchor 인지
+    confirmed: bool            # Q-C=C3 혼합 큐 결정 결과</code></pre>
+
+<p>
+  v3 결정 <strong>Q-C=C3 혼합</strong>: formula/literal 같은 명백 패턴은 자동 confirmed,
+  branch/lookup 같은 모호한 것만 사용자 큐. 이 분류 결과가 ActionParam.confirmed 에 박힘.
+</p>
+
+<h3>3.2 ActionEffect — diff 의 단위</h3>
+<pre><code>class ActionEffect:
+    op: Literal["create", "mutate", "read", "delete"]
+    target_term: str           # BusinessTerm fqn — 무엇이 변하나
+    target_attr: str | None    # term 의 어느 속성
+    description: str = ""
+    # 시뮬레이션 diff 출력의 단위가 됨 (안전재고.value: 100 → 142)</code></pre>
+
+<!-- ============================================== -->
+<h2 id="kinds">4. Pure Function · Effectful Action · Workflow — 3분류</h2>
+
+<p>
+  이 분류가 시뮬레이션 정확도를 결정한다. simulator 가 어떤 mocking 전략으로 돌릴지 직결.
+</p>
+
+<table>
+  <thead><tr>
+    <th>kind</th><th>예시 (Java 코드)</th><th>simulator 전략</th><th>diff 의미</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="pill fn">pure_function</span></td>
+      <td><code>SafetyStockCalculator.compute(item, leadTime, stdev)</code> — 입력만으로 출력 결정</td>
+      <td>RestrictedPython 직접 실행, 외부 의존 mock 없음, 결과 신뢰</td>
+      <td>output.value 변화 — 가장 정확</td>
+    </tr>
+    <tr>
+      <td><span class="pill verb">effectful</span></td>
+      <td><code>OrderService.place(order)</code> — DB 쓰기, 알림 발송 등 부작용</td>
+      <td>외부 호출 mock_* stub (현 PythonGenerator 가 이미 함), state delta 추적</td>
+      <td>effects[*] 별 변화 — "이렇게 변할 것" (가설적)</td>
+    </tr>
+    <tr>
+      <td><span class="pill warn">workflow</span></td>
+      <td><code>PurchasePlanner.run()</code> — 여러 Action 순차 호출</td>
+      <td>sub_actions 를 순차 실행, state 누적</td>
+      <td>각 step 의 effect + 최종 상태</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="panel warn">
+  <h4>왜 분류가 시뮬레이션 정확도와 직결인가</h4>
+  <p>
+    pure function 시뮬은 <strong>결정적 (deterministic) 결과</strong> — 사용자에게 "이 변경 시 안전재고가 정확히 100→142 됨" 으로 자신 있게 보여줄 수 있다.
+    effectful 시뮬은 <strong>가설적 (hypothetical) 결과</strong> — "외부 시스템이 mock 처럼 행동한다고 가정하면 이렇게 됨". UI 가 둘을 구분 표시해야 사용자가 신뢰 수준을 안다.
+  </p>
+  <p>현재 모델은 이 구분이 없어서 모든 시뮬 결과가 같은 무게로 보여진다. 이것이 "시뮬레이션 결과를 얼마나 믿어야 하나?" 라는 사용자 의구심의 근원.</p>
+</div>
+
+<!-- ============================================== -->
+<h2 id="lifecycle">5. Action 라이프사이클 — Discovery → 시뮬 → PR</h2>
+
+<ol>
+  <li><strong>Discovery</strong>
+    <ul>
+      <li>코드 측: Java parser 가 메서드 추출 → Action 후보 (kind 자동 추정 — DB/IO 호출 있으면 effectful, 없으면 pure_function)</li>
+      <li>매뉴얼 측: LLM 이 "동사 같은 표현" (-하기/-계산/-처리) 추출 → Action 후보 (parent_process 에 연결)</li>
+    </ul>
+  </li>
+  <li><strong>Pairing (코드 ↔ 매뉴얼)</strong>
+    <ul>
+      <li>4-stage resolution (현 term_resolver 와 동일 패턴): exact → alias → embedding → LLM</li>
+      <li>매칭 결과 = <code>realized_by</code> 채워짐</li>
+    </ul>
+  </li>
+  <li><strong>Anchor binding (혼합 큐, Q-C=C3)</strong>
+    <ul>
+      <li>params/output 자동 매칭: 명백한 alias / literal → 자동 confirmed</li>
+      <li>모호한 것: 사용자 큐 → 확정 시 ActionParam.confirmed = True</li>
+    </ul>
+  </li>
+  <li><strong>Signature lock</strong>
+    <ul>
+      <li>모든 ActionParam 이 confirmed → <code>signature_locked_at</code> 세팅</li>
+      <li>이때부터 시뮬레이션 가능 (locked 안 된 Action 은 simulate 시도 시 거부)</li>
+    </ul>
+  </li>
+  <li><strong>Simulation</strong>
+    <ul>
+      <li>ChangeSpec → target_action_fqn (or workflow_fqn) → PythonGenerator 가 lock 된 시그니처 + 변환된 body 로 함수 빌드</li>
+      <li>RestrictedPython 실행, effects 별 diff</li>
+    </ul>
+  </li>
+  <li><strong>PR draft (Q-E=E2)</strong>
+    <ul>
+      <li>ChangeSpec.kind 가 Action 의 어느 슬롯에 해당? 슬롯별 Java patch 템플릿</li>
+      <li>예: <code>kind=anchor_value</code> + <code>target_action.params[2]</code> → 상수 변경 patch</li>
+    </ul>
+  </li>
+</ol>
+
+<!-- ============================================== -->
+<h2 id="principles">6. 시뮬레이션 정확도를 위한 7 설계 원칙</h2>
+
+<div class="panel">
+  <h3>P1. Signature lock 게이트</h3>
+  <p>
+    Action 시그니처 (params/output/preconditions) 가 confirmed 되기 전에는 시뮬레이션 호출 거부. UX 적으로 짜증날 수 있지만 결과 신뢰를 위해 필수.
+    "lock 안 된 Action" 큐 카드를 Workbench 우측에 노출 → 사용자가 confirm 흐름으로 자연스럽게.
+  </p>
+</div>
+
+<div class="panel">
+  <h3>P2. Anchor 는 Action 의 1급 필드</h3>
+  <p>
+    현재 anchor 는 method 옆에 floating. Action 도입 시 ActionParam 에 직접 붙는다. anchor 가 Action 슬롯 하나하나에 박혀야 ChangeSpec 이 "params[0] 의 literal 변경" 처럼 슬롯 정확히 지목 가능.
+  </p>
+</div>
+
+<div class="panel">
+  <h3>P3. Pure / Effectful / Workflow 분류 = 신뢰 등급 표기</h3>
+  <p>
+    UI 에서 시뮬 결과는 kind 별 다르게 표시 — pure 는 "확정", effectful 은 "가정 하에", workflow 는 "체인 누적". 같은 톤으로 보여주지 않는다.
+  </p>
+</div>
+
+<div class="panel">
+  <h3>P4. Action signature 변경 ≠ Action body 변경 (다른 ChangeSpec kind)</h3>
+  <p>
+    리드타임의 max range 를 60→90 으로 확대 (시그니처 변경) vs 안전재고 산식의 1.65 계수 변경 (body 변경) — 영향 범위·리스크가 다르다. ChangeSpec.kind 가 이 둘을 구분해야 함.
+  </p>
+</div>
+
+<div class="panel">
+  <h3>P5. Workflow 는 Action chain, 별도 노드 아님</h3>
+  <p>
+    "Workflow Action" 도 그냥 <code>kind=workflow</code> 인 Action. sub_actions 필드만 있을 뿐 모델 한 종류로 통일. 시뮬 입장에서 일관된 trigger 단위.
+  </p>
+</div>
+
+<div class="panel">
+  <h3>P6. 한국어 canonical + 영문 fqn (D1 결정 정합)</h3>
+  <p>
+    qualified_name 은 영문/dotted (search·diff·PR 메시지용), canonical_label 은 한국어 (사용자 표시·Python 변수명용). 둘 다 1급.
+  </p>
+</div>
+
+<div class="panel">
+  <h3>P7. Signature 변경은 Action 의 새 버전을 만든다</h3>
+  <p>
+    이미 시뮬·PR 만들어진 Action 의 시그니처를 깨면 과거 시뮬레이션 reproducibility 가 깨진다. signature_locked 이후 변경은 새 version 으로 fork. 과거 시뮬은 옛 version 에 pinned. (audit & reproducibility)
+  </p>
+</div>
+
+<!-- ============================================== -->
+<h2 id="changespec">7. 기존 ChangeSpec 5종이 Action 모델에서 어떻게 살아남나</h2>
+
+<table>
+  <thead><tr>
+    <th>현 ChangeSpec.kind</th><th>지금 의미</th><th>Action 도입 후 의미</th><th>PR 단위</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td><code>rule_statement</code></td>
+      <td>"x ≥ 10" → "x ≥ 20"</td>
+      <td>Action.preconditions[i] 또는 postconditions[i] 의 statement 변경</td>
+      <td>Java if 조건 patch</td>
+    </tr>
+    <tr>
+      <td><code>rule_severity</code></td>
+      <td>hard ↔ soft 토글</td>
+      <td>해당 BusinessRule.severity 변경 — Action 영향 분석은 derived</td>
+      <td>(보통 코드 patch 없음, 정책 변경)</td>
+    </tr>
+    <tr>
+      <td><code>anchor_value</code></td>
+      <td>literal/branch 값 변경</td>
+      <td>ActionParam[i].range 또는 body 안 literal 변경</td>
+      <td>Java 상수 patch</td>
+    </tr>
+    <tr>
+      <td><code>method_body</code></td>
+      <td>메서드 body 텍스트 교체</td>
+      <td>Action.realized_by 의 method body 교체 — 시그니처 유지</td>
+      <td>Java method body patch</td>
+    </tr>
+    <tr>
+      <td><code>term_binding</code></td>
+      <td>term ↔ code 매핑 추가/제거</td>
+      <td>ActionParam.object_ref_term 변경 또는 ActionEffect.target_term 변경</td>
+      <td>(코드 patch 없음, 매핑만)</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="panel info">
+  ChangeSpec 모델은 <strong>그대로 유지</strong>해도 된다. 단 <code>target_method_fqn</code> → <code>target_action_fqn</code> 으로 바뀌고, payload 안에 "Action 의 어느 슬롯" (precondition[2], params[0].range, effects[1].target_term) 을 명시하면 됨.
+  마이그레이션은 method → action 1:1 매핑만 처리하면 무 손실.
+</div>
+
+<!-- ============================================== -->
+<h2 id="questions">8. 결정 질문 10개 (페이지 내 입력 + 복사)</h2>
+
+<p class="lead">
+  아래 라디오 + 메모 입력은 브라우저에 자동 저장됩니다 (localStorage). 다 채우고 하단 <strong>"📋 전체 답변 복사"</strong> 버튼을 누르면 마크다운으로 클립보드에 복사됩니다 — 그대로 채팅에 붙여넣어 주세요.
+</p>
+
+<form id="answers-form">
+
+<!-- Q1 -->
+<div class="qcard" data-q="Q1">
+  <h3><span class="qid">Q1</span> <span id="Q1-title">Action vs Function 분리 채택?</span></h3>
+  <div class="ctx">
+    팔란티어는 <strong>Action</strong>(거버넌스 wrapper) 과 <strong>Function</strong>(순수 계산) 을 분리한다. 우리 시뮬레이션 입장에서 pure function 은 결정적 시뮬이 가능해 정확도가 다르다. 분리할 것인가?
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="Q1" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> 단일 노드 <code>Action</code>, kind 필드로 pure_function/effectful/workflow 구분 <span class="desc">(권장 — 모델 1종, 의미는 분리)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q1" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> 두 노드 분리 — <code>BusinessFunction</code> + <code>BusinessAction</code> 별도 <span class="desc">(팔란티어 충실, 모델 복잡도 ↑)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q1" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> 일단 단일 Action, Function 은 phase 2 에서 분리 검토</span>
+    </label>
+  </div>
+  <textarea name="Q1_note" placeholder="추가 의견 / 우려 / 대안 (선택)"></textarea>
+</div>
+
+<!-- Q2 -->
+<div class="qcard" data-q="Q2">
+  <h3><span class="qid">Q2</span> <span id="Q2-title">Action ↔ Method 카디널리티</span></h3>
+  <div class="ctx">
+    하나의 Java 메서드는 하나의 Action 에 대응? 아니면 한 Action 이 여러 메서드 (오버로드/언어별 구현) 를 가질 수 있나?
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="Q2" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> 1:1 — 한 메서드 = 한 Action <span class="desc">(단순, but 오버로드 처리 어려움)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q2" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> 1:N — 한 Action 이 여러 구현 (primary 1, partial N) <span class="desc">(현 ConceptBindingSet 패턴 계승, 권장)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q2" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> M:N — 한 메서드가 여러 Action 의 일부 <span class="desc">(가장 유연, 매핑 복잡도 ↑)</span></span>
+    </label>
+  </div>
+  <textarea name="Q2_note" placeholder="..."></textarea>
+</div>
+
+<!-- Q3 -->
+<div class="qcard" data-q="Q3">
+  <h3><span class="qid">Q3</span> <span id="Q3-title">Action ↔ Process(매뉴얼 동사) 관계</span></h3>
+  <div class="ctx">
+    현 <code>schema.Process</code>(매뉴얼-도출, IO+formula+rules) 와 새 <code>Action</code> 의 관계. <code>Process</code> 가 거의 Action 시그니처라 자원 중복 가능성.
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="Q3" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> Process 폐기 — 매뉴얼도 Action 으로 직접 모델링 <span class="desc">(통합, 단순)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q3" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> Process 유지, Action 과 <code>SPECIFIED_BY</code> 엣지로 연결 <span class="desc">(매뉴얼 측 시그니처 = Action 의 spec, 코드 측 시그니처 = Action 의 impl)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q3" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> Process 는 description 출처로만 활용 (Action 의 매뉴얼 출처 텍스트)</span>
+    </label>
+  </div>
+  <textarea name="Q3_note" placeholder="..."></textarea>
+</div>
+
+<!-- Q4 -->
+<div class="qcard" data-q="Q4">
+  <h3><span class="qid">Q4</span> <span id="Q4-title">Anchor 부착 위치</span></h3>
+  <div class="ctx">
+    7종 anchor (param/local/return/branch/literal/field/field_access) 를 Action 모델 어디에 박을 것인가? 시뮬레이션이 정확하려면 ChangeSpec 이 anchor 슬롯을 정확히 지목해야 함.
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="Q4" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> Action.params/output 만 1급, 그 외 anchor 는 별도 <code>AnchorBinding</code> 테이블 <span class="desc">(시그니처는 Action, 본체는 별도 — 권장)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q4" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> 모든 anchor 가 Action 의 1급 필드 <span class="desc">(완전 통합, but Action 노드 비대)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q4" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> 현재처럼 method 옆 floating 유지, Action 은 reference 만 <span class="desc">(최소 변경, but 슬롯 지목 정확도 ↓)</span></span>
+    </label>
+  </div>
+  <textarea name="Q4_note" placeholder="..."></textarea>
+</div>
+
+<!-- Q5 -->
+<div class="qcard" data-q="Q5">
+  <h3><span class="qid">Q5</span> <span id="Q5-title">precondition/postcondition 출처</span></h3>
+  <div class="ctx">
+    Action 의 pre/post condition 은 어디서 오나? 코드 본체의 가드 (early return / throw) 자동 추출? 매뉴얼 명시? 둘 다?
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="Q5" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> 코드 본체 자동 추출만 <span class="desc">(현 BusinessRule 추출 흐름 연장, 매뉴얼 무시)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q5" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> 매뉴얼 명시만 <span class="desc">(사용자 작성, 코드 자동 추출은 후보로만)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q5" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> 둘 다 — 자동 초안 + 사용자 confirm <span class="desc">(Q-C=C3 혼합 큐 결정과 정합, 권장)</span></span>
+    </label>
+  </div>
+  <textarea name="Q5_note" placeholder="..."></textarea>
+</div>
+
+<!-- Q6 -->
+<div class="qcard" data-q="Q6">
+  <h3><span class="qid">Q6</span> <span id="Q6-title">Action naming convention</span></h3>
+  <div class="ctx">
+    한국어 변수 사용 결정 (D1) 정합. 사용자가 표시·검색에 무엇을 보나?
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="Q6" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> 한국어 canonical 만 <span class="desc">(예: "안전재고_계산" — 단순, but 영문 검색 불가)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q6" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> 영문 fqn + 한국어 label 둘 다 <span class="desc">(<code>action.scm.calculate_safety_stock</code> + "안전재고 계산" — 권장)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q6" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> 도메인 prefix 강제 — <code>scm.안전재고_계산</code> <span class="desc">(한글 식별자, but 검색·diff·PR 에서 깨질 위험)</span></span>
+    </label>
+  </div>
+  <textarea name="Q6_note" placeholder="..."></textarea>
+</div>
+
+<!-- Q7 -->
+<div class="qcard" data-q="Q7">
+  <h3><span class="qid">Q7</span> <span id="Q7-title">Workflow 표현</span></h3>
+  <div class="ctx">
+    "발주 cycle 전체 시뮬" 같은 multi-step. 별도 Workflow 노드 신설? Action 자체에 sub_actions 필드?
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="Q7" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> Action.kind="workflow" + sub_actions 필드 <span class="desc">(P5 원칙, 모델 1종 통일 — 권장)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q7" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> 별도 <code>Workflow</code> 노드 신설</span>
+    </label>
+    <label>
+      <input type="radio" name="Q7" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> 매뉴얼의 BusinessProcess 가 Workflow 역할 (Action 들의 ordered list)</span>
+    </label>
+    <label>
+      <input type="radio" name="Q7" value="D">
+      <span class="opt-text"><span class="lbl">D.</span> 지금은 안 만들고 phase 2 (단일 Action 만 simulate)</span>
+    </label>
+  </div>
+  <textarea name="Q7_note" placeholder="..."></textarea>
+</div>
+
+<!-- Q8 -->
+<div class="qcard" data-q="Q8">
+  <h3><span class="qid">Q8</span> <span id="Q8-title">Signature lock 게이트 적용 강도</span></h3>
+  <div class="ctx">
+    P1 원칙: lock 안 된 Action 은 시뮬 거부? 사용자 UX 와 정확도 트레이드오프.
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="Q8" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> Strict — lock 없으면 시뮬 거부, 사용자에게 confirm 큐 안내 <span class="desc">(정확도 우선)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q8" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> Soft — lock 없어도 시뮬 가능하나 결과에 "unconfirmed signature" 워닝 표시</span>
+    </label>
+    <label>
+      <input type="radio" name="Q8" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> 자동 lock — auto-confirmed 한 anchor 까지 받고 자동 lock, 나머지는 default 추론 <span class="desc">(UX 좋음, 정확도 약화)</span></span>
+    </label>
+  </div>
+  <textarea name="Q8_note" placeholder="..."></textarea>
+</div>
+
+<!-- Q9 -->
+<div class="qcard" data-q="Q9">
+  <h3><span class="qid">Q9</span> <span id="Q9-title">Action 의 effects 표현 깊이</span></h3>
+  <div class="ctx">
+    diff 의 단위가 됨. "안전재고.value: 100→142" 정도까지 정형화? 자연어로?
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="Q9" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> 표현 안 함 — pure_function 만 받고 effectful 시뮬은 sandbox 결과만</span>
+    </label>
+    <label>
+      <input type="radio" name="Q9" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> 자연어 description 만 <span class="desc">(가벼움, but diff 자동화 어려움)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q9" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> 정형 effect — <code>{op: mutate, target_term, target_attr}</code> <span class="desc">(권장, diff 자동화 가능)</span></span>
+    </label>
+  </div>
+  <textarea name="Q9_note" placeholder="..."></textarea>
+</div>
+
+<!-- Q10 -->
+<div class="qcard" data-q="Q10">
+  <h3><span class="qid">Q10</span> <span id="Q10-title">기존 BusinessTerm 마이그레이션</span></h3>
+  <div class="ctx">
+    이미 등록된 BusinessTerm 들 (명사·동사 섞임) 을 어떻게 분리?
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="Q10" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> 전부 BusinessTerm(명사) 로 두고 새 등록만 Action 분리 <span class="desc">(점진, 데이터 무손실)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q10" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> LLM 1회 일괄 재분류 — 동사로 분류된 term 은 Action 으로 자동 이전 <span class="desc">(빠름, 검증 필요)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q10" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> 사용자 1회 검토 큐 — LLM 후보 + 사용자 confirm <span class="desc">(혼합 큐 패턴 정합, 권장)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="Q10" value="D">
+      <span class="opt-text"><span class="lbl">D.</span> 데모 데이터 reset 후 새 모델로 시작 <span class="desc">(가장 깔끔, but 작업 손실)</span></span>
+    </label>
+  </div>
+  <textarea name="Q10_note" placeholder="..."></textarea>
+</div>
+
+</form>
+
+<!-- copybar -->
+<div class="copybar">
+  <div class="progress">진행: <strong id="progress-count">0</strong> / 10 응답</div>
+  <button type="button" class="secondary" id="clear-btn">초기화</button>
+  <button type="button" class="primary" id="copy-btn">📋 전체 답변 복사</button>
+  <span id="copy-status">✓ 클립보드에 복사됨</span>
+</div>
+
+<details>
+  <summary>복사 결과 미리보기</summary>
+  <pre id="preview-output">(아직 응답 없음)</pre>
+</details>
+
+<!-- ============================================== -->
+<h2 id="next">9. 사용자 답변 받은 후 다음 단계</h2>
+
+<ol>
+  <li>답변 → <code>온톨로지-방식-결정.html</code> (확정 결정 정리, v3 결정 12개에 추가)</li>
+  <li>스키마 신설: <code>backend/modeling/ontology/action_schema.py</code> + <code>mapping/action_binding.py</code></li>
+  <li>마이그레이션 스크립트: 기존 BusinessTerm → BusinessTerm(명사) + Action 분리 (Q10 결정에 따라)</li>
+  <li>ChangeSpec.target_method_fqn → target_action_fqn 마이그레이션 (Q2 결정에 따라 1:1 매핑)</li>
+  <li>PythonGenerator 입력에 ActionSignature 추가 (LLM 호출 1회로 결정적 결과)</li>
+  <li>Workbench: Ontology editor 카드 종류에 Action 추가, signature lock 큐 사이드 패널</li>
+  <li>CHECKLIST.md / TODO.md 갱신 + step 단위 데모 가이드</li>
+</ol>
+
+<p class="source">
+  근거 자료:
+  <a href="https://www.palantir.com/docs/foundry/ontology/core-concepts">Palantir · Ontology Core Concepts</a> ·
+  <a href="https://www.palantir.com/docs/foundry/action-types/overview">Action Types Overview</a>
+  <br>
+  내부 코드 인용:
+  <code>backend/modeling/ontology/schema.py</code> ·
+  <code>backend/modeling/mapping/mapping_models.py</code> ·
+  <code>backend/modeling/simulation/change_spec.py</code> ·
+  <code>backend/modeling/simulation/python_generator.py</code> ·
+  <code>backend/modeling/mapping/anchor_binding_suggester.py</code>
+  <br>
+  관련 메모: <code>project_decisions_v3.md</code> (Q-C=C3 혼합 anchor / Q-D=D1 한국어 변수 / Q-E=E2 draft PR)
+</p>
+
+</div>
+
+<script>
+(function () {
+  const STORAGE_KEY = 'ontong-action-answers-v2';
+  const QIDS = ['Q1','Q2','Q3','Q4','Q5','Q6','Q7','Q8','Q9','Q10'];
+  const form = document.getElementById('answers-form');
+  const progressEl = document.getElementById('progress-count');
+  const previewEl = document.getElementById('preview-output');
+  const statusEl = document.getElementById('copy-status');
+
+  function readAnswers() {
+    const out = {};
+    for (const q of QIDS) {
+      const radio = form.querySelector('input[name="' + q + '"]:checked');
+      const note = form.querySelector('textarea[name="' + q + '_note"]');
+      const choice = radio ? radio.value : null;
+      const noteVal = note ? note.value.trim() : '';
+      if (choice || noteVal) out[q] = { choice, note: noteVal };
+    }
+    return out;
+  }
+
+  function persist() {
+    const ans = readAnswers();
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ans)); } catch (e) {}
+    refreshProgress(ans);
+    refreshPreview(ans);
+  }
+
+  function restore() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) { saved = {}; }
+    for (const q of QIDS) {
+      const a = saved[q];
+      if (!a) continue;
+      if (a.choice) {
+        const radio = form.querySelector('input[name="' + q + '"][value="' + a.choice + '"]');
+        if (radio) radio.checked = true;
+      }
+      if (a.note) {
+        const note = form.querySelector('textarea[name="' + q + '_note"]');
+        if (note) note.value = a.note;
+      }
+    }
+    refreshProgress(saved);
+    refreshPreview(saved);
+  }
+
+  function refreshProgress(ans) {
+    let count = 0;
+    for (const q of QIDS) {
+      if (ans[q] && (ans[q].choice || ans[q].note)) count++;
+    }
+    progressEl.textContent = count;
+  }
+
+  function buildMarkdown(ans) {
+    let md = '# onTong Action 도입 결정 — Q1~Q10 답변\n\n';
+    md += '_답변 기준일: ' + new Date().toISOString().slice(0,10) + '_\n\n';
+    for (const q of QIDS) {
+      const titleEl = document.getElementById(q + '-title');
+      const title = titleEl ? titleEl.textContent : q;
+      const a = ans[q];
+      md += '## ' + q + '. ' + title + '\n';
+      if (!a) {
+        md += '_(미응답)_\n\n';
+        continue;
+      }
+      md += '- **선택**: ' + (a.choice || '_(없음)_') + '\n';
+      if (a.note) md += '- **메모**: ' + a.note.replace(/\n/g, '\n  ') + '\n';
+      md += '\n';
+    }
+    return md;
+  }
+
+  function refreshPreview(ans) {
+    if (!Object.keys(ans).length) {
+      previewEl.textContent = '(아직 응답 없음)';
+      return;
+    }
+    previewEl.textContent = buildMarkdown(ans);
+  }
+
+  document.getElementById('copy-btn').addEventListener('click', async function () {
+    const ans = readAnswers();
+    const md = buildMarkdown(ans);
+    try {
+      await navigator.clipboard.writeText(md);
+      statusEl.classList.add('show');
+      setTimeout(function () { statusEl.classList.remove('show'); }, 2200);
+    } catch (e) {
+      // fallback: textarea select
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (e2) {}
+      document.body.removeChild(ta);
+      statusEl.textContent = '✓ 복사됨 (fallback)';
+      statusEl.classList.add('show');
+      setTimeout(function () {
+        statusEl.classList.remove('show');
+        statusEl.textContent = '✓ 클립보드에 복사됨';
+      }, 2200);
+    }
+  });
+
+  document.getElementById('clear-btn').addEventListener('click', function () {
+    if (!confirm('모든 응답을 초기화할까요?')) return;
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    for (const r of form.querySelectorAll('input[type=radio]')) r.checked = false;
+    for (const t of form.querySelectorAll('textarea')) t.value = '';
+    refreshProgress({});
+    refreshPreview({});
+  });
+
+  form.addEventListener('change', persist);
+  form.addEventListener('input', persist);
+
+  restore();
+})();
+</script>
+
+</body>
+</html>

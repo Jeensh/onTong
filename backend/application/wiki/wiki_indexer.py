@@ -7,10 +7,11 @@ import os
 import re
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from backend.core.config import settings
-from backend.core.schemas import WikiFile
+from backend.core.schemas import WikiFile, DocumentMetadata
 from backend.infrastructure.vectordb.chroma import ChromaWrapper
 from backend.infrastructure.search.fulltext_protocol import FullTextSearch
 from backend.infrastructure.storage.file_hash import FileHashStore
@@ -66,6 +67,39 @@ def _build_path_prefix(file_path: str) -> str:
         hierarchy = " > ".join(_norm(f) for f in folders)
         return f"[분류: {hierarchy}] [문서: {doc_name}]"
     return f"[문서: {doc_name}]"
+
+
+def compute_effective_authors(meta: DocumentMetadata) -> list[str]:
+    """Resolve the effective author list for search/filter.
+
+    Priority: explicit frontmatter `authors:` (list) → fallback to deduped
+    [created_by, updated_by]. Empty strings are dropped.
+    """
+    if meta.authors:
+        return [a for a in meta.authors if a]
+    ordered = [meta.created_by, meta.updated_by]
+    return list(dict.fromkeys(a for a in ordered if a))
+
+
+def compute_mtime_epoch(meta: DocumentMetadata, file_abs_path: str | None = None) -> float:
+    """Resolve mtime_epoch (UTC) from frontmatter `updated` → `created` → filesystem mtime."""
+    for iso in (meta.updated, meta.created):
+        if not iso:
+            continue
+        try:
+            s = iso.strip().replace("Z", "+00:00")
+            dt = datetime.fromisoformat(s) if "T" in s else datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.timestamp()
+        except ValueError:
+            continue
+    if file_abs_path:
+        try:
+            return os.path.getmtime(file_abs_path)
+        except OSError:
+            pass
+    return 0.0
 
 
 def _extract_path_depths(file_path: str) -> dict[str, str]:
@@ -270,6 +304,15 @@ class WikiIndexer:
             else:
                 # str, int, float, bool — ChromaDB supports natively
                 result[field_name] = value
+
+        # Effective authors (frontmatter `authors:` or fallback to created_by/updated_by)
+        effective_authors = compute_effective_authors(meta)
+        result["authors"] = f"|{'|'.join(effective_authors)}|" if effective_authors else ""
+
+        # mtime_epoch for time-range filters (from `updated` → `created`, float)
+        wiki_root = Path(settings.wiki_dir)
+        abs_path = str((wiki_root / wiki_file.path).resolve()) if wiki_file.path else None
+        result["mtime_epoch"] = compute_mtime_epoch(meta, abs_path)
 
         # Structured path metadata for pre-filtering at scale
         result.update(_extract_path_depths(wiki_file.path))

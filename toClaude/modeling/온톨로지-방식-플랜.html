@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>onTong — 작업 플랜 (Ontology Core + Detachable Agents)</title>
+<style>
+  :root {
+    --bg: #0b1018; --panel: #111827; --panel-2: #0f172a; --panel-3: #0a0f1a;
+    --border: #1f2937; --border-2: #334155;
+    --text: #e5e7eb; --text-dim: #94a3b8; --text-faint: #64748b;
+    --accent: #38bdf8; --accent-2: #818cf8;
+    --warn: #f59e0b; --bad: #f87171; --good: #34d399;
+    --code-bg: #0a0f1a;
+    --core: #38bdf8; --agent: #fb923c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.65 -apple-system, BlinkMacSystemFont, "SF Pro Text",
+      "Segoe UI", "Helvetica Neue", "Pretendard", sans-serif;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 48px 32px 96px; }
+  header.top { border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 32px; }
+  h1 { font-size: 28px; margin: 0 0 8px; font-weight: 700; letter-spacing: -0.02em; }
+  h1 .badge {
+    display: inline-block; margin-left: 12px; padding: 5px 12px;
+    background: rgba(52,211,153,0.1); border: 1px solid var(--good);
+    color: var(--good); font-size: 11px; font-weight: 600;
+    border-radius: 4px; vertical-align: middle;
+  }
+  h2 {
+    font-size: 22px; margin: 56px 0 18px; padding-top: 14px;
+    border-top: 1px solid var(--border); color: var(--accent); font-weight: 600;
+  }
+  h3 { font-size: 17px; margin: 28px 0 10px; color: var(--text); font-weight: 600; }
+  h4 {
+    font-size: 13px; margin: 16px 0 6px; color: var(--text-dim);
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  p { margin: 8px 0; } ul, ol { margin: 8px 0; padding-left: 22px; } li { margin: 4px 0; }
+  code {
+    background: var(--code-bg); border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 3px;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--accent);
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    padding: 14px 16px; border-radius: 6px; overflow-x: auto;
+    font-size: 12.5px; line-height: 1.55;
+  }
+  pre code { background: none; border: none; padding: 0; color: var(--text); }
+  .lead { font-size: 15px; color: var(--text-dim); margin-top: 8px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 18px 22px; margin: 14px 0; }
+  .panel.warn { border-left: 3px solid var(--warn); }
+  .panel.good { border-left: 3px solid var(--good); }
+  .panel.bad  { border-left: 3px solid var(--bad); }
+  .panel.info { border-left: 3px solid var(--accent); }
+  .panel.principle { border-left: 3px solid var(--accent-2); background: rgba(129,140,248,0.04); }
+  .panel h3:first-child, .panel h4:first-child { margin-top: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--panel-2); color: var(--text-dim); font-weight: 600; }
+  tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+  .pill {
+    display: inline-block; padding: 1px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; vertical-align: middle;
+    border: 1px solid var(--border-2);
+  }
+  .pill.core  { color: var(--core);  border-color: var(--core);  background: rgba(56,189,248,0.08); }
+  .pill.agent { color: var(--agent); border-color: var(--agent); background: rgba(251,146,60,0.08); }
+  .pill.delete { color: var(--bad); border-color: var(--bad); background: rgba(248,113,113,0.08); }
+  .pill.keep { color: var(--good); border-color: var(--good); background: rgba(52,211,153,0.08); }
+  .pill.rewrite { color: var(--warn); border-color: var(--warn); background: rgba(245,158,11,0.08); }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 32px 0; }
+  .quote { border-left: 3px solid var(--accent-2); padding: 4px 14px; color: var(--text-dim); font-style: italic; margin: 12px 0; }
+  .toc { color: var(--text-dim); font-size: 13px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .small { font-size: 12px; color: var(--text-faint); }
+  .source { font-size: 12px; color: var(--text-faint); }
+
+  .step-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-left: 4px solid;
+    border-radius: 8px;
+    padding: 16px 20px; margin: 14px 0;
+  }
+  .step-card.core  { border-left-color: var(--core); }
+  .step-card.agent { border-left-color: var(--agent); }
+  .step-card .step-head {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 10px; flex-wrap: wrap;
+  }
+  .step-card .step-num {
+    color: var(--bg);
+    padding: 4px 10px; border-radius: 4px;
+    font-weight: 700; font-size: 12px;
+    font-family: "SF Mono", Menlo, monospace;
+  }
+  .step-card.core  .step-num { background: var(--core); }
+  .step-card.agent .step-num { background: var(--agent); }
+  .step-card .step-title { font-size: 16px; font-weight: 600; flex: 1; }
+  .step-card .step-meta {
+    color: var(--text-faint); font-size: 11px;
+    background: var(--panel-3); padding: 2px 8px; border-radius: 4px;
+  }
+  .step-card .step-deliverables {
+    background: var(--panel-2); border-radius: 4px;
+    padding: 10px 14px; margin: 8px 0;
+    font-size: 12.5px;
+  }
+  .step-card .step-deliverables strong { color: var(--accent); }
+  .step-card .ref-decision {
+    color: var(--text-faint); font-size: 11px; margin-top: 6px;
+  }
+  .step-card .ref-decision code { color: var(--text-dim); }
+
+  .arch-box {
+    background: var(--panel-3); border: 1px solid var(--border);
+    border-radius: 8px; padding: 24px; margin: 18px 0;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12.5px;
+  }
+  .arch-row {
+    display: grid; grid-template-columns: 1fr 80px 1fr;
+    gap: 12px; align-items: center;
+  }
+  .arch-side {
+    border: 2px solid; border-radius: 6px;
+    padding: 14px 16px; background: var(--panel);
+  }
+  .arch-side.core  { border-color: var(--core); }
+  .arch-side.agent { border-color: var(--agent); }
+  .arch-side .head {
+    font-weight: 700; margin-bottom: 8px; font-size: 13px;
+  }
+  .arch-side.core .head { color: var(--core); }
+  .arch-side.agent .head { color: var(--agent); }
+  .arch-mid { text-align: center; color: var(--text-faint); font-size: 11px; }
+
+  /* Interactive Q form (consistent with v2~v5 docs) */
+  .qcard {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent); border-radius: 8px;
+    padding: 18px 22px; margin: 18px 0;
+  }
+  .qcard h3 {
+    margin-top: 0; color: var(--accent); font-size: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .qcard h3 .qid {
+    background: var(--panel-3); border: 1px solid var(--border-2);
+    color: var(--text-dim); padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600;
+  }
+  .qcard .ctx {
+    color: var(--text-dim); font-size: 13px;
+    background: rgba(56,189,248,0.04); border-left: 2px solid var(--border-2);
+    padding: 8px 12px; margin: 10px 0;
+  }
+  .qcard .ctx strong { color: var(--text); }
+  .options { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+  .options label {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 12px; border-radius: 6px;
+    background: var(--panel-3); border: 1px solid var(--border);
+    cursor: pointer; transition: background 0.1s, border-color 0.1s;
+  }
+  .options label:hover { background: rgba(56,189,248,0.05); border-color: var(--border-2); }
+  .options input[type=radio] { margin-top: 4px; flex-shrink: 0; accent-color: var(--accent); }
+  .options label:has(input:checked) { background: rgba(56,189,248,0.08); border-color: var(--accent); }
+  .options .opt-text { flex: 1; line-height: 1.5; }
+  .options .opt-text .lbl { font-weight: 600; color: var(--text); margin-right: 4px; }
+  .options .opt-text .desc { color: var(--text-dim); font-size: 12.5px; }
+  .qcard textarea {
+    width: 100%; margin-top: 8px; padding: 10px 12px;
+    background: var(--panel-3); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-family: inherit;
+    font-size: 13px; line-height: 1.55; resize: vertical; min-height: 60px;
+  }
+  .qcard textarea:focus { outline: none; border-color: var(--accent); }
+  .qcard textarea::placeholder { color: var(--text-faint); }
+
+  .copybar {
+    position: sticky; bottom: 16px; z-index: 10;
+    background: var(--panel); border: 1px solid var(--border-2);
+    border-radius: 10px; padding: 14px 18px; margin: 32px 0 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .copybar .progress { color: var(--text-dim); font-size: 13px; flex: 1; }
+  .copybar .progress strong { color: var(--accent); }
+  button.primary {
+    background: var(--accent); color: var(--bg); border: none;
+    padding: 9px 18px; border-radius: 6px; font-size: 13px;
+    font-weight: 600; cursor: pointer;
+  }
+  button.primary:hover { background: var(--accent-2); }
+  button.secondary {
+    background: transparent; color: var(--text-dim);
+    border: 1px solid var(--border-2); padding: 9px 14px;
+    border-radius: 6px; font-size: 12px; cursor: pointer;
+  }
+  button.secondary:hover { color: var(--text); border-color: var(--text-dim); }
+  #copy-status { font-size: 12px; color: var(--good); font-weight: 600; opacity: 0; transition: opacity 0.2s; }
+  #copy-status.show { opacity: 1; }
+  details { margin: 10px 0; }
+  summary { cursor: pointer; color: var(--accent); font-weight: 500; padding: 6px 0; }
+  summary:hover { color: var(--accent-2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>온톨로지 작업 플랜 <span class="badge">PLAN · 2026-05-01</span></h1>
+  <p class="lead">
+    사용자 지침: (1) 토론 결과가 ideal — <strong>기존과 충돌 시 기존 그냥 삭제, 타협 금지</strong>.
+    (2) 시뮬레이션·NL 영향 분석 등은 온톨로지를 <strong>사용</strong>하는 기능 — <strong>부착/탈착 가능한 agent 로 분리</strong>.
+    (3) 핵심: Java 기반 시스템 잘 표현 + 도메인 매핑 + 여러 기능을 편하게 할 수 있는 온톨로지.
+  </p>
+</header>
+
+<!-- ============================================== -->
+<h2 id="principle">1. 핵심 원칙 — Ontology = product, Agent = consumer</h2>
+
+<div class="arch-box">
+  <div class="arch-row">
+    <div class="arch-side core">
+      <div class="head">CORE — 온톨로지 자체</div>
+      Code Layer (Java 충실)<br>
+      Domain Layer (BusinessTerm)<br>
+      Mapping Layer (Action · Anchor)<br>
+      Query API (consumer 가 쓸 인터페이스)<br>
+      Workbench UI (편집/탐색)<br>
+      <span style="color: var(--text-faint); font-size: 11px;">
+        ↑ 절대 consumer 코드를 import 하지 않음
+      </span>
+    </div>
+    <div class="arch-mid">↑ Query API ↑<br>+<br>Plugin Contract</div>
+    <div class="arch-side agent">
+      <div class="head">AGENT — 부착/탈착 가능</div>
+      Simulation Agent (Scenario · Sandbox)<br>
+      ChangeSpec + DraftPR Agent<br>
+      자연어 영향 분석 Agent<br>
+      RAG / 채팅 Agent<br>
+      Wiki / 검색 Agent<br>
+      <span style="color: var(--text-faint); font-size: 11px;">
+        ↑ Query API 만 사용. Core 모델 직접 import 금지
+      </span>
+    </div>
+  </div>
+</div>
+
+<div class="panel principle">
+  <h4>3 가지 불가침 원칙</h4>
+  <ol>
+    <li><strong>Agent 는 온톨로지 Core 의 internal 모델을 직접 import 하지 않는다.</strong> Query API 만 통한다.</li>
+    <li><strong>Agent 추가/제거가 Core 에 영향 0.</strong> Agent 폴더 통째 삭제해도 온톨로지는 그대로.</li>
+    <li><strong>한 Agent 의 데이터는 그 agent 의 store 에만 있다.</strong> Core 의 SQLite 에 끼어들지 않음.</li>
+  </ol>
+</div>
+
+<!-- ============================================== -->
+<h2 id="discard">2. 폐기 대상 (no 타협)</h2>
+
+<p>
+  16 결정과 충돌하는 모든 기존 자산을 archive 후 삭제. 데이터 보존이나 마이그레이션 노력 없음 (Q10=D 정합 + 사용자 지침).
+</p>
+
+<table>
+  <thead><tr>
+    <th>대상</th><th>분류</th><th>이유</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td>BusinessTerm 59개 (DB) + ConceptBinding 199개 + BusinessRule 135개 데이터</td>
+      <td><span class="pill delete">삭제</span></td>
+      <td>새 모델 (kind+facets+inheritance+composition) 와 schema 호환 X</td>
+    </tr>
+    <tr>
+      <td><code>backend/modeling/mapping/mapping_models.py</code> (Round 2/3 BusinessTerm/ConceptBinding/RoleBinding)</td>
+      <td><span class="pill delete">삭제</span></td>
+      <td>새 Domain Layer 스키마 (BusinessTerm 2-kind+facets, Inheritance, Composition) 로 치환</td>
+    </tr>
+    <tr>
+      <td><code>backend/modeling/ontology/schema.py</code> (Process/Entity/Relation/Term 등 매뉴얼 도출 모델)</td>
+      <td><span class="pill delete">삭제</span></td>
+      <td>Q3=A — Process 폐기, Action 단일 동사. 매뉴얼은 description 출처로만 attach</td>
+    </tr>
+    <tr>
+      <td><code>backend/modeling/simulation/*</code> (현 sandbox/python_generator/change_spec/pr_creator)</td>
+      <td><span class="pill rewrite">Agent 로 분리 후 재작성</span></td>
+      <td>Core 에서 빼서 Simulation Agent 로. 코드는 새 Action 모델에 맞게 재작성 — 기존 path 호환 X</td>
+    </tr>
+    <tr>
+      <td><code>backend/modeling/mapping/concept_store.py</code>, <code>business_term_registry.py</code></td>
+      <td><span class="pill delete">삭제</span></td>
+      <td>BusinessTerm 신모델 store 로 교체</td>
+    </tr>
+    <tr>
+      <td><code>backend/modeling/mapping/anchor_binding_suggester.py</code></td>
+      <td><span class="pill rewrite">재작성</span></td>
+      <td>fragment-level + composite path + subtype cast 지원 새로 만듦</td>
+    </tr>
+    <tr>
+      <td>Workbench 의 BusinessTerm 카드 / Mapping 페이지 / Simulation drawer 컴포넌트</td>
+      <td><span class="pill delete">삭제</span></td>
+      <td>Term tree (Domain) + Code tree (Code) + Action card + Path picker 로 새로 구성</td>
+    </tr>
+    <tr>
+      <td>HANDOFF 의 옵션 A/B/C/D 대기 항목</td>
+      <td><span class="pill delete">폐기</span></td>
+      <td>옵션 B (SemanticHook) 는 Action 의 약식 — 본 플랜으로 흡수. 옵션 A (TIER 1) / C (react-window) / D (ConstraintEvaluator) 는 현재 결정 outside, 후일 재검토</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== -->
+<h2 id="keep">3. 보존 / 부분 재활용 대상</h2>
+
+<table>
+  <thead><tr>
+    <th>대상</th><th>분류</th><th>방식</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td><code>java_parser.py</code> + <code>spring/*</code> 10 analyzer + <code>cross_file_enricher.py</code> + <code>reflection_*</code> + <code>parser_protocol.py</code></td>
+      <td><span class="pill keep">로직 유지 + 출력 어댑터</span></td>
+      <td>Java 분석 로직 자체는 가치 있음. 단 출력은 새 CodeType / CodeMethod / CallSite 모델로 매핑하는 어댑터 신설. 기존 graph_writer 출력은 폐기.</td>
+    </tr>
+    <tr>
+      <td><code>method_anchor.py</code> (anchor 7종 추출)</td>
+      <td><span class="pill keep">유지</span></td>
+      <td>anchor 추출 로직 그대로. binding 만 새 모델 (fragment-level + path with subtype) 로</td>
+    </tr>
+    <tr>
+      <td><code>backend/modeling/persistence/database.py</code> (SQLAlchemy session)</td>
+      <td><span class="pill keep">유지</span></td>
+      <td>SQLite 어댑터 인프라. 새 테이블은 새 모듈에서 정의</td>
+    </tr>
+    <tr>
+      <td><code>backend/shared/agent_framework/</code></td>
+      <td><span class="pill keep">유지 + 보강</span></td>
+      <td>이미 있는 base agent class. Plugin 등록·해제·Query API 호출 패턴 표준화</td>
+    </tr>
+    <tr>
+      <td><code>backend/shared/contracts/</code></td>
+      <td><span class="pill keep">유지</span></td>
+      <td>Section 간 contract 자리. Core ↔ Agent contract 가 여기로</td>
+    </tr>
+    <tr>
+      <td>OD-11 Phase B 의 Spring 분석 로직 자체 (DI/AOP/Http/Events/Scheduled/Profile/Jpa/Reflection/MapStruct/BeanUtils/NativeSql)</td>
+      <td><span class="pill keep">로직 유지</span></td>
+      <td>출력 매퍼만 새로. 분석 가치 큼.</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================== -->
+<h2 id="core-phase">4. CORE Phase — 온톨로지 자체 (C1 ~ C6)</h2>
+
+<p class="lead">
+  여기까지 끝내면 온톨로지가 standalone 으로 작동. Agent 가 하나도 없어도 Workbench 에서 편집/탐색 가능.
+</p>
+
+<div class="step-card core">
+  <div class="step-head">
+    <span class="step-num">C1</span>
+    <span class="step-title">기존 자산 archive + 삭제 (clean slate)</span>
+    <span class="step-meta">의존 없음 · 가장 먼저</span>
+  </div>
+  <ul>
+    <li><code>git tag pre-action-model-2026-05-01</code> — 되돌릴 수 있는 태그</li>
+    <li>아래 모듈 archive 폴더로 이동: <code>archive/2026-05-pre-action-model/</code>
+      <ul>
+        <li>mapping/{mapping_models, concept_store, business_term_registry, anchor_binding_suggester}</li>
+        <li>ontology/{schema, ontology_store, builder_service, validator, loader}</li>
+        <li>simulation/* 전체 (Agent 로 옮기기 전 보존)</li>
+      </ul>
+    </li>
+    <li>SQLite 의 BusinessTerm / BusinessRule / ConceptBinding / Process 등 테이블 drop</li>
+    <li>관련 API endpoint, 프론트 컴포넌트 즉시 삭제 (UI 가 깨진 채 시작)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: archive 폴더, drop 스크립트, git tag, "삭제 완료" 보고서
+  </div>
+  <div class="ref-decision">참조 결정: <code>Q10=D</code>, 사용자 지침 (타협 금지)</div>
+</div>
+
+<div class="step-card core">
+  <div class="step-head">
+    <span class="step-num">C2</span>
+    <span class="step-title">Code Layer — Java 충실 mirror + CallSiteAnalyzer</span>
+    <span class="step-meta">의존: C1</span>
+  </div>
+  <ul>
+    <li>SQLite 신 schema: <code>CodeType</code> / <code>CodeField</code> / <code>CodeMethod</code> / <code>CallSite</code></li>
+    <li>기존 java_parser + 10 Spring analyzer 출력을 새 모델로 매핑하는 <code>code_layer_adapter.py</code></li>
+    <li><code>Class.role</code> / <code>Method.role</code> 자동 분류 (annotation + 이름 패턴 + LLM unknown 처리)</li>
+    <li><code>CallSiteAnalyzer</code> Case 1~4 자동 (single_impl / instanceof_guard / annotation / factory_branch)</li>
+    <li>Case 5~7 (generic / Strategy Map / Reflection) 은 <code>analysis_source="static_unresolved"</code> 로 마킹만, 사용자 큐 데이터만 채움</li>
+    <li>tests + Java 샘플 1~2 종으로 e2e 검증 (e.g., abstract Order + StandardOrder + RushOrder)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>backend/modeling/code_layer/{schema, store, adapter, callsite_analyzer, role_classifier}.py</code>, tests, sample 분석 리포트
+  </div>
+  <div class="ref-decision">참조 결정: <code>D1=C, D2=A, D3=A+</code></div>
+</div>
+
+<div class="step-card core">
+  <div class="step-head">
+    <span class="step-num">C3</span>
+    <span class="step-title">Domain Layer — BusinessTerm 신모델 (kind+facets+inheritance+composition)</span>
+    <span class="step-meta">의존: C1</span>
+  </div>
+  <ul>
+    <li>SQLite schema: <code>BusinessTerm</code> (kind=atomic|composite, facets) / <code>Inheritance</code> / <code>Composition</code></li>
+    <li><code>BusinessRule</code> 도 함께 신설 (severity, terms_ref)</li>
+    <li><code>effective_parts</code> resolver (transitive closure, 사이클 방지)</li>
+    <li>Validator: kind=atomic 의 parts 금지, kind=composite 의 parents 사이클 금지, struct_like_hint 일관성</li>
+    <li>tests + 샘플 도메인 (주문 / 주문스펙 / 화학성분정보 등 4~5 종)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>backend/modeling/domain_layer/{schema, store, resolver, validator}.py</code>, tests, 데모 도메인 데이터
+  </div>
+  <div class="ref-decision">참조 결정: <code>D1=C, C2=A</code> (path syntax 시 traversal 가능 구조), <code>C4=A</code> (자동 추출 input 형식)</div>
+</div>
+
+<div class="step-card core">
+  <div class="step-head">
+    <span class="step-num">C4</span>
+    <span class="step-title">Mapping Layer — TypeRealization + Action + Realization + AnchorBinding</span>
+    <span class="step-meta">의존: C2, C3</span>
+  </div>
+  <ul>
+    <li>SQLite: <code>TypeRealization</code> (CodeType↔Term) / <code>Action</code> / <code>Realization</code> (다형성, dispatch_source) / <code>AnchorBinding</code> (fragment-level, composite path with subtype cast)</li>
+    <li><code>VerificationLevel</code> state machine (UNMAPPED → DRAFT → SIGNATURE_LOCKED → BODY_ANCHORED → SIM_VERIFIED → PR_PROVEN)</li>
+    <li>Path syntax parser/validator: <code>params[0]&lt;Subtype&gt;.spec.diameter.range[1]</code> 풀이</li>
+    <li>Action 후보 자동 추출 — <code>Method.role=business</code> 마다 Action 1개 후보</li>
+    <li>Realization 자동 binding — CallSiteAnalyzer Case 1~4 결과 그대로</li>
+    <li>모호한 case (Case 5~7) 사용자 confirm 큐 — 후보 list + caller 컨텍스트 + LLM 추천</li>
+    <li>Anchor 자동 binding (혼합 큐) — alias/literal 자동 confirmed, branch/lookup 큐</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>backend/modeling/mapping_layer/{schema, store, action, realization, anchor_binding, path_parser, verification_level}.py</code>, tests
+  </div>
+  <div class="ref-decision">참조 결정: <code>Q1', Q3, Q5, Q9, Q4', C2, D3</code></div>
+</div>
+
+<div class="step-card core">
+  <div class="step-head">
+    <span class="step-num">C5</span>
+    <span class="step-title">Query API — Agent 가 쓸 깨끗한 인터페이스</span>
+    <span class="step-meta">의존: C2, C3, C4 · 가장 중요한 boundary</span>
+  </div>
+  <p>
+    Agent 가 Core 의 internal 모델을 import 하지 않게 하는 facade. Agent 는 오로지 이 API 만 호출.
+  </p>
+  <ul>
+    <li><strong>Term Query</strong>: <code>get_term(fqn)</code>, <code>list_terms(domain, kind, ...)</code>, <code>effective_parts(fqn)</code>, <code>resolve_path("주문.화학성분정보[-1].C")</code></li>
+    <li><strong>Code Query</strong>: <code>get_code_type(fqn)</code>, <code>list_code_types(role)</code>, <code>get_call_sites(method_fqn)</code></li>
+    <li><strong>Action Query</strong>: <code>get_action(fqn)</code>, <code>list_actions(declared_on_term, kind, verification_min)</code>, <code>get_realizations(action_fqn, input_type=None)</code> — input type 주면 dispatch 결과 반환</li>
+    <li><strong>Anchor Query</strong>: <code>get_anchor_bindings(action_fqn)</code>, <code>find_anchor_at_slot(action_fqn, slot_path)</code></li>
+    <li><strong>Mapping Query</strong>: <code>get_unmapped_methods()</code>, <code>get_ambiguous_call_sites()</code>, <code>get_verification_progress()</code></li>
+    <li><strong>Search</strong>: FTS5 — Term/Action/CodeType/CodeMethod 통합 검색</li>
+    <li>모든 응답은 DTO (frozen pydantic) — Core 내부 ORM 객체 노출 X</li>
+    <li>OpenAPI spec 자동 생성 (REST endpoint 도 동시 expose)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>backend/modeling/api/ontology_query_api.py</code> (Python facade) + REST endpoints + DTO 모듈, OpenAPI spec, Agent 작성 가이드
+  </div>
+  <div class="ref-decision">참조 결정: 사용자 지침 (Agent 분리)</div>
+</div>
+
+<div class="step-card core">
+  <div class="step-head">
+    <span class="step-num">C6</span>
+    <span class="step-title">Workbench UI (온톨로지 편집/탐색만)</span>
+    <span class="step-meta">의존: C5</span>
+  </div>
+  <ul>
+    <li><strong>Code Tree</strong> (lazy expand, FTS5 검색) — Java 클래스 트리, role 별 필터, extends/implements 시각화</li>
+    <li><strong>Term Tree</strong> (lazy expand, virtual scroll) — Inheritance 엣지 (extends 실선, implements 점선) + Composition (HAS_A) tree</li>
+    <li><strong>Action Card</strong> — nested params, realizations 다중, VerificationLevel 배지</li>
+    <li><strong>Path Picker</strong> — params/output traversal 자동완성 (subtype cast 포함)</li>
+    <li><strong>Mapping Queues</strong>: Unmapped Methods / Ambiguous CallSites (D3 후보 list + 컨텍스트 + LLM 추천) / Anchor Confirm</li>
+    <li><strong>VerificationLevel 진척 대시보드</strong> — KPI</li>
+    <li>Simulation drawer / NL 영향 분석 등은 <strong>없음</strong> (Agent 가 plug 됐을 때 그 agent 가 자기 UI 추가)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>frontend/src/components/sections/modeling/{CodeTree, TermTree, ActionCard, PathPicker, MappingQueues, VerificationDashboard}.tsx</code>, e2e demo
+  </div>
+  <div class="ref-decision">참조 결정: <code>Q4', Q7'</code> (UI 분리), <code>D3</code> (큐 컨텍스트), feedback_scale_5k_classes</div>
+</div>
+
+<div class="panel good">
+  <h4>CORE Phase 완료 시점 ≈ "온톨로지 product" 출시 가능</h4>
+  <p>
+    이 시점에서 사용자는 Java repo import → 매핑 큐 처리 → 깨끗한 온톨로지 보유. 시뮬도 NL 분석도 없지만 <strong>온톨로지 자체로 가치 있음</strong>.
+    Agent 들은 이 위에 플러그인 처럼 부착.
+  </p>
+</div>
+
+<!-- ============================================== -->
+<h2 id="agent-phase">5. AGENT Phase — 부착식 Consumer (A1 ~ A4)</h2>
+
+<p class="lead">
+  각 agent 는 독립 폴더, 독립 store, Query API 만 호출. Agent 폴더 통째로 삭제해도 Core 무관.
+</p>
+
+<div class="step-card agent">
+  <div class="step-head">
+    <span class="step-num">A1</span>
+    <span class="step-title">Agent Framework 보강 — Plugin contract</span>
+    <span class="step-meta">의존: C5</span>
+  </div>
+  <ul>
+    <li>기존 <code>backend/shared/agent_framework/</code> 위에 Plugin pattern 추가</li>
+    <li><code>OntologyAgent</code> base class — Query API client 자동 주입</li>
+    <li>Agent 등록/해제 — 단순 Python entry-point. 활성 agent 목록 환경 변수로 toggle</li>
+    <li>Agent 가 자기 SQLite store 가지면 <code>agents/&lt;name&gt;/store.db</code> 분리</li>
+    <li>Agent 가 자기 REST endpoint 가지면 <code>/agents/&lt;name&gt;/...</code> 자동 라우팅</li>
+    <li>Agent 가 자기 Workbench UI 가지면 <code>frontend/agents/&lt;name&gt;/</code> 에서 lazy load</li>
+    <li>Contract 위반 (Core internal import 등) 정적 검사 — <code>tools/check_agent_isolation.py</code></li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>backend/shared/agent_framework/{base, registry, contract_check}.py</code>, agent 작성 가이드 markdown
+  </div>
+  <div class="ref-decision">참조 결정: 사용자 지침 (부착/탈착)</div>
+</div>
+
+<div class="step-card agent">
+  <div class="step-head">
+    <span class="step-num">A2</span>
+    <span class="step-title">Simulation Agent — Scenario + Sandbox + Diff</span>
+    <span class="step-meta">의존: A1</span>
+  </div>
+  <ul>
+    <li><code>agents/simulation/</code> 폴더 — 자체 SQLite (Scenario / ScenarioStep / SimulationResult)</li>
+    <li><strong>SimulationScenario</strong> + <strong>ScenarioStep</strong> 모델</li>
+    <li><strong>ScenarioInputAdapter</strong> Protocol — 1단계: <code>FormInputAdapter</code> + <code>FixtureInputAdapter</code></li>
+    <li><strong>PythonGenerator</strong> 신작성 — Query API 로 Term 그래프 가져와 nested dataclass 트리 + Realization 다중 → dispatcher 자동 생성. 기존 P27 generator 폐기 (재활용 X)</li>
+    <li><strong>SandboxRunner</strong> (RestrictedPython, Q-A=A2)</li>
+    <li><strong>Diff reporter</strong> (Step List + Side-by-side, Q7'=A)</li>
+    <li>VerificationLevel 갱신 — sim 통과 시 SIM_VERIFIED 로 (Query API write call)</li>
+    <li>Simulation Agent UI: Scenario builder + Diff viewer (frontend/agents/simulation/)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>backend/agents/simulation/*</code>, <code>frontend/agents/simulation/*</code>, e2e 데모 (주문 검증 시뮬)
+  </div>
+  <div class="ref-decision">참조 결정: <code>Q7', C2, C3</code> (adapter), <code>D3</code> (dispatcher), Q-A/Q-B/Q-D</div>
+</div>
+
+<div class="step-card agent">
+  <div class="step-head">
+    <span class="step-num">A3</span>
+    <span class="step-title">ChangeSpec + DraftPR Agent</span>
+    <span class="step-meta">의존: A2</span>
+  </div>
+  <ul>
+    <li><code>agents/change_pr/</code> — ChangeSpec 모델 (target_action_fqn + slot path) + 5종 kind</li>
+    <li>Action 슬롯 변경 → Java patch 템플릿 생성 → GitHub draft PR (Q-E=E2)</li>
+    <li>VerificationLevel → PR_PROVEN 으로 갱신</li>
+    <li>Simulation Agent 의 결과를 input 으로 받음 (agent 간 통신은 Query API 또는 명시적 contract)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>backend/agents/change_pr/*</code>, <code>frontend/agents/change_pr/*</code>
+  </div>
+  <div class="ref-decision">참조 결정: <code>Q-E=E2</code></div>
+</div>
+
+<div class="step-card agent">
+  <div class="step-head">
+    <span class="step-num">A4</span>
+    <span class="step-title">자연어 영향 분석 Agent</span>
+    <span class="step-meta">의존: A1</span>
+  </div>
+  <ul>
+    <li><code>agents/nl_impact/</code> — "이 변경의 영향은?" 자연어 질의 처리</li>
+    <li>Query API 의 <code>get_action_dependencies(action_fqn)</code> + <code>get_anchor_bindings(action_fqn)</code> 로 영향 그래프 traversal</li>
+    <li>LLM 으로 자연어 보고서 생성 — Action 별 영향 + Term 별 변화 + 위험도</li>
+    <li>UI: 채팅 패널 (Workbench 우측 drawer)</li>
+  </ul>
+  <div class="step-deliverables">
+    <strong>산출물</strong>: <code>backend/agents/nl_impact/*</code>, <code>frontend/agents/nl_impact/*</code>
+  </div>
+  <div class="ref-decision">참조 결정: 사용자 지침 (NL 분석은 분리된 agent)</div>
+</div>
+
+<div class="panel info">
+  <h4>추가 가능한 agent 후보 (Phase 2+)</h4>
+  <ul>
+    <li><strong>RAG Agent</strong> — 온톨로지를 retrieval source 로 (기존 wiki rag_agent 의 새 모델 적응판)</li>
+    <li><strong>Wiki Agent</strong> — Action / Term description 자동 글쓰기</li>
+    <li><strong>Quality Audit Agent</strong> — VerificationLevel 진척 모니터링 + Slack 알림</li>
+    <li><strong>External Sync Agent</strong> — Confluence / Jira 와 동기화</li>
+  </ul>
+</div>
+
+<!-- ============================================== -->
+<h2 id="contract">6. Agent ↔ Core Contract (불가침)</h2>
+
+<pre><code># ✓ 좋은 agent 코드
+from backend.shared.agent_framework import OntologyAgent
+from backend.shared.contracts.ontology_query import OntologyQueryClient
+
+class SimulationAgent(OntologyAgent):
+    def run_scenario(self, scenario_id: str):
+        scenario = self.store.get_scenario(scenario_id)        # 자기 store
+        for step in scenario.steps:
+            action = self.ontology.get_action(step.action_fqn)  # Query API
+            term = self.ontology.get_term(action.declared_on_term)
+            ...
+
+# ✗ 나쁜 agent 코드 (정적 검사로 차단)
+from backend.modeling.mapping_layer.schema import Action  # ✗ Core internal import
+from backend.modeling.persistence.database import session_scope  # ✗ Core DB 직접
+action = session.query(ActionRow).filter_by(fqn=...).first()  # ✗ ORM 직접</code></pre>
+
+<p>
+  Agent 격리 정적 검사 (<code>tools/check_agent_isolation.py</code>):
+</p>
+<ul>
+  <li><code>backend/agents/**/*.py</code> 가 <code>backend/modeling/{code_layer,domain_layer,mapping_layer}/**</code> import 시 build 실패</li>
+  <li><code>backend/agents/**/*.py</code> 가 <code>backend/modeling/persistence/**</code> import 시 build 실패</li>
+  <li>허용: <code>backend.shared.agent_framework</code>, <code>backend.shared.contracts.ontology_query</code>, 자기 폴더 안</li>
+</ul>
+
+<!-- ============================================== -->
+<h2 id="ordering">7. 진행 순서 권장</h2>
+
+<table>
+  <thead><tr><th>순서</th><th>Step</th><th>왜 이때</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><span class="pill core">C1</span> 기존 archive + 삭제</td><td>충돌 제거. 빈 슬레이트.</td></tr>
+    <tr><td>2</td><td><span class="pill core">C2</span> Code Layer + CallSiteAnalyzer</td><td>Java 사실 먼저. 도메인 모델 만들기 전 코드 ground truth 확보.</td></tr>
+    <tr><td>3</td><td><span class="pill core">C3</span> Domain Layer (Term)</td><td>C2 와 병렬 가능. 단 효율 위해 순차.</td></tr>
+    <tr><td>4</td><td><span class="pill core">C4</span> Mapping Layer</td><td>C2·C3 의존. 가장 큰 step.</td></tr>
+    <tr><td>5</td><td><span class="pill core">C5</span> Query API</td><td>Agent 작성 위한 boundary 확정.</td></tr>
+    <tr><td>6</td><td><span class="pill core">C6</span> Workbench UI</td><td>여기까지면 온톨로지 standalone 사용 가능 — 첫 데모.</td></tr>
+    <tr><td>7</td><td><span class="pill agent">A1</span> Agent Framework</td><td>Plugin pattern 인프라.</td></tr>
+    <tr><td>8</td><td><span class="pill agent">A2</span> Simulation Agent</td><td>가장 큰 가치 agent. 두 번째 데모.</td></tr>
+    <tr><td>9</td><td><span class="pill agent">A3</span> ChangeSpec + PR Agent</td><td>Simulation 결과 활용.</td></tr>
+    <tr><td>10</td><td><span class="pill agent">A4</span> NL 영향 분석 Agent</td><td>독립 가능 — A2/A3 와 병렬도 OK.</td></tr>
+  </tbody>
+</table>
+
+<div class="panel principle">
+  <h4>두 번의 자연스러운 시연 분기점</h4>
+  <ul>
+    <li><strong>C6 완료 후</strong>: "Java repo 넣으면 깨끗한 온톨로지가 나온다" 시연</li>
+    <li><strong>A2 완료 후</strong>: "온톨로지 위에서 시뮬레이션이 돈다" 시연</li>
+  </ul>
+  <p>각 분기점에서 사용자 검토·승인·다음 단계 결정.</p>
+</div>
+
+<!-- ============================================== -->
+<h2 id="open">8. 남은 의사결정 (페이지 내 입력 + 복사)</h2>
+
+<p class="lead">
+  아래 4개 라디오 + 메모는 브라우저에 자동 저장됩니다 (localStorage). 다 채우고 하단 <strong>"📋 답변 4 개 복사"</strong> 누르면 마크다운으로 클립보드에 복사됩니다.
+</p>
+
+<form id="answers-form">
+
+<!-- O1 -->
+<div class="qcard" data-q="O1">
+  <h3><span class="qid">O1</span> <span id="O1-title">OD-11 Phase B 잔여 (B8 / B9) 처리</span></h3>
+  <div class="ctx">
+    OD-11 Phase B 가 거의 완료 (B5 Spring 8 analyzer, B6 Cross-file Enricher, B7 Reflection 끝).
+    <strong>잔여:</strong> B8 (Impact/BFS query engine — 4 subphase 완료), B9 (Slab sample E2E 미진행).
+    이게 새 Code Layer (C2) 와 겹침.
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="O1" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> B8/B9 폐기 — C2 (새 Code Layer) 에서 처음부터 새로 <span class="desc">(가장 깨끗, 사용자 지침 정합)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="O1" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> B8 query engine 만 보존 (그래프 traversal 로직 가치 있음) → C5 Query API 가 흡수, B9 폐기</span>
+    </label>
+    <label>
+      <input type="radio" name="O1" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> B8/B9 먼저 끝내고 그 위에 Action 모델 적층 <span class="desc">(기존 작업 보존, but 타협 발생)</span></span>
+    </label>
+  </div>
+  <textarea name="O1_note" placeholder="추가 의견 (선택)"></textarea>
+</div>
+
+<!-- O2 -->
+<div class="qcard" data-q="O2">
+  <h3><span class="qid">O2</span> <span id="O2-title">기존 wiki / RAG (Section 1, 완료) 처리</span></h3>
+  <div class="ctx">
+    Section 1 (wiki + RAG agent) 는 별도 팀 (위키 세션) 작업으로 이미 완료.
+    onTong 의 NL 영향 분석 Agent (A4) 와 개념적으로 겹칠 수 있음.
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="O2" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> Section 1 그대로 유지, A4 (NL Agent) 는 모델링 전용 별도 agent <span class="desc">(분리 명확, 두 agent 공존)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="O2" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> A4 가 Section 1 RAG 를 흡수 — 같은 agent 가 위키 + 모델링 NL 둘 다 처리 <span class="desc">(통합, but 위키 팀 작업 변경 영향)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="O2" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> A4 가 Section 1 RAG 의 Query API 를 source 중 하나로 사용 (loose coupling) <span class="desc">(권장 — 통합 X, 협력 ○)</span></span>
+    </label>
+  </div>
+  <textarea name="O2_note" placeholder="..."></textarea>
+</div>
+
+<!-- O3 -->
+<div class="qcard" data-q="O3">
+  <h3><span class="qid">O3</span> <span id="O3-title">Section 3 (Simulation 스캐폴딩) 처리</span></h3>
+  <div class="ctx">
+    HANDOFF 에 따르면 Section 3 (Simulation 섹션) 은 별도 팀 + MockClient + 스캐폴딩까지 우리가 만들었음.
+    A2 (Simulation Agent) 와 같은 영역.
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="O3" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> Section 3 폐기 — A2 (Simulation Agent) 로 통째 대체 <span class="desc">(사용자 지침 정합, 가장 깨끗)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="O3" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> Section 3 스캐폴딩만 보존, 내부 로직은 A2 로 채움 <span class="desc">(UI 라우팅 등 일부 보존)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="O3" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> Section 3 별도 유지, A2 는 Section 2 (modeling) 안 simulation drawer 로만 <span class="desc">(두 시뮬 공존)</span></span>
+    </label>
+  </div>
+  <textarea name="O3_note" placeholder="..."></textarea>
+</div>
+
+<!-- O4 -->
+<div class="qcard" data-q="O4">
+  <h3><span class="qid">O4</span> <span id="O4-title">Workbench 5-mode rail (v3.1 Q-U10) 변경 폭</span></h3>
+  <div class="ctx">
+    v3 결정의 5 mode rail (Code / Ontology / Manual / Simulation / Mapping) — Two-Layer 도입으로 재구성 필요.
+  </div>
+  <div class="options">
+    <label>
+      <input type="radio" name="O4" value="A">
+      <span class="opt-text"><span class="lbl">A.</span> 4 모드로 단순화 — Code / Domain / Mapping / Action <span class="desc">(Core 만, agent 모드 X)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="O4" value="B">
+      <span class="opt-text"><span class="lbl">B.</span> 4 모드 (Core) + agent 별 자기 모드 동적 추가 (Simulation Agent plug 시 모드 1개 추가) <span class="desc">(권장 — 부착식 정합)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="O4" value="C">
+      <span class="opt-text"><span class="lbl">C.</span> 5 모드 그대로, 라벨만 변경 <span class="desc">(최소 변경, 기존 UX 학습 보존)</span></span>
+    </label>
+    <label>
+      <input type="radio" name="O4" value="D">
+      <span class="opt-text"><span class="lbl">D.</span> Mode rail 자체 폐기 — 단일 통합 화면 + 좌측 트리·중앙 콘텐츠·우측 detail <span class="desc">(가장 큰 변경)</span></span>
+    </label>
+  </div>
+  <textarea name="O4_note" placeholder="..."></textarea>
+</div>
+
+</form>
+
+<div class="copybar">
+  <div class="progress">진행: <strong id="progress-count">0</strong> / 4 응답</div>
+  <button type="button" class="secondary" id="clear-btn">초기화</button>
+  <button type="button" class="primary" id="copy-btn">📋 답변 4 개 복사</button>
+  <span id="copy-status">✓ 클립보드에 복사됨</span>
+</div>
+
+<details>
+  <summary>복사 결과 미리보기</summary>
+  <pre id="preview-output">(아직 응답 없음)</pre>
+</details>
+
+<hr>
+
+<div class="panel good">
+  <h3>요약</h3>
+  <ul>
+    <li><strong>CORE 6 step (C1~C6)</strong> — 온톨로지 자체. Agent 없이도 standalone 가치.</li>
+    <li><strong>AGENT 4 step (A1~A4)</strong> — Simulation / ChangeSpec+PR / NL 영향 분석 — Plugin 형태 부착.</li>
+    <li><strong>충돌 시 기존 자산 삭제</strong> — 사용자 지침 정합. archive 후 drop.</li>
+    <li><strong>Java 분석 로직 (Spring 10 analyzer 등) 은 보존</strong> — output 만 새 모델로 어댑터.</li>
+    <li><strong>Agent 격리 contract 정적 검사</strong> — Core internal import 시 build 실패.</li>
+    <li><strong>4개 open 의사결정 (O1~O4)</strong> — 답 받으면 CORE Phase C1 시작.</li>
+  </ul>
+</div>
+
+<p class="source">
+  관련 문서: <a href="./온톨로지-방식-결정.html">최종 결정 (16개)</a> ·
+  v1~v5 토론 (<a href="./온톨로지-방식-고찰.html">v1</a> ~ <a href="./온톨로지-방식-고찰-v5.html">v5</a>)
+</p>
+
+</div>
+
+<script>
+(function () {
+  const STORAGE_KEY = 'ontong-action-answers-plan-O';
+  const QIDS = ['O1','O2','O3','O4'];
+  const form = document.getElementById('answers-form');
+  const progressEl = document.getElementById('progress-count');
+  const previewEl = document.getElementById('preview-output');
+  const statusEl = document.getElementById('copy-status');
+
+  function readAnswers() {
+    const out = {};
+    for (const q of QIDS) {
+      const radio = form.querySelector('input[name="' + q + '"]:checked');
+      const note = form.querySelector('textarea[name="' + q + '_note"]');
+      const choice = radio ? radio.value : null;
+      const noteVal = note ? note.value.trim() : '';
+      if (choice || noteVal) out[q] = { choice, note: noteVal };
+    }
+    return out;
+  }
+
+  function persist() {
+    const ans = readAnswers();
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ans)); } catch (e) {}
+    refreshProgress(ans); refreshPreview(ans);
+  }
+
+  function restore() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) { saved = {}; }
+    for (const q of QIDS) {
+      const a = saved[q]; if (!a) continue;
+      if (a.choice) {
+        const radio = form.querySelector('input[name="' + q + '"][value="' + a.choice + '"]');
+        if (radio) radio.checked = true;
+      }
+      if (a.note) {
+        const note = form.querySelector('textarea[name="' + q + '_note"]');
+        if (note) note.value = a.note;
+      }
+    }
+    refreshProgress(saved); refreshPreview(saved);
+  }
+
+  function refreshProgress(ans) {
+    let count = 0;
+    for (const q of QIDS) if (ans[q] && (ans[q].choice || ans[q].note)) count++;
+    progressEl.textContent = count;
+  }
+
+  function buildMarkdown(ans) {
+    let md = '# onTong 작업 플랜 — O1·O2·O3·O4 답변\n\n';
+    md += '_답변 기준일: ' + new Date().toISOString().slice(0,10) + '_\n\n';
+    for (const q of QIDS) {
+      const titleEl = document.getElementById(q + '-title');
+      const title = titleEl ? titleEl.textContent : q;
+      const a = ans[q];
+      md += '## ' + q + '. ' + title + '\n';
+      if (!a) { md += '_(미응답)_\n\n'; continue; }
+      md += '- **선택**: ' + (a.choice || '_(없음)_') + '\n';
+      if (a.note) md += '- **메모**: ' + a.note.replace(/\n/g, '\n  ') + '\n';
+      md += '\n';
+    }
+    return md;
+  }
+
+  function refreshPreview(ans) {
+    if (!Object.keys(ans).length) { previewEl.textContent = '(아직 응답 없음)'; return; }
+    previewEl.textContent = buildMarkdown(ans);
+  }
+
+  document.getElementById('copy-btn').addEventListener('click', async function () {
+    const md = buildMarkdown(readAnswers());
+    try {
+      await navigator.clipboard.writeText(md);
+      statusEl.classList.add('show');
+      setTimeout(function () { statusEl.classList.remove('show'); }, 2200);
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = md; document.body.appendChild(ta);
+      ta.select(); try { document.execCommand('copy'); } catch (e2) {}
+      document.body.removeChild(ta);
+      statusEl.textContent = '✓ 복사됨 (fallback)';
+      statusEl.classList.add('show');
+      setTimeout(function () {
+        statusEl.classList.remove('show');
+        statusEl.textContent = '✓ 클립보드에 복사됨';
+      }, 2200);
+    }
+  });
+
+  document.getElementById('clear-btn').addEventListener('click', function () {
+    if (!confirm('응답 4개를 초기화할까요?')) return;
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    for (const r of form.querySelectorAll('input[type=radio]')) r.checked = false;
+    for (const t of form.querySelectorAll('textarea')) t.value = '';
+    refreshProgress({}); refreshPreview({});
+  });
+
+  form.addEventListener('change', persist);
+  form.addEventListener('input', persist);
+  restore();
+})();
+</script>
+
+</body>
+</html>
