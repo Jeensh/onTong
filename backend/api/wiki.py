@@ -515,11 +515,80 @@ async def create_folder(path: str, user: User = Depends(require_write)):
 
 @router.patch("/folder/{path:path}")
 async def move_folder(path: str, body: MoveRequest, user: User = Depends(require_write)):
-    """Rename or move a folder."""
-    result = await _svc().move_folder(path, body.new_path)
-    if not result:
-        raise HTTPException(status_code=400, detail=f"Cannot move folder: {path}")
-    return {"old_path": path, "new_path": body.new_path}
+    """Folder rename via batched RenameOrchestrator (Phase 4).
+
+    - Subtree enumeration
+    - Per-child rename via single-file orchestrator (with all P3 guarantees)
+    - Per-user bulk lock prevents concurrent folder ops
+    - SSE folder_rename_progress / _finished events
+    """
+    _validate_path(path)
+    _validate_path(body.new_path)
+    svc = _svc()
+    orch = svc.get_folder_rename_orchestrator()
+    if orch is None:
+        # Legacy fallback
+        result = await svc.move_folder(path, body.new_path)
+        if not result:
+            raise HTTPException(status_code=400, detail=f"Cannot move folder: {path}")
+        return {"old_path": path, "new_path": body.new_path, "warning": "fallback_legacy_no_inbound_update"}
+
+    try:
+        plan = await orch.plan(path, body.new_path, user.name)
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail={"error": str(e), "blocked": True})
+
+    result = await orch.execute(plan.audit_id)
+    if result.status == "failed":
+        raise HTTPException(status_code=409, detail={
+            "error": result.error,
+            "audit_id": result.audit_id,
+        })
+    return {
+        "old_path": path,
+        "new_path": body.new_path,
+        "audit_id": result.audit_id,
+        "status": result.status,
+        "total_files": result.total_files,
+        "files_done": result.files_done,
+        "files_failed": result.files_failed,
+        "inbound_done": result.inbound_done,
+        "inbound_failed": result.inbound_failed,
+    }
+
+
+@router.get("/folder-rename-preview/{path:path}")
+async def folder_rename_preview(path: str, to: str, user: User = Depends(require_write)):
+    """Compute the impact of a folder rename without executing it."""
+    _validate_path(path)
+    _validate_path(to)
+    svc = _svc()
+    orch = svc.get_folder_rename_orchestrator()
+    if orch is None:
+        raise HTTPException(status_code=503, detail="FolderRenameOrchestrator not available")
+    try:
+        plan = await orch.plan(path, to, user.name)
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail={
+            "error": str(e),
+            "blocked": True,
+            "old_path": path,
+            "new_path": to,
+        })
+    return {
+        "audit_id": plan.audit_id,
+        "old_folder": plan.old_folder,
+        "new_folder": plan.new_folder,
+        "file_count": plan.file_count,
+        "inbound_count": plan.inbound_count,
+        "unique_inbound_sources": plan.unique_inbound_sources,
+        "estimated_seconds": plan.estimated_seconds,
+        "impact_items": [
+            {"source_path": it.source_path, "ref_count": it.ref_count}
+            for it in plan.impact_items
+        ],
+        "file_pairs": plan.file_pairs[:50],  # truncate; full list available via orchestrator
+    }
 
 
 @router.delete("/folder/{path:path}")

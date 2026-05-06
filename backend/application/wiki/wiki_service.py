@@ -642,6 +642,38 @@ class WikiService:
             self._rename_orch = None
             return None
 
+    def get_folder_rename_orchestrator(self):
+        """Resolve a singleton FolderRenameOrchestrator. Lazy + cached."""
+        if hasattr(self, "_folder_rename_orch"):
+            return self._folder_rename_orch
+        rename_orch = self.get_rename_orchestrator()
+        if rename_orch is None:
+            self._folder_rename_orch = None
+            return None
+        try:
+            from backend.core.config import settings
+            from backend.core.backends import get_audit_store
+            from pathlib import Path
+            from backend.application.rename.folder_orchestrator import FolderRenameOrchestrator
+
+            profile = settings.resolve_profile()
+            wiki_dir = Path(settings.wiki_dir)
+            if profile.audit_store_backend == "sqlite":
+                audit = get_audit_store(profile, sqlite_path=str(wiki_dir / ".ontong" / "audit.db"))
+            else:
+                audit = get_audit_store(profile, postgres_dsn=settings.postgres_dsn)
+
+            self._folder_rename_orch = FolderRenameOrchestrator(
+                rename_orch=rename_orch,
+                audit_store=audit,
+                content_store=self,
+            )
+            return self._folder_rename_orch
+        except Exception as e:
+            logger.error(f"FolderRenameOrchestrator init failed: {e}")
+            self._folder_rename_orch = None
+            return None
+
     def _get_ref_index_lazy(self):
         """Resolve RefIndex once, cache on instance."""
         if not hasattr(self, "_ref_index_cache"):
