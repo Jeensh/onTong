@@ -44,13 +44,16 @@ class SqliteRefIndex(RefIndex):
                 "INSERT INTO wiki_references (source_path, target_path, kind, location) VALUES (?, ?, ?, ?)",
                 [(r.source_path, r.target_path, r.kind, json.dumps(r.location, ensure_ascii=False)) for r in refs],
             )
-            # Register source + refresh last_indexed_at so stale_sources() works.
-            # ON CONFLICT updates the timestamp; without it the row would keep
-            # its original timestamp and look stale forever.
+            # Register source + refresh last_indexed_at + stem so broken() can
+            # do a SQL-side anti-join without a Python pass.
+            stem = PurePosixPath(source_path).stem
             self._conn.execute(
-                "INSERT INTO wiki_sources (source_path, last_indexed_at) VALUES (?, datetime('now')) "
-                "ON CONFLICT(source_path) DO UPDATE SET last_indexed_at = datetime('now')",
-                (source_path,),
+                "INSERT INTO wiki_sources (source_path, stem, last_indexed_at) "
+                "VALUES (?, ?, datetime('now')) "
+                "ON CONFLICT(source_path) DO UPDATE SET "
+                "  stem = excluded.stem, "
+                "  last_indexed_at = datetime('now')",
+                (source_path, stem),
             )
 
     def remove_for_source(self, source_path: str) -> None:
@@ -79,11 +82,15 @@ class SqliteRefIndex(RefIndex):
     def rename_source(self, old: str, new: str) -> int:
         with self._lock, self._conn:
             cur = self._conn.execute("UPDATE wiki_references SET source_path=? WHERE source_path=?", (new, old))
-            # Keep wiki_sources in sync with the rename + refresh timestamp.
+            # Keep wiki_sources in sync with the rename + refresh timestamp + stem.
+            new_stem = PurePosixPath(new).stem
             self._conn.execute(
-                "INSERT INTO wiki_sources (source_path, last_indexed_at) VALUES (?, datetime('now')) "
-                "ON CONFLICT(source_path) DO UPDATE SET last_indexed_at = datetime('now')",
-                (new,),
+                "INSERT INTO wiki_sources (source_path, stem, last_indexed_at) "
+                "VALUES (?, ?, datetime('now')) "
+                "ON CONFLICT(source_path) DO UPDATE SET "
+                "  stem = excluded.stem, "
+                "  last_indexed_at = datetime('now')",
+                (new, new_stem),
             )
             self._conn.execute("DELETE FROM wiki_sources WHERE source_path=?", (old,))
             return cur.rowcount
@@ -91,68 +98,45 @@ class SqliteRefIndex(RefIndex):
     def stems(self) -> dict[str, list[str]]:
         """Map of stem → [source_paths with that stem].
 
-        Stem = filename without .md extension. Derived from wiki_sources table
-        (all indexed paths, even those with no outbound refs). Used by broken()
-        to disambiguate wikilink false positives.
+        Reads the materialized stem column directly. Used by broken() (now SQL-side)
+        and exposed for legacy callers / tests.
         """
         from collections import defaultdict
         with self._lock:
-            cur = self._conn.execute("SELECT source_path FROM wiki_sources")
+            cur = self._conn.execute("SELECT stem, source_path FROM wiki_sources")
             result: dict[str, list[str]] = defaultdict(list)
             for row in cur.fetchall():
-                sp = row["source_path"]
-                stem = PurePosixPath(sp).stem
-                result[stem].append(sp)
+                result[row["stem"]].append(row["source_path"])
         return dict(result)
 
     def broken(self, *, limit: int = 100, offset: int = 0, kind: int | None = None) -> list[Reference]:
         """References whose target_path doesn't resolve to any known source.
 
-        Wikilinks (BODY_WIKILINK) carry a stem as target_path and are checked
-        against the stem map built from all known source paths. Path-based refs
-        (BODY_MD_LINK, FM_*) are checked against the full source_path set.
-
-        Implementation: Python-side filter after fetching candidates. This loads
-        all candidate rows into memory, which is acceptable at 100K-row scale
-        (~20MB). Phase 6 can materialize stem as a DB column or use a temp table
-        if benchmarks show contention.
+        Implementation (E3): SQL-side anti-join against wiki_sources. The two
+        cases collapse into one query:
+          - BODY_WIKILINK target_path is broken iff no wiki_sources row has the
+            same stem.
+          - Other kinds are broken iff no wiki_sources row has the same source_path.
+        idx_wiki_sources_stem and the source_path PK make both NOT EXISTS
+        subqueries index-lookups, so this scales linearly with broken-ref count
+        rather than (refs * sources) like the prior Python pass.
         """
-        # Step 1: collect all known source paths from wiki_sources (includes zero-ref sources)
-        with self._lock:
-            cur = self._conn.execute("SELECT source_path FROM wiki_sources")
-            all_sources = [row["source_path"] for row in cur.fetchall()]
-
-        known_paths = set(all_sources)
-        known_stems = {PurePosixPath(p).stem for p in all_sources}
-
-        # Step 2: fetch candidate refs (optionally filtered by kind)
-        sql = "SELECT * FROM wiki_references"
-        params: list = []
+        sql = (
+            "SELECT r.* FROM wiki_references r WHERE "
+            "((r.kind = ? AND NOT EXISTS (SELECT 1 FROM wiki_sources s WHERE s.stem = r.target_path)) "
+            " OR "
+            " (r.kind != ? AND NOT EXISTS (SELECT 1 FROM wiki_sources s WHERE s.source_path = r.target_path)))"
+        )
+        params: list = [RefKind.BODY_WIKILINK, RefKind.BODY_WIKILINK]
         if kind is not None:
-            sql += " WHERE kind=?"
+            sql += " AND r.kind = ?"
             params.append(kind)
-        sql += " ORDER BY id"
+        sql += " ORDER BY r.id LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
 
         with self._lock:
             cur = self._conn.execute(sql, params)
-            all_rows = cur.fetchall()
-
-        # Step 3: Python-filter "broken"
-        broken_refs: list[Reference] = []
-        for row in all_rows:
-            ref = self._row_to_ref(row)
-            if ref.kind == RefKind.BODY_WIKILINK:
-                # Wikilinks use stem as target; broken iff stem not in any source
-                if ref.target_path not in known_stems:
-                    broken_refs.append(ref)
-            else:
-                # Path-based refs: broken iff full target_path not in known sources
-                if ref.target_path not in known_paths:
-                    broken_refs.append(ref)
-            if len(broken_refs) >= offset + limit:
-                break  # enough collected for this page
-
-        return broken_refs[offset: offset + limit]
+            return [self._row_to_ref(r) for r in cur.fetchall()]
 
     def clear(self) -> None:
         with self._lock, self._conn:

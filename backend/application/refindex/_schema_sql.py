@@ -19,12 +19,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_refs_unique
 -- Required by stems() / broken() for accurate wikilink resolution.
 -- last_indexed_at refreshed on every upsert_for_source so stale_sources()
 -- can surface paths whose ref index hasn't been refreshed in a while.
+-- stem is the materialized filename-minus-.md, used by broken() to detect
+-- valid [[wikilink]] targets without a Python-side filter pass.
 CREATE TABLE IF NOT EXISTS wiki_sources (
     source_path     TEXT PRIMARY KEY,
+    stem            TEXT NOT NULL DEFAULT '',
     last_indexed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_wiki_sources_last_indexed
     ON wiki_sources (last_indexed_at);
+CREATE INDEX IF NOT EXISTS idx_wiki_sources_stem
+    ON wiki_sources (stem);
 """
 
 SQLITE_DDL = """
@@ -43,12 +48,17 @@ CREATE INDEX IF NOT EXISTS idx_refs_source ON wiki_references (source_path);
 -- Required by stems() / broken() for accurate wikilink resolution.
 -- last_indexed_at refreshed on every upsert_for_source so stale_sources()
 -- can surface paths whose ref index hasn't been refreshed in a while.
+-- stem is the materialized filename-minus-.md, used by broken() to detect
+-- valid [[wikilink]] targets without a Python-side filter pass.
 CREATE TABLE IF NOT EXISTS wiki_sources (
     source_path     TEXT PRIMARY KEY,
+    stem            TEXT NOT NULL DEFAULT '',
     last_indexed_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_wiki_sources_last_indexed
     ON wiki_sources (last_indexed_at);
+CREATE INDEX IF NOT EXISTS idx_wiki_sources_stem
+    ON wiki_sources (stem);
 """
 
 # Note: SQLite uses generic JSON-as-TEXT; the unique index over (location->>'offset')

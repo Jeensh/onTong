@@ -317,3 +317,71 @@ def test_rename_source_refreshes_last_indexed_at(sqlite_index):
     ).fetchone()["last_indexed_at"]
 
     assert second > first
+
+
+# ── E3: materialized stem column ─────────────────────────────────────────────
+
+def test_stem_column_populated_on_upsert(sqlite_index):
+    """upsert_for_source materializes stem from the source_path."""
+    sqlite_index.upsert_for_source("dir1/foo-bar.md", [])
+    row = sqlite_index._conn.execute(
+        "SELECT stem FROM wiki_sources WHERE source_path='dir1/foo-bar.md'"
+    ).fetchone()
+    assert row["stem"] == "foo-bar"
+
+
+def test_stem_column_updates_on_rename(sqlite_index):
+    """rename_source rewrites stem to match the new path."""
+    sqlite_index.upsert_for_source("dir/old-name.md", [])
+    sqlite_index.rename_source("dir/old-name.md", "dir/new-name.md")
+    row = sqlite_index._conn.execute(
+        "SELECT stem FROM wiki_sources WHERE source_path='dir/new-name.md'"
+    ).fetchone()
+    assert row["stem"] == "new-name"
+
+
+def test_broken_pagination_with_offset(sqlite_index):
+    """broken() now uses SQL LIMIT/OFFSET — must page deterministically by id."""
+    # Create 5 broken md links
+    for i in range(5):
+        sqlite_index.upsert_for_source(
+            f"src{i}.md",
+            [Reference(f"src{i}.md", f"missing{i}.md", RefKind.BODY_MD_LINK,
+                       {"offset": 0, "length": 12, "raw": f"missing{i}.md"})],
+        )
+
+    page1 = sqlite_index.broken(limit=2, offset=0)
+    page2 = sqlite_index.broken(limit=2, offset=2)
+    page3 = sqlite_index.broken(limit=2, offset=4)
+    seen = [r.target_path for r in (page1 + page2 + page3)]
+    assert sorted(seen) == [f"missing{i}.md" for i in range(5)]
+    # Pages do not overlap
+    assert len(set(seen)) == 5
+
+
+def test_broken_kind_filter_path_only(sqlite_index):
+    """broken(kind=BODY_MD_LINK) returns only path-broken refs, not wikilinks."""
+    sqlite_index.upsert_for_source("a.md", [
+        Reference("a.md", "missing.md", RefKind.BODY_MD_LINK,
+                  {"offset": 0, "length": 10, "raw": "missing.md"}),
+        Reference("a.md", "ghost-stem", RefKind.BODY_WIKILINK,
+                  {"offset": 20, "length": 10, "raw": "ghost-stem"}),
+    ])
+    md_only = sqlite_index.broken(kind=RefKind.BODY_MD_LINK)
+    assert len(md_only) == 1
+    assert md_only[0].target_path == "missing.md"
+    assert md_only[0].kind == RefKind.BODY_MD_LINK
+
+
+def test_broken_kind_filter_wikilink_only(sqlite_index):
+    """broken(kind=BODY_WIKILINK) returns only stem-broken wikilinks."""
+    sqlite_index.upsert_for_source("a.md", [
+        Reference("a.md", "missing.md", RefKind.BODY_MD_LINK,
+                  {"offset": 0, "length": 10, "raw": "missing.md"}),
+        Reference("a.md", "ghost-stem", RefKind.BODY_WIKILINK,
+                  {"offset": 20, "length": 10, "raw": "ghost-stem"}),
+    ])
+    wl_only = sqlite_index.broken(kind=RefKind.BODY_WIKILINK)
+    assert len(wl_only) == 1
+    assert wl_only[0].target_path == "ghost-stem"
+    assert wl_only[0].kind == RefKind.BODY_WIKILINK
