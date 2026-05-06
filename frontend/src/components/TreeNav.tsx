@@ -59,6 +59,8 @@ import { ContextMenu as ACLContextMenu, type MenuItemDef } from "@/components/Co
 import { ShareDialog } from "@/components/ShareDialog";
 import { PropertiesPanel } from "@/components/PropertiesPanel";
 import { useAuth } from "@/hooks/useAuth";
+import { RenameImpactDialog } from "@/components/sections/wiki/RenameImpactDialog";
+import { fetchRenamePlan, executeRename, type RenamePlanResponse } from "@/lib/wiki/renameWithPreview";
 
 // ── API helpers ───────────────────────────────────────────────────────
 
@@ -1549,6 +1551,16 @@ function addTreeNode(nodes: WikiTreeNode[], parentPath: string, newNode: WikiTre
   });
 }
 
+/** Find a node by exact path */
+function findTreeNode(nodes: WikiTreeNode[], path: string): WikiTreeNode | null {
+  for (const n of nodes) {
+    if (n.path === path) return n;
+    const found = findTreeNode(n.children, path);
+    if (found) return found;
+  }
+  return null;
+}
+
 /** Update paths recursively when a node is renamed/moved */
 function updateNodePath(node: WikiTreeNode, oldPrefix: string, newPrefix: string): WikiTreeNode {
   const newPath = node.path.replace(oldPrefix, newPrefix);
@@ -1587,6 +1599,12 @@ export function TreeNav() {
   const [newVersionCreating, setNewVersionCreating] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ path: string; type: "file" | "folder" } | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Rename impact preview dialog state
+  const [renamePending, setRenamePending] = useState<{ old: string; new: string } | null>(null);
+  const [renamePlan, setRenamePlan] = useState<RenamePlanResponse | null>(null);
+  const [renamePlanLoading, setRenamePlanLoading] = useState(false);
+  const [renamePlanError, setRenamePlanError] = useState<string | null>(null);
 
   // Share dialog / properties panel
   const [shareDialogPath, setShareDialogPath] = useState<string | null>(null);
@@ -1741,7 +1759,7 @@ export function TreeNav() {
 
   // ── Rename ──────────────────────────────────────────────────────
 
-  const handleRenameSubmit = useCallback(async (node: WikiTreeNode, newName: string) => {
+  const handleRenameSubmit = useCallback((node: WikiTreeNode, newName: string) => {
     setRenamingNode(null);
     if (newName === node.name) return;
 
@@ -1751,26 +1769,67 @@ export function TreeNav() {
     const finalName = (!node.is_dir && !newName.includes(".")) ? `${newName}.md` : newName;
     const newPath = parent ? `${parent}/${finalName}` : finalName;
 
-    try {
-      await apiMove(node.path, newPath, node.is_dir);
-
-      if (!node.is_dir) {
-        const tab = tabs.find((t) => t.filePath === node.path);
-        if (tab) updateTabPath(tab.id, newPath);
-      }
-
-      toast.success(`"${node.name}" → "${finalName}"`);
-      // Optimistic update: rename node in tree
-      setTree((prev) => {
-        const updated = updateNodePath(node, node.path, newPath);
-        updated.name = finalName;
-        const parentPath = node.path.includes("/") ? node.path.substring(0, node.path.lastIndexOf("/")) : "";
-        return addTreeNode(removeTreeNode(prev, node.path), parentPath, updated);
-      });
-    } catch (err) {
-      toast.error(`이름 변경 실패: ${(err as Error).message}`);
+    if (node.is_dir) {
+      // Folders: no inbound-ref concept — go straight to PATCH via apiMove
+      apiMove(node.path, newPath, true)
+        .then(() => {
+          toast.success(`"${node.name}" → "${finalName}"`);
+          setTree((prev) => {
+            const updated = updateNodePath(node, node.path, newPath);
+            updated.name = finalName;
+            const parentPath = node.path.includes("/") ? node.path.substring(0, node.path.lastIndexOf("/")) : "";
+            return addTreeNode(removeTreeNode(prev, node.path), parentPath, updated);
+          });
+        })
+        .catch((err: Error) => toast.error(`이름 변경 실패: ${err.message}`));
+      return;
     }
-  }, [tabs, updateTabPath]);
+
+    // Files: show impact preview dialog first, then PATCH on confirm
+    setRenamePending({ old: node.path, new: newPath });
+    setRenamePlan(null);
+    setRenamePlanLoading(true);
+    setRenamePlanError(null);
+    fetchRenamePlan(node.path, newPath)
+      .then((p) => setRenamePlan(p))
+      .catch((e: Error) => setRenamePlanError(String(e)))
+      .finally(() => setRenamePlanLoading(false));
+  }, []);
+
+  const handleRenameDialogConfirm = useCallback(async () => {
+    if (!renamePending) return;
+    const { old: oldPath, new: newPath } = renamePending;
+    try {
+      const result = await executeRename(oldPath, newPath);
+      const finalName = newPath.split("/").pop() ?? newPath;
+      toast.success(`이름 변경 완료 (${result.inbound_done}개 문서 갱신됨)`, {
+        description: `"${oldPath.split("/").pop()}" → "${finalName}"`,
+      });
+      // Update open tabs if the renamed file was open
+      const tab = tabs.find((t) => t.filePath === oldPath);
+      if (tab) updateTabPath(tab.id, newPath);
+      // Optimistic tree update
+      setTree((prev) => {
+        const targetNode = findTreeNode(prev, oldPath);
+        if (!targetNode) return prev;
+        const updated = updateNodePath(targetNode, oldPath, newPath);
+        updated.name = finalName;
+        const parentPath = oldPath.includes("/") ? oldPath.substring(0, oldPath.lastIndexOf("/")) : "";
+        return addTreeNode(removeTreeNode(prev, oldPath), parentPath, updated);
+      });
+    } catch (e) {
+      toast.error(`이름 변경 실패: ${(e as Error)?.message ?? e}`);
+    } finally {
+      setRenamePending(null);
+      setRenamePlan(null);
+    }
+  }, [renamePending, tabs, updateTabPath]);
+
+  const handleRenameDialogCancel = useCallback(() => {
+    setRenamePending(null);
+    setRenamePlan(null);
+    setRenamePlanError(null);
+  }, []);
 
   // ── Delete ──────────────────────────────────────────────────────
 
@@ -2187,6 +2246,19 @@ export function TreeNav() {
           />
         );
       })()}
+
+      {/* Rename Impact Preview Dialog */}
+      {renamePending && (
+        <RenameImpactDialog
+          oldPath={renamePending.old}
+          newPath={renamePending.new}
+          plan={renamePlan}
+          loading={renamePlanLoading}
+          error={renamePlanError}
+          onCancel={handleRenameDialogCancel}
+          onConfirm={handleRenameDialogConfirm}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteConfirm} onOpenChange={(open) => { if (!open) { setDeleteConfirm(null); setDeleteLoading(false); } }}>
