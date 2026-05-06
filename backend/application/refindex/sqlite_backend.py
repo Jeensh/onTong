@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from .extractor import Reference, RefKind
 from .ref_protocol import RefIndex
@@ -44,10 +44,16 @@ class SqliteRefIndex(RefIndex):
                 "INSERT INTO wiki_references (source_path, target_path, kind, location) VALUES (?, ?, ?, ?)",
                 [(r.source_path, r.target_path, r.kind, json.dumps(r.location, ensure_ascii=False)) for r in refs],
             )
+            # Register source in wiki_sources so stems()/broken() see it even with no refs.
+            self._conn.execute(
+                "INSERT OR REPLACE INTO wiki_sources (source_path) VALUES (?)",
+                (source_path,),
+            )
 
     def remove_for_source(self, source_path: str) -> None:
         with self._lock, self._conn:
             self._conn.execute("DELETE FROM wiki_references WHERE source_path=?", (source_path,))
+            self._conn.execute("DELETE FROM wiki_sources WHERE source_path=?", (source_path,))
 
     def inbound(self, target_path: str, *, kind: int | None = None) -> list[Reference]:
         with self._lock:
@@ -70,25 +76,80 @@ class SqliteRefIndex(RefIndex):
     def rename_source(self, old: str, new: str) -> int:
         with self._lock, self._conn:
             cur = self._conn.execute("UPDATE wiki_references SET source_path=? WHERE source_path=?", (new, old))
+            # Keep wiki_sources in sync with the rename.
+            self._conn.execute(
+                "INSERT OR REPLACE INTO wiki_sources (source_path) VALUES (?)", (new,)
+            )
+            self._conn.execute("DELETE FROM wiki_sources WHERE source_path=?", (old,))
             return cur.rowcount
 
-    def broken(self, *, limit: int = 100, offset: int = 0, kind: int | None = None) -> list[Reference]:
-        sql = """
-            SELECT r.* FROM wiki_references r
-            LEFT JOIN (SELECT DISTINCT source_path FROM wiki_references) src
-                ON src.source_path = r.target_path
-            WHERE src.source_path IS NULL
+    def stems(self) -> dict[str, list[str]]:
+        """Map of stem → [source_paths with that stem].
+
+        Stem = filename without .md extension. Derived from wiki_sources table
+        (all indexed paths, even those with no outbound refs). Used by broken()
+        to disambiguate wikilink false positives.
         """
+        from collections import defaultdict
+        with self._lock:
+            cur = self._conn.execute("SELECT source_path FROM wiki_sources")
+            result: dict[str, list[str]] = defaultdict(list)
+            for row in cur.fetchall():
+                sp = row["source_path"]
+                stem = PurePosixPath(sp).stem
+                result[stem].append(sp)
+        return dict(result)
+
+    def broken(self, *, limit: int = 100, offset: int = 0, kind: int | None = None) -> list[Reference]:
+        """References whose target_path doesn't resolve to any known source.
+
+        Wikilinks (BODY_WIKILINK) carry a stem as target_path and are checked
+        against the stem map built from all known source paths. Path-based refs
+        (BODY_MD_LINK, FM_*) are checked against the full source_path set.
+
+        Implementation: Python-side filter after fetching candidates. This loads
+        all candidate rows into memory, which is acceptable at 100K-row scale
+        (~20MB). Phase 6 can materialize stem as a DB column or use a temp table
+        if benchmarks show contention.
+        """
+        # Step 1: collect all known source paths from wiki_sources (includes zero-ref sources)
+        with self._lock:
+            cur = self._conn.execute("SELECT source_path FROM wiki_sources")
+            all_sources = [row["source_path"] for row in cur.fetchall()]
+
+        known_paths = set(all_sources)
+        known_stems = {PurePosixPath(p).stem for p in all_sources}
+
+        # Step 2: fetch candidate refs (optionally filtered by kind)
+        sql = "SELECT * FROM wiki_references"
         params: list = []
         if kind is not None:
-            sql += " AND r.kind=?"
+            sql += " WHERE kind=?"
             params.append(kind)
-        sql += " ORDER BY r.id LIMIT ? OFFSET ?"
-        params.extend([limit, offset])
+        sql += " ORDER BY id"
+
         with self._lock:
             cur = self._conn.execute(sql, params)
-            return [self._row_to_ref(r) for r in cur.fetchall()]
+            all_rows = cur.fetchall()
+
+        # Step 3: Python-filter "broken"
+        broken_refs: list[Reference] = []
+        for row in all_rows:
+            ref = self._row_to_ref(row)
+            if ref.kind == RefKind.BODY_WIKILINK:
+                # Wikilinks use stem as target; broken iff stem not in any source
+                if ref.target_path not in known_stems:
+                    broken_refs.append(ref)
+            else:
+                # Path-based refs: broken iff full target_path not in known sources
+                if ref.target_path not in known_paths:
+                    broken_refs.append(ref)
+            if len(broken_refs) >= offset + limit:
+                break  # enough collected for this page
+
+        return broken_refs[offset: offset + limit]
 
     def clear(self) -> None:
         with self._lock, self._conn:
             self._conn.execute("DELETE FROM wiki_references")
+            self._conn.execute("DELETE FROM wiki_sources")

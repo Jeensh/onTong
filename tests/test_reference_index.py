@@ -159,3 +159,88 @@ def test_postgres_backend_smoke(monkeypatch):
         assert PostgresRefIndex is not None
     except ImportError as e:
         pytest.fail(f"PostgresRefIndex import failed: {e}")
+
+
+# ── Phase 5-A: stems() + revised broken() tests ──────────────────────────────
+
+def test_stems_returns_stem_to_paths_map(sqlite_index):
+    """stems() groups source_paths by their filename stem."""
+    sqlite_index.upsert_for_source("dir1/foo.md", [
+        Reference("dir1/foo.md", "x.md", RefKind.BODY_MD_LINK,
+                  {"offset": 0, "length": 4, "raw": "x.md"})
+    ])
+    sqlite_index.upsert_for_source("dir2/bar.md", [
+        Reference("dir2/bar.md", "y.md", RefKind.BODY_MD_LINK,
+                  {"offset": 0, "length": 4, "raw": "y.md"})
+    ])
+    sqlite_index.upsert_for_source("dir3/foo.md", [
+        Reference("dir3/foo.md", "z.md", RefKind.BODY_MD_LINK,
+                  {"offset": 0, "length": 4, "raw": "z.md"})
+    ])
+    stems = sqlite_index.stems()
+    assert sorted(stems["foo"]) == ["dir1/foo.md", "dir3/foo.md"]
+    assert stems["bar"] == ["dir2/bar.md"]
+
+
+def test_stems_empty_when_index_is_empty(sqlite_index):
+    """stems() returns an empty dict when no refs are indexed."""
+    assert sqlite_index.stems() == {}
+
+
+def test_broken_excludes_wikilinks_with_existing_stem(sqlite_index):
+    """A [[foo]] wikilink is NOT broken if any source has stem 'foo'."""
+    # a.md links to wikilink 'foo'
+    sqlite_index.upsert_for_source("a.md", [
+        Reference("a.md", "foo", RefKind.BODY_WIKILINK,
+                  {"offset": 0, "length": 3, "raw": "foo"})
+    ])
+    # dir/foo.md exists as a source (no outbound refs, but it's in the index)
+    sqlite_index.upsert_for_source("dir/foo.md", [])
+
+    broken = sqlite_index.broken()
+    # foo stem is owned by dir/foo.md → wikilink is NOT broken
+    assert len(broken) == 0
+
+
+def test_broken_includes_wikilinks_with_missing_stem(sqlite_index):
+    """A [[ghost]] wikilink IS broken if no source has stem 'ghost'."""
+    sqlite_index.upsert_for_source("a.md", [
+        Reference("a.md", "ghost", RefKind.BODY_WIKILINK,
+                  {"offset": 0, "length": 5, "raw": "ghost"})
+    ])
+
+    broken = sqlite_index.broken()
+    targets = [r.target_path for r in broken]
+    assert "ghost" in targets
+
+
+def test_broken_path_based_refs_still_detected(sqlite_index):
+    """Non-wikilink refs (paths) still detected as broken when target missing."""
+    sqlite_index.upsert_for_source("a.md", [
+        Reference("a.md", "missing.md", RefKind.BODY_MD_LINK,
+                  {"offset": 0, "length": 10, "raw": "missing.md"}),
+    ])
+
+    broken = sqlite_index.broken()
+    targets = [r.target_path for r in broken]
+    assert "missing.md" in targets
+
+
+def test_broken_wikilink_and_path_combined(sqlite_index):
+    """Mixed refs: valid wikilink (stem exists) + broken path + broken wikilink."""
+    sqlite_index.upsert_for_source("a.md", [
+        Reference("a.md", "real-stem", RefKind.BODY_WIKILINK,
+                  {"offset": 0, "length": 9, "raw": "real-stem"}),
+        Reference("a.md", "ghost-stem", RefKind.BODY_WIKILINK,
+                  {"offset": 20, "length": 10, "raw": "ghost-stem"}),
+        Reference("a.md", "missing.md", RefKind.BODY_MD_LINK,
+                  {"offset": 40, "length": 10, "raw": "missing.md"}),
+    ])
+    # real-stem is an actual indexed source
+    sqlite_index.upsert_for_source("dir/real-stem.md", [])
+
+    broken = sqlite_index.broken()
+    broken_targets = {r.target_path for r in broken}
+    assert "ghost-stem" in broken_targets
+    assert "missing.md" in broken_targets
+    assert "real-stem" not in broken_targets

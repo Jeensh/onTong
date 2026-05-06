@@ -45,5 +45,14 @@ class RefIndex(ABC):
         for Phase 1; Phase 6 can refine."""
 
     @abstractmethod
+    def stems(self) -> dict[str, list[str]]:
+        """Map of stem → [source_paths with that stem].
+
+        Stem = filename without .md extension. Built from DISTINCT source_path
+        in the index. Used by broken() to disambiguate wikilink false positives:
+        a [[foo]] wikilink is only broken if no indexed source has stem 'foo'.
+        """
+
+    @abstractmethod
     def clear(self) -> None:
         """Wipe the entire index. Test-only / migration use."""

@@ -7,10 +7,11 @@ RenameOrchestrator to patch only the precise location without naive str.replace(
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 # Import _parse_frontmatter from local_fs — do not duplicate frontmatter parsing logic.
@@ -53,6 +54,61 @@ _WIKILINK_RE = re.compile(r"\[\[([^\]\|]+)(?:\|[^\]]*)?\]\]")
 
 # External href prefixes — these should be skipped for BODY_MD_LINK
 _EXTERNAL_PREFIXES = ("http://", "https://", "mailto:", "#")
+
+
+# ── Helper: resolve relative markdown link targets ───────────────────────────
+
+def _resolve_relative(source_path: str, target: str) -> str:
+    """Normalize a body markdown link target relative to source's directory.
+
+    External links (http/https/mailto/anchor): returned unchanged.
+    Already project-rooted paths (contain '/' without ./ or ../): returned unchanged.
+    Relative (./  ../  or plain sibling filename): resolved using source_path's parent as base.
+
+    Examples:
+      source='라이브데모/sub/note.md', target='../article-a.md'
+        → '라이브데모/article-a.md'
+      source='라이브데모/index.md', target='article-a.md'
+        → '라이브데모/article-a.md'
+      source='라이브데모/index.md', target='라이브데모/article-a.md'
+        → '라이브데모/article-a.md'  (already rooted, no double-nesting)
+      source='a.md', target='b.md'
+        → 'b.md'  (sibling at root)
+      source='a.md', target='/abs/c.md'
+        → 'abs/c.md'  (strip leading /)
+
+    Only applied to BODY_MD_LINK. Wikilinks and frontmatter are unchanged.
+    """
+    if not target or target.startswith(("http://", "https://", "mailto:", "#")):
+        return target
+
+    # Strip any leading "/" — wiki paths are project-rooted, no absolute filesystem paths.
+    t = target.lstrip("/")
+    if t != target:
+        # Had a leading slash: project-rooted after stripping.
+        return t
+
+    # Detect explicit relative markers.
+    is_explicit_relative = t.startswith("./") or t.startswith("../")
+
+    # If target has a "/" but is NOT explicitly relative, treat it as already
+    # project-rooted (e.g. "라이브데모/article-a.md" from any source).
+    if "/" in t and not is_explicit_relative:
+        return t
+
+    # Strip "./" prefix for explicit same-dir refs.
+    if t.startswith("./"):
+        t = t[2:]
+
+    src_dir = PurePosixPath(source_path).parent
+    if str(src_dir) == ".":
+        # Source is at the root level; target is already root-relative (no nesting).
+        return t
+
+    # Compose source directory + target, then normalize ../ segments.
+    composed = str(src_dir / t)
+    normalized = os.path.normpath(composed).replace("\\", "/")
+    return normalized
 
 
 # ── Helper: mask code regions ─────────────────────────────────────────────────
@@ -212,7 +268,13 @@ class ReferenceExtractor:
         body: str,
         fm_length: int,
     ) -> list[Reference]:
-        """Extract [text](href) links from body, skipping code and external URLs."""
+        """Extract [text](href) links from body, skipping code and external URLs.
+
+        target_path is normalized to a project-rooted path via _resolve_relative so
+        that relative links (../foo.md, ./foo.md, sibling.md) index correctly and
+        Patcher's target_remap can match them. location.raw preserves the as-written
+        form so Patcher's sanity check (substring verification) still works.
+        """
         if not body:
             return []
 
@@ -228,17 +290,21 @@ class ReferenceExtractor:
             href_start_in_body = m.start(2)
             absolute_offset = fm_length + href_start_in_body
 
-            # Verify against original body (not masked) — should be identical
-            actual = body[href_start_in_body: href_start_in_body + len(href)]
+            # Verify against original body (not masked) — raw is the as-written form.
+            raw_href = body[href_start_in_body: href_start_in_body + len(href)]
+
+            # Resolve relative paths so target_path is always project-rooted.
+            # raw_href is kept in location.raw for Patcher's substring sanity check.
+            resolved_target = _resolve_relative(source_path, raw_href)
 
             refs.append(Reference(
                 source_path=source_path,
-                target_path=href,
+                target_path=resolved_target,
                 kind=RefKind.BODY_MD_LINK,
                 location={
                     "offset": absolute_offset,
-                    "length": len(href),
-                    "raw": actual,
+                    "length": len(raw_href),
+                    "raw": raw_href,
                 },
             ))
 

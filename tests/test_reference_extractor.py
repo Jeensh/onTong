@@ -137,3 +137,67 @@ Also [[stem-b|Alias]] and [outside link](https://example.com).
     assert sorted(by_kind.get(RefKind.FM_RELATED, [])) == ["docs/r1.md", "docs/r2.md"]
     assert sorted(by_kind.get(RefKind.BODY_WIKILINK, [])) == ["stem-a", "stem-b"]
     assert by_kind.get(RefKind.BODY_MD_LINK) == ["docs/r1.md"]
+
+
+# ── Phase 5-A: relative path resolution tests ────────────────────────────────
+
+def test_md_link_relative_dotdot_resolved(extractor):
+    """../article-a.md from a sub-dir resolves to the parent dir's file."""
+    raw = "# Sub\n[A](../article-a.md)\n"
+    refs = extractor.extract("라이브데모/sub/note.md", raw)
+    md = [r for r in refs if r.kind == RefKind.BODY_MD_LINK]
+    assert len(md) == 1
+    assert md[0].target_path == "라이브데모/article-a.md"
+    # Raw is preserved for patcher's sanity check
+    assert md[0].location["raw"] == "../article-a.md"
+
+
+def test_md_link_relative_sibling_resolved(extractor):
+    """Plain sibling name (no ./ prefix) resolves to same directory."""
+    raw = "# Index\n[A](article-a.md)\n"
+    refs = extractor.extract("라이브데모/index.md", raw)
+    md = [r for r in refs if r.kind == RefKind.BODY_MD_LINK]
+    assert len(md) == 1
+    assert md[0].target_path == "라이브데모/article-a.md"
+
+
+def test_md_link_already_rooted_unchanged(extractor):
+    """A path that already starts from the project root isn't double-nested."""
+    raw = "# Index\n[A](라이브데모/article-a.md)\n"
+    refs = extractor.extract("라이브데모/index.md", raw)
+    md = [r for r in refs if r.kind == RefKind.BODY_MD_LINK]
+    assert len(md) == 1
+    assert md[0].target_path == "라이브데모/article-a.md"
+
+
+def test_md_link_at_root_unchanged(extractor):
+    """Source at root, target sibling at root — stays at root."""
+    raw = "# Top\n[B](b.md)\n"
+    refs = extractor.extract("a.md", raw)
+    md = [r for r in refs if r.kind == RefKind.BODY_MD_LINK]
+    assert md[0].target_path == "b.md"
+
+
+def test_md_link_with_dot_slash_resolved(extractor):
+    """./neighbor.md resolves to same directory as source."""
+    raw = "# Sub\n[A](./neighbor.md)\n"
+    refs = extractor.extract("docs/sub/note.md", raw)
+    md = [r for r in refs if r.kind == RefKind.BODY_MD_LINK]
+    assert md[0].target_path == "docs/sub/neighbor.md"
+
+
+def test_wikilink_target_path_remains_stem(extractor):
+    """Wikilinks always carry stem as target_path — NOT resolved to absolute."""
+    raw = "# Doc\nSee [[other-stem]] there.\n"
+    refs = extractor.extract("docs/sub/note.md", raw)
+    wl = [r for r in refs if r.kind == RefKind.BODY_WIKILINK]
+    assert len(wl) == 1
+    assert wl[0].target_path == "other-stem"  # NOT resolved
+
+
+def test_frontmatter_paths_unchanged(extractor):
+    """Frontmatter targets are always absolute by convention — don't resolve."""
+    raw = "---\nrelated:\n  - 라이브데모/article-a.md\n---\n# Doc\n"
+    refs = extractor.extract("라이브데모/sub/note.md", raw)
+    rel = [r for r in refs if r.kind == RefKind.FM_RELATED]
+    assert rel[0].target_path == "라이브데모/article-a.md"  # not normalized further
