@@ -44,9 +44,12 @@ class SqliteRefIndex(RefIndex):
                 "INSERT INTO wiki_references (source_path, target_path, kind, location) VALUES (?, ?, ?, ?)",
                 [(r.source_path, r.target_path, r.kind, json.dumps(r.location, ensure_ascii=False)) for r in refs],
             )
-            # Register source in wiki_sources so stems()/broken() see it even with no refs.
+            # Register source + refresh last_indexed_at so stale_sources() works.
+            # ON CONFLICT updates the timestamp; without it the row would keep
+            # its original timestamp and look stale forever.
             self._conn.execute(
-                "INSERT OR REPLACE INTO wiki_sources (source_path) VALUES (?)",
+                "INSERT INTO wiki_sources (source_path, last_indexed_at) VALUES (?, datetime('now')) "
+                "ON CONFLICT(source_path) DO UPDATE SET last_indexed_at = datetime('now')",
                 (source_path,),
             )
 
@@ -76,9 +79,11 @@ class SqliteRefIndex(RefIndex):
     def rename_source(self, old: str, new: str) -> int:
         with self._lock, self._conn:
             cur = self._conn.execute("UPDATE wiki_references SET source_path=? WHERE source_path=?", (new, old))
-            # Keep wiki_sources in sync with the rename.
+            # Keep wiki_sources in sync with the rename + refresh timestamp.
             self._conn.execute(
-                "INSERT OR REPLACE INTO wiki_sources (source_path) VALUES (?)", (new,)
+                "INSERT INTO wiki_sources (source_path, last_indexed_at) VALUES (?, datetime('now')) "
+                "ON CONFLICT(source_path) DO UPDATE SET last_indexed_at = datetime('now')",
+                (new,),
             )
             self._conn.execute("DELETE FROM wiki_sources WHERE source_path=?", (old,))
             return cur.rowcount
@@ -153,3 +158,19 @@ class SqliteRefIndex(RefIndex):
         with self._lock, self._conn:
             self._conn.execute("DELETE FROM wiki_references")
             self._conn.execute("DELETE FROM wiki_sources")
+
+    def stale_sources(self, threshold_seconds: int) -> list[str]:
+        """Source paths whose last_indexed_at is older than threshold_seconds.
+
+        Returns sorted source_paths so callers can deterministically pick a batch
+        to re-index. Operators use this to find files where the on-disk content
+        may have drifted from the indexed refs.
+        """
+        with self._lock:
+            cur = self._conn.execute(
+                "SELECT source_path FROM wiki_sources "
+                "WHERE last_indexed_at < datetime('now', ?) "
+                "ORDER BY last_indexed_at",
+                (f"-{int(threshold_seconds)} seconds",),
+            )
+            return [row["source_path"] for row in cur.fetchall()]

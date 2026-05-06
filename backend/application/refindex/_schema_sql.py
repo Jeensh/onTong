@@ -17,11 +17,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_refs_unique
 
 -- Tracks all indexed source paths, even those with no outbound refs.
 -- Required by stems() / broken() for accurate wikilink resolution.
--- Maintained in parallel with wiki_references by upsert_for_source / remove_for_source.
+-- last_indexed_at refreshed on every upsert_for_source so stale_sources()
+-- can surface paths whose ref index hasn't been refreshed in a while.
 CREATE TABLE IF NOT EXISTS wiki_sources (
-    source_path  TEXT PRIMARY KEY,
-    indexed_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    source_path     TEXT PRIMARY KEY,
+    last_indexed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS idx_wiki_sources_last_indexed
+    ON wiki_sources (last_indexed_at);
 """
 
 SQLITE_DDL = """
@@ -38,11 +41,14 @@ CREATE INDEX IF NOT EXISTS idx_refs_source ON wiki_references (source_path);
 
 -- Tracks all indexed source paths, even those with no outbound refs.
 -- Required by stems() / broken() for accurate wikilink resolution.
--- Maintained in parallel with wiki_references by upsert_for_source / remove_for_source.
+-- last_indexed_at refreshed on every upsert_for_source so stale_sources()
+-- can surface paths whose ref index hasn't been refreshed in a while.
 CREATE TABLE IF NOT EXISTS wiki_sources (
-    source_path  TEXT PRIMARY KEY,
-    indexed_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    source_path     TEXT PRIMARY KEY,
+    last_indexed_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_wiki_sources_last_indexed
+    ON wiki_sources (last_indexed_at);
 """
 
 # Note: SQLite uses generic JSON-as-TEXT; the unique index over (location->>'offset')

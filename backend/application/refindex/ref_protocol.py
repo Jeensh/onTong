@@ -56,3 +56,11 @@ class RefIndex(ABC):
     @abstractmethod
     def clear(self) -> None:
         """Wipe the entire index. Test-only / migration use."""
+
+    @abstractmethod
+    def stale_sources(self, threshold_seconds: int) -> list[str]:
+        """Source paths whose last_indexed_at is older than threshold_seconds.
+
+        Returns paths sorted oldest-first so a batch re-indexer can pick
+        a deterministic slice. Used by operators to surface files whose
+        on-disk content may have drifted from the indexed refs."""

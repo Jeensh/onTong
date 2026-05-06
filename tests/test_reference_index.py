@@ -244,3 +244,76 @@ def test_broken_wikilink_and_path_combined(sqlite_index):
     assert "ghost-stem" in broken_targets
     assert "missing.md" in broken_targets
     assert "real-stem" not in broken_targets
+
+
+# ── E5: last_indexed_at + stale_sources ──────────────────────────────────────
+
+def test_last_indexed_at_advances_on_reupsert(sqlite_index):
+    """Re-indexing the same source must refresh its last_indexed_at.
+
+    Regression test: the previous code used INSERT OR REPLACE which technically
+    refreshed via the default, but the Postgres equivalent used DO NOTHING and
+    silently kept the old timestamp. Verifying both backends advance the value
+    keeps the semantics consistent.
+    """
+    import time
+    sqlite_index.upsert_for_source("a.md", [])
+    first = sqlite_index._conn.execute(
+        "SELECT last_indexed_at FROM wiki_sources WHERE source_path='a.md'"
+    ).fetchone()["last_indexed_at"]
+
+    # SQLite datetime('now') has 1-second resolution; sleep just past that.
+    time.sleep(1.1)
+    sqlite_index.upsert_for_source("a.md", [])
+    second = sqlite_index._conn.execute(
+        "SELECT last_indexed_at FROM wiki_sources WHERE source_path='a.md'"
+    ).fetchone()["last_indexed_at"]
+
+    assert second > first, f"timestamp did not advance: {first!r} -> {second!r}"
+
+
+def test_stale_sources_returns_old_paths(sqlite_index):
+    """stale_sources(threshold) returns paths older than threshold seconds."""
+    # Insert a fresh source then back-date it via direct SQL.
+    sqlite_index.upsert_for_source("old1.md", [])
+    sqlite_index.upsert_for_source("old2.md", [])
+    sqlite_index.upsert_for_source("fresh.md", [])
+
+    # Back-date old1 / old2 by 2 hours; fresh stays at "now".
+    sqlite_index._conn.execute(
+        "UPDATE wiki_sources SET last_indexed_at = datetime('now', '-2 hours') "
+        "WHERE source_path IN ('old1.md', 'old2.md')"
+    )
+
+    # threshold = 1 hour: catches old1 + old2, skips fresh.
+    stale = sqlite_index.stale_sources(threshold_seconds=3600)
+    assert sorted(stale) == ["old1.md", "old2.md"]
+
+
+def test_stale_sources_excludes_recent(sqlite_index):
+    """Sources just upserted are NOT stale at any reasonable threshold."""
+    sqlite_index.upsert_for_source("just-now.md", [])
+    stale = sqlite_index.stale_sources(threshold_seconds=10)
+    assert "just-now.md" not in stale
+
+
+def test_stale_sources_returns_empty_when_no_sources(sqlite_index):
+    """No sources indexed → no stale sources."""
+    assert sqlite_index.stale_sources(threshold_seconds=1) == []
+
+
+def test_rename_source_refreshes_last_indexed_at(sqlite_index):
+    """Renaming a source counts as a fresh index event — timestamp must update."""
+    import time
+    sqlite_index.upsert_for_source("old-path.md", [])
+    first = sqlite_index._conn.execute(
+        "SELECT last_indexed_at FROM wiki_sources WHERE source_path='old-path.md'"
+    ).fetchone()["last_indexed_at"]
+
+    time.sleep(1.1)
+    sqlite_index.rename_source("old-path.md", "new-path.md")
+    second = sqlite_index._conn.execute(
+        "SELECT last_indexed_at FROM wiki_sources WHERE source_path='new-path.md'"
+    ).fetchone()["last_indexed_at"]
+
+    assert second > first

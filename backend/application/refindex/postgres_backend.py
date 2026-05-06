@@ -51,9 +51,12 @@ class PostgresRefIndex(RefIndex):
                     "INSERT INTO wiki_references (source_path, target_path, kind, location) VALUES (%s, %s, %s, %s::jsonb)",
                     [(r.source_path, r.target_path, r.kind, json.dumps(r.location, ensure_ascii=False)) for r in refs],
                 )
-            # Register source in wiki_sources so stems()/broken() see it even with no refs.
+            # Register source + refresh last_indexed_at so stale_sources() works.
+            # The DO UPDATE on conflict is critical: DO NOTHING here would mean
+            # a re-indexed source keeps its original timestamp and looks stale forever.
             cur.execute(
-                "INSERT INTO wiki_sources (source_path) VALUES (%s) ON CONFLICT (source_path) DO NOTHING",
+                "INSERT INTO wiki_sources (source_path, last_indexed_at) VALUES (%s, now()) "
+                "ON CONFLICT (source_path) DO UPDATE SET last_indexed_at = now()",
                 (source_path,),
             )
             conn.commit()
@@ -88,9 +91,10 @@ class PostgresRefIndex(RefIndex):
         with self._conn() as conn, conn.cursor() as cur:
             cur.execute("UPDATE wiki_references SET source_path=%s WHERE source_path=%s", (new, old))
             n = cur.rowcount
-            # Keep wiki_sources in sync with the rename.
+            # Keep wiki_sources in sync with the rename + refresh timestamp.
             cur.execute(
-                "INSERT INTO wiki_sources (source_path) VALUES (%s) ON CONFLICT (source_path) DO NOTHING",
+                "INSERT INTO wiki_sources (source_path, last_indexed_at) VALUES (%s, now()) "
+                "ON CONFLICT (source_path) DO UPDATE SET last_indexed_at = now()",
                 (new,),
             )
             cur.execute("DELETE FROM wiki_sources WHERE source_path=%s", (old,))
@@ -167,3 +171,19 @@ class PostgresRefIndex(RefIndex):
             cur.execute("DELETE FROM wiki_references")
             cur.execute("DELETE FROM wiki_sources")
             conn.commit()
+
+    def stale_sources(self, threshold_seconds: int) -> list[str]:
+        """Source paths whose last_indexed_at is older than threshold_seconds.
+
+        Returns sorted source_paths so callers can deterministically pick a batch
+        to re-index. Operators use this to find files where the on-disk content
+        may have drifted from the indexed refs.
+        """
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT source_path FROM wiki_sources "
+                "WHERE last_indexed_at < now() - make_interval(secs => %s) "
+                "ORDER BY last_indexed_at",
+                (int(threshold_seconds),),
+            )
+            return [row["source_path"] for row in cur.fetchall()]
