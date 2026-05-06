@@ -58,12 +58,16 @@ _EXTERNAL_PREFIXES = ("http://", "https://", "mailto:", "#")
 
 # ── Helper: resolve relative markdown link targets ───────────────────────────
 
-def _resolve_relative(source_path: str, target: str) -> str:
+def _resolve_relative(source_path: str, target: str) -> str | None:
     """Normalize a body markdown link target relative to source's directory.
 
     External links (http/https/mailto/anchor): returned unchanged.
     Already project-rooted paths (contain '/' without ./ or ../): returned unchanged.
     Relative (./  ../  or plain sibling filename): resolved using source_path's parent as base.
+
+    Returns None when the resolved path would escape above the wiki root
+    (e.g. too many '..' segments). Caller is expected to skip such refs —
+    they reference files outside the wiki and can't be resolved.
 
     Examples:
       source='라이브데모/sub/note.md', target='../article-a.md'
@@ -76,6 +80,10 @@ def _resolve_relative(source_path: str, target: str) -> str:
         → 'b.md'  (sibling at root)
       source='a.md', target='/abs/c.md'
         → 'abs/c.md'  (strip leading /)
+      source='a.md', target='../escape.md'
+        → None  (escapes wiki root)
+      source='dir1/dir2/a.md', target='../../../escape.md'
+        → None  (escapes wiki root after normalization)
 
     Only applied to BODY_MD_LINK. Wikilinks and frontmatter are unchanged.
     """
@@ -102,12 +110,20 @@ def _resolve_relative(source_path: str, target: str) -> str:
 
     src_dir = PurePosixPath(source_path).parent
     if str(src_dir) == ".":
-        # Source is at the root level; target is already root-relative (no nesting).
-        return t
+        # Source is at the root level. Compose with cwd so normpath sees
+        # the same '..' arithmetic as the deeper case below.
+        composed = t
+    else:
+        # Compose source directory + target.
+        composed = str(src_dir / t)
 
-    # Compose source directory + target, then normalize ../ segments.
-    composed = str(src_dir / t)
     normalized = os.path.normpath(composed).replace("\\", "/")
+
+    # normpath produces a leading '..' when the path resolves above its starting
+    # point. That means the link escapes the wiki root → caller should skip it.
+    if normalized == ".." or normalized.startswith("../"):
+        return None
+
     return normalized
 
 
@@ -296,6 +312,9 @@ class ReferenceExtractor:
             # Resolve relative paths so target_path is always project-rooted.
             # raw_href is kept in location.raw for Patcher's substring sanity check.
             resolved_target = _resolve_relative(source_path, raw_href)
+            if resolved_target is None:
+                # Link escapes the wiki root — skip indexing it.
+                continue
 
             refs.append(Reference(
                 source_path=source_path,

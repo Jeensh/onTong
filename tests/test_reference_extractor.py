@@ -66,10 +66,14 @@ def test_body_wikilink_with_alias_strips_pipe(extractor):
 
 
 def test_body_markdown_link_local(extractor):
+    """In-bounds local md links are extracted. Source in a sub-dir so '../' resolves
+    to a real wiki path (not a root escape — see E2 root-escape tests below).
+    """
     raw = "# Doc\n[click](docs/other.md) and [also](../sibling.md).\n"
-    refs = extractor.extract("doc.md", raw)
+    refs = extractor.extract("dir/doc.md", raw)
     md_links = [r for r in refs if r.kind == RefKind.BODY_MD_LINK]
-    assert sorted(r.target_path for r in md_links) == ["../sibling.md", "docs/other.md"]
+    # docs/other.md already rooted → unchanged. ../sibling.md from dir/doc.md → sibling.md.
+    assert sorted(r.target_path for r in md_links) == ["docs/other.md", "sibling.md"]
 
 
 def test_body_markdown_link_external_skipped(extractor):
@@ -201,3 +205,56 @@ def test_frontmatter_paths_unchanged(extractor):
     refs = extractor.extract("라이브데모/sub/note.md", raw)
     rel = [r for r in refs if r.kind == RefKind.FM_RELATED]
     assert rel[0].target_path == "라이브데모/article-a.md"  # not normalized further
+
+
+# ── E2: root escape clamp ────────────────────────────────────────────────────
+
+def test_md_link_root_escape_from_root_skipped(extractor):
+    """Source at root + target='../escape.md' escapes wiki root → skip."""
+    raw = "# Top\n[escape](../escape.md) and [keep](b.md).\n"
+    refs = extractor.extract("a.md", raw)
+    md = [r for r in refs if r.kind == RefKind.BODY_MD_LINK]
+    targets = [r.target_path for r in md]
+    assert "b.md" in targets
+    assert "../escape.md" not in targets
+    assert all(not t.startswith("..") for t in targets)
+
+
+def test_md_link_deep_root_escape_skipped(extractor):
+    """Source deep in tree + too many '..' segments escapes wiki root → skip."""
+    raw = "# Deep\n[escape](../../../escape.md) and [keep](../sibling.md).\n"
+    refs = extractor.extract("dir1/dir2/note.md", raw)
+    md = [r for r in refs if r.kind == RefKind.BODY_MD_LINK]
+    targets = [r.target_path for r in md]
+    # ../sibling.md from dir1/dir2/note.md → dir1/sibling.md (in-bounds, kept)
+    assert "dir1/sibling.md" in targets
+    # ../../../escape.md from dir1/dir2/note.md → escapes → skipped
+    assert all(not t.startswith("..") for t in targets)
+    assert len(md) == 1
+
+
+def test_md_link_dotdot_in_bounds_kept(extractor):
+    """A single '..' that lands inside the wiki root must still be indexed."""
+    raw = "# Sub\n[A](../article-a.md)\n"
+    refs = extractor.extract("dir/sub/note.md", raw)
+    md = [r for r in refs if r.kind == RefKind.BODY_MD_LINK]
+    assert len(md) == 1
+    assert md[0].target_path == "dir/article-a.md"
+
+
+def test_md_link_dotdot_then_back_in_kept(extractor):
+    """'../sibling-dir/file.md' resolves in-bounds and is kept."""
+    raw = "# Sub\n[A](../other/file.md)\n"
+    refs = extractor.extract("dir/sub/note.md", raw)
+    md = [r for r in refs if r.kind == RefKind.BODY_MD_LINK]
+    assert len(md) == 1
+    assert md[0].target_path == "dir/other/file.md"
+
+
+def test_md_link_dotdot_to_root_kept(extractor):
+    """'../foo.md' from one-level-deep source lands at root → keep."""
+    raw = "# Sub\n[A](../foo.md)\n"
+    refs = extractor.extract("dir/note.md", raw)
+    md = [r for r in refs if r.kind == RefKind.BODY_MD_LINK]
+    assert len(md) == 1
+    assert md[0].target_path == "foo.md"
