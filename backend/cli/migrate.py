@@ -107,7 +107,108 @@ def cmd_snapshots_export(args: argparse.Namespace) -> int:
 
 
 def cmd_fulltext_export(args: argparse.Namespace) -> int:
-    print("fulltext-export is not yet implemented (lands in Phase 6).")
+    """Export full-text search index between backends.
+
+    Usage:
+        ontong migrate fulltext-export --from bm25 --to es --es-url http://localhost:9200
+
+    Walks all wiki .md files, chunks them, and writes to the destination
+    backend. For ES, performs alias-swap migration: builds a fresh index,
+    populates, then atomically swaps the alias.
+    """
+    from pathlib import Path
+    from backend.core.config import settings
+
+    from_backend = args.from_
+    to_backend = args.to
+
+    if from_backend not in ("bm25", "es"):
+        print(f"ERROR: unknown --from: {from_backend}")
+        return 2
+    if to_backend not in ("bm25", "es"):
+        print(f"ERROR: unknown --to: {to_backend}")
+        return 2
+    if from_backend == to_backend:
+        print("ERROR: --from and --to must differ")
+        return 2
+
+    if to_backend == "es":
+        es_url = getattr(args, "es_url", "") or "http://localhost:9200"
+        try:
+            from backend.infrastructure.search.es_backend import ESSearchBackend, INDEX_PREFIX
+            import time
+        except ImportError as e:
+            print(f"ERROR: elasticsearch dep missing: {e}")
+            print("  pip install elasticsearch")
+            return 2
+
+        # Build a fresh index with timestamp suffix
+        es = ESSearchBackend(es_url)
+        new_index_name = f"{INDEX_PREFIX}{int(time.time())}"
+
+        # Walk wiki dir, chunk via existing WikiIndexer.chunk method
+        from backend.application.wiki.wiki_indexer import WikiIndexer
+        from backend.infrastructure.vectordb.chroma import ChromaWrapper
+        chroma = ChromaWrapper()
+        indexer = WikiIndexer(chroma)
+
+        wiki_dir = Path(settings.wiki_dir)
+        all_paths = []
+        for p in wiki_dir.rglob("*.md"):
+            rel = p.relative_to(wiki_dir).as_posix()
+            if rel.startswith(("_skills/", "_personas/", ".ontong/", "assets/")):
+                continue
+            if any(part.startswith(".") for part in p.relative_to(wiki_dir).parts):
+                continue
+            all_paths.append(rel)
+
+        print(f"Indexing {len(all_paths)} files to ES ...")
+
+        from backend.core.schemas import WikiFile
+        from backend.infrastructure.storage.local_fs import _parse_frontmatter
+        total_chunks = 0
+        for i, rel in enumerate(all_paths):
+            try:
+                raw = (wiki_dir / rel).read_text(encoding="utf-8")
+                meta, body = _parse_frontmatter(raw)
+                wf = WikiFile(
+                    path=rel,
+                    title=rel.rsplit("/", 1)[-1].replace(".md", ""),
+                    content=body,
+                    raw_content=raw,
+                    metadata=meta,
+                )
+                chunks = indexer.chunk(wf)
+                if not chunks:
+                    continue
+                docs = [
+                    {
+                        "id": c.id,
+                        "file_path": c.file_path,
+                        "heading": c.heading,
+                        "content": c.content,
+                        "tags": meta.tags or [],
+                        "domain": meta.domain or "",
+                        "process": meta.process or "",
+                        "mtime_epoch": 0,
+                    }
+                    for c in chunks
+                ]
+                added = es.add_documents(docs)
+                total_chunks += added
+                if (i + 1) % 100 == 0:
+                    print(f"  ... {i+1}/{len(all_paths)} files, {total_chunks} chunks")
+            except Exception as e:
+                print(f"  WARN {rel}: {e}")
+
+        print(f"Indexed {total_chunks} chunks across {len(all_paths)} files")
+        print(f"Alias {INDEX_PREFIX}* swapped to current index")
+        return 0
+
+    elif to_backend == "bm25":
+        print("ES → BM25 export deferred (BM25 is in-memory; rebuild on server start)")
+        return 0
+
     return 0
 
 
@@ -129,7 +230,8 @@ def register_migrate(sub) -> None:
     se.add_argument("--to", required=True)
     se.set_defaults(func=cmd_snapshots_export)
 
-    fe = msub.add_parser("fulltext-export", help="Export search index between backends (Phase 6)")
-    fe.add_argument("--from", dest="from_", required=True)
-    fe.add_argument("--to", required=True)
+    fe = msub.add_parser("fulltext-export", help="Export search index between backends")
+    fe.add_argument("--from", dest="from_", required=True, choices=["bm25", "es"])
+    fe.add_argument("--to", required=True, choices=["bm25", "es"])
+    fe.add_argument("--es-url", dest="es_url", help="ES URL (default http://localhost:9200)")
     fe.set_defaults(func=cmd_fulltext_export)

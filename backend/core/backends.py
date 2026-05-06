@@ -295,3 +295,39 @@ def get_audit_store(profile: Profile, *, sqlite_path: str | None = None, postgre
     _singletons["audit_store"] = (profile.audit_store_backend, store)
     logger.info(f"AuditStore initialized: {profile.audit_store_backend}")
     return store
+
+
+def get_fulltext_search(profile: Profile, *, es_url: str = ""):
+    """Return a FullTextSearch matching the profile.
+
+    dev/team: BM25 in-memory (existing global instance, returned as-is)
+    enterprise: ES via es_url
+    """
+    cached = _singletons.get("fulltext")
+    if cached is not None:
+        cached_name, cached_obj = cached
+        if cached_name != profile.fulltext_backend:
+            raise RuntimeError(
+                f"Profile changed mid-process: cached fulltext backend is {cached_name!r}, "
+                f"requested {profile.fulltext_backend!r}. Call _reset_for_test() between switches."
+            )
+        return cached_obj
+
+    if profile.fulltext_backend == "bm25_inmem":
+        # Reuse the existing global BM25 index. We wrap it minimally so it
+        # exposes the FullTextSearch protocol surface.
+        from backend.infrastructure.search.bm25 import bm25_index
+        backend_obj = bm25_index  # the class already has add_documents, remove_by_file, search, etc.
+    elif profile.fulltext_backend == "elasticsearch":
+        from backend.infrastructure.search.es_backend import ESSearchBackend
+        if not es_url:
+            raise RuntimeError("es_url required for elasticsearch fulltext backend")
+        backend_obj = ESSearchBackend(es_url)
+    elif profile.fulltext_backend == "pg_fts":
+        raise NotImplementedError("pg_fts fulltext backend deferred to Phase 6+")
+    else:
+        raise ValueError(f"unknown fulltext backend: {profile.fulltext_backend}")
+
+    _singletons["fulltext"] = (profile.fulltext_backend, backend_obj)
+    logger.info(f"FullText backend initialized: {profile.fulltext_backend}")
+    return backend_obj
