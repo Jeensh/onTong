@@ -33,8 +33,39 @@ class RenameOrchestrator:
         self._snapshots = snapshot_store
         self._chunk_updater = chunk_updater
 
+    def _check_edit_lock(self, path: str, actor: str) -> str | None:
+        """Check if there's an active edit lock held by SOMEONE OTHER than the rename actor.
+
+        Returns the holder's name if blocked, None if clear.
+        Uses backend.application.lock_service.get_lock_service() — the same lock
+        service used by the editor's edit-session locks.
+        """
+        try:
+            from backend.application.lock_service import get_lock_service
+            svc = get_lock_service()
+            info = svc.status(path)
+            if info is None:
+                return None
+            if info.user == actor:
+                # Same user is renaming what they're editing — allow
+                return None
+            # Different user holds the edit lock
+            return info.user
+        except Exception as e:
+            # Non-fatal — log and let the rename proceed
+            import logging
+            logging.getLogger(__name__).warning(f"edit lock check failed for {path}: {e}")
+            return None
+
     async def plan(self, old_path: str, new_path: str, actor: str) -> RenamePlan:
         """Compute impact of rename without making any changes."""
+        # Phase 5-C: check edit-session lock before computing impact
+        holder = self._check_edit_lock(old_path, actor)
+        if holder:
+            raise RuntimeError(
+                f"이 문서는 현재 {holder}가 편집 중입니다. 편집이 끝난 후 다시 시도하세요."
+            )
+
         # 1. Aggregate inbound refs from RefIndex (full path)
         inbound = self._ref_index.inbound(old_path)
 
@@ -136,6 +167,22 @@ class RenameOrchestrator:
             new_path = audit_row.payload.get("new_path")
             actor = audit_row.actor
             lock_user = f"rename:{actor}"
+
+            # Phase 5-C: check edit-session lock before acquiring rename locks
+            holder = self._check_edit_lock(old_path, actor)
+            if holder:
+                self._audit.update_audit_status(
+                    int(audit_id), "failed",
+                    error=f"edit lock held by {holder}",
+                )
+                return RenameResult(
+                    audit_id=audit_id,
+                    status="failed",
+                    inbound_done=0,
+                    inbound_failed=0,
+                    inbound_total=0,
+                    error=f"이 문서는 현재 {holder}가 편집 중입니다.",
+                )
 
             # Source lock
             src_acq, src_missed = lock_set_in_order([old_path], lock_user, ttl=LOCK_TTL)

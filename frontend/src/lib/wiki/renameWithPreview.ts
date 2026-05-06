@@ -36,7 +36,18 @@ const userIdHeader = (): Record<string, string> => {
 export async function fetchRenamePlan(oldPath: string, newPath: string): Promise<RenamePlanResponse> {
   const url = `/api/wiki/rename-preview/${encodeURIComponent(oldPath)}?to=${encodeURIComponent(newPath)}`;
   const r = await fetch(url, { headers: userIdHeader() });
-  if (!r.ok) throw new Error(`rename-preview HTTP ${r.status}: ${await r.text()}`);
+  if (!r.ok) {
+    // Try to surface structured error from 409 edit-lock blocked response
+    try {
+      const body = await r.json();
+      const detail = body?.detail;
+      if (detail?.error) throw new Error(detail.error);
+      if (typeof detail === "string") throw new Error(detail);
+    } catch (e) {
+      if (e instanceof Error && e.message !== "Failed to parse") throw e;
+    }
+    throw new Error(`rename-preview HTTP ${r.status}`);
+  }
   return r.json();
 }
 

@@ -288,7 +288,15 @@ async def rename_preview(path: str, to: str, user: User = Depends(require_write)
     orch = svc.get_rename_orchestrator()
     if orch is None:
         raise HTTPException(status_code=503, detail="RenameOrchestrator not available")
-    plan = await orch.plan(path, to, user.name)
+    try:
+        plan = await orch.plan(path, to, user.name)
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail={
+            "error": str(e),
+            "blocked": True,
+            "old_path": path,
+            "new_path": to,
+        })
     return {
         "audit_id": plan.audit_id,
         "old_path": plan.old_path,
@@ -321,12 +329,19 @@ async def move_file(path: str, body: MoveRequest, user: User = Depends(require_w
             raise HTTPException(status_code=404, detail=f"File not found: {path}")
         return {"old_path": path, "new_path": body.new_path, "warning": "fallback_legacy_path"}
 
-    plan = await orch.plan(path, body.new_path, user.name)
+    try:
+        plan = await orch.plan(path, body.new_path, user.name)
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail={
+            "error": str(e),
+            "blocked": True,
+        })
     result = await orch.execute(plan.audit_id)
     if result.status == "failed":
         raise HTTPException(status_code=409, detail={
             "error": result.error,
             "audit_id": result.audit_id,
+            "blocked": "편집 중" in (result.error or ""),
         })
     return {
         "old_path": path,

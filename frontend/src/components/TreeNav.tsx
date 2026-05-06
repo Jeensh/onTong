@@ -60,6 +60,7 @@ import { ShareDialog } from "@/components/ShareDialog";
 import { PropertiesPanel } from "@/components/PropertiesPanel";
 import { useAuth } from "@/hooks/useAuth";
 import { RenameImpactDialog } from "@/components/sections/wiki/RenameImpactDialog";
+import { RenameUndoToast } from "@/components/sections/wiki/RenameUndoToast";
 import { fetchRenamePlan, executeRename, type RenamePlanResponse } from "@/lib/wiki/renameWithPreview";
 
 // ── API helpers ───────────────────────────────────────────────────────
@@ -1605,6 +1606,13 @@ export function TreeNav() {
   const [renamePlan, setRenamePlan] = useState<RenamePlanResponse | null>(null);
   const [renamePlanLoading, setRenamePlanLoading] = useState(false);
   const [renamePlanError, setRenamePlanError] = useState<string | null>(null);
+  // Phase 5-C: undo toast state (set after successful PATCH rename)
+  const [renameToast, setRenameToast] = useState<{
+    auditId: string;
+    oldPath: string;
+    newPath: string;
+    inboundDone: number;
+  } | null>(null);
 
   // Share dialog / properties panel
   const [shareDialogPath, setShareDialogPath] = useState<string | null>(null);
@@ -1802,9 +1810,6 @@ export function TreeNav() {
     try {
       const result = await executeRename(oldPath, newPath);
       const finalName = newPath.split("/").pop() ?? newPath;
-      toast.success(`이름 변경 완료 (${result.inbound_done}개 문서 갱신됨)`, {
-        description: `"${oldPath.split("/").pop()}" → "${finalName}"`,
-      });
       // Update open tabs if the renamed file was open
       const tab = tabs.find((t) => t.filePath === oldPath);
       if (tab) updateTabPath(tab.id, newPath);
@@ -1817,8 +1822,17 @@ export function TreeNav() {
         const parentPath = oldPath.includes("/") ? oldPath.substring(0, oldPath.lastIndexOf("/")) : "";
         return addTreeNode(removeTreeNode(prev, oldPath), parentPath, updated);
       });
+      // Phase 5-C: show undo toast instead of plain success toast
+      setRenameToast({
+        auditId: result.audit_id,
+        oldPath,
+        newPath,
+        inboundDone: result.inbound_done,
+      });
     } catch (e) {
-      toast.error(`이름 변경 실패: ${(e as Error)?.message ?? e}`);
+      const errMsg = (e as Error)?.message ?? String(e);
+      // Surface edit-lock 409 or generic rename failure
+      toast.error(`이름 변경 실패: ${errMsg}`);
     } finally {
       setRenamePending(null);
       setRenamePlan(null);
@@ -2257,6 +2271,21 @@ export function TreeNav() {
           error={renamePlanError}
           onCancel={handleRenameDialogCancel}
           onConfirm={handleRenameDialogConfirm}
+        />
+      )}
+
+      {/* Phase 5-C: Rename Undo Toast */}
+      {renameToast && (
+        <RenameUndoToast
+          auditId={renameToast.auditId}
+          oldPath={renameToast.oldPath}
+          newPath={renameToast.newPath}
+          inboundDone={renameToast.inboundDone}
+          onDismiss={() => setRenameToast(null)}
+          onUndoComplete={(success, msg) => {
+            if (success) toast.success(msg);
+            else toast.error(msg);
+          }}
         />
       )}
 
