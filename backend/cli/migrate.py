@@ -146,11 +146,13 @@ def cmd_fulltext_export(args: argparse.Namespace) -> int:
         new_index_name = es.create_fresh_index()
         print(f"Building fresh index {new_index_name} ...")
 
-        # Walk wiki dir, chunk via existing WikiIndexer.chunk method
+        # Walk wiki dir, chunk via existing WikiIndexer.chunk method.
+        # We only call .chunk() here so the fulltext backend is unused — pass the
+        # ES backend itself to satisfy the new constructor signature.
         from backend.application.wiki.wiki_indexer import WikiIndexer
         from backend.infrastructure.vectordb.chroma import ChromaWrapper
         chroma = ChromaWrapper()
-        indexer = WikiIndexer(chroma)
+        indexer = WikiIndexer(chroma, es)
 
         wiki_dir = Path(settings.wiki_dir)
         all_paths = []

@@ -80,6 +80,9 @@ class Settings(BaseSettings):
     # Postgres (team / enterprise)
     postgres_dsn: str = ""  # e.g. postgresql+asyncpg://user:pass@localhost:5432/ontong
 
+    # Elasticsearch (enterprise — fulltext_backend=elasticsearch)
+    es_url: str = ""  # e.g. http://elasticsearch:9200
+
     # Ollama
     ollama_num_parallel: int = 4  # Max parallel LLM requests (Ollama)
     llm_semaphore_limit: int = 8  # Max concurrent LLM calls across all agents

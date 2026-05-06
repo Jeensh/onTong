@@ -147,6 +147,17 @@ class ESSearchBackend(FullTextSearch):
         logger.info(f"ES removed {deleted} chunks for {file_path}")
         return deleted
 
+    def has_file(self, file_path: str) -> bool:
+        """True iff at least one chunk exists for file_path. Used by indexer cold-start."""
+        try:
+            result = self._es.count(
+                index=INDEX_ALIAS,
+                body={"query": {"term": {"file_path": file_path}}},
+            )
+            return int(result.get("count", 0)) > 0
+        except Exception:
+            return False
+
     def search(
         self, query: str, limit: int = 10, *, file_predicate=None
     ) -> list[SearchHit]:

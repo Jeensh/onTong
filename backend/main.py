@@ -92,8 +92,15 @@ async def lifespan(app: FastAPI):
     # Initialize ChromaDB
     chroma.connect()
 
+    # Resolve fulltext backend via the profile factory (BM25 in dev, ES in enterprise).
+    # Done before WikiIndexer so the indexer doesn't reach into bm25_index directly.
+    from backend.core.backends import get_fulltext_search
+    _ft_profile = settings.resolve_profile()
+    fulltext = get_fulltext_search(_ft_profile, es_url=settings.es_url)
+    logger.info(f"FullText backend: {_ft_profile.fulltext_backend}")
+
     # Build services
-    indexer = WikiIndexer(chroma)
+    indexer = WikiIndexer(chroma, fulltext)
     search_service = WikiSearchService()
     wiki_service = WikiService(storage, indexer, search_service)
 

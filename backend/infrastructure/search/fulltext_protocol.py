@@ -28,6 +28,14 @@ class FullTextSearch(ABC):
         """Full-text search. file_predicate filters before scoring."""
 
     @abstractmethod
+    def has_file(self, file_path: str) -> bool:
+        """True iff at least one chunk for file_path is present.
+
+        Used by WikiIndexer to skip re-adding documents that are already
+        indexed (BM25 is in-process; on cold-start it may be empty even when
+        ChromaDB is up-to-date)."""
+
+    @abstractmethod
     def clear(self) -> None: ...
 
     @property

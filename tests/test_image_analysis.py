@@ -8,6 +8,17 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 
+class _FakeFT:
+    """No-op FullTextSearch for chunk()-only tests (fulltext backend is unused here)."""
+    def add_documents(self, docs): return len(docs)
+    def remove_by_file(self, file_path): return 0
+    def search(self, query, limit=10, *, file_predicate=None): return []
+    def has_file(self, file_path): return False
+    def clear(self): pass
+    @property
+    def size(self): return 0
+
+
 class TestImageAnalysisModels:
     """Test ImageAnalysis dataclass and sidecar file I/O."""
 
@@ -587,7 +598,7 @@ class TestEndToEndImageSearch:
         original_wiki_dir = settings.wiki_dir
         settings.wiki_dir = wiki_dir
         try:
-            indexer = WikiIndexer(chroma_mock)
+            indexer = WikiIndexer(chroma_mock, _FakeFT())
             chunks = indexer.chunk(wiki_file)
         finally:
             settings.wiki_dir = original_wiki_dir
@@ -642,7 +653,7 @@ class TestEndToEndImageSearch:
         original_wiki_dir = settings.wiki_dir
         settings.wiki_dir = wiki_dir
         try:
-            indexer = WikiIndexer(chroma_mock)
+            indexer = WikiIndexer(chroma_mock, _FakeFT())
             chunks = indexer.chunk(wiki_file)
         finally:
             settings.wiki_dir = original_wiki_dir

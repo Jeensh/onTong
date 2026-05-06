@@ -12,7 +12,7 @@ from pathlib import Path
 from backend.core.config import settings
 from backend.core.schemas import WikiFile
 from backend.infrastructure.vectordb.chroma import ChromaWrapper
-from backend.infrastructure.search.bm25 import BM25Document, bm25_index, tokenize
+from backend.infrastructure.search.fulltext_protocol import FullTextSearch
 from backend.infrastructure.storage.file_hash import FileHashStore
 from backend.infrastructure.cache.query_cache import query_cache
 
@@ -175,8 +175,9 @@ def enrich_chunk_with_images(chunk_text: str, wiki_root: Path) -> str:
 
 
 class WikiIndexer:
-    def __init__(self, chroma: ChromaWrapper) -> None:
+    def __init__(self, chroma: ChromaWrapper, fulltext: FullTextSearch) -> None:
         self.chroma = chroma
+        self._fulltext = fulltext
         hash_path = Path(settings.wiki_dir) / ".ontong" / "index_hashes.json"
         self.hash_store = FileHashStore(hash_path)
 
@@ -229,20 +230,18 @@ class WikiIndexer:
 
         return chunks
 
-    @staticmethod
-    def _ensure_bm25(file_path: str, chunks: list) -> None:
-        """Add chunks to BM25 index if not already present."""
-        with bm25_index._lock:
-            already = any(d.file_path == file_path for d in bm25_index._documents)
-        if not already:
-            bm25_docs = [
-                BM25Document(
-                    id=c.id, file_path=c.file_path, heading=c.heading,
-                    content=c.content, tokens=tokenize(c.content),
-                )
-                for c in chunks
-            ]
-            bm25_index.add_documents(bm25_docs)
+    def _ensure_in_fulltext(self, file_path: str, chunks: list) -> None:
+        """Add chunks to the fulltext index if no chunks for this file are present.
+
+        The fulltext backend (BM25 in-memory by default) may be empty after a
+        cold start even when ChromaDB is up-to-date — populate it on demand.
+        """
+        if self._fulltext.has_file(file_path):
+            return
+        self._fulltext.add_documents([
+            {"id": c.id, "file_path": c.file_path, "heading": c.heading, "content": c.content}
+            for c in chunks
+        ])
 
     @staticmethod
     def _metadata_to_chroma(
@@ -304,8 +303,8 @@ class WikiIndexer:
         chroma_skip = not force and not self.hash_store.has_changed(wiki_file.path, hash_input)
 
         if chroma_skip:
-            # BM25 is in-memory — must repopulate after server restart even if ChromaDB is up-to-date
-            self._ensure_bm25(wiki_file.path, chunks)
+            # FullText (BM25/ES) may be empty after a cold start — repopulate on demand.
+            self._ensure_in_fulltext(wiki_file.path, chunks)
             logger.debug(f"Skipped indexing (unchanged): {wiki_file.path}")
             return 0
 
@@ -324,16 +323,12 @@ class WikiIndexer:
         except Exception as e:
             logger.warning(f"ChromaDB indexing failed for {wiki_file.path}: {e}. File saved without indexing.")
 
-        # Sync BM25 index
-        bm25_index.remove_by_file(wiki_file.path)
-        bm25_docs = [
-            BM25Document(
-                id=c.id, file_path=c.file_path, heading=c.heading,
-                content=c.content, tokens=tokenize(c.content),
-            )
+        # Sync fulltext index (BM25 / ES — picked by profile via factory)
+        self._fulltext.remove_by_file(wiki_file.path)
+        self._fulltext.add_documents([
+            {"id": c.id, "file_path": c.file_path, "heading": c.heading, "content": c.content}
             for c in chunks
-        ]
-        bm25_index.add_documents(bm25_docs)
+        ])
 
         # Update content hash + invalidate search cache
         self.hash_store.update(wiki_file.path, hash_input)
@@ -342,10 +337,10 @@ class WikiIndexer:
         return len(chunks)
 
     async def remove_file(self, path: str) -> None:
-        """Remove all chunks for a given file from ChromaDB + BM25 + hash store."""
+        """Remove all chunks for a given file from ChromaDB + fulltext + hash store."""
         try:
             self.chroma.delete_where({"file_path": path})
-            bm25_index.remove_by_file(path)
+            self._fulltext.remove_by_file(path)
             self.hash_store.remove(path)
             logger.info(f"Removed chunks for {path}")
         except Exception as e:
@@ -364,7 +359,7 @@ class WikiIndexer:
                         logger.info(f"Cleared {len(result['ids'])} existing chunks before reindex")
             except Exception as e:
                 logger.warning(f"Failed to clear collection before reindex: {e}")
-            bm25_index.clear()
+            self._fulltext.clear()
             self.hash_store.clear()
 
         total = 0
@@ -378,7 +373,7 @@ class WikiIndexer:
 
         logger.info(
             f"Reindexed {len(files)} files: {total} chunks indexed, "
-            f"{skipped} skipped (unchanged), BM25: {bm25_index.size}"
+            f"{skipped} skipped (unchanged), fulltext: {self._fulltext.size}"
         )
         return total
 
