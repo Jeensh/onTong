@@ -91,6 +91,7 @@ mypy = "^1.0"
 httpx = "^0.25.0"
 fakeredis = "^2.20"
 pytest-postgresql = "^6.0"
+locust = "^2.20"
 
 [tool.black]
 line-length = 100
