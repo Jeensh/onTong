@@ -1884,7 +1884,7 @@ export function TreeNav() {
     setRenamePlan(null);
     setRenamePlanLoading(true);
     setRenamePlanError(null);
-    fetchRenamePlan(node.path, newPath)
+    fetchRenamePlan(node.path, newPath, { withDiff: true })
       .then((p) => setRenamePlan(p))
       .catch((e: Error) => setRenamePlanError(String(e)))
       .finally(() => setRenamePlanLoading(false));

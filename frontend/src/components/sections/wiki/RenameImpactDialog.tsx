@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { RenamePlanResponse } from "@/lib/wiki/renameWithPreview";
+import type { PreviewHunk, RenamePlanResponse, SourcePreview } from "@/lib/wiki/renameWithPreview";
 
 export interface RenameImpactDialogProps {
   oldPath: string;
@@ -91,6 +91,19 @@ export function RenameImpactDialog({
                 </div>
               )}
 
+              {plan.previews && plan.previews.length > 0 && (
+                <details className="mt-4 rounded-md border border-slate-200 bg-white">
+                  <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    변경 미리보기 ({plan.previews.length} 개 문서)
+                  </summary>
+                  <div className="space-y-3 p-3">
+                    {plan.previews.map((p, i) => (
+                      <SourcePreviewBlock key={i} preview={p} />
+                    ))}
+                  </div>
+                </details>
+              )}
+
               {plan.unique_inbound_sources === 0 && (
                 <p className="mt-2 text-xs text-slate-500">
                   이 파일을 인용하는 문서가 없습니다. 이름 변경은 단순 파일 이동만 수행합니다.
@@ -134,6 +147,38 @@ function SummaryRow({ label, value, highlight }: { label: string; value: string;
       <span className={`font-mono text-sm ${highlight ? "font-semibold text-blue-700" : "text-slate-800"}`}>
         {value}
       </span>
+    </div>
+  );
+}
+
+function SourcePreviewBlock({ preview }: { preview: SourcePreview }) {
+  return (
+    <div className="rounded border border-slate-200 bg-slate-50">
+      <div className="border-b border-slate-200 bg-white px-2 py-1 font-mono text-xs text-slate-700">
+        {preview.source_path}
+      </div>
+      <div className="space-y-2 p-2">
+        {preview.hunks.map((h, i) => (
+          <HunkBlock key={i} hunk={h} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HunkBlock({ hunk }: { hunk: PreviewHunk }) {
+  return (
+    <div className="text-xs">
+      <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">
+        line {hunk.line_no} · <span className="text-rose-600">{hunk.old_target}</span> →{" "}
+        <span className="text-emerald-700">{hunk.new_target}</span>
+      </div>
+      <pre className="overflow-x-auto rounded border border-rose-200 bg-rose-50 px-2 py-1 font-mono text-[11px] leading-snug text-rose-900">
+        {hunk.before}
+      </pre>
+      <pre className="mt-1 overflow-x-auto rounded border border-emerald-200 bg-emerald-50 px-2 py-1 font-mono text-[11px] leading-snug text-emerald-900">
+        {hunk.after}
+      </pre>
     </div>
   );
 }

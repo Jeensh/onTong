@@ -277,10 +277,19 @@ async def save_file(
 
 
 @router.get("/rename-preview/{path:path}")
-async def rename_preview(path: str, to: str, user: User = Depends(require_write)):
+async def rename_preview(
+    path: str,
+    to: str,
+    with_diff: bool = False,
+    user: User = Depends(require_write),
+):
     """Compute the impact of a rename without executing it.
 
     Returns RenamePlan-shaped JSON. UI shows confirm dialog if confirm_required=True.
+
+    with_diff=true also returns per-source body hunks so the UI can preview
+    exactly which lines will change before the user accepts the rename.
+    Capped server-side at the first 20 sources to keep the response cheap.
     """
     _validate_path(path)
     _validate_path(to)
@@ -297,7 +306,7 @@ async def rename_preview(path: str, to: str, user: User = Depends(require_write)
             "old_path": path,
             "new_path": to,
         })
-    return {
+    response: dict = {
         "audit_id": plan.audit_id,
         "old_path": plan.old_path,
         "new_path": plan.new_path,
@@ -310,6 +319,9 @@ async def rename_preview(path: str, to: str, user: User = Depends(require_write)
             for it in plan.impact_items
         ],
     }
+    if with_diff:
+        response["previews"] = await orch.compute_preview_hunks(path, to)
+    return response
 
 
 @router.patch("/file/{path:path}")

@@ -5,6 +5,19 @@ export interface ImpactItem {
   ref_count: number;
 }
 
+export interface PreviewHunk {
+  line_no: number;
+  before: string;
+  after: string;
+  old_target: string;
+  new_target: string;
+}
+
+export interface SourcePreview {
+  source_path: string;
+  hunks: PreviewHunk[];
+}
+
 export interface RenamePlanResponse {
   audit_id: string;
   old_path: string;
@@ -14,6 +27,7 @@ export interface RenamePlanResponse {
   confirm_required: boolean;
   estimated_seconds: number;
   impact_items: ImpactItem[];
+  previews?: SourcePreview[];
 }
 
 export interface RenameExecResponse {
@@ -33,8 +47,14 @@ const userIdHeader = (): Record<string, string> => {
   return { "X-User-Id": id };
 };
 
-export async function fetchRenamePlan(oldPath: string, newPath: string): Promise<RenamePlanResponse> {
-  const url = `/api/wiki/rename-preview/${encodeURIComponent(oldPath)}?to=${encodeURIComponent(newPath)}`;
+export async function fetchRenamePlan(
+  oldPath: string,
+  newPath: string,
+  options: { withDiff?: boolean } = {},
+): Promise<RenamePlanResponse> {
+  const params = new URLSearchParams({ to: newPath });
+  if (options.withDiff) params.set("with_diff", "true");
+  const url = `/api/wiki/rename-preview/${encodeURIComponent(oldPath)}?${params.toString()}`;
   const r = await fetch(url, { headers: userIdHeader() });
   if (!r.ok) {
     // Try to surface structured error from 409 edit-lock blocked response

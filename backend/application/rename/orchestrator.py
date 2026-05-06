@@ -16,6 +16,43 @@ MAX_IMPACT_PREVIEW = 100
 UNDO_WINDOW_SECONDS = 5 * 60  # 5 minutes
 
 
+def _build_hunk(
+    raw: str,
+    off: int,
+    length: int,
+    expected_raw: str,
+    new_target: str,
+    context_chars: int,
+) -> dict:
+    """Extract a context window around a single ref change.
+
+    Snaps to line boundaries on each side so the UI can render the hunk as
+    a clean code block instead of mid-line fragments.
+    """
+    ctx_start = max(0, off - context_chars)
+    ctx_end = min(len(raw), off + length + context_chars)
+
+    nl_before = raw.rfind("\n", ctx_start, off)
+    if nl_before > -1:
+        ctx_start = nl_before + 1
+    nl_after = raw.find("\n", off + length, ctx_end)
+    if nl_after > -1:
+        ctx_end = nl_after
+
+    before = raw[ctx_start:ctx_end]
+    rel_off = off - ctx_start
+    after = before[:rel_off] + new_target + before[rel_off + length:]
+    line_no = raw.count("\n", 0, off) + 1
+
+    return {
+        "line_no": line_no,
+        "before": before,
+        "after": after,
+        "old_target": expected_raw,
+        "new_target": new_target,
+    }
+
+
 class RenameOrchestrator:
     """Coordinates the end-to-end rename.
 
@@ -126,6 +163,82 @@ class RenameOrchestrator:
             event_bus.publish(event_type, {"audit_id": audit_id, **data})
         except Exception as e:
             logger.warning("event_bus publish failed for %s: %s", event_type, e)
+
+    async def compute_preview_hunks(
+        self,
+        old_path: str,
+        new_path: str,
+        *,
+        max_sources: int = 20,
+        context_chars: int = 200,
+    ) -> list[dict]:
+        """Dry-run the rename and return per-source body hunks for the UI preview.
+
+        Returns: [
+            {
+              "source_path": "...",
+              "hunks": [{"line_no": int, "before": str, "after": str,
+                         "old_target": str, "new_target": str}, ...]
+            },
+            ...
+        ]
+
+        Capped at max_sources to keep the preview cheap. Hunks include
+        context_chars on each side, clipped to the nearest line boundary
+        for readability. The hunk's `before` / `after` differ only at the
+        rewritten ref so the UI can display them inline.
+        """
+        from pathlib import Path as _P
+        from backend.application.refindex.extractor import RefKind
+
+        target_remap: dict[str, str] = {old_path: new_path}
+        old_stem = _P(old_path).stem
+        new_stem = _P(new_path).stem
+        if old_stem and old_stem != new_stem:
+            target_remap[old_stem] = new_stem
+
+        all_inbound = list(self._ref_index.inbound(old_path))
+        if old_stem and old_stem != old_path:
+            all_inbound += list(self._ref_index.inbound(old_stem, kind=RefKind.BODY_WIKILINK))
+
+        unique_sources = sorted({r.source_path for r in all_inbound})[:max_sources]
+        if not unique_sources or self._content is None:
+            return []
+
+        previews: list[dict] = []
+        for src_path in unique_sources:
+            try:
+                src_file = await self._content.storage.read(src_path)
+            except Exception as e:
+                logger.warning("preview read failed for %s: %s", src_path, e)
+                continue
+            if src_file is None:
+                continue
+            raw = src_file.raw_content
+
+            src_refs = self._ref_index.outbound(src_path)
+            relevant = [r for r in src_refs if r.target_path in target_remap]
+            # Same descending-offset order as the real patcher uses, so
+            # offsets in `before` line up with what execute() will see.
+            relevant.sort(key=lambda r: -r.location["offset"])
+
+            hunks: list[dict] = []
+            for r in relevant:
+                off = r.location["offset"]
+                length = r.location["length"]
+                expected_raw = r.location["raw"]
+                if raw[off:off + length] != expected_raw:
+                    # Stale offset — would skip in execute() too. Don't display.
+                    continue
+                new_target = target_remap[r.target_path]
+                hunks.append(_build_hunk(raw, off, length, expected_raw, new_target, context_chars))
+
+            if hunks:
+                # Display in document order (top-to-bottom)
+                hunks.reverse()
+                previews.append({"source_path": src_path, "hunks": hunks})
+
+        return previews
 
     async def execute(self, audit_id: str, *, force: bool = False) -> RenameResult:
         """Full rename pipeline.

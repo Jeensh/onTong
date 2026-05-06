@@ -63,6 +63,39 @@ def test_rename_preview_returns_impact(app_with_wiki):
     assert body["unique_inbound_sources"] == 2
     sources = sorted(it["source_path"] for it in body["impact_items"])
     assert sources == ["a.md", "b.md"]
+    # Default response omits previews to keep payload small
+    assert "previews" not in body or body["previews"] == []
+
+
+def test_rename_preview_with_diff_returns_hunks(app_with_wiki):
+    """with_diff=true asks the orchestrator for per-source body hunks."""
+    app, _, _ = app_with_wiki
+    client = TestClient(app)
+    r = client.get("/api/wiki/rename-preview/target.md?to=renamed.md&with_diff=true")
+    assert r.status_code == 200
+    body = r.json()
+    assert "previews" in body
+    by_source = {p["source_path"]: p for p in body["previews"]}
+    # b.md has a single body markdown link to target.md
+    assert "b.md" in by_source
+    b_hunks = by_source["b.md"]["hunks"]
+    assert len(b_hunks) >= 1
+    hunk = b_hunks[0]
+    assert "target.md" in hunk["before"]
+    assert "renamed.md" in hunk["after"]
+    assert hunk["old_target"] == "target.md"
+    assert hunk["new_target"] == "renamed.md"
+    assert isinstance(hunk["line_no"], int) and hunk["line_no"] >= 1
+
+
+def test_rename_preview_without_diff_omits_previews(app_with_wiki):
+    """Default request must not include the heavier previews payload."""
+    app, _, _ = app_with_wiki
+    client = TestClient(app)
+    r = client.get("/api/wiki/rename-preview/target.md?to=renamed.md")
+    assert r.status_code == 200
+    body = r.json()
+    assert "previews" not in body
 
 
 def test_patch_renames_and_patches_inbound(app_with_wiki):
