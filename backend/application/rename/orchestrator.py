@@ -305,11 +305,41 @@ class RenameOrchestrator:
             except Exception as e:
                 logger.warning("RefIndex.rename_source failed: %s", e)
 
-            # Patch each inbound source
+            # E4: ACL leak window guard — sync chunk metadata BEFORE inbound
+            # patches. If we leave this until the end, every inbound patch
+            # widens the window during which ChromaDB chunks still carry the
+            # old path (and old ACL). Doing it here closes the window to the
+            # update_for_path_rename call itself (~10-50ms typical).
+            jobs = self._audit.list_jobs(int(audit_id))
+            chunk_job = next((j for j in jobs if j.kind == "update_chunk_meta"), None)
+            if self._chunk_updater is not None:
+                try:
+                    if chunk_job:
+                        self._audit.update_job(chunk_job.id, status="running")
+                    wiki_file_at_new = await self._content.storage.read(new_path)
+                    cm_result = await self._chunk_updater.update_for_path_rename(
+                        old_path, new_path, wiki_file_at_new_path=wiki_file_at_new,
+                    )
+                    if chunk_job:
+                        if cm_result.get("error"):
+                            self._audit.update_job(
+                                chunk_job.id, status="failed", last_error=cm_result["error"]
+                            )
+                        else:
+                            self._audit.update_job(chunk_job.id, status="done")
+                    self._publish_progress(audit_id, "rename_progress", {
+                        "step": "chunk_meta_done",
+                        "access_scope_synced": cm_result.get("access_scope_synced", False),
+                    })
+                except Exception as e:
+                    logger.error("chunk meta update failed: %s", e)
+                    if chunk_job:
+                        self._audit.update_job(chunk_job.id, status="failed", last_error=str(e))
+
+            # Patch each inbound source — runs after the ACL window is closed.
             from backend.application.rename.patcher import patch_references
             inbound_done = 0
             inbound_failed = 0
-            jobs = self._audit.list_jobs(int(audit_id))
             job_by_target = {j.target_path: j for j in jobs if j.kind == "patch_inbound"}
 
             for src_path in unique_sources_capped:
@@ -363,33 +393,9 @@ class RenameOrchestrator:
                         "current": src_path,
                     })
 
-            # Chunk metadata update (OQ-4=A: includes re-embedding)
-            chunk_job = next((j for j in jobs if j.kind == "update_chunk_meta"), None)
-            if self._chunk_updater is not None:
-                try:
-                    if chunk_job:
-                        self._audit.update_job(chunk_job.id, status="running")
-                    wiki_file_at_new = await self._content.storage.read(new_path)
-                    cm_result = await self._chunk_updater.update_for_path_rename(
-                        old_path, new_path, wiki_file_at_new_path=wiki_file_at_new,
-                    )
-                    if chunk_job:
-                        if cm_result.get("error"):
-                            self._audit.update_job(
-                                chunk_job.id, status="failed", last_error=cm_result["error"]
-                            )
-                        else:
-                            self._audit.update_job(chunk_job.id, status="done")
-                except Exception as e:
-                    logger.error("chunk meta update failed: %s", e)
-                    if chunk_job:
-                        self._audit.update_job(chunk_job.id, status="failed", last_error=str(e))
-
-            self._publish_progress(audit_id, "rename_progress", {
-                "step": "chunk_meta_done",
-            })
-
-            # Refresh jobs list to check final statuses
+            # E4: chunk_meta now runs *before* the inbound loop above so the
+            # ACL leak window stays minimal. Just refresh job status here so
+            # the success/partial decision below sees the latest state.
             jobs = self._audit.list_jobs(int(audit_id))
             chunk_job = next((j for j in jobs if j.kind == "update_chunk_meta"), None)
             chunk_failed = chunk_job is not None and chunk_job.status == "failed"
