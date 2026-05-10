@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: slab-design
+
+  # 데모 레거시는 정적 아티팩트 — 실제 Oracle 인스턴스 미연결.
+  # JDBC URL은 placeholder (production와 동일 형태로 둠).
+  datasource:
+    url: jdbc:oracle:thin:@//localhost:1521/XEPDB1
+    username: slabdesign
+    password: slabdesign
+    driver-class-name: oracle.jdbc.OracleDriver
+    hikari:
+      # 실제 연결을 시도하지 않도록 lazy 처리
+      initialization-fail-timeout: -1
+      connection-timeout: 5000
+
+  jpa:
+    database-platform: org.hibernate.dialect.OracleDialect
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    open-in-view: false
+
+  # Spring Cloud Stream Kafka — 코드 아티팩트로만 존재, broker 미연결.
+  cloud:
+    stream:
+      kafka:
+        binder:
+          brokers: localhost:9092
+
+mybatis:
+  mapper-locations: classpath*:mappers/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    com.example.slabdesign: INFO

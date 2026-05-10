@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: slab-design
+  profiles:
+    active: local
