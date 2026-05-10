@@ -10,6 +10,8 @@ import {
   Zap,
 } from "lucide-react";
 import { runAgent3, type Agent3Result } from "@/lib/simulation/agentApi";
+import { OntologyEvidenceToggle } from "./OntologyEvidencePanel";
+import { resolveActionFqn } from "@/lib/simulation/stepActionMap";
 
 interface Props {
   onHandoffToSandbox?: (stepId: string) => void;
@@ -67,6 +69,11 @@ export function NavigatorPanel({ onHandoffToSandbox }: Props) {
           비즈니스 용어를 자연어로 입력하면 ontology + slab-design 키워드 매핑으로 소스 코드 위치를 찾고 미리보기를 제공합니다.
         </p>
       </div>
+
+      <OntologyEvidenceToggle
+        actionFqn={resolveActionFqn(activeLocation?.step_id ?? "pipeline_full")}
+        label={`📚 검색 결과의 ontology Action 근거 (${activeLocation?.step_id ?? "전체"})`}
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[400px_1fr]">
         <section className="rounded-lg border border-border bg-card p-4 space-y-4">

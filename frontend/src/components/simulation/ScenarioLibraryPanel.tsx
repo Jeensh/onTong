@@ -23,6 +23,7 @@ import {
 } from "@/lib/simulation/storageApi";
 import { getStepLabel } from "@/lib/simulation/stepLabels";
 import { HelpPopover } from "./HelpPopover";
+import { OntologyEvidenceToggle } from "./OntologyEvidencePanel";
 
 export function ScenarioLibraryPanel() {
   const [items, setItems] = useState<Scenario[]>([]);
@@ -150,6 +151,11 @@ export function ScenarioLibraryPanel() {
           룰 변경 / 정합성 / 마이그레이션 시뮬을 한 곳에서 관리. YAML 시드 + 사용자 정의.
         </p>
       </div>
+
+      <OntologyEvidenceToggle
+        actionFqn="action.scm.슬랩설계_실행"
+        label="📚 시나리오들이 참조하는 ontology Action 근거 보기"
+      />
 
       <div className="flex items-center gap-2 flex-wrap">
         <button

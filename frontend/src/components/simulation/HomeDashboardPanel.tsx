@@ -18,6 +18,7 @@ import {
 import { listJobs, listRuns, listScenarios } from "@/lib/simulation/storageApi";
 import { DbSeedCard } from "./DbSeedCard";
 import { MigrationDiffCard } from "./MigrationDiffCard";
+import { OntologyEvidenceToggle } from "./OntologyEvidencePanel";
 
 interface Props {
   onJump?: (view: string) => void;
@@ -182,6 +183,12 @@ export function HomeDashboardPanel({ onJump }: Props = {}) {
 
       {/* ── DB 시드 카드 (PG 활성 시 9 마스터 + 5 샘플 주문 적재) ── */}
       <DbSeedCard />
+
+      {/* ── 온톨로지 근거 — Section 2 ontology trace ─────────── */}
+      <OntologyEvidenceToggle
+        actionFqn="action.scm.슬랩설계_실행"
+        label="📚 이 시뮬레이션 플랫폼의 온톨로지 근거 (Section 2 → Section 3)"
+      />
 
       {/* ── 핵심 지표 ─────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

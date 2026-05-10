@@ -24,6 +24,7 @@ import {
 import { getStepLabel } from "@/lib/simulation/stepLabels";
 import { HelpPopover } from "./HelpPopover";
 import { JsonTable } from "./JsonTable";
+import { OntologyEvidenceToggle } from "./OntologyEvidencePanel";
 
 interface Props {
   onHandoffToSandbox?: (stepId: string, presetInputs: Record<string, unknown>) => void;
@@ -117,6 +118,11 @@ export function OntologyBridgePanel({ onHandoffToSandbox }: Props = {}) {
           도메인 용어 → 영향 받는 sandbox step + 추천 시나리오. Section 2 온톨로지와 결합.
         </p>
       </div>
+
+      <OntologyEvidenceToggle
+        actionFqn="action.scm.슬랩설계_실행"
+        label="📚 브릿지가 참조하는 ontology 전체 근거 (Section 2 → Section 3)"
+      />
 
       {/* AI 어시스턴트 카드 (Phase 7-B) */}
       <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">

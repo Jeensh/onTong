@@ -28,6 +28,8 @@ import {
   PLOT_LAYOUT_BASE,
   barOutline,
 } from "@/lib/simulation/plotTheme";
+import { OntologyEvidenceToggle } from "./OntologyEvidencePanel";
+import { resolveActionFqn } from "@/lib/simulation/stepActionMap";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -143,6 +145,11 @@ export function ImpactPanel() {
           룰/값을 바꾼 뒤, 같은 표본 N건을 변경 전·후로 동시 실행해 결과 분포가 어떻게 달라졌는지 보여줍니다 — Slab 매수, 단중, 실수율 변동량 + 「OK→Fail」 흐름도(Cascade Sankey).
         </p>
       </div>
+
+      <OntologyEvidenceToggle
+        actionFqn={resolveActionFqn(presetId.toLowerCase().includes("productivity") ? "productivity" : "pipeline_full")}
+        label={`📚 변경 영향이 미치는 ontology Action 근거 (${presetId})`}
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[400px_1fr]">
         <section className="rounded-lg border border-border bg-card p-4 space-y-4">
