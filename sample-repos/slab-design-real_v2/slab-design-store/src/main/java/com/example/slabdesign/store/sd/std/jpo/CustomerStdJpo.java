@@ -11,12 +11,9 @@ import java.math.BigDecimal;
  * sd · std · CUSTOMER_STD — 특정 고객사 설계 제한 JPO.
  * Composite PK: (CMP_CD, ORG_CD, PRIORITY).
  *
- * NOTE: PRODUCT_CD 는 다른 테이블의 PRODUCT_CD 와 동일 도메인 개념 (품명/품종).
- *       레거시 비표준화 그대로 보존 — 도구의 온톨로지 매핑이 풀어줄 정확한 영역.
- *
  * 알고리즘 매핑:
- *   step 5 단중하한 = max(..., **PKG_WGT_LOW (특정고객사 단중하한)**, ...)
- *   step 6 단중상한 = min(..., **PKG_WGT_HIGH (특정고객사 단중상한)**, ...)
+ *   step 5 단중하한 = max(..., PKG_WGT_LOW (특정고객사 단중하한), ...)
+ *   step 6 단중상한 = min(..., PKG_WGT_HIGH (특정고객사 단중상한), ...)
  */
 @Entity
 @Table(name = "CUSTOMER_STD")
@@ -33,7 +30,7 @@ public class CustomerStdJpo {
     private Integer priority;       // 우선순위 (tiebreaker)
 
     @Column(name = "PRODUCT_CD", length = 3)
-    private String productCd;   // 품명 — 다른 테이블 PRODUCT_CD 와 동일 의미, 레거시 비표준 컬럼명
+    private String productCd;   // 품명
 
     @Column(name = "CUSTOMER_CD", length = 10)
     private String customerCd;

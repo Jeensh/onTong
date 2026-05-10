@@ -10,7 +10,7 @@ public class CustomerStdEntity {
     private String cmpCd;
     private String orgCd;
     private Integer priority;
-    private String productCd;   // 품명 — 다른 테이블 PRODUCT_CD/PRODUCT_CD 와 동일 도메인
+    private String productCd;   // 품명
     private String customerCd;
     private BigDecimal pkgWgtHigh;
     private BigDecimal pkgWgtLow;

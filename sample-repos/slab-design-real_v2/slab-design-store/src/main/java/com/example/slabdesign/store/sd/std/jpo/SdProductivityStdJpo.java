@@ -12,9 +12,6 @@ import java.math.BigDecimal;
  * Composite PK: (CMP_CD, ORG_CD, PROC_CD, GRADE_CD, PRODUCT_CD, CUSTOMER_CD).
  *
  * PROC_CD 값: SM / HR / HRF / CR / ANL1 / ANL2 / GAL / CRF (8 공정 약어).
- *
- * NOTE: PRODUCT_CD 는 다른 테이블의 PRODUCT_CD / PRODUCT_CD 와 동일 도메인 (품명/품종/품종코드).
- *       레거시 비표준화 그대로 보존.
  */
 @Entity
 @Table(name = "SD_PRODUCTIVITY_STD")
@@ -34,7 +31,7 @@ public class SdProductivityStdJpo {
     private String gradeCd;
 
     @Id @Column(name = "PRODUCT_CD", length = 4)
-    private String productCd;      // 품종코드 — 동일 의미, 레거시 비표준 컬럼명
+    private String productCd;      // 품종코드
 
     @Id @Column(name = "CUSTOMER_CD", length = 10)
     private String customerCd;
