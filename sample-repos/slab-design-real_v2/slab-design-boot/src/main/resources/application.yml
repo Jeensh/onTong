@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: slab-design-real-v2
+  datasource:
+    url: jdbc:h2:mem:slabdesign;MODE=Oracle;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    open-in-view: false
+    defer-datasource-initialization: true
+  sql:
+    init:
+      mode: always
+      data-locations:
+        - classpath:db/seed/01_master.sql
+        - classpath:db/seed/02_orders.sql
+      continue-on-error: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.example.slabdesign: DEBUG
+    org.hibernate.SQL: WARN
+    org.springframework.boot.autoconfigure: INFO
