@@ -1,0 +1,952 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>slab-design 시스템 — Slab 설계 데모 콘솔</title>
+<style>
+:root{
+  --bg:#0b0d10; --surface:#11151b; --surface-2:#161b23; --line:#222a36;
+  --text:#e6edf3; --muted:#8b97a8; --accent:#7dd3fc; --accent-2:#a5b4fc;
+  --green:#34d399; --yellow:#fbbf24; --red:#f87171; --code:#0f141b;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  line-height:1.55;font-size:14px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code,pre,.mono{font-family:"JetBrains Mono","SF Mono",ui-monospace,Menlo,monospace;font-size:12.5px}
+
+.layout{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+nav.side{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+  border-right:1px solid var(--line);background:var(--surface);padding:18px 14px}
+nav.side h2{font-size:11px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin:0 0 10px}
+nav.side ul{list-style:none;padding:0;margin:0 0 18px}
+nav.side a{display:block;padding:6px 10px;border-radius:6px;color:var(--text);font-size:13px;margin:2px 0}
+nav.side a:hover{background:var(--surface-2);text-decoration:none}
+nav.side a.active{background:rgba(125,211,252,.15);color:var(--accent);font-weight:600}
+nav.side .group-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:14px 8px 4px}
+
+main{padding:24px 32px 80px;max-width:1400px}
+header.h{padding-bottom:18px;border-bottom:1px solid var(--line);margin-bottom:24px}
+header.h .eyebrow{color:var(--accent);font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:600}
+header.h h1{font-size:24px;margin:6px 0 6px;font-weight:700;letter-spacing:-.005em}
+header.h .lede{color:var(--muted);font-size:13px;margin:0;max-width:780px}
+header.h .meta{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;font-size:12px;color:var(--muted)}
+header.h .meta b{color:var(--text)}
+header.h .badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.badge{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--surface-2);
+  color:var(--muted);border:1px solid var(--line)}
+.badge.ok{color:var(--green);border-color:rgba(52,211,153,.4)}
+.badge.warn{color:var(--yellow);border-color:rgba(251,191,36,.4)}
+.badge.err{color:var(--red);border-color:rgba(248,113,113,.4)}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin:0 0 24px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.card h4{margin:0 0 4px;font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.card .v{font-size:20px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+.card .sub{font-size:11px;color:var(--muted);margin-top:2px}
+.card.green .v{color:var(--green)}
+.card.yellow .v{color:var(--yellow)}
+.card.red .v{color:var(--red)}
+
+section{margin:28px 0}
+section > h2{font-size:18px;margin:0 0 4px;letter-spacing:-.005em;border-left:3px solid var(--accent);padding-left:10px}
+section > .desc{color:var(--muted);font-size:13px;margin:0 0 12px}
+
+.tablewrap{border:1px solid var(--line);border-radius:8px;overflow:auto;background:var(--surface);max-height:600px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{position:sticky;top:0;background:var(--surface-2);text-align:left;padding:8px 10px;
+  border-bottom:1px solid var(--line);font-weight:600;color:var(--muted);font-size:11px;
+  text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;z-index:1}
+td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+tbody tr:hover{background:var(--surface-2)}
+td.num{text-align:right;font-family:"JetBrains Mono",ui-monospace,monospace;color:#cbd5e1}
+td.code{font-family:"JetBrains Mono",ui-monospace,monospace;color:#a5b4fc;font-size:12px}
+.empty{padding:30px;color:var(--muted);text-align:center}
+
+button{cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--text);
+  padding:7px 14px;border-radius:6px;font-size:13px;font-weight:500}
+button:hover{background:var(--surface-2);border-color:var(--accent)}
+button.primary{background:var(--accent);color:#0b0d10;border-color:var(--accent);font-weight:700}
+button.primary:hover{background:#bae6fd}
+button:disabled{opacity:.5;cursor:not-allowed}
+input,select{background:var(--code);border:1px solid var(--line);color:var(--text);
+  padding:6px 10px;border-radius:6px;font-size:13px}
+
+.runbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
+.runbar label{font-size:12px;color:var(--muted)}
+.result-pre{background:var(--code);border:1px solid var(--line);border-radius:8px;
+  padding:14px;margin:8px 0;font-size:12px;color:#cbd5e1;overflow:auto;max-height:400px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:980px){.row{grid-template-columns:1fr} .layout{grid-template-columns:1fr} nav.side{display:none}}
+
+.tab-bar{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 12px;flex-wrap:wrap}
+.tab-bar button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;
+  padding:8px 12px;font-size:12.5px;color:var(--muted)}
+.tab-bar button.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:700;background:transparent}
+.kbd{background:var(--surface-2);padding:1px 6px;border-radius:4px;font-size:11.5px;border:1px solid var(--line);
+  font-family:"JetBrains Mono",monospace}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav class="side">
+  <h2>Slab Design 콘솔</h2>
+  <ul>
+    <li><a href="#intro" class="active" data-jump="intro">📖 시스템 소개</a></li>
+    <li><a href="#overview" data-jump="overview">📊 개요 + 시드</a></li>
+    <li><a href="#run" data-jump="run">▶ Slab 설계 실행</a></li>
+    <li><a href="#results" data-jump="results">🧱 SLAB_RESULT</a></li>
+    <li><a href="#history" data-jump="history">🕓 SLAB_DESIGN_HIST</a></li>
+  </ul>
+  <div class="group-title">입력 데이터</div>
+  <ul>
+    <li><a href="#orders" data-jump="orders">📋 주문 4종 (OS/OM/QD/CHEM)</a></li>
+    <li><a href="#specs" data-jump="specs">⚙️ 표준/사양 8종</a></li>
+  </ul>
+  <div class="group-title">★ Postman 가이드</div>
+  <ul>
+    <li><a href="#postman-1" data-jump="postman-1">🧪 단일 설계 (test-design)</a></li>
+    <li><a href="#postman-2" data-jump="postman-2">📑 시나리오 9건 JSON</a></li>
+    <li><a href="#postman-3" data-jump="postman-3">📊 step별 데이터 매핑</a></li>
+  </ul>
+  <div class="group-title">외부 도구</div>
+  <ul>
+    <li><a href="http://localhost:8080/h2-console" target="_blank">🛢️ H2 콘솔 (raw SQL)</a></li>
+    <li><a href="/section3.html">← Section 3 랜딩</a></li>
+  </ul>
+</nav>
+
+<main>
+
+<header class="h">
+  <div class="eyebrow">SLAB-DESIGN · DEMO 콘솔 · onTong</div>
+  <h1>Slab 설계 시스템 — H2 데이터 + Slab 설계 실행</h1>
+  <p class="lede">
+    slab-design Spring Boot (포트 8080) 의 H2 in-memory DB 데이터를 직접 조회하고,
+    <code>POST /api/sd/working/batch</code> 를 화면에서 실행하여 결과 / 이력 / 입력 데이터를 모두 시각적으로 확인합니다.
+  </p>
+  <div class="meta">
+    <span><b>Spring Boot</b> :8080</span>
+    <span><b>profile</b> h2 (in-memory)</span>
+    <span><b>data</b> data-h2.sql 자동 시드</span>
+  </div>
+  <div class="badges" id="badges">
+    <span class="badge" id="b-bridge">slab-design 연결 확인 중...</span>
+  </div>
+</header>
+
+<!-- ============ 시스템 소개 ============ -->
+<section id="intro">
+  <h2>0. slab-design 시스템 — 무엇을 하는 시스템인가</h2>
+  <p class="desc" style="font-size:14px">
+    제철소의 <b>slab 설계 (Slab Design) 알고리즘</b> 데모 시스템. 고객 주문 1건이 들어오면
+    <b>21단계 알고리즘</b>으로 적절한 <b>slab (강편) 의 두께·폭·길이·매수·중량</b>을 자동 산정합니다.
+    <br/>
+    이 onTong Section 3 의 분석 대상 (legacy 자바 fixture) 으로, Java/Spring Boot 21-step 알고리즘 + Oracle/Kafka 의존 구조를 의도적으로 보존.
+  </p>
+
+  <div class="cards">
+    <div class="card"><h4>도메인</h4><div class="v" style="font-size:15px">제철소 SCM</div>
+      <div class="sub">제강(SM) → 열연(HR) → slab 설계</div></div>
+    <div class="card"><h4>알고리즘</h4><div class="v" style="font-size:15px">21-step</div>
+      <div class="sub">검증 + 룩업 + A-a 루프 + 최종</div></div>
+    <div class="card"><h4>DB 테이블</h4><div class="v" style="font-size:15px">14종</div>
+      <div class="sub">주문 4 + 표준 8 + 결과 2</div></div>
+    <div class="card"><h4>스택</h4><div class="v" style="font-size:15px">Java 21</div>
+      <div class="sub">Spring Boot 3.4 / JPA / H2</div></div>
+  </div>
+
+  <h3 style="margin:20px 0 8px;font-size:15px;color:var(--accent-2)">⛓ slab 설계 흐름 — 한눈에</h3>
+  <div class="result-pre" style="white-space:pre;line-height:1.5">
+┌────────────────────────────────────────────────────────────────────────┐
+│  고객 주문 (ORDER_OS / OM / QD / CHEMICAL 4 JPO 통합)                    │
+│  • 회사 (cmpCd) · 소 (orgCd) · 주문번호 (orderNo)                        │
+│  • 강종 (gradeCd) · 품종 (productTypeCd) · 고객 (customerCd)             │
+│  • 폭/길이 (orderWidth/Length) · 단중 (orderWgt) · 포장단중 (pkgWgt)     │
+│  • 8 공정 due (SM/HR/HRF/CR/ANL1/ANL2/GAL/CRF) · 화학 8 성분             │
+└─────────────────────────────────┬──────────────────────────────────────┘
+                                  │
+                ┌─────────────────▼─────────────────┐
+                │  STEP 0  ★ 5종 검증기 (validator)  │
+                │  DG001~005 — 재고/사이즈/포장/      │
+                │              설계대기량/작업기한일    │
+                └─────────────────┬─────────────────┘
+                                  │ 통과 시
+                ┌─────────────────▼─────────────────┐
+                │  STEP 1  Slab 두께 결정             │
+                │  CAST_SPEC 룩업 → slabThickness   │
+                └─────────────────┬─────────────────┘
+                                  │
+            ┌─────────────────────▼─────────────────────┐
+            │  STEP 2~6  one-shot — 폭/길이/단중 1차 범위 │
+            │  CAST_SPEC ∩ HR_SPEC ∩ EDGING ∩ HR_MIN/MAX │
+            └─────────────────────┬─────────────────────┘
+                                  │
+                ┌─────────────────▼─────────────────┐
+                │  STEP 7~15  ★ A-a 루프            │
+                │  분할수 max → 1 fallback           │
+                │  → Slab 매수 + 단중 산정           │
+                └─────────────────┬─────────────────┘
+                                  │
+                ┌─────────────────▼─────────────────┐
+                │  STEP 16~19  최종 폭/길이 + 목표값  │
+                └─────────────────┬─────────────────┘
+                                  │
+                ┌─────────────────▼─────────────────┐
+                │  STEP 20  SLAB_RESULT 매수만큼 INS  │
+                │  STEP 21  SLAB_DESIGN_HIST 적재    │
+                └────────────────────────────────────┘</div>
+
+  <h3 style="margin:20px 0 8px;font-size:15px;color:var(--accent-2)">🏭 도메인 용어 (제철 SCM)</h3>
+  <table>
+    <thead><tr><th>용어</th><th>영문/약자</th><th>의미</th></tr></thead>
+    <tbody>
+      <tr><td>slab</td><td>slab</td><td>제강(SM) 출력 + 열연(HR) 입력 — 중간 강재. 본 시스템의 산출물</td></tr>
+      <tr><td>주문</td><td>order</td><td>고객 주문. 1 주문 = 다수 slab 가능</td></tr>
+      <tr><td>강종</td><td>grade</td><td>강 화학 성분 등급 (G01, G02 ...)</td></tr>
+      <tr><td>품종</td><td>productType</td><td>제품 카테고리 (A001 ... 의도적으로 컬럼명 3종 혼재)</td></tr>
+      <tr><td>실수율</td><td>productivity / yield</td><td>공정 산출/투입 비율 (누적 곱)</td></tr>
+      <tr><td>단중</td><td>unit weight</td><td>slab 1 매당 중량 (kg)</td></tr>
+      <tr><td>포장단중</td><td>pkg weight</td><td>고객 포장 단위 중량 제약</td></tr>
+      <tr><td>8 공정</td><td>SM/HR/HRF/CR/ANL1/ANL2/GAL/CRF</td><td>제강 → 열연 → 열연정정 → 냉연 → 풀림1/2 → 도금 → 냉연정정</td></tr>
+      <tr><td>확정통과공장</td><td>confirmedPlantCd</td><td>8자 문자열 — 각 char 가 공정별 plant. <code>' '</code> = 비활성</td></tr>
+      <tr><td>EDGING</td><td>edging</td><td>slab → 스트립 폭 변환 룰. <code>*</code> 와일드카드 fallback</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin:20px 0 8px;font-size:15px;color:var(--accent-2)">📋 검증기 5종 (DG001~005)</h3>
+  <table>
+    <thead><tr><th>코드</th><th>이름</th><th>fail 조건</th></tr></thead>
+    <tbody>
+      <tr><td><b>DG001</b></td><td>재고주문</td><td><code>stockCode</code>(재고코드) <code>= 1</code> → 새 slab 설계 대상 아님</td></tr>
+      <tr><td><b>DG002</b></td><td>주문 폭/길이</td><td><code>orderWidth</code>(주문 폭) <code>≤ 0</code> 또는 <code>orderLength</code>(주문 길이) <code>≤ 0</code></td></tr>
+      <tr><td><b>DG003</b></td><td>포장단중 범위</td><td><code>pkgWgtLow</code>(포장단중 하한) <code>≤ 0</code> 또는 <code>pkgWgtHigh</code>(포장단중 상한) <code>&lt; pkgWgtLow</code></td></tr>
+      <tr><td><b>DG004</b></td><td>설계대기량</td><td><code>designPendQty</code>(설계대기량) <code>≤ 0</code> 또는 <code>designPendQtyHigh</code>(설계대기량 상한) <code>&lt; pkgWgtLow</code>(포장단중 하한)</td></tr>
+      <tr><td><b>DG005</b></td><td>작업기한일</td><td>활성 공정 <code>*Due</code>(공정별 기한) 또는 <code>workDue</code>(작업기한일) 가 NULL/과거</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin:20px 0 8px;font-size:15px;color:var(--accent-2)">🚨 알고리즘 fail 코드 (DG10x ~)</h3>
+  <table>
+    <thead><tr><th>코드</th><th>step</th><th>의미</th></tr></thead>
+    <tbody>
+      <tr><td><b>DG101</b></td><td>step 1</td><td><code>CAST_SPEC</code>(연주설비 사양) 미존재 — 슬랩 두께(<code>slabThickness</code>) 결정 불가</td></tr>
+      <tr><td><b>DG102</b></td><td>step 2</td><td><code>HR_SPEC</code>(열연설비 사양) 미존재 또는 HR 비활성 — 폭(<code>firstWidth*</code>) 산정 불가</td></tr>
+      <tr><td><b>DG103</b></td><td>step 2</td><td><code>EDGING_GROUP</code>(Edging 그룹기준) 매칭 실패</td></tr>
+      <tr><td><b>DG104</b></td><td>step 2</td><td>산정된 폭 범위 invalid (<code>firstWidthLow</code>(폭하한) <code>&gt; firstWidthHigh</code>(폭상한))</td></tr>
+      <tr><td><b>DG106</b></td><td>step 5/6</td><td>단중 산정 invalid — <code>HR_MIN_WGT</code>(압연 MIN 단중) 격자 외 또는 <code>secondWgtLow</code>(단중하한) <code>&gt;</code> <code>secondWgtHigh</code>(단중상한)</td></tr>
+      <tr><td><b>DG108</b></td><td>step 12-13</td><td>A-a 루프 silent fail — 분할 단중 범위(<code>splitWgt*</code>) 또는 매수(<code>slabCount</code>) 미수렴</td></tr>
+      <tr><td><b>DG109</b></td><td>step 8</td><td>A-a 루프 분할수 maxSplit~1 까지 모두 수렴 실패 (no convergence)</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin:20px 0 8px;font-size:15px;color:var(--accent-2)">🔌 API 엔드포인트</h3>
+  <table>
+    <thead><tr><th>Method</th><th>경로</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td>POST</td><td><code>/api/sd/working/batch?cmpCd=&orgCd=</code></td><td><b>회사·소 일괄 설계</b> (원본 컨트롤러)</td></tr>
+      <tr><td>POST</td><td><code>/api/sd/admin/test-design</code></td><td>★ 단일 주문 ad-hoc 설계 (Postman 용, JSON body)</td></tr>
+      <tr><td>POST</td><td><code>/api/sd/admin/clear-results</code></td><td>SLAB_RESULT + HIST 초기화</td></tr>
+      <tr><td>GET</td><td><code>/api/sd/admin/counts</code></td><td>14 테이블 row 카운트</td></tr>
+      <tr><td>GET</td><td><code>/api/sd/admin/orders/{os,om,qd,chemical}</code></td><td>주문 4 JPO 조회</td></tr>
+      <tr><td>GET</td><td><code>/api/sd/admin/spec/{cast,hr,hr-min-wgt,hr-max-wgt,edging,edging-group,productivity,customer}</code></td><td>표준 8종 조회</td></tr>
+      <tr><td>GET</td><td><code>/api/sd/admin/results · /history</code></td><td>slab 결과 / step 이력</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout ok" style="margin-top:14px;padding:12px 14px;border-left:3px solid var(--green);background:rgba(52,211,153,.06);border-radius:6px">
+    <b>본 콘솔의 가치</b><br/>
+    이 화면은 slab-design Spring Boot 의 <b>실제 H2 데이터를 라이브로 조회</b>하면서 <b>21-step 알고리즘 실행</b>까지 모두 시각적으로 확인합니다.
+    아래 §1 부터 차례로 따라가면 도메인 전반 + 데이터 + API 사용까지 한 화면에서 학습 가능.
+  </div>
+</section>
+
+<!-- ============ 개요 ============ -->
+<section id="overview">
+  <h2>1. 14 테이블 / 시드 카운트</h2>
+  <p class="desc">
+    기동 시 Hibernate <code>create-drop</code> 으로 14 테이블 자동 생성 후 <code>data-h2.sql</code> 이 시드 INSERT.
+    아래 카운트는 <code>GET /api/sd/admin/counts</code> 의 라이브 응답.
+  </p>
+  <div class="cards" id="counts">
+    <div class="card"><h4>로딩 중...</h4></div>
+  </div>
+</section>
+
+<!-- ============ 실행 ============ -->
+<section id="run">
+  <h2>2. ▶ Slab 설계 실행 (POST API)</h2>
+  <p class="desc">
+    <code>POST /api/sd/working/batch?cmpCd=&orgCd=</code> — 회사·소 단위 배치 slab 설계.
+    내부 흐름: <code>SdDriver.batchDesign</code> → <code>SdOrderExtractor.extractDesignableOrders</code>
+    → 각 후보에 <code>SdDesigner.design()</code> (validator + 21-step) → <code>BatchResult</code> JSON.
+  </p>
+  <div class="runbar">
+    <label>cmpCd: <input id="cmpCd" value="01" maxlength="2" style="width:60px" /></label>
+    <label>orgCd: <input id="orgCd" value="K" maxlength="1" style="width:50px" /></label>
+    <button class="primary" id="btn-run">▷ 실행</button>
+    <button id="btn-quick-K">테스트 (01, K) 광양</button>
+    <button id="btn-quick-P">테스트 (01, P) 포항</button>
+    <button id="btn-quick-X">테스트 (K, K) — 미존재</button>
+    <span id="run-elapsed" class="badge"></span>
+  </div>
+  <div class="row">
+    <div>
+      <h4 style="margin:6px 0;font-size:12px;color:var(--muted)">요청</h4>
+      <pre class="result-pre" id="req-pre">아직 실행되지 않음</pre>
+    </div>
+    <div>
+      <h4 style="margin:6px 0;font-size:12px;color:var(--muted)">응답</h4>
+      <pre class="result-pre" id="res-pre">버튼을 눌러 실행</pre>
+    </div>
+  </div>
+  <div id="run-summary" style="margin-top:8px"></div>
+</section>
+
+<!-- ============ Slab 결과 ============ -->
+<section id="results">
+  <h2>3. 🧱 SLAB_RESULT — 설계된 slab</h2>
+  <p class="desc">
+    21-step 알고리즘이 성공적으로 끝낸 slab 한 행 = SDSlabEntity. 처음에는 빈 상태이며,
+    <b>위 §2 의 실행이 성공</b>하면 그 횟수만큼 row 가 누적됩니다.
+  </p>
+  <div class="runbar">
+    <button id="btn-refresh-results">🔄 새로고침</button>
+    <span class="badge" id="results-count"></span>
+  </div>
+  <div class="tablewrap" id="results-table">
+    <div class="empty">로딩 중...</div>
+  </div>
+</section>
+
+<!-- ============ 이력 ============ -->
+<section id="history">
+  <h2>4. 🕓 SLAB_DESIGN_HIST — Step 별 이력</h2>
+  <p class="desc">
+    21-step 의 각 step 통과/실패 이력. 처음에는 빈 상태이며, 실행 시 step 별로 row 가 적재됩니다.
+  </p>
+  <div class="runbar">
+    <button id="btn-refresh-history">🔄 새로고침</button>
+    <span class="badge" id="history-count"></span>
+  </div>
+  <div class="tablewrap" id="history-table">
+    <div class="empty">로딩 중...</div>
+  </div>
+</section>
+
+<!-- ============ 주문 ============ -->
+<section id="orders">
+  <h2>5. 📋 입력 — 주문 4종 (ORDER_OS / OM / QD / CHEMICAL)</h2>
+  <p class="desc">
+    <code>SDOrderEntity</code> 통합 도메인 객체의 원천. 같은 PK <code>(cmpCd, orgCd, orderNo)</code> 로 4 JPO 가 합쳐짐.
+  </p>
+  <div class="tab-bar">
+    <button class="on" data-tab="os">ORDER_OS (진도/공정)</button>
+    <button data-tab="om">ORDER_OM (단중/사이즈)</button>
+    <button data-tab="qd">ORDER_QD (강종/HR 폭)</button>
+    <button data-tab="chemical">ORDER_CHEMICAL (8 성분)</button>
+  </div>
+  <div class="tablewrap" id="orders-table"><div class="empty">로딩 중...</div></div>
+</section>
+
+<!-- ============ 표준/사양 ============ -->
+<section id="specs">
+  <h2>6. ⚙️ 입력 — 표준/사양 8종</h2>
+  <p class="desc">
+    21-step 알고리즘이 참조하는 격자/룩업/실수율 표.
+  </p>
+  <div class="tab-bar">
+    <button class="on" data-spec="cast">CAST_SPEC (연주설비)</button>
+    <button data-spec="hr">HR_SPEC (열연)</button>
+    <button data-spec="hr-min-wgt">HR_MIN_WGT (격자)</button>
+    <button data-spec="hr-max-wgt">HR_MAX_WGT (격자)</button>
+    <button data-spec="edging">EDGING_SPEC</button>
+    <button data-spec="edging-group">EDGING_GROUP</button>
+    <button data-spec="productivity">SD_PRODUCTIVITY_STD</button>
+    <button data-spec="customer">CUSTOMER_STD</button>
+  </div>
+  <div class="tablewrap" id="specs-table"><div class="empty">로딩 중...</div></div>
+</section>
+
+<!-- ============================== Postman 가이드 ============================== -->
+<section id="postman-1">
+  <h2>7. 🧪 Postman 단일 설계 호출 — <code>POST /api/sd/admin/test-design</code></h2>
+  <p class="desc">
+    <code>POST /api/sd/working/batch</code> 는 <b>Body 없음 / 회사·소 일괄 처리</b>입니다.
+    Postman 으로 <b>특정 주문 1건만</b> 골라 설계 실행하고 history / SLAB_RESULT 변화를 즉시 확인하려면
+    별도 추가된 <code>POST /api/sd/admin/test-design</code> endpoint 를 사용합니다.
+  </p>
+
+  <div class="cards">
+    <div class="card"><h4>Method</h4><div class="v" style="font-size:14px">POST</div></div>
+    <div class="card"><h4>URL</h4><div class="v" style="font-size:14px">localhost:8080</div>
+      <div class="sub">/api/sd/admin/test-design</div></div>
+    <div class="card"><h4>Headers</h4><div class="v" style="font-size:14px">Content-Type</div>
+      <div class="sub">application/json</div></div>
+    <div class="card"><h4>Body</h4><div class="v" style="font-size:14px">raw / JSON</div>
+      <div class="sub">cmpCd, orgCd, orderNo</div></div>
+  </div>
+
+  <h4 style="margin:14px 0 6px;font-size:13px;color:var(--accent-2)">Postman 단계별 설정</h4>
+  <ol style="font-size:13.5px;padding-left:20px;line-height:1.8">
+    <li>새 Request 생성 → Method = <span class="kbd">POST</span></li>
+    <li>URL: <code>http://localhost:8080/api/sd/admin/test-design</code></li>
+    <li>Headers 탭 → <code>Content-Type</code> = <code>application/json</code></li>
+    <li>Body 탭 → <span class="kbd">raw</span> + 우측 드롭다운 <span class="kbd">JSON</span> 선택</li>
+    <li>아래 §8 시나리오 표에서 원하는 JSON 1개 복사 → Body 에 붙여넣기</li>
+    <li><span class="kbd">Send</span> 클릭 → 응답에 <code>status</code> + <code>history[]</code> + <code>slab</code> 즉시 확인</li>
+  </ol>
+
+  <h4 style="margin:14px 0 6px;font-size:13px;color:var(--accent-2)">응답 스키마</h4>
+  <pre class="result-pre"><code>{
+  "cmpCd":   "01",
+  "orgCd":   "K",
+  "orderNo": "TC01-NORMAL    ",
+  "status":  "success" | "skipped" | "not_found" | "error",
+  "slab":    { ...SDSlabEntity 필드... }   // 성공 시
+            | null,                          // skip / fail 시
+  "counts": {
+    "history_added": 2,    // 이번 호출이 추가한 SLAB_DESIGN_HIST row 수
+    "result_added":  0     // SLAB_RESULT row 수
+  },
+  "history": [             // 이번 호출이 추가한 history row 만 잘라서
+    { "stepNo": 0, "stepName": "VALIDATION_FAILED", "errorCode": "DG001", "eventTime": "..." },
+    { "stepNo": 1, "stepName": "SLAB_THICKNESS",    "errorCode": "DG101", "eventTime": "..." }
+  ]
+}</code></pre>
+
+  <h4 style="margin:14px 0 6px;font-size:13px;color:var(--accent-2)">curl 동치 (참고)</h4>
+  <pre class="result-pre"><code>curl -X POST http://localhost:8080/api/sd/admin/test-design \
+  -H "Content-Type: application/json" \
+  -d '{"cmpCd":"01","orgCd":"K","orderNo":"TC01-NORMAL    "}'</code></pre>
+
+  <h4 style="margin:14px 0 6px;font-size:13px;color:var(--accent-2)">부가 endpoint</h4>
+  <table style="margin:0">
+    <thead><tr><th>Method</th><th>URL</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td>POST</td><td><code>/api/sd/admin/clear-results</code></td><td>SLAB_RESULT + SLAB_DESIGN_HIST 일괄 삭제 (test 사이클 초기화)</td></tr>
+      <tr><td>GET</td><td><code>/api/sd/admin/counts</code></td><td>14 테이블 row 카운트 한 번에</td></tr>
+      <tr><td>GET</td><td><code>/api/sd/admin/orders/os</code></td><td>ORDER_OS 9 row 전체 (orderNo 확인용)</td></tr>
+      <tr><td>GET</td><td><code>/api/sd/admin/history</code></td><td>SLAB_DESIGN_HIST 누적 이력</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="postman-2">
+  <h2>8. 📑 시나리오 9건 JSON — 정상/경계/에러 유형별</h2>
+  <p class="desc">
+    H2 시드된 <b>9건의 의도된 시나리오</b>. Section 3 의 Hypothesis 케이스 유형 (normal / boundary / error) 매핑.
+    각 JSON 을 §7 의 Body 에 붙여넣고 <span class="kbd">Send</span> 만 누르면 즉시 검증 가능.
+  </p>
+
+  <table>
+    <thead><tr>
+      <th>#</th><th>시나리오</th><th>유형</th><th>의도된 결과</th><th>step</th><th>error</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>TC01</td><td><b>정상</b> — SM=A + HR=A 활성</td>
+          <td><span class="badge ok">정상</span></td>
+          <td>step 0~1 통과 → step 2 DG103 (EDGING 미세조정 후 더 진행 가능)</td>
+          <td>2</td><td>DG103</td></tr>
+      <tr><td>TC02</td><td><b>정상</b> — smCd=B 변형</td>
+          <td><span class="badge ok">정상</span></td><td>step 0~1 통과</td><td>2</td><td>DG103</td></tr>
+      <tr><td>TC03</td><td><b>경계</b> — pkgWgtLow == pkgWgtHigh (20==20)</td>
+          <td><span class="badge warn">경계</span></td>
+          <td>DG003 경계 통과 + step 1 통과</td><td>2</td><td>DG103</td></tr>
+      <tr><td>TC04</td><td>★ 에러 — stockCode=1 (재고주문)</td>
+          <td><span class="badge err">에러</span></td>
+          <td><b>step 0 DG001 fail</b></td><td>0</td><td><b>DG001</b></td></tr>
+      <tr><td>TC05</td><td>★ 에러 — confirmedPlantCd 활성 vs hrfDue NULL</td>
+          <td><span class="badge err">에러</span></td>
+          <td><b>step 0 DG005 fail</b></td><td>0</td><td><b>DG005</b></td></tr>
+      <tr><td>TC06</td><td>★ 에러 — productTypeCd=X999 (CAST_SPEC 미시드)</td>
+          <td><span class="badge err">에러</span></td>
+          <td><b>step 1 DG101 fail</b></td><td>1</td><td><b>DG101</b></td></tr>
+      <tr><td>TC07</td><td>★ 에러 — HR 비활성 (확통[1]=' ')</td>
+          <td><span class="badge err">에러</span></td>
+          <td><b>step 2 DG102 fail</b></td><td>2</td><td><b>DG102</b></td></tr>
+      <tr><td>TC08</td><td>★ 에러 — orderWidth=1900 (HR_MIN_WGT 격자 외)</td>
+          <td><span class="badge err">에러</span></td>
+          <td>step 1~2 진행 후 5/6 격자 fail (격자 1800 까지)</td><td>2~5</td><td>DG103/106</td></tr>
+      <tr><td>TC09</td><td>정상 (3 공정) — SM+HR+HRF 활성, 모든 due 설정</td>
+          <td><span class="badge ok">정상</span></td>
+          <td>step 0~1 통과</td><td>2</td><td>DG103</td></tr>
+    </tbody>
+  </table>
+
+  <p class="desc" style="margin-top:14px">
+    ※ TC01~TC03, TC09 의 step 2 DG103 은 EDGING_GROUP 매칭 결과 — <b>step 0/1 통과만으로 검증 인프라 OK</b>.
+    EDGING_GROUP 매칭을 더 풀어 step 끝까지 가게 하려면 <code>data-h2.sql</code> 의 EDGING_GROUP customer 와 selectedHrTgtWidth 범위 조정.
+  </p>
+
+  <h4 style="margin:18px 0 6px;font-size:13px;color:var(--accent-2)">JSON Body — TC01~TC09 (Postman 에 그대로 붙여넣기)</h4>
+
+  <details open style="background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:8px 0">
+    <summary style="cursor:pointer;font-weight:600">▶ 정상 시나리오 (TC01, TC02, TC03, TC09)</summary>
+<pre class="result-pre"><code>// TC01 정상 — SM=A + HR=A 활성. 가장 기본 시나리오
+{"cmpCd":"01","orgCd":"K","orderNo":"TC01-NORMAL    "}
+
+// TC02 정상 — smCd=B (CC2/M2 매핑)
+{"cmpCd":"01","orgCd":"K","orderNo":"TC02-NORMAL-B  "}
+
+// TC03 경계값 — pkgWgtLow == pkgWgtHigh (20==20). DG003 경계 통과
+{"cmpCd":"01","orgCd":"K","orderNo":"TC03-BOUNDARY  "}
+
+// TC09 정상 (3공정 활성) — SM+HR+HRF 모두 due 설정
+{"cmpCd":"01","orgCd":"P","orderNo":"TC09-NORMAL-3P "}  // ★ 포항 (orgCd=P)</code></pre>
+  </details>
+
+  <details style="background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:8px 0">
+    <summary style="cursor:pointer;font-weight:600">▶ 검증기 fail (DG001~005) — TC04, TC05</summary>
+<pre class="result-pre"><code>// TC04 — stockCode=1 (재고주문) → DG001 fail
+{"cmpCd":"01","orgCd":"K","orderNo":"TC04-ERR-DG001 "}
+// 응답 history[0]: stepNo=0, stepName=VALIDATION_FAILED, errorCode=DG001
+
+// TC05 — confirmedPlantCd='AAA     ' 인데 hrfDue=NULL → DG005 fail
+{"cmpCd":"01","orgCd":"K","orderNo":"TC05-ERR-DG005 "}
+// 응답 history[0]: errorCode=DG005</code></pre>
+  </details>
+
+  <details style="background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:8px 0">
+    <summary style="cursor:pointer;font-weight:600">▶ Algorithm fail (DG101~) — TC06, TC07, TC08</summary>
+<pre class="result-pre"><code>// TC06 — productTypeCd='X999' (CAST_SPEC 미시드) → DG101 fail
+{"cmpCd":"01","orgCd":"K","orderNo":"TC06-ERR-DG101 "}
+// 응답 history[1]: stepNo=1, stepName=SLAB_THICKNESS, errorCode=DG101
+
+// TC07 — confirmedPlantCd='A       ' (HR=' ' 비활성) → DG102 fail
+{"cmpCd":"01","orgCd":"K","orderNo":"TC07-ERR-DG102 "}
+// 응답 history[1]: stepNo=2, stepName=FIRST_WIDTH_RANGE, errorCode=DG102
+
+// TC08 — orderWidth=1900 (HR_MIN_WGT 격자 1800 초과) → step 5/6 fail
+{"cmpCd":"01","orgCd":"K","orderNo":"TC08-ERR-WIDE  "}</code></pre>
+  </details>
+
+  <h4 style="margin:18px 0 6px;font-size:13px;color:var(--accent-2)">대량 호출 (모든 시나리오 한번에 검증)</h4>
+  <pre class="result-pre"><code># 모든 TC 한번에 — bash for-loop
+for tc in "TC01-NORMAL    " "TC02-NORMAL-B  " "TC03-BOUNDARY  " \
+          "TC04-ERR-DG001 " "TC05-ERR-DG005 " "TC06-ERR-DG101 " \
+          "TC07-ERR-DG102 " "TC08-ERR-WIDE  " "TC09-NORMAL-3P "; do
+  curl -s -X POST http://localhost:8080/api/sd/admin/test-design \
+    -H "Content-Type: application/json" \
+    -d "{\"cmpCd\":\"01\",\"orgCd\":\"K\",\"orderNo\":\"${tc}\"}" \
+    | python3 -c "import sys,json; d=json.load(sys.stdin); h=d.get('history',[]); print(f'{d[\"orderNo\"]}: status={d[\"status\"]} → step={h[-1][\"stepNo\"] if h else 0} error={h[-1][\"errorCode\"] if h else None}')"
+done</code></pre>
+
+  <h4 style="margin:18px 0 6px;font-size:13px;color:var(--accent-2)">실측 응답 (2026-05-10 모든 시나리오 라이브 호출)</h4>
+  <pre class="result-pre"><code>TC01-NORMAL    : status=skipped → step=2 error=DG103
+TC04-ERR-DG001 : status=skipped → step=0 error=DG001  ✓ 의도대로 fail
+TC05-ERR-DG005 : status=skipped → step=0 error=DG005  ✓ 의도대로 fail
+TC06-ERR-DG101 : status=skipped → step=1 error=DG101  ✓ 의도대로 fail
+TC07-ERR-DG102 : status=skipped → step=2 error=DG102  ✓ 의도대로 fail</code></pre>
+</section>
+
+<section id="postman-3">
+  <h2>9. 📊 Step 별 데이터 매핑 — 어떤 step 이 어떤 테이블을 룩업하나</h2>
+  <p class="desc">
+    21-step 알고리즘의 각 step 이 어떤 H2 테이블 행을 참조하는지 한눈에 정리.
+    "이 step 을 테스트하려면 어느 행을 시드해야 하는가" 가 명확.
+  </p>
+
+  <table>
+    <thead><tr>
+      <th>Step</th><th>이름 (한국어)</th><th>참조 테이블</th><th>현재 시드 (row)</th><th>매칭 키</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>0</td><td>검증기 (validator)</td>
+          <td><code>ORDER_OS</code> + <code>ORDER_OM</code></td>
+          <td>9 + 9</td>
+          <td>stockCode / orderWidth / pkgWgtLow~High / designPendQty / confirmedPlantCd × 8 due / workDue</td></tr>
+      <tr><td>1</td><td>두께 결정 (thickness)</td>
+          <td><code>CAST_SPEC</code></td>
+          <td>2</td>
+          <td>(cmpCd, orgCd, smCd, castCd, machineCd, productTypeCd) — PlantMappingService.smCd→castCd/machineCd</td></tr>
+      <tr><td>2</td><td>1차 폭범위 (width_range)</td>
+          <td><code>CAST_SPEC</code> ∩ <code>HR_SPEC</code> ∩ <code>EDGING_GROUP</code> ∩ <code>EDGING_SPEC</code></td>
+          <td>2 + 2 + 3 + 3</td>
+          <td>+ hrPlantCd / gradeCd / customerCd / selectedHrTgtWidth</td></tr>
+      <tr><td>3</td><td>1차 길이범위 (length_range)</td>
+          <td><code>CAST_SPEC</code> ∩ <code>HR_SPEC</code></td>
+          <td>2 + 2</td><td>productTypeCd</td></tr>
+      <tr><td>5</td><td>★ 2차 단중하한 (second_wgt_low)</td>
+          <td><code>HR_MIN_WGT</code> + <code>CUSTOMER_STD</code></td>
+          <td>8 + 3</td>
+          <td>(hrCd, thickness, width) 격자 + (customerCd, productNameCd) 우선순위</td></tr>
+      <tr><td>6</td><td>★ 2차 단중상한 (second_wgt_high)</td>
+          <td><code>HR_MAX_WGT</code></td>
+          <td>8</td>
+          <td>(hrCd, thickness, width) 격자</td></tr>
+      <tr><td>7</td><td>최대 분할수 (max_split)</td>
+          <td>(slab.firstWgt, order.pkgWgt 메모리)</td>
+          <td>—</td><td>step 4~6 결과만 사용</td></tr>
+      <tr><td>8</td><td>분할 단중범위 (split_range)</td>
+          <td>(메모리)</td><td>—</td><td>분할수 + step 4 결과</td></tr>
+      <tr><td>9</td><td>slab 매수 (slab_count)</td>
+          <td>(메모리 — pkgWgt 기반)</td><td>—</td><td>—</td></tr>
+      <tr><td>10</td><td>slab 단중 (slab_weight)</td>
+          <td>(메모리)</td><td>—</td><td>—</td></tr>
+      <tr><td>16</td><td>최종 폭범위 (final_width_range)</td>
+          <td><code>CAST_SPEC</code> ∩ <code>HR_SPEC</code></td>
+          <td>2 + 2</td><td>productTypeCd</td></tr>
+      <tr><td>17</td><td>최종 길이범위 (final_length_range)</td>
+          <td><code>CAST_SPEC</code> ∩ <code>HR_SPEC</code></td>
+          <td>2 + 2</td><td>productTypeCd</td></tr>
+      <tr><td>18·19</td><td>목표 폭/길이 (target_size)</td>
+          <td>(메모리)</td><td>—</td><td>—</td></tr>
+      <tr><td>21 (전체)</td><td>실수율 곱 (productivity)</td>
+          <td><code>SD_PRODUCTIVITY_STD</code></td>
+          <td>8</td>
+          <td>(procCd × gradeCd × prodKindCd × customerCd) 우선순위</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout ok" style="margin-top:14px;padding:12px 14px;border-left:3px solid var(--green);background:rgba(52,211,153,.06);border-radius:6px">
+    <b>✅ 시드 적재 검증 완료</b><br/>
+    14 테이블 모두 자동 생성 + 67 row 적재 + 9 시나리오 라이브 호출 결과:
+    <ul style="margin:6px 0 0;padding-left:18px;font-size:13px">
+      <li>step 0 (validator) — 5건 케이스 (정상 통과 + DG001/DG005 의도된 fail)</li>
+      <li>step 1 (thickness) — TC06 (DG101) 의도된 fail / TC01~03/09 통과</li>
+      <li>step 2 (width_range) — TC07 (DG102) 의도된 fail / 나머지 DG103 (EDGING 추가 조정 필요)</li>
+      <li>step 5/6 격자 — TC08 (격자 외) 의도된 fail</li>
+    </ul>
+    <b>전체 데이터 인프라 정상 동작 확인.</b>
+  </div>
+
+  <h4 style="margin:18px 0 6px;font-size:13px;color:var(--accent-2)">Step별 데이터 직접 조회 (Postman)</h4>
+  <pre class="result-pre"><code># step 0 입력 — 9 주문
+GET http://localhost:8080/api/sd/admin/orders/os
+GET http://localhost:8080/api/sd/admin/orders/om
+
+# step 1 — CAST_SPEC 2 row
+GET http://localhost:8080/api/sd/admin/spec/cast
+
+# step 2 — HR_SPEC + EDGING_GROUP/SPEC
+GET http://localhost:8080/api/sd/admin/spec/hr
+GET http://localhost:8080/api/sd/admin/spec/edging-group
+GET http://localhost:8080/api/sd/admin/spec/edging
+
+# step 5/6 — 2D 격자
+GET http://localhost:8080/api/sd/admin/spec/hr-min-wgt
+GET http://localhost:8080/api/sd/admin/spec/hr-max-wgt
+
+# 21 — 8 공정 실수율
+GET http://localhost:8080/api/sd/admin/spec/productivity</code></pre>
+</section>
+
+</main>
+</div>
+
+<script>
+const API = "http://localhost:8080";
+
+// ─── 도메인 필드 한글 라벨 (slab-design.md / sd-tables.md 기준) ───
+const FIELD_LABELS = {
+  // 공통 PK
+  cmpCd: "회사코드", orgCd: "소코드", orderNo: "주문번호",
+  // ORDER_OS
+  osProgress: "OS 진도", closeFlag: "종결플래그", stockCode: "재고코드",
+  designPendQty: "설계대기량", designPendQtyLow: "설계대기량 하한", designPendQtyHigh: "설계대기량 상한",
+  confirmedPlantCd: "확정통과공장코드(8자리)", possiblePlantCd: "가능통과공장코드",
+  smDue: "제강 기한", hrDue: "열연 기한", hrfDue: "열연정정 기한",
+  crDue: "냉연 기한", anl1Due: "ANL1 기한", anl2Due: "ANL2 기한",
+  galDue: "도금 기한", crfDue: "냉정 기한",
+  // ORDER_OM
+  orderWgtLow: "주문단중 하한", orderWgtHigh: "주문단중 상한",
+  orderWidth: "주문 폭", orderLength: "주문 길이",
+  workDue: "작업기한일", pkgWgtLow: "포장단중 하한", pkgWgtHigh: "포장단중 상한",
+  productTypeCd: "품종", customerCd: "고객사", prodDue: "생산기한일", deliveryDue: "납기일",
+  // ORDER_QD
+  gradeCd: "강종", hrTgtWidth_1: "HR 목표폭1", hrTgtWidth_2: "HR 목표폭2",
+  hrTgtWidth_3: "HR 목표폭3", hrTgtWidth_4: "HR 목표폭4", hrTgtWidth_5: "HR 목표폭5",
+  // CAST_SPEC
+  smCd: "제강코드", castCd: "연주코드", machineCd: "머신코드",
+  slabThickness: "슬랩 두께", widthLow: "폭 하한", widthHigh: "폭 상한",
+  lengthLow: "길이 하한", lengthHigh: "길이 상한", wgtLow: "단중 하한", wgtHigh: "단중 상한",
+  // HR_SPEC
+  hrPlantCd: "열연공장코드",
+  // HR_MIN_WGT / MAX_WGT
+  hrCd: "열연코드", thickness: "두께", width: "폭",
+  minWgt: "최소 단중(kg)", maxWgt: "최대 단중(kg)",
+  // EDGING
+  edgingGroupCd: "Edging 그룹", priority: "우선순위",
+  hrTgtWidthLow: "HR 목표폭 하한", hrTgtWidthHigh: "HR 목표폭 상한",
+  edgingCapLow: "Edging 능력 하한(보정값)", edgingCapHigh: "Edging 능력 상한(보정값)",
+  // PRODUCTIVITY
+  procCd: "공정구분", prodKindCd: "품종", productivity: "실수율",
+  // CUSTOMER_STD
+  productNameCd: "품명",
+  // SLAB_RESULT
+  slabNo: "슬랩번호", slabWidth: "슬랩 폭", slabWidthLow: "슬랩 폭 하한", slabWidthHigh: "슬랩 폭 상한",
+  slabLength: "슬랩 길이", slabLengthLow: "슬랩 길이 하한", slabLengthHigh: "슬랩 길이 상한",
+  slabWgt: "슬랩 단중(kg)",
+  // SLAB_DESIGN_HIST
+  historyNo: "이력번호", stepNo: "step", stepName: "step 이름",
+  errorCode: "에러코드", errorMessage: "에러메시지", snapshot: "snapshot JSON",
+  // 기타
+  insertedAt: "입력일시", updatedAt: "수정일시",
+};
+
+function labelOf(field) {
+  const ko = FIELD_LABELS[field];
+  return ko ? `<div style="font-size:9px;color:#94a3b8;font-weight:400;margin-top:1px">${ko}</div>` : "";
+}
+
+async function fetchJson(path) {
+  const r = await fetch(API + path);
+  if (!r.ok) throw new Error(`${path} → ${r.status}`);
+  return r.json();
+}
+async function postJson(path) {
+  const t0 = performance.now();
+  const r = await fetch(API + path, { method: "POST" });
+  const t1 = performance.now();
+  const data = await r.json().catch(() => ({}));
+  return { status: r.status, data, elapsedMs: Math.round(t1 - t0) };
+}
+
+// ─── badges ───
+async function checkConn() {
+  const el = document.getElementById("b-bridge");
+  try {
+    const c = await fetchJson("/api/sd/admin/counts");
+    const total = Object.values(c).reduce((a,b)=>a+b, 0);
+    el.className = "badge ok";
+    el.textContent = `slab-design :8080 OK · 14 테이블 / ${total} row`;
+  } catch (e) {
+    el.className = "badge err";
+    el.textContent = `slab-design :8080 미응답 — ./mvnw + java -jar ... --spring.profiles.active=h2 확인`;
+  }
+}
+
+// ─── §1 카운트 ───
+const TABLE_LABELS = {
+  ORDER_OS: "진도관리 주문", ORDER_OM: "주문처리 단중·사이즈", ORDER_QD: "품질설계 강종·HR목표폭", ORDER_CHEMICAL: "주문 8성분",
+  CAST_SPEC: "연주설비 사양", HR_SPEC: "열연설비 사양", HR_MIN_WGT: "압연 MIN 단중", HR_MAX_WGT: "압연 MAX 단중",
+  EDGING_SPEC: "Edging 능력기준", EDGING_GROUP: "Edging 그룹기준",
+  SD_PRODUCTIVITY_STD: "8공정 실수율", CUSTOMER_STD: "고객사 포장단중 한도",
+  SLAB_RESULT: "설계된 슬랩 결과", SLAB_DESIGN_HIST: "step 별 설계 이력",
+};
+async function loadCounts() {
+  const c = await fetchJson("/api/sd/admin/counts");
+  const order = ["ORDER_OS","ORDER_OM","ORDER_QD","ORDER_CHEMICAL",
+                 "CAST_SPEC","HR_SPEC","HR_MIN_WGT","HR_MAX_WGT",
+                 "EDGING_SPEC","EDGING_GROUP","SD_PRODUCTIVITY_STD","CUSTOMER_STD",
+                 "SLAB_RESULT","SLAB_DESIGN_HIST"];
+  const html = order.map(k => {
+    const v = c[k] ?? 0;
+    const cls = (k === "SLAB_RESULT" || k === "SLAB_DESIGN_HIST") ?
+      (v > 0 ? "card green" : "card yellow") : "card";
+    const ko = TABLE_LABELS[k] || "";
+    return `<div class="${cls}"><h4>${k}</h4><div class="v">${v}</div><div class="sub">${ko}</div></div>`;
+  }).join("");
+  document.getElementById("counts").innerHTML = html;
+}
+
+// ─── 테이블 헬퍼 ───
+// 클립보드 복사 — 토스트 알림
+function copyToClipboard(text, hint) {
+  navigator.clipboard.writeText(text).then(() => {
+    const t = document.createElement("div");
+    t.textContent = "✓ 복사됨" + (hint ? " — " + hint : "");
+    t.style.cssText = "position:fixed;bottom:24px;right:24px;background:#0ea5e9;color:#0b0d10;padding:8px 14px;border-radius:6px;font-weight:600;font-size:13px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3)";
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 1400);
+  }).catch(e => alert("복사 실패: " + e.message));
+}
+
+// 전역 row 저장소 — 버튼에서 row 인덱스로 참조
+window._tableRowStore = {};
+
+// ORDER_OS 행 → POST /api/sd/admin/test-design 의 body JSON
+function osRowToTestDesignBody(r) {
+  return JSON.stringify({ cmpCd: r.cmpCd, orgCd: r.orgCd, orderNo: r.orderNo }, null, 2);
+}
+
+// ORDER_OS + 다른 테이블 합쳐 onTong Differential 의 order JSON 형태 빌드
+function rowToOrderJson(r) {
+  // OS / OM / QD 어떤 row 든 들어올 수 있으므로 들어온 키만 그대로 사용 + 숫자 → string 변환 (BigDecimal 호환)
+  const out = {};
+  for (const [k, v] of Object.entries(r)) {
+    if (v === null || v === undefined) continue;
+    if (typeof v === "number") out[k] = String(v);
+    else out[k] = v;
+  }
+  return JSON.stringify(out, null, 2);
+}
+
+function rowsToTable(rows, opts) {
+  opts = opts || {};
+  if (!rows || !rows.length) return `<div class="empty">데이터 없음 (0 row)</div>`;
+  // row 저장 (전역 키)
+  const storeKey = opts.storeKey || ("rows-" + Math.random().toString(36).slice(2, 8));
+  window._tableRowStore[storeKey] = rows;
+  // 모든 키 수집
+  const keys = [...new Set(rows.flatMap(r => Object.keys(r)))];
+  const includeJsonAction = opts.jsonAction !== false;
+  const isOrderOs = opts.kind === "order_os";
+  const actionTh = includeJsonAction
+    ? (isOrderOs ? `<th style="white-space:nowrap">📋 JSON</th>` : `<th style="white-space:nowrap">📋</th>`)
+    : "";
+  const head = keys.map(k => `<th><div style="font-family:ui-monospace,monospace">${k}</div>${labelOf(k)}</th>`).join("") + actionTh;
+  const body = rows.map((r, idx) => {
+    const cells = keys.map(k => {
+      const v = r[k];
+      const isNum = typeof v === "number";
+      const isCode = typeof v === "string" && (k === "orderNo" || k.endsWith("Cd") || k.endsWith("CD"));
+      const cls = isNum ? "num" : (isCode ? "code" : "");
+      const display = v === null || v === undefined ? '<span style="color:#475569">∅</span>' : String(v);
+      return `<td class="${cls}">${display}</td>`;
+    }).join("");
+    let actionTd = "";
+    if (includeJsonAction) {
+      if (isOrderOs) {
+        actionTd = `<td style="white-space:nowrap">
+          <button onclick="copyRowAsTestDesign('${storeKey}',${idx})"
+            style="font-size:10px;padding:2px 6px"
+            title="POST /api/sd/admin/test-design body (cmpCd/orgCd/orderNo) 복사">📋 test-design</button>
+          <button onclick="copyRowAsOrderJson('${storeKey}',${idx})"
+            style="font-size:10px;padding:2px 6px;margin-left:2px"
+            title="onTong Differential order body 복사 (모든 OS 컬럼)">📋 order</button>
+        </td>`;
+      } else {
+        actionTd = `<td style="white-space:nowrap">
+          <button onclick="copyRowAsOrderJson('${storeKey}',${idx})"
+            style="font-size:10px;padding:2px 6px"
+            title="이 row 를 JSON 으로 복사">📋 JSON</button>
+        </td>`;
+      }
+    }
+    return "<tr>" + cells + actionTd + "</tr>";
+  }).join("");
+  return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+// 전역 핸들러 — onclick 에서 호출
+window.copyRowAsTestDesign = function(storeKey, idx) {
+  const row = (window._tableRowStore[storeKey] || [])[idx];
+  if (!row) return;
+  copyToClipboard(osRowToTestDesignBody(row), `test-design body (${(row.orderNo||"").trim()})`);
+};
+window.copyRowAsOrderJson = function(storeKey, idx) {
+  const row = (window._tableRowStore[storeKey] || [])[idx];
+  if (!row) return;
+  copyToClipboard(rowToOrderJson(row), `order JSON (${(row.orderNo||"").trim()||"row"})`);
+};
+
+async function loadTable(path, container, badge) {
+  const el = document.getElementById(container);
+  el.innerHTML = `<div class="empty">로딩 중...</div>`;
+  try {
+    const rows = await fetchJson(path);
+    const kind = path.includes("/orders/os") ? "order_os" : "other";
+    const storeKey = container + ":" + path;
+    el.innerHTML = rowsToTable(rows, { kind, storeKey });
+    if (badge) document.getElementById(badge).textContent = `${rows.length} row`;
+  } catch (e) {
+    el.innerHTML = `<div class="empty">에러: ${e.message}</div>`;
+  }
+}
+
+// ─── §2 실행 ───
+function showRun(cmpCd, orgCd, status, data, elapsedMs) {
+  const reqUrl = `${API}/api/sd/working/batch?cmpCd=${cmpCd}&orgCd=${orgCd}`;
+  document.getElementById("req-pre").textContent =
+    `POST ${reqUrl}\n(Body 없음 — query parameter 만 사용)`;
+  document.getElementById("res-pre").textContent =
+    `HTTP ${status}\n\n${JSON.stringify(data, null, 2)}`;
+  document.getElementById("run-elapsed").textContent =
+    `${elapsedMs} ms · HTTP ${status}`;
+
+  const sumEl = document.getElementById("run-summary");
+  if (status === 200 && data && typeof data.total === "number") {
+    const cls = data.processedCount > 0 ? "card green" :
+                data.total > 0 ? "card yellow" : "card";
+    sumEl.innerHTML = `
+      <div class="cards">
+        <div class="${cls}"><h4>total (후보 추출)</h4><div class="v">${data.total}</div></div>
+        <div class="card green"><h4>processed (성공)</h4><div class="v">${data.processedCount}</div></div>
+        <div class="card yellow"><h4>skipped</h4><div class="v">${data.skippedCount}</div></div>
+        <div class="card"><h4>processedSlabs</h4><div class="v">${(data.processedSlabs||[]).length}</div></div>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:6px 0">
+        ${data.processedCount > 0
+          ? "설계 성공 → §3 SLAB_RESULT 새로고침으로 결과 확인"
+          : data.total > 0
+            ? "후보 추출 OK · 21-step 도중 fail → §4 SLAB_DESIGN_HIST 에 step 별 fail 사유"
+            : "후보 0건 — cmpCd/orgCd 와 ORDER_OS 시드 매칭 확인 (시드: cmpCd=01, orgCd=K 또는 P)"}
+      </p>`;
+    // 자동으로 결과/이력 갱신
+    loadCounts();
+    loadTable("/api/sd/admin/results", "results-table", "results-count");
+    loadTable("/api/sd/admin/history", "history-table", "history-count");
+  } else {
+    sumEl.innerHTML = "";
+  }
+}
+
+async function runBatch(cmpCd, orgCd) {
+  document.getElementById("res-pre").textContent = "실행 중...";
+  document.getElementById("run-elapsed").textContent = "";
+  try {
+    const { status, data, elapsedMs } = await postJson(
+      `/api/sd/working/batch?cmpCd=${encodeURIComponent(cmpCd)}&orgCd=${encodeURIComponent(orgCd)}`);
+    showRun(cmpCd, orgCd, status, data, elapsedMs);
+  } catch (e) {
+    document.getElementById("res-pre").textContent = "에러: " + e.message;
+  }
+}
+
+document.getElementById("btn-run").onclick = () =>
+  runBatch(document.getElementById("cmpCd").value, document.getElementById("orgCd").value);
+document.getElementById("btn-quick-K").onclick = () => runBatch("01", "K");
+document.getElementById("btn-quick-P").onclick = () => runBatch("01", "P");
+document.getElementById("btn-quick-X").onclick = () => runBatch("K", "K");
+
+// ─── §3 / §4 ───
+document.getElementById("btn-refresh-results").onclick = () =>
+  loadTable("/api/sd/admin/results", "results-table", "results-count");
+document.getElementById("btn-refresh-history").onclick = () =>
+  loadTable("/api/sd/admin/history", "history-table", "history-count");
+
+// ─── §5 주문 탭 ───
+const ordersTab = (which) => loadTable(`/api/sd/admin/orders/${which}`, "orders-table");
+document.querySelectorAll('.tab-bar [data-tab]').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.tab-bar [data-tab]').forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    ordersTab(b.dataset.tab);
+  };
+});
+
+// ─── §6 표준 탭 ───
+const specsTab = (which) => loadTable(`/api/sd/admin/spec/${which}`, "specs-table");
+document.querySelectorAll('.tab-bar [data-spec]').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.tab-bar [data-spec]').forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    specsTab(b.dataset.spec);
+  };
+});
+
+// ─── side nav active ───
+document.querySelectorAll('nav.side a[data-jump]').forEach(a => {
+  a.onclick = (e) => {
+    document.querySelectorAll('nav.side a[data-jump]').forEach(x => x.classList.remove("active"));
+    a.classList.add("active");
+  };
+});
+
+// ─── init ───
+checkConn();
+loadCounts();
+ordersTab("os");
+specsTab("cast");
+loadTable("/api/sd/admin/results", "results-table", "results-count");
+loadTable("/api/sd/admin/history", "history-table", "history-count");
+</script>
+</body>
+</html>
