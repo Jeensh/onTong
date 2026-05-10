@@ -377,6 +377,26 @@ class FailurePolicy(BaseModel):
     on_dispatch_inconsistent: Literal["continue", "fail_fast"] = "continue"
 
 
+# ─── Run lifecycle (spec 03 §1.1) ─────────────────────────────────
+
+
+class RunHandle(BaseModel):
+    """spec 03 §1.1 — POST /api/simulation/runs 의 응답 + 상태 polling.
+
+    상태 머신 (spec 05 §4.1):
+        pending → running → {completed, failed, cancelled}
+        pending → cancelled (시작 전 취소 허용)
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    status: Literal["pending", "running", "completed", "failed", "cancelled"]
+    created_at: str
+    plan: Optional[RunPlan] = None
+    """dry_run=True 면 채워짐 (코드 생성만, sandbox 안 부름). 그 외 None."""
+
+
 __all__ = [
     "ChangeSpec",
     "RunOptions",
@@ -397,4 +417,6 @@ __all__ = [
     "TableSpec",
     "LookupRow",
     "FailurePolicy",
+    # Run lifecycle (STEP 3b-5)
+    "RunHandle",
 ]

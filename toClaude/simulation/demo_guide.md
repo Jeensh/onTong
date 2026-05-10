@@ -637,3 +637,140 @@ PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/ -q
 ### `br_evidence` 의 severity 가 모두 'info'
 - 의도된 동작 — orchestrator 가 outcome=violated→error / 그 외→info 로 매핑 (echo-stub iter)
 - 후속: ontology_client 의 BusinessRule.severity 직접 조회 보강
+
+---
+
+## 2026-05-10 STEP 3b-5 — RunHandle state machine + RunHandleStore
+
+### S20. RunHandleStore + Orchestrator e2e — submit → completed/sim_verified
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python - <<'PY'
+"""Phase C P-2018-0098 ChangeSpec → submit() → RunHandle.completed → SimResult.sim_verified."""
+from backend.shared.contracts.simulation import (
+    ChangeSpec, CreateRunRequest, RunOptions, RunPlan, SandboxCapabilities,
+)
+from backend.simulation.api.run_handle import RunHandleStore
+from backend.simulation.runner.java_sandbox import StubJavaSandbox
+from backend.simulation.runner.lookup_source import LookupDataSource
+from backend.simulation.runner.orchestrator import Orchestrator
+from backend.simulation.runner.python_generator import PythonGenerator
+
+
+# (FakeOnt 정의 — S17 참조)
+class FakeRz:
+    code_method_fqn = "com.scm.SdDesigner.runStep1"
+
+
+class FakeAct:
+    fqn = "scm.workflow.SDSlabEntity_step_1_to_8"
+    preconditions = ["br.scm.slab.DG003.WidthMin"]
+    postconditions = ["br.scm.slab.DG003.WidthMax"]
+
+
+class FakeAB:
+    id = "anchor.scm.proc_kind_hr"
+    anchor_locator = "자리 1 = HR"
+    code_method_fqn = "com.scm.SdDesigner.runStep1"
+    target_action_fqn = "scm.workflow.SDSlabEntity_step_1_to_8"
+    target_slot = "param[0]"
+
+
+class FakeOnt:
+    def get_action(self, fqn): return FakeAct() if fqn == FakeAct.fqn else None
+    def get_realizations_for_input_type(self, action_fqn, code_type_fqn):
+        return [FakeRz()] if (action_fqn == FakeAct.fqn and code_type_fqn == "scm.order.Order") else []
+    def get_anchor_bindings_for_action(self, action_fqn):
+        return [FakeAB()] if action_fqn == FakeAct.fqn else []
+    def list_code_types(self, role=None): return []
+
+
+ont = FakeOnt()
+orch = Orchestrator(
+    python_generator=PythonGenerator(),
+    java_sandbox=StubJavaSandbox(SandboxCapabilities(backend="stub"), ont),
+    lookup_source_factory=lambda fixture: LookupDataSource(ont, fixture),
+)
+store = RunHandleStore()
+
+req = CreateRunRequest(change_spec=ChangeSpec(
+    action_fqn="scm.workflow.SDSlabEntity_step_1_to_8",
+    atomic_overrides={},
+    scenario_fixture={"lookups": {}, "metadata": {"scenario_origin": "P-2018-0098"}},
+), requested_by="tester")
+plan = RunPlan(delegates_to_tree=[
+    {"action_fqn": FakeAct.fqn, "depth": 1, "primary_input_type": "scm.order.Order"},
+])
+
+handle = store.submit(req, orch, plan)
+print("RunHandle :", handle.run_id, "status=", handle.status)
+print("ChangeSpec:", store.get_change_spec(handle.run_id).action_fqn)
+sr = store.get_sim_result(handle.run_id)
+print("SimResult :", "verdict=", sr.verdict, "/ run_id=", sr.run_id)
+print("List pending  :", len(store.list(status="pending")))
+print("List completed:", len(store.list(status="completed")))
+PY
+# 기대 출력 (요약):
+# RunHandle : run-... status= completed
+# ChangeSpec: scm.workflow.SDSlabEntity_step_1_to_8
+# SimResult : verdict= sim_verified / run_id= run-...
+# List pending  : 0
+# List completed: 1
+```
+
+### S21. 상태 전환 invalid 검출
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python - <<'PY'
+"""terminal 상태에서 다른 상태로 못 가는지 검증."""
+from backend.shared.contracts.simulation import ChangeSpec, CreateRunRequest
+from backend.simulation.api.run_handle import RunHandleStore
+
+store = RunHandleStore()
+h = store.register(CreateRunRequest(change_spec=ChangeSpec(action_fqn="x")))
+store.transition(h.run_id, "running")
+store.transition(h.run_id, "completed")
+try:
+    store.transition(h.run_id, "running")
+except ValueError as e:
+    print("OK rejected:", e)
+
+# pending 에서 직접 cancelled 는 허용
+h2 = store.register(CreateRunRequest(change_spec=ChangeSpec(action_fqn="y")))
+store.transition(h2.run_id, "cancelled")
+print("pending → cancelled OK:", store.get(h2.run_id).status)
+PY
+# 기대 출력:
+# OK rejected: invalid transition 'completed' → 'running' for run 'run-...'. Allowed: (terminal)
+# pending → cancelled OK: cancelled
+```
+
+### S22. RunHandle 20 test + 회귀 (3a + 3b-1~3b-5 누적)
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/test_run_handle.py -v
+# 기대: 20 passed
+
+PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/ -q
+# 기대: 282 passed (이전 262 → +20), 17 skipped, 3 failed (sample-repos 부재 — 무관)
+```
+
+## Troubleshooting (3b-5)
+
+### `ValueError: invalid transition 'completed' → 'X'`
+- 의도된 동작 — terminal 상태 (completed/failed/cancelled) 에서 다른 상태로 전이 거부
+- 디버그: `_VALID_TRANSITIONS` dict 의 entry 확인
+- 새 상태 추가 시: dict 에 forward edge + (필요 시) backward 도 추가
+
+### `KeyError: run_id 'X' not registered`
+- 원인: 등록 안 된 run_id 로 transition 호출
+- 확인: `store.list()` 로 등록된 run_id 목록 확인. test 격리 (각 test 가 fresh store 사용) 보장
+
+### submit 후 `get_sim_result` 가 None 반환
+- 원인 1: orchestrator 가 예외 발생 → status=failed, sim_result 미저장
+- 원인 2: status=cancelled (pending 에서 취소된 run)
+- 확인: `store.get(run_id).status` 검사 — completed 만 sim_result 보관
+
+### multi-thread 환경에서 race condition 의심
+- 본 store 는 `threading.RLock` 보호 — 단일 process 다 thread 안전 (FastAPI worker)
+- multi-process 환경 (gunicorn workers) 는 본 v1 에서 미지원 — 운영 v2 (Redis) 에서 보강
