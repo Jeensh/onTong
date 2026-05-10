@@ -79,5 +79,15 @@ Single Source of Truth for task status. Use `[x]` (done) / `[ ]` (pending).
 ## Backlog
 
 - ★ **STEP 3.1 종결** (2026-05-10) — 7개 신설 파일 + main.py wiring 모두 완료. spec 03/04/05 1차 통합 완료.
-- 다음: STEP 4.1+ (첫 시나리오 ChangeSpec → SimResult 흐름) 또는 통합 backlog 진행 — 사용자 결정 대기
+- ★ **STEP 3c 종결** (2026-05-10) — Section 3 ↔ Section 2 ontology 실데이터 통합 완료. NullOntologyClient default 제거 / `_build_minimal_run_plan` 1-frame echo 제거 / 하드코딩 `primary_input_type` 제거. 실 ontology DB 의 1514 actions 기반으로 dispatch / anchor / BR 동작.
+- 다음: STEP 4.1+ (첫 시나리오 ChangeSpec → SimResult 흐름 — atomic_overrides 4-rule 적용 + lookups schema 확정) 또는 통합 backlog — 사용자 결정 대기
+
+### STEP 3c 신설 파일 (Section 3 ↔ Section 2 ontology wire)
+
+- `backend/simulation/runner/run_plan_builder.py` — RunPlan 빌드 (modeling facade BFS recursive). `_build_minimal_run_plan` 1-frame echo 대체.
+- `backend/simulation/api/spec_router.py` 수정 — `_build_default_orchestrator()` 가 실 `OntologyQueryClientImpl()` 사용. `_NullOntologyClient` 보존 (test override / 비상 fallback). `get_run_plan_builder()` Depends getter 추가.
+- `backend/simulation/runner/java_sandbox.py` 수정 — `_select_realization` fallback 추가 (primary_input 미상 시 action.realizations[0]). 이전 strict 셀렉터 `_select_realization_legacy()` 보존.
+- `tests/simulation/test_run_plan_builder.py` — 12 test
+- `tests/simulation/test_ontology_integration.py` — 5 test (실 DB 1514 actions hit)
+- `tests/simulation/test_java_sandbox.py` — fallback 2 test 추가 (총 15)
 

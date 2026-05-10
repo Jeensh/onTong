@@ -349,6 +349,55 @@ def test_stub_dispatch_outputs_empty_by_default():
 # ─── 8. Phase B P-2018-0098 회귀 — drama DNA HR proc anchor capture ────
 
 
+def test_stub_dispatch_falls_back_to_action_realizations_when_primary_input_unknown():
+    """primary_input_slot=None 이라도 action.realizations[0] 가 있으면 fallback consistent=True.
+
+    실 ontology 회귀: 많은 action 이 params 없거나 primary_input_type 미상.
+    """
+    from backend.shared.contracts.simulation import RunInputs, RunOptions, SandboxCapabilities
+    from backend.simulation.runner.java_sandbox import StubJavaSandbox
+
+    action = FakeAction(fqn="action.x")
+    action.realizations = [FakeRealization("com.X.method")]
+    client = FakeOntologyClient(actions={"action.x": action})
+
+    sandbox = StubJavaSandbox(
+        capabilities=SandboxCapabilities(backend="stub"),
+        ontology_client=client,
+    )
+    result = sandbox.dispatch(
+        action_fqn="action.x",
+        inputs=RunInputs(slots={}, overrides={}, primary_input_slot=None),
+        run_options=RunOptions(sandbox_tier="stub_dispatch"),
+    )
+    # fallback: action.realizations[0] 의 code_method_fqn → consistent=True
+    assert result.realized_method_fqn == "com.X.method"
+    assert result.dispatch_consistent is True
+
+
+def test_stub_dispatch_falls_back_when_primary_type_yields_no_realizations():
+    """primary_input_slot 있지만 type 별 realization 0건 + action.realizations 는 있음 → fallback."""
+    from backend.shared.contracts.simulation import SandboxCapabilities
+    from backend.simulation.runner.java_sandbox import StubJavaSandbox
+
+    action = FakeAction(fqn="action.y")
+    action.realizations = [FakeRealization("com.Y.method")]
+    # get_realizations_for_input_type 는 빈 리스트 반환 (type-specific 매칭 없음)
+    client = FakeOntologyClient(actions={"action.y": action})
+
+    sandbox = StubJavaSandbox(
+        capabilities=SandboxCapabilities(backend="stub"),
+        ontology_client=client,
+    )
+    result = sandbox.dispatch(
+        action_fqn="action.y",
+        inputs=make_run_inputs(primary_type="scm.unknown.Type"),
+        run_options=make_run_options(),
+    )
+    assert result.realized_method_fqn == "com.Y.method"
+    assert result.dispatch_consistent is True
+
+
 def test_stub_dispatch_p_2018_0098_anchor_capture_for_drama_dna():
     """P-2018-0098 회귀: '자리 1 = HR' anchor 가 드라마 DNA 로 capture 되는지."""
     from backend.shared.contracts.simulation import SandboxCapabilities

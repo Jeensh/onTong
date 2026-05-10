@@ -34,6 +34,7 @@ def app_with_spec_router():
     from backend.simulation.runner.lookup_source import LookupDataSource
     from backend.simulation.runner.orchestrator import Orchestrator
     from backend.simulation.runner.python_generator import PythonGenerator
+    from backend.simulation.runner.run_plan_builder import RunPlanBuilder
 
     class _NullOnt:
         def get_action(self, fqn): return None
@@ -48,11 +49,13 @@ def app_with_spec_router():
         java_sandbox=StubJavaSandbox(SandboxCapabilities(backend="stub"), ont),
         lookup_source_factory=lambda fixture: LookupDataSource(ont, fixture),
     )
+    plan_builder = RunPlanBuilder(ont)
 
     app = FastAPI()
     app.include_router(spec_router.router)
     app.dependency_overrides[spec_router.get_store] = lambda: store
     app.dependency_overrides[spec_router.get_orchestrator] = lambda: orch
+    app.dependency_overrides[spec_router.get_run_plan_builder] = lambda: plan_builder
     return app
 
 

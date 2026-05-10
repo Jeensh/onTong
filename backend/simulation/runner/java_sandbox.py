@@ -141,46 +141,93 @@ class StubJavaSandbox:
     ) -> tuple[Optional[str], bool, Optional[str]]:
         """Returns (realized_method_fqn, dispatch_consistent, mismatch_reason).
 
-        stub 단순화:
-        - primary_input_slot 없음 → consistent=False, mismatch="primary_input not declared"
-        - primary type 으로 realizations 조회, 첫 번째 선택
-        - realizations 없음 → consistent=False, mismatch reason 채움
-        - 있음 → consistent=True (Action.realizes 역포인터 검증은 후속 iteration)
+        stub 단순화 (실 ontology 호환 fallback 포함):
+        - primary_input_slot 있음 + realizations 매칭 → consistent=True, 첫 번째 선택
+        - primary_input_slot 있음 + realizations 0건 → action.realizations[0] fallback
+          (modeling 의 applies_to=None base 처리. fallback 시 consistent=True 유지)
+        - primary_input_slot 없음 → action.realizations[0] fallback (object_ref 미참조 action)
+        - 모든 fallback 실패 → consistent=False, mismatch_reason 채움
+        """
+        slot = inputs.primary_input_slot
+        primary_type: Optional[str] = None
+
+        if slot is not None:
+            typed_value = inputs.slots.get(slot)
+            if typed_value is None:
+                return (
+                    None,
+                    False,
+                    f"primary_input slot '{slot}' not present in RunInputs.slots",
+                )
+            primary_type = typed_value.type_
+
+            try:
+                realizations = self._ont.get_realizations_for_input_type(
+                    action_fqn, primary_type
+                )
+            except Exception as exc:
+                logger.warning(
+                    "get_realizations_for_input_type(%s, %s) 실패 — %s",
+                    action_fqn, primary_type, exc,
+                )
+                realizations = []
+
+            if realizations:
+                selected = realizations[0]
+                method_fqn = getattr(selected, "code_method_fqn", None)
+                if method_fqn:
+                    return (method_fqn, True, None)
+
+        # fallback — action.realizations[0]
+        # (primary_input 미상이거나 type-별 realization 없는 경우)
+        try:
+            action = self._ont.get_action(action_fqn)
+        except Exception as exc:
+            logger.warning("get_action(%s) 실패 — %s", action_fqn, exc)
+            action = None
+
+        if action is not None:
+            for r in (getattr(action, "realizations", None) or []):
+                method_fqn = getattr(r, "code_method_fqn", None)
+                if method_fqn:
+                    # fallback 도 consistent=True (stub 의 보수적 처리)
+                    return (method_fqn, True, None)
+
+        # 진짜 fallback 도 없음
+        if primary_type is None:
+            return (
+                None,
+                False,
+                "primary_input slot not declared and action has no realizations",
+            )
+        return (
+            None,
+            False,
+            f"no realization for input type {primary_type!r} on action {action_fqn!r}",
+        )
+
+    # legacy — 본 메서드는 fallback 으로 통합돼 더 이상 별도로 호출되지 않음
+    def _select_realization_legacy(
+        self, action_fqn: str, inputs: RunInputs
+    ) -> tuple[Optional[str], bool, Optional[str]]:
+        """이전 echo-stub 의 strict 셀렉터 — 호환성 위해 보존 (호출 안 함).
+
+        primary_input_slot 없음 → 즉시 inconsistent.
+        새 _select_realization 가 fallback 추가로 대체.
         """
         slot = inputs.primary_input_slot
         if slot is None:
-            return (
-                None,
-                False,
-                "primary_input slot not declared — pure constant Action 은 stub 에서 dispatch 무관",
-            )
+            return (None, False, "primary_input slot not declared")
         typed_value = inputs.slots.get(slot)
         if typed_value is None:
-            return (
-                None,
-                False,
-                f"primary_input slot '{slot}' not present in RunInputs.slots",
-            )
+            return (None, False, f"primary_input slot {slot!r} not in RunInputs.slots")
         primary_type = typed_value.type_
-
         try:
-            realizations = self._ont.get_realizations_for_input_type(
-                action_fqn, primary_type
-            )
-        except Exception as exc:
-            logger.warning(
-                "get_realizations_for_input_type(%s, %s) 실패 — %s",
-                action_fqn, primary_type, exc,
-            )
+            realizations = self._ont.get_realizations_for_input_type(action_fqn, primary_type)
+        except Exception:
             realizations = []
-
         if not realizations:
-            return (
-                None,
-                False,
-                f"no realization for input type {primary_type!r} on action {action_fqn!r}",
-            )
-
+            return (None, False, f"no realization for {primary_type!r} on {action_fqn!r}")
         selected = realizations[0]
         method_fqn = getattr(selected, "code_method_fqn", None)
         if method_fqn is None:

@@ -874,5 +874,109 @@ for (m, p), mods in sorted(seen.items()):
 - 후속 보강: STEP 3b-7 (또는 운영 v2) 에서 asyncio.Queue / Redis-RQ 로 비동기화
 
 ### NullOntologyClient 라 `verdict=inconclusive` 만 나옴
-- 의도된 동작 — modeling facade 미연결 환경에서 stub backend 가 realization 비어있음 → consistent=False → inconclusive
-- 정합성 검증: 통합 작업 시 `_build_default_orchestrator()` 의 NullOntologyClient 를 실 `OntologyQueryClient` 로 교체
+- **STEP 3c (2026-05-10) 부터 해결** — default 가 실 `OntologyQueryClientImpl()` 사용. 1514 actions 로딩된 환경에선 dispatch_consistent=True 가능.
+- 그래도 inconclusive 가 나오면: ontology DB 가 비었거나, 해당 action 이 realizations 0건 + sub_actions 도 0건 (workflow root 만 sub_actions 있는 경우 등)
+
+---
+
+## 2026-05-10 STEP 3c — Section 3 ↔ Section 2 ontology 실데이터 통합
+
+### S26. 실 ontology + RunPlanBuilder e2e
+
+```bash
+# 백엔드 기동 후
+ACTION_FQN=$(PYTHONPATH=$(pwd) ./venv/bin/python -c "
+from backend.modeling.api.ontology_query import OntologyQueryClientImpl
+ont = OntologyQueryClientImpl()
+for a in ont.list_actions():
+    if a.realizations:
+        print(a.fqn); break
+")
+echo "target: $ACTION_FQN"
+
+RUN_ID=$(curl -sS -X POST http://127.0.0.1:8001/api/simulation/runs \
+  -H "Content-Type: application/json" \
+  -d "{\"change_spec\":{\"action_fqn\":\"$ACTION_FQN\",\"atomic_overrides\":{},\"scenario_fixture\":{\"lookups\":{}}}}" \
+  | python3 -c "import sys, json; print(json.load(sys.stdin)['run_id'])")
+
+curl -sS http://127.0.0.1:8001/api/simulation/runs/$RUN_ID/sim-result | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+print('verdict:', d['verdict'])
+print('frame[0].dispatch_consistent:', d['delegation_trace'][0]['dispatch_consistent'])
+print('frame[0].realized_method_fqn:', d['delegation_trace'][0]['realized_method_fqn'])
+"
+# 기대 (실 ontology DB 환경):
+# verdict: sim_verified
+# frame[0].dispatch_consistent: True
+# frame[0].realized_method_fqn: <실 Java method fqn>
+```
+
+### S27. 21-step workflow 회로
+
+```bash
+RUN_ID=$(curl -sS -X POST http://127.0.0.1:8001/api/simulation/runs \
+  -H "Content-Type: application/json" \
+  -d '{"change_spec":{"action_fqn":"action.scm.슬랩설계_실행","atomic_overrides":{},"scenario_fixture":{"lookups":{}}}}' \
+  | python3 -c "import sys, json; print(json.load(sys.stdin)['run_id'])")
+
+curl -sS http://127.0.0.1:8001/api/simulation/runs/$RUN_ID/sim-result | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+print('frame count:', len(d['delegation_trace']))
+print('anchor_evidence:', len(d['anchor_evidence']))
+print('consistent count:', sum(1 for f in d['delegation_trace'] if f['dispatch_consistent']))
+"
+# 기대: 22 frames (root + 21 sub_actions), anchor 7+, consistent 21+
+```
+
+### S28. RunPlanBuilder 단독 검증
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python - <<'PY'
+from backend.modeling.api.ontology_query import OntologyQueryClientImpl
+from backend.simulation.runner.run_plan_builder import RunPlanBuilder
+
+ont = OntologyQueryClientImpl()
+builder = RunPlanBuilder(ont)
+plan = builder.build("action.scm.슬랩설계_실행")
+print("frames :", len(plan.delegates_to_tree))
+print("expected_brs.direct    :", plan.expected_brs.get("direct", []))
+print("expected_brs.transitive:", len(plan.expected_brs.get("transitive", [])), "건")
+print("expected_anchors       :", len(plan.expected_anchors), "건")
+print("warnings:", len(plan.warnings))
+PY
+```
+
+### S29. STEP 3c test 회귀
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/test_run_plan_builder.py tests/simulation/test_ontology_integration.py -v
+# 기대: 17 passed (12 + 5)
+
+PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/ -q
+# 기대: 314 passed (이전 295 → +19), 17 skipped, 3 failed (sample-repos — 무관)
+```
+
+## Troubleshooting (3c)
+
+### `OntologyQueryClientImpl 인스턴스화 실패` warning log
+- 원인: SQLite DB 파일 미존재 / 권한 문제 / modeling internal schema 호환성 문제
+- 해결: backend/main.py 의 `bootstrap_database()` 호출 확인. 또는 ontology DB 가 없는 상태로도 동작 (NullOntologyClient fallback)
+- 영향: 이 경우 verdict 가 무조건 inconclusive — STEP 3c 이전 동작과 동일
+
+### POST /runs 가 여전히 verdict=inconclusive
+- 원인 1: ontology DB 가 비어있음 → `list_actions()` 가 빈 리스트
+- 원인 2: 해당 action 의 realizations 가 0건 + sub_actions 도 0건 (orphan action)
+- 원인 3: workflow root action 자체는 realization 없음 (sub_actions 만) → root frame 만 inconsistent. sub-action 들은 consistent=True 가능
+- 확인: GET /runs/{id}/sim-result 의 delegation_trace 검사 — 각 frame 의 dispatch_consistent / realized_method_fqn
+
+### `_NullOntologyClient` 가 default 로 사용됨
+- 원인: spec_router import 시점 또는 첫 dispatch 시 OntologyQueryClientImpl 인스턴스화 실패
+- 해결: backend/main.py 의 init() 호출 순서 확인. uvicorn 로그의 `spec_router: OntologyQueryClientImpl wired` 메시지 검출
+- 강제 리셋: `from backend.simulation.api.spec_router import reset_singletons; reset_singletons()` 후 재호출
+
+### 21-step workflow 가 frame 수 적게 나옴
+- 원인: `RunPlanBuilder.build(max_depth=10)` 의 max_depth 초과
+- 해결: 현재 default 10. 더 깊은 tree 면 `RunPlanBuilder.build(action_fqn, max_depth=30)` 로 호출 시 깊이 확장
+- 확인: plan.warnings 에 "max_depth=N 초과" 메시지 있는지
