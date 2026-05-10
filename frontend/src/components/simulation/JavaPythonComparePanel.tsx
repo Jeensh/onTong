@@ -20,6 +20,7 @@ import {
   type FieldDiff,
 } from "@/lib/simulation/differentialApi";
 import { JsonTable } from "./JsonTable";
+import { OntologyEvidenceToggle } from "./OntologyEvidencePanel";
 
 const SLAB_DESIGN_BASE = "http://localhost:8080";
 
@@ -278,6 +279,10 @@ export function JavaPythonComparePanel() {
           같은 입력으로 Java <code>SdDesigner.design()</code> 와 Python <code>pipeline_full</code> 양쪽
           실행 → field-by-field 결과 차이. BigDecimal tolerance (rel 1e-9 / abs 1e-12) 적용.
         </p>
+        <OntologyEvidenceToggle
+          actionFqn="action.scm.슬랩설계_실행"
+          label="📚 이 비교의 온톨로지 근거 (Java/Python 모두 같은 ontology Action 기반)"
+        />
         {status ? (
           status.java_bridge_available ? (
             <p className="text-xs text-emerald-500 flex items-center gap-1.5">

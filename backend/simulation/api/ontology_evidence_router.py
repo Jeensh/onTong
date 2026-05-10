@@ -331,4 +331,63 @@ def get_ontology_evidence(
     )
 
 
+@router.get("/ontology-evidence/by-action", response_model=RunOntologyEvidence)
+def get_ontology_evidence_by_action(action_fqn: str) -> RunOntologyEvidence:
+    """run_id 없이 action_fqn 만으로 ontology evidence 조회.
+
+    GET /api/simulation/ontology-evidence/by-action?action_fqn=...
+
+    SandboxPanel / JavaPythonComparePanel / NavigatorPanel 같은 곳에서 spec 03 run 을
+    트리거하지 않고도 "이 기능이 ontology 의 어떤 entity 와 연결되어 있는지" 를
+    사용자에게 즉시 보여주기 위한 lightweight endpoint.
+
+    response 의 run_id 는 빈 문자열, traces 는 action / realizations / preconditions /
+    postconditions / anchor_bindings 를 ontology 에서 직접 enumerate.
+    """
+    ont = _get_ontology_client()
+    traces: list[OntologyTrace] = []
+
+    # 1. root action
+    traces.append(_trace_action(action_fqn, ont))
+
+    # 2. realizations — action.realizations 의 각 method
+    try:
+        action = ont.get_action(action_fqn)
+    except Exception:
+        action = None
+
+    if action is not None:
+        for r in (getattr(action, "realizations", None) or []):
+            method_fqn = getattr(r, "code_method_fqn", None)
+            if method_fqn:
+                traces.append(_trace_realized_method(action_fqn, method_fqn, ont))
+
+        # 3. preconditions / postconditions
+        for br in (getattr(action, "preconditions", None) or []):
+            traces.append(_trace_br(action_fqn, br, ont))
+        for br in (getattr(action, "postconditions", None) or []):
+            traces.append(_trace_br(action_fqn, br, ont))
+
+    # 4. anchor bindings
+    try:
+        bindings = ont.get_anchor_bindings_for_action(action_fqn) or []
+    except Exception:
+        bindings = []
+    for b in bindings:
+        anchor_id = getattr(b, "id", None)
+        if anchor_id:
+            traces.append(_trace_anchor(action_fqn, anchor_id, ont))
+
+    summary: dict[str, int] = {}
+    for t in traces:
+        summary[t.evidence_kind] = summary.get(t.evidence_kind, 0) + 1
+
+    return RunOntologyEvidence(
+        run_id="",
+        action_fqn=action_fqn,
+        traces=traces,
+        summary=summary,
+    )
+
+
 __all__ = ["router"]

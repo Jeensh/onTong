@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   Beaker,
   BookMarked,
+  BookOpen,
   Compass,
   Flame,
   GitCompare,
@@ -23,6 +24,7 @@ import { OntologyBridgePanel } from "./OntologyBridgePanel";
 import { HomeDashboardPanel } from "./HomeDashboardPanel";
 import { OnboardingBanner } from "./OnboardingBanner";
 import { JavaPythonComparePanel } from "./JavaPythonComparePanel";
+import { OntologyEvidenceView } from "./OntologyEvidenceView";
 
 type SimView =
   | "home"
@@ -33,7 +35,8 @@ type SimView =
   | "impact"
   | "navigator"
   | "bridge"
-  | "differential";
+  | "differential"
+  | "evidence";
 
 interface NavItem {
   id: SimView;
@@ -111,6 +114,13 @@ const NAVIGATE_NAV: NavItem[] = [
     tooltip: "도메인 용어 (실수율 / 두께 / EDGING / PlantMapping …) 를 검색하면 → 영향받는 단계 + 추천 시나리오 자동 도출. Section 2 의 온톨로지 그래프와 결합.",
   },
   {
+    id: "evidence",
+    label: "온톨로지 근거 보기",
+    icon: <BookOpen size={18} />,
+    description: "기능 ↔ ontology trace",
+    tooltip: "Section 3 시뮬의 모든 결과는 Section 2 ontology 의 Action / Realization / BR / AnchorBinding 에서 derive 됨. action_fqn 선택 → 4 evidence kind trace 즉시 표시.",
+  },
+  {
     id: "navigator",
     label: "코드 내비게이터",
     icon: <Compass size={18} />,
@@ -154,7 +164,7 @@ const ONBOARDING_STEPS = [
 
 const VALID_VIEWS: SimView[] = [
   "home", "sandbox", "scenarios", "history",
-  "regression", "impact", "navigator", "bridge", "differential",
+  "regression", "impact", "navigator", "bridge", "differential", "evidence",
 ];
 
 function readInitialView(): SimView {
@@ -277,6 +287,7 @@ export function SimulationSection() {
           {active === "bridge" && (
             <OntologyBridgePanel onHandoffToSandbox={handoffFromBridge} />
           )}
+          {active === "evidence" && <OntologyEvidenceView />}
         </div>
       </div>
     </div>

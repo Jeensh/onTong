@@ -190,3 +190,40 @@ def test_evidence_404_when_run_not_completed(app_with_evidence):
     resp = client.get(f"/api/simulation/runs/{handle.run_id}/ontology-evidence")
     assert resp.status_code == 404
     assert "not available" in resp.json()["detail"]
+
+
+# ─── 8. by-action endpoint — run_id 없이 ───────────────────────
+
+
+def test_evidence_by_action_returns_traces(app_with_evidence):
+    """by-action endpoint — run_id 없이 action_fqn 만으로 evidence 조회."""
+    app, _, _ = app_with_evidence
+    client = TestClient(app)
+    resp = client.get(
+        "/api/simulation/ontology-evidence/by-action",
+        params={"action_fqn": "action.scm.std.match_customer_limit_for_order"},
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["run_id"] == ""
+    assert data["action_fqn"] == "action.scm.std.match_customer_limit_for_order"
+    assert "in-process facade" in data["ontology_transport"]
+    # action trace 는 항상 있음
+    assert any(t["evidence_kind"] == "action" for t in data["traces"])
+
+
+def test_evidence_by_action_unknown_action(app_with_evidence):
+    """미등록 action — action trace 가 warning 메시지 반환 (200 OK)."""
+    app, _, _ = app_with_evidence
+    client = TestClient(app)
+    resp = client.get(
+        "/api/simulation/ontology-evidence/by-action",
+        params={"action_fqn": "action.does.not.exist"},
+    )
+    # 200 — unknown 도 friendly trace 반환
+    assert resp.status_code == 200
+    data = resp.json()
+    action_traces = [t for t in data["traces"] if t["evidence_kind"] == "action"]
+    assert len(action_traces) == 1
+    # 등록 안 된 메시지 또는 ontology 조회 실패 메시지
+    assert "등록 안 된" in action_traces[0]["explanation"] or "조회 실패" in action_traces[0]["explanation"]

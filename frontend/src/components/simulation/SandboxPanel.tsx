@@ -17,6 +17,25 @@ import { HelpPopover } from "./HelpPopover";
 import { JsonTable } from "./JsonTable";
 import { TimelineScrubber } from "./TimelineScrubber";
 import { AutoPRCard } from "./AutoPRCard";
+import { OntologyEvidenceToggle } from "./OntologyEvidencePanel";
+
+const SANDBOX_STEP_TO_ACTION: Record<string, string> = {
+  pipeline: "action.scm.슬랩설계_실행",
+  pipeline_full: "action.scm.슬랩설계_실행",
+  validator: "action.scm.슬랩설계_실행",
+  productivity: "action.scm.슬랩설계_실행",
+  thickness: "action.scm.슬랩설계_실행",
+  width_range: "action.scm.슬랩설계_실행",
+  length_range: "action.scm.슬랩설계_실행",
+  second_wgt: "action.scm.슬랩설계_실행",
+  max_split: "action.scm.슬랩설계_실행",
+  split_range: "action.scm.슬랩설계_실행",
+  slab_count: "action.scm.슬랩설계_실행",
+  slab_weight: "action.scm.슬랩설계_실행",
+  final_width_range: "action.scm.슬랩설계_실행",
+  final_length_range: "action.scm.슬랩설계_실행",
+  target_size: "action.scm.슬랩설계_실행",
+};
 
 interface Props {
   initialStepId?: string;
@@ -249,6 +268,12 @@ export function SandboxPanel({ initialStepId, onConsumeInitial }: Props = {}) {
               pytest 코드 다운로드
             </button>
           )}
+
+          {/* 온톨로지 근거 — 어떤 ontology action 기반인지 */}
+          <OntologyEvidenceToggle
+            actionFqn={SANDBOX_STEP_TO_ACTION[stepId] ?? "action.scm.슬랩설계_실행"}
+            label={`📚 이 단계의 온톨로지 근거 (${stepId} → action 매핑)`}
+          />
 
           {stream.error && (
             <div className="rounded border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
