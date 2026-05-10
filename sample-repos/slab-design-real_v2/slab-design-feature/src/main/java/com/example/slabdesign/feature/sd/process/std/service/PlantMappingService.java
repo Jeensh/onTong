@@ -31,6 +31,9 @@ public class PlantMappingService {
         m.put("B", new PlantMapping("CC2", "M2"));
         m.put("C", new PlantMapping("CC3", "M3"));
         m.put("D", new PlantMapping("CC4", "M4"));
+        // Golden-scenario fixture plant: SM='K' uses (CC1, M1) so the seeded
+        // CAST_SPEC row (sm=K, cast=CC1, machine=M1) resolves at step 1/2/3.
+        m.put("K", new PlantMapping("CC1", "M1"));
         return m;
     }
 

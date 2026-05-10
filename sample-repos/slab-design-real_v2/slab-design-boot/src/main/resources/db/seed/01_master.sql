@@ -18,14 +18,14 @@ INSERT INTO CAST_SPEC (CMP_CD, ORG_CD, SM_CD, CAST_CD, MACHINE_CD, PRODUCT_CD,
                        WGT_LOW, WGT_HIGH)
 VALUES ('K', '1', 'K', 'CC1', 'M1', 'COIL',
         230.00, 800.00, 2000.00, 4000.00, 12000.00,
-        10.000, 30.000);
+        10000.000, 30000.000);
 
 INSERT INTO CAST_SPEC (CMP_CD, ORG_CD, SM_CD, CAST_CD, MACHINE_CD, PRODUCT_CD,
                        SLAB_THICKNESS, WIDTH_LOW, WIDTH_HIGH, LENGTH_LOW, LENGTH_HIGH,
                        WGT_LOW, WGT_HIGH)
 VALUES ('K', '1', 'K', 'CC1', 'M1', 'FS',
         250.00, 800.00, 2200.00, 4000.00, 12000.00,
-        10.000, 32.000);
+        10000.000, 32000.000);
 
 -- SS41-specific row in case PlantMapping pulls a different cast for SS41 paths
 -- (we use the SAME PK for COIL+SS41 since PK has no GRADE column; redundant entries
@@ -35,16 +35,18 @@ VALUES ('K', '1', 'K', 'CC1', 'M1', 'FS',
 -- ------------------------------------------------------------
 -- HR_SPEC -- 열연설비사양기준 (열연공장+품종 -> width / length range)
 -- PK: (CMP_CD, ORG_CD, HR_PLANT_CD, PRODUCT_CD)
--- Scenarios with HR active (S2, S3, S4) use confirmedPlantCd[1]='K' -> HR_PLANT_CD='K'.
+-- All HR-active scenarios (S1/S2/S3/S5) use confirmedPlantCd[1]='1' so HR_PLANT_CD='1'
+-- (the digit also doubles as the HR_TGT_WIDTH_N column index in SelectedHrTgtWidthResolver).
+-- S4 short-circuits at validation (DG004) so HR_SPEC is never consulted there.
 -- ------------------------------------------------------------
 INSERT INTO HR_SPEC (CMP_CD, ORG_CD, HR_PLANT_CD, PRODUCT_CD,
                      WIDTH_LOW, WIDTH_HIGH, LENGTH_LOW, LENGTH_HIGH)
-VALUES ('K', '1', 'K', 'COIL',
+VALUES ('K', '1', '1', 'COIL',
         750.00, 2100.00, 3500.00, 13000.00);
 
 INSERT INTO HR_SPEC (CMP_CD, ORG_CD, HR_PLANT_CD, PRODUCT_CD,
                      WIDTH_LOW, WIDTH_HIGH, LENGTH_LOW, LENGTH_HIGH)
-VALUES ('K', '1', 'K', 'FS',
+VALUES ('K', '1', '1', 'FS',
         750.00, 2300.00, 3500.00, 13000.00);
 
 -- ------------------------------------------------------------
@@ -83,55 +85,57 @@ INSERT INTO EDGING_SPEC (CMP_CD, ORG_CD, EDGING_GROUP_CD,
 VALUES ('K', '1', '*', -100.00, 100.00);
 
 -- ------------------------------------------------------------
--- CUSTOMER_STD -- 고객사 단중 제한
+-- CUSTOMER_STD -- 고객사 단중 제한 (단위: kg)
 -- PK: (CMP_CD, ORG_CD, PRIORITY)
--- CUST-001: comfortable range 5.0-25.0 (admits S1/S2/S3/S5)
--- CUST-FAIL: very tight 0.100-0.200 -> S4 will fail DG004 (cross-check pkg vs cast wgt)
+-- CUST-001: comfortable range 5,000-25,000 kg per coil (admits S1/S2/S3/S5).
+-- CUST-FAIL: NOT consulted at runtime — S4 short-circuits at validator (DG004) before
+--            algorithm reaches CUSTOMER_STD lookup. Kept here for completeness.
+-- NOTE: All weights stored as kg to align with SdFirstWeightAction's mm³×g/cm³×1e-6 = kg.
 -- ------------------------------------------------------------
 INSERT INTO CUSTOMER_STD (CMP_CD, ORG_CD, PRIORITY,
                           PRODUCT_CD, CUSTOMER_CD,
                           PKG_WGT_LOW, PKG_WGT_HIGH)
 VALUES ('K', '1', 1,
         'COI', 'CUST-001',
-        5.000, 25.000);
+        5000.000, 25000.000);
 
 INSERT INTO CUSTOMER_STD (CMP_CD, ORG_CD, PRIORITY,
                           PRODUCT_CD, CUSTOMER_CD,
                           PKG_WGT_LOW, PKG_WGT_HIGH)
 VALUES ('K', '1', 2,
         'COI', 'CUST-FAIL',
-        0.100, 0.200);
+        100.000, 200.000);
 
 -- ------------------------------------------------------------
--- HR_MIN_WGT -- 압연 MIN 단중 (2D sheet on thickness x width)
+-- HR_MIN_WGT -- 압연 MIN 단중 (2D sheet on thickness x width); 단위: kg
 -- PK: (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH)
--- Lookup pattern: smallest (THICKNESS,WIDTH) cell that COVERS the order's input.
--- We seed a few cells covering thickness 230-260 x width 1000-2200.
+-- Typical slab MIN weight ~5,000 kg (5 tonnes) at 230mm thickness.
 -- ------------------------------------------------------------
 INSERT INTO HR_MIN_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MIN_WGT)
-VALUES ('K', '1', 'K', 230.00, 1200.00, 5.000);
+VALUES ('K', '1', '1', 230.00, 1200.00, 5000.000);
 INSERT INTO HR_MIN_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MIN_WGT)
-VALUES ('K', '1', 'K', 230.00, 1500.00, 5.000);
+VALUES ('K', '1', '1', 230.00, 1500.00, 5000.000);
 INSERT INTO HR_MIN_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MIN_WGT)
-VALUES ('K', '1', 'K', 230.00, 2200.00, 5.000);
+VALUES ('K', '1', '1', 230.00, 2200.00, 5000.000);
 INSERT INTO HR_MIN_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MIN_WGT)
-VALUES ('K', '1', 'K', 250.00, 1500.00, 5.000);
+VALUES ('K', '1', '1', 250.00, 1500.00, 5000.000);
 INSERT INTO HR_MIN_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MIN_WGT)
-VALUES ('K', '1', 'K', 250.00, 2200.00, 5.000);
+VALUES ('K', '1', '1', 250.00, 2200.00, 5000.000);
 
 -- ------------------------------------------------------------
--- HR_MAX_WGT -- 압연 MAX 단중 (same shape as HR_MIN_WGT)
+-- HR_MAX_WGT -- 압연 MAX 단중 (same shape as HR_MIN_WGT); 단위: kg
+-- Typical slab MAX weight ~30,000 kg (30 tonnes).
 -- ------------------------------------------------------------
 INSERT INTO HR_MAX_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MAX_WGT)
-VALUES ('K', '1', 'K', 230.00, 1200.00, 30.000);
+VALUES ('K', '1', '1', 230.00, 1200.00, 30000.000);
 INSERT INTO HR_MAX_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MAX_WGT)
-VALUES ('K', '1', 'K', 230.00, 1500.00, 30.000);
+VALUES ('K', '1', '1', 230.00, 1500.00, 30000.000);
 INSERT INTO HR_MAX_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MAX_WGT)
-VALUES ('K', '1', 'K', 230.00, 2200.00, 30.000);
+VALUES ('K', '1', '1', 230.00, 2200.00, 30000.000);
 INSERT INTO HR_MAX_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MAX_WGT)
-VALUES ('K', '1', 'K', 250.00, 1500.00, 30.000);
+VALUES ('K', '1', '1', 250.00, 1500.00, 30000.000);
 INSERT INTO HR_MAX_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MAX_WGT)
-VALUES ('K', '1', 'K', 250.00, 2200.00, 30.000);
+VALUES ('K', '1', '1', 250.00, 2200.00, 30000.000);
 
 -- ------------------------------------------------------------
 -- SD_PRODUCTIVITY_STD -- 공정별 실수율
