@@ -43,7 +43,7 @@
 | **OntologyGraph** | vis-network 기반 그래프 시각화 — 노드 타입별 색상, Agent 탐색 경로 하이라이팅 |
 | **딥 링킹 (시나리오 A)** | 완료 → "Slab 설계 3D로 확인" 버튼 → 조정 폭 파라미터로 시뮬레이터 이동 |
 | **딥 링킹 (시나리오 C)** | 완료 → "최적 분할수 N개를 3D로 확인" 버튼 → 분할 애니메이션 |
-| **딥 링킹 (시나리오 B)** | 완료 → "영향받은 슬랩 Slab 설계 3D로 확인" 버튼 |
+| **딥 링킹 (시나리오 B)** | 완료 → "영향받은 Slab Slab 설계 3D로 확인" 버튼 |
 | **온톨로지 → 시뮬레이터 연동** | Order 노드 클릭 → 해당 주문 파라미터로 시뮬레이터 자동 이동 |
 | **Zustand 상태 관리** | useSimulationStore (activeView, graphData, customAgents, orders) |
 | **API 클라이언트 + SSE 파서** | api.ts — fetchOntologyGraph, runAgent, runCustomAgent 등 |
