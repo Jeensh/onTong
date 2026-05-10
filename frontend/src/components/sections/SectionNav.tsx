@@ -1,11 +1,12 @@
 "use client";
 
-import { BookOpen, Cpu } from "lucide-react";
+import { BookOpen, Cpu, Beaker } from "lucide-react";
 import { useWorkspaceStore } from "@/lib/workspace/useWorkspaceStore";
 import type { SectionId } from "@/types";
 import { cn } from "@/lib/utils";
 
 // 2026-05-02: C6 Phase 1 — Modeling section React 구현 시작 (Workbench V6 base).
+// 2026-05-10: Simulation 섹션 jyu 브랜치에 통합 (Section 3 plug-in).
 const SECTIONS: {
   id: SectionId;
   label: string;
@@ -14,6 +15,7 @@ const SECTIONS: {
 }[] = [
   { id: "wiki", label: "Wiki", icon: <BookOpen className="w-3.5 h-3.5" />, status: "active" },
   { id: "modeling", label: "Modeling", icon: <Cpu className="w-3.5 h-3.5" />, status: "active" },
+  { id: "simulation", label: "Simulation", icon: <Beaker className="w-3.5 h-3.5" />, status: "active" },
 ];
 
 export function SectionNav() {
@@ -42,11 +44,7 @@ export function SectionNav() {
           >
             {section.icon}
             {section.label}
-            {section.status === "scaffolding" && (
-              <span className="text-[9px] px-1 py-px rounded bg-muted-foreground/10 text-muted-foreground leading-none">
-                soon
-              </span>
-            )}
+            {section.status === "scaffolding"}
           </button>
         ))}
       </div>
