@@ -76,4 +76,23 @@ public class SdOrderExtractor {
         }
         return result;
     }
+
+    /**
+     * 단일 주문 hydration — 진도/종결 필터 미적용 (호출자 책임).
+     * SdDriver.singleDesign 진입점에서 사용.
+     *
+     * @return OS 미존재 시 null. 그 외 OM/QD/CHEM 부분 누락은 reflection logic 이 NULL 처리.
+     */
+    @Transactional(readOnly = true)
+    public SDOrderEntity findOne(String cmpCd, String orgCd, String orderNo) {
+        SDOrderPK pk = new SDOrderPK(cmpCd, orgCd, orderNo);
+        SDOrderOsJpo os = osRepository.findById(pk).orElse(null);
+        if (os == null) {
+            return null;
+        }
+        SDOrderOmJpo om = omRepository.findById(pk).orElse(null);
+        SDOrderQdJpo qd = qdRepository.findById(pk).orElse(null);
+        SDOrderChemicalJpo chemical = chemicalRepository.findById(pk).orElse(null);
+        return orderLogic.toEntity(os, om, qd, chemical);
+    }
 }
