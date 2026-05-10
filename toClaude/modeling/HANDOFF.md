@@ -6,6 +6,30 @@
 
 ---
 
+## 🟢 2026-05-10 종료 시점 — Phase D 종결 직전 / 인계 가능 상태
+
+### 완료
+- **handoff-spec/ 6 doc 완성** (`00 README + 01 schema + 02 ontology API + 03 sim API + 04 ChangeSpec/SimResult + 05 Runner + 06 onboarding`). 외부 단독 전달 가능.
+- **D.5 = `06-developer-onboarding.md`** — STEP 1~4 + 회복 명령 + Phase E 11건 부딪히는 위치 + FAQ 7. 350+ 줄. 본 문서의 STEP 2.3 의 9 검증 SQL 은 실 DB (`data/ontology.db`) 와 1:1 일치 (atomic 16 / composite 29 / action 38 / verified 38 / realization 43 / BR 17 / BR enforced_by 17 / anchor 9 / anchor with line 9).
+- **00-README 연동** — D.5 row 추가 + "처음 해야 할 일" 양쪽 진입점 (06 → 1~7 → 06).
+- **인계 검증 통과** — Critical 처리 완료 + Major 11건 (design-gaps #37~#47) Phase E backlog 등록.
+
+### 다음 세션 첫 작업
+1. Phase D 종결 — 2 서브에이전트 fresh-context 검수 (D.5 자체 + 06 STEP 4 첫 흐름 시나리오 적정성)
+2. (검수 통과 시) Phase E 진입 — backlog #37~#47 결정 시 사용자 합의 절차
+
+### 환경 점검 1줄
+```bash
+PYTHONPATH=$(pwd) python3 -c "
+import sqlite3; c=sqlite3.connect('data/ontology.db').cursor()
+for sql, exp in [(\"business_terms WHERE repo_id='slab-design-real' AND kind='atomic'\",16),(\"actions WHERE repo_id='slab-design-real'\",38),(\"business_rules WHERE repo_id='slab-design-real' AND confirmed=1\",17),(\"anchor_bindings WHERE repo_id='slab-design-real' AND confirmed=1\",9)]:
+  c.execute(f'SELECT count(*) FROM {sql}'); g=c.fetchone()[0]; print(f'{\"OK\" if g==exp else \"FAIL\"} {sql} → {g} (expected {exp})')
+"
+```
+4 모두 OK → 인계 시점 상태 유지. FAIL 있으면 `06-developer-onboarding.md` Section 5 의 회복 명령 4종 실행.
+
+---
+
 ## 🔴 현재 상태 (2026-05-01 세션 — CLEAN SLATE 진행 중, C1 완료)
 
 ### Action 모델 + Two-Layer 아키텍처 도입 결정 (2026-05-01)
@@ -1053,53 +1077,237 @@ cd frontend && npm run dev
 
 ---
 
-## 🔴 다음 세션 첫 작업 (2026-05-05 종료 시점 픽업) — **읽고 시작할 것**
+## 🔴 다음 세션 첫 작업 (2026-05-10 종료 시점 픽업) — **Phase D 진입 (API 설계 + 인계 가이드)**
 
-### 핵심 인지
-- **Round 5 인터뷰 (`round5-live-authoring.html`)** 가 의도적으로 보류된 상태. 보류 시점: Phase A.7.7 (Gap Inspector) + A.8 (Customer / Productivity). 이유: "Authoring AI 완성 후" 표시.
-- 그 사이 **Authoring AI 인프라 (R6 + P1a)** 를 완성. 이제 보류 풀고 모델링 사이클 재개.
-- **DB 큐의 29 BusinessTerm + 36 Action + 34 TypeRealization 은 recommend bulk 가 자동 적재한 것** — Round 5 식 인터뷰로 만든 것이 아님. 사용자는 이걸 명시적으로 구분: *"지금 큐에 있는 애들은 그냥 recommend 로 추가된 애들. 우리가 html 로 대화하면서 구체화하고 만들어갔던 방식으로 전체 한 사이클이 돌아야해."*
+### 핵심 인지 — Phase A + B + C 완료
+- Phase A (Round 6) — Customer / Productivity. **48 row**
+- Phase B — Round 5 archive 6 entity. **50 row** (atomic 6 + composite 8 + Action 7 + BR 3 + TR 26)
+- Phase C — Order (4 sub) + Slab + 21-step Algorithm. **80 row** (C.1 23 + C.2 14 + C.3 4 + C.4 12 + C.5 19 + C.6 8)
+- **Phase A+B+C 합계 = 178 row ground truth** (Phase D 입력 자료)
+- 산출물: `phase-c-archive-confirm.html` (C.7 종결) + `phase-b-archive-confirm.html` (B.6) + `round6-live-authoring.html` (Phase A) + `design-gaps-and-questions.md` (36 항목)
 
-### 구체적 첫 작업
-**Round 5 식 풀 사이클 한 번**. entity 1개 골라서 사용자와 Claude 가 같이 HTML 로 인터뷰 → 구체화 → 결정 → ontology 에 confirm.
+### 합의된 큰 흐름 — Phase A → B → C → D → E
+| Phase | 내용 | 모드 | 상태 |
+|---|---|---|---|
+| A | Round 6 — Customer/Productivity | M1 | ✓ 완료 (48 row) |
+| B | Round 5 archive 6 entity | M1 빠른 confirm | ✓ 완료 (50 row) |
+| C | Order (4 sub) + Slab + 21-step Algorithm | M3 hybrid | ✓ 완료 (80 row) |
+| **D** | 다음 개발자용 API 설계 + 인계 가이드 + API 문서 | TBD | **★ 다음 세션 첫 작업** |
+| E | 검증 + design-gaps **36 항목** 결정 + AnchorBinding ~110-140 보강 | — | Phase D 후 |
 
-### Entity 후보 (3가지 갈래, 사용자 결정)
-| 갈래 | 후보 | 의의 |
+### Phase A+B+C 통합 ground truth (178 row)
+- **atomic 16**: Phase A 7 (cmp/org/proc/grade/product_kind/customer/confirmed_plant_cd) + Phase B 6 (hr_plant_cd/sm_cd/cast_cd/machine_cd/edging_group_cd/priority) + Phase C 3 (order_no/slab_no/specific_gravity) — 합계 **16** (이전 "14" 표기는 off-by-2 오류, 정정)
+- **composite 22**: scm.std 2 / scm.spec 8 / scm.order 5 / scm.slab 7
+- **Action 41**: Phase A 4 + Phase B 7 + Phase C 30
+- **BusinessRule 17**: Phase A 1 + Phase B 3 + Phase C 13 (Validator 5 + Customer retroactive 1 + SdDesigner 1 + 21-step body 3 + Save+history 3)
+- **TR ~60**: PRIMARY 14 + PARTIAL ~46
+- **AnchorBinding 9** (Phase A only) + **~110-140 마킹** (Phase E 보강)
+- **design-gaps 36**: Phase A 22 / Phase B 5 / Phase C 9
+- **운영 이슈 history 7건**: P-2018-0098 / P-2018-0237 / P-2018-0721 / P-2019-0445 / P-2020-0411 + 2017 회의 + 정XX 2018-12-04
+
+### 새 운영 패턴 (필수 적용)
+사용자 명시 (Round 6 Step 8 Q6): **"작업할때 맥락이 다른 서브에이전트 2에게 검토를 하는 과정을 거쳐줘"**
+- Phase 진입 / 종료 / 핵심 결정 / 큰 산출물 작성 시 `Agent` 2 개 병렬 spawn (general-purpose, fresh context)
+- 역할 차별화 (예: 기술 정확성 + 비판적). 결과 통합 후 사용자 보고
+- 메모리: `feedback_subagent_review.md`
+
+### Phase C 진입 직전 할 일 순서
+1. backend / frontend 살아있는지 ping (port 8001 / 3000)
+2. **2 fresh-context 서브에이전트 검토** — (a) Phase A+B ontology 모델 통합 일관성 / (b) Phase C 진입 준비 (Order/Slab/21-step 시작점 + 빠뜨림). 결과 통합 보고 — **✓ 2026-05-10 완료**
+3. 사용자 정정 / 진행 결정
+4. Phase C 진입 — Order (4 sub) + Slab + 21-step Algorithm. M3 hybrid (M1 빠른 confirm + 새 Action 추론은 M2 깊이 인터뷰)
+
+### Phase B 5 entity 합의 (2026-05-10)
+| Entity | row | 핵심 |
 |---|---|---|
-| **G1 — 보류 항목 재개** | `Customer (A.8)` 또는 `Productivity (A.8)` | Round 5 자체 미진행 entity. 가장 자연스러운 재개. |
-| **G2 — 비교 시연** | `HrSpec` 재실시 | 이미 Round 5 에서 정리됨. Authoring AI 도구로 다시 거쳐서 결과 비교 (사용자 직접 vs AI 도구). 데모 가치 ↑ |
-| **G3 — 새 entity** | 기존 적재 안 된 다른 JPO (예: `SDOrderEntity`) | clean slate. 새 도메인 영역 |
+| B.1 HrSpec | 8 | 열연공장 + Constraint. atomic hr_plant_cd 신규 (PRIMARY) |
+| B.2 CastSpec | 13 | 연주공장 + Constraint. atomic sm/cast/machine 3 신규 + ★ map_sm_to_cast_machine Action |
+| B.3 EdgingSpec | 7 | wildcard fallback + ★ Phase B 첫 BR (3-단계 lookup strategy) |
+| B.4 EdgingGroup | 11 | matching rule + atomic priority 신규 + Phase A retroactive (Customer.priority TR) |
+| B.5 HrMinWgt + HrMaxWgt | 11 | 2D ceiling lookup + ★ shared BR (1 BR → 2 entity) |
+| **합계** | **50** | + Phase A retroactive 1 = 51 |
 
-### 모드 (사용자 결정 — 차이가 큼)
-| 모드 | 방식 | 비용 / 시간 |
+### Phase B 4 결정 (2026-05-09 사용자 합의)
+| Q | 결정 | 의미 |
 |---|---|---|
-| **M1 — Round 5 직접 인터뷰** | Claude 가 HTML 작성 → 사용자 답변 → 다음 step 작성. 도구 안 씀. | LLM 비용 0, 사용자 시간 1-2h |
-| **M2 — Authoring AI 도구 사용** | 사용자가 frontend 에서 「새 세션」→ JPO 선택 → cap 1~12 진행. graph 자동 활용. | LLM 비용 ~$5 / 1 entity, 30분 |
-| **M3 — 하이브리드** | M1 식 HTML 로 사용자 답변 받되, cap 1~12 도 병행 호출해서 같은 답변 자동 재현 (비교 자료) | M2 비용 + 추가 시간 |
+| Q1 범위 | **A — 6 entity 만** | Order/Slab 은 Phase C 에서 21-step 과 같이 |
+| Q2 atomic share | **A — 적극 share** | scm.shared.* 재사용. 신규 의미 발견 시 등록 (Step 7 confirmed_plant_cd / B.4 priority 패턴) |
+| Q3 BR 정책 | **A — enforced_by + violated_at_call** | 코드 가드 있는 rule 만 등록. 단순 값 범위는 facets |
+| Q4 PK 결함 entity | **A — minimal + 결함 마킹** | facets.pk_quality_issue + design-gaps 항목 등록 |
 
-### 시작 자료 (next-session 첫 파일들)
-- `toClaude/modeling/round5-live-authoring.html` — 보류 시점 + Phase 진척
-- `toClaude/modeling/recommend-vs-authoring-deep.html` — recommend vs Authoring 흐름 비교
-- DB 현황: 29 term + 36 action + 34 realization (모두 draft, recommend 가 자동 적재)
-- Authoring AI 도구: 27 routes 라이브 (R6 + P1a 모두 완료)
-- 백엔드 살아있음 (port 8001), 프론트 살아있음 (port 3000)
-- 가장 최근 R6-VAL 검증 결과: cap 2 confidence 0.50/0.45 (with/without javadoc) → 도구 가치 검증됨
+### Phase C 5 결정 (2026-05-10 사용자 합의)
+| Q | 결정 | 의미 |
+|---|---|---|
+| Q1 SDSlabEntity 38 작업필드 | **B — step grouping 5 composite** | first_range/second_wgt/split_state/final_range/target. dataflow 의존성을 composite 단위로 |
+| Q2 Order 4-sub 결합 | **A — PRIMARY + 4 sub inheritance** | order = root composite, om/os/qd/chemical 4 sub 를 parts. SDOrderLogic reflection 은 별 Action |
+| Q3 order_chemical 24 컬럼 | **A — unused_in_21step facet** | composite 1 + 마킹. design-gaps #28 (신규) 향후 보강 |
+| Q4 A-a 루프 control flow | **A — workflow Action.kind** | SdDesigner.runAaLoop = workflow (vs pure_function). facets: iteration_pattern + max_iter + exception_handling + delegates_to |
+| Q5 SlabResult 28 원본=조정 | **A — BR + composite facets 복합** | rule.scm.slab.original_equals_adjusted (enforced_by: SdSlabSaveAction setter) + facets.invariant_pairs |
 
-### 시작 직후 Claude 가 할 일 순서
-1. 이 HANDOFF 의 본 섹션 확인
-2. `CHANGES.md` 의 `[ ]` 항목 (지금 없음) 확인
-3. 사용자에게 G1/G2/G3 + M1/M2/M3 조합 어떤 거 원하는지 물어봄
-4. 결정 후 첫 step 부터 진행 — 사용자 답변 받고 다음 step
+### Phase D 5 결정 (2026-05-10 사용자 합의 — Agent 2 추천 따라)
+| Q | 결정 | 의미 |
+|---|---|---|
+| Q1 Phase D 범위 | **C — 인계 문서 + ontology API + ChangeSpec/SimResult 명세** | reference 시뮬 PoC 는 별 phase. 명세까지 |
+| Q2 ChangeSpec format | **B — Action FQN + atomic path override + scenario fixture** | 구조화. 결정성 ↑. 다음 개발자 schema 따라 입력 작성 |
+| Q3 Critical 갭 4건 (#1/#2/#4/#5) | **A — Phase D 명세, Phase E 구현** | SIM_VERIFIED / anchor invalidation / input fixture / Java dispatch — 명세까지만 |
+| Q4 backend 통합 vs 별 API | **B — 신규 `/api/simulation/*`** | 관심사 분리. ontology read-only vs simulation stateful |
+| Q5 Phase D 모드 | **M4 신규** | 서브에이전트 2 자동 검토 + 사용자 형식 통합. 큰 단계마다 fresh-context 검토 |
 
-### 컨텍스트 메모
+### Phase D 단계 분해 (D.0~D.5)
+- **D.0** 5 결정 합의 + 모드 — ✓ 완료
+- **D.1** 인계 onboarding doc — 178 row 전체 그림 + 4 sub-domain map + 16 atomic pool + entry point ★ 다음 작업
+- **D.2** Ontology Query API 명세 안정화 — sample request/response + OpenAPI
+- **D.3** ChangeSpec + SimResult schema + critical 갭 4건 명세
+- **D.4** 시뮬 runner interface 명세 — PythonGenerator + Java dispatch sandbox + input fixture
+- **D.5** 다음 개발자 가이드 (인계 패키지) — D.1~D.4 통합 + Phase E backlog
+
+### Phase A+B atomic 13개 (Phase C 입력)
+- **scm.shared Phase A 7** — cmp / org / proc / grade / product_kind / customer / confirmed_plant_cd
+- **scm.shared Phase B 6 신규** — hr_plant_cd (B.1) / sm_cd, cast_cd, machine_cd (B.2) / edging_group_cd (B.3) / **priority (B.4)** ★ Customer.priority TR 은 Phase A retroactive
+
+### Phase A+B BusinessRule 4개
+- Phase A 1: rule.scm.std.productivity_safe_range
+- Phase B 3: rule.scm.spec.edging_spec_lookup_strategy / rule.scm.spec.edging_group_match_strategy / rule.scm.spec.hr_wgt_2d_ceiling_lookup (shared)
+
+### Phase B 신규 design-gaps (5)
+- #23 NPE → HIST FAIL 미구현 (HrSpec/CastSpec)
+- #24 wildcard 미구현 (HrSpec)
+- #25 hardcoded plant mapping (CastSpec PlantMappingService)
+- #26 PRIORITY in PK 디자인 quirk (EdgingGroup)
+- #27 2D sheet row 폭증 위험 (HrMin/MaxWgt)
+
+### Phase C 신규 design-gaps (9)
+- #28 order_chemical 24 컬럼 풀모델 향후 보강
+- #29 SDOrderLogic reflection 매핑 drama DNA
+- #30 in-memory composite TR 표현 한계 (Slab 5 work composite)
+- #31 SLAB_DESIGN_HIST 미모델링
+- #32 SlabNoSequence side effect (atomic.slab_no.generated_by)
+- #33 SdDesigner.design step 14 (제품단중 최대화 모드) 미구현 TODO
+- #34 SpecificGravityProvider hardcoded 강종→비중 매핑
+- #35 SdSecondWgtHighAction commented-out legacy fallback (drama DNA)
+- #36 SdDesigner javadoc REQUIRES_NEW vs 실제 default REQUIRED 갭
+
+→ Phase A 22 + Phase B 5 + Phase C 9 = **36 design-gaps 항목** (Phase E 일괄 결정)
+
+### Phase B 의 본질 (재인터뷰 X) — ✓ 완료
+- Round 5 의 archive section 들에 6 entity 의 도메인 fact 가 이미 정리됨
+- ontology 의 description / parts / facets / Action 만 빠르게 채움
+- 사용자는 archive 그대로 사용할지 정정할지만 결정
+- 실제 소요: 5 entity (HrMin/Max 통합 처리) × ~30 분 ≈ 2.5h
+
+### Phase C 의 본질 (M3 hybrid)
+- Order (4 sub: order_om / order_os / order_qd / order_chemical) + Slab + 21-step Algorithm
+- M1 빠른 confirm (Order/Slab schema 는 Round 5 Step 1~3 에 archive 있음)
+- M2 깊이 인터뷰 (21-step Algorithm 의 12~15 Action — Round 5 미완)
+- 합계 ~6h 예상
+
+### Phase B 6 entity — 정의 cheatsheet (round5 archive 핵심 사실)
+| Entity | 정의 | PK |
+|---|---|---|
+| **HrSpec** | 열연공장 스펙 — 폭·길이·단중 제약 | (cmp, org, hrPlantCd, productType) |
+| **CastSpec** | **연주공장 (Cast plant) 머신 단위** — 두께 (머신당 고정값) · 폭 / 길이 범위. <em>(화학 성분 ❌ — 화학은 order_chemical 도메인. 2026-05-09 정정)</em> | (cmp, org, productType, castCd/machineCd) |
+| **EdgingSpec** | 슬랩 폭 변환 룰 — \* wildcard fallback (Round 5 D-3″) | (cmp, org, productType, edgingCd) |
+| **EdgingGroup** | EDGING 설비 그룹 + EdgingConstraint, PRIORITY tiebreaker | (cmp, org, edgingGroupCd) |
+| **HrMinWgt / HrMaxWgt** | 단중 표준 (단중하한 / 단중상한 입력) | (cmp, org, hrPlantCd, productType, ...) |
+
+### 산출물 (Phase A+B 종료 시점) — Phase C 입력 자료
+- `toClaude/modeling/round6-live-authoring.html` (Phase A 8 step + Phase B retroactive 적용)
+- `toClaude/modeling/phase-b-archive-confirm.html` ★ **Phase B 종결** — B.1~B.5 + B.6 archive (50 row + Phase A retroactive)
+- `toClaude/modeling/reference-materials.md` (인덱스 + 검수 기록)
+- `toClaude/modeling/section1-2-3-overview.html` (발표용)
+- `toClaude/modeling/design-gaps-and-questions.md` (Phase A 22 + Phase B 5 = 27 항목)
+- `toClaude/modeling/anchor-binding-deep-dive.html` (인터랙티브 심층)
+- `toClaude/modeling/round5-live-authoring.html` (★ Phase C 입력 — Order/Slab/21-step archive)
+
+### Round 6 끝 시점 의심 영역 (Phase E 에서 결정)
+| 영역 | 등급 |
+|---|---|
+| Spring Data JPA / 자동 SQL anchor 한계 | design-gaps #22 |
+| anchor invalidation 폭발 (50K scale) | #17 |
+| 성능 / 인덱싱 (50K row 검색 SLA) | #21 |
+| 코드 vs ontology ground truth 충돌 | #11 |
+| BusinessRule vs 방어로직 갭 UI | #13 |
+| SIM_VERIFIED 자동 결정 / Anchor invalidation 흐름 / 시뮬 input fixture / Java dispatch sandbox | #1, 2, 4, 5 |
+
+### 컨텍스트 메모 (변하지 않음)
 - 사용자 = 팀 리더, Section 2 직접 담당
-- 비판적 검토 선호 — "내가 뭘 알려주기 전에 너무 많은 걸 알고 물어보는 느낌" (P1-B feedback) 주의
-- "MVP 제안 금지, 풀 시연 가정" — 작업 단위 끝까지 완결
-- "일정/시간/우선순위 분기 제안 금지. 사용자가 결정." — 추천만 하되 결정은 사용자
+- "MVP 제안 금지, 풀 시연 가정" + "100K+ 문서 규모" + 5K 클래스 검색 우선
+- 일정 / 우선순위 분기 제안 금지 — 사용자 결정
+- HTML 인터뷰 패턴: 각 Q 마다 textarea + recommend hint + 「📋 답변 복사」 → 채팅 붙여넣기
 
 ### 백엔드 / 프론트엔드 상태
-- Backend uvicorn (port 8001) — 24+ routes 라이브 (R6 + P1a). 변경 시 `pkill -f uvicorn ; set -a && . ./.env && set +a && ./.venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8001 --log-level info` 로 재시작.
-- Frontend Next.js (port 3000) — Turbopack dev mode.
-- 새 세션 시작 시 backend / frontend 둘 다 살아있는지 먼저 확인 (`curl -s -o /dev/null -w "%{http_code}\n" --max-time 5 http://localhost:8001/openapi.json`).
+- Backend uvicorn (port 8001) — 153 routes (ontology 32 + authoring 27)
+- 재시작: `pkill -f uvicorn ; set -a && . ./.env && set +a && ./.venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8001 --log-level warning &`
 
-마지막 업데이트: 2026-05-05 (R6 + P1a + P3 폴리싱 6건 모두 완료. P4 데모 전 Round 5 풀 사이클 한 번 결정 → 다음 세션 진입.)
+마지막 업데이트: 2026-05-10 (Phase A+B+C 완료, **178 row ground truth**, Phase D 진입 준비)
+
+---
+
+## 📋 (참고) 이전 세션 정보 — Round 6 Step 2 답변 대기 시점
+
+### 핵심 인지 (현재 진행 중)
+- **Round 6 — `toClaude/modeling/round6-live-authoring.html`** 진행 중. G1 (Customer/Productivity) + M1 (직접 HTML 인터뷰) 모드.
+- 8 step 풀 사이클 중 **Step 2 form 작성 완료, 사용자 답변 대기**.
+- task list:
+  - #1 Step 0 ✓ 시작 화면 합의
+  - #2 Step 1 ✓ 공유 atomic 6종 합의
+  - #3 Step 2 진행 중 (form 답변 대기) ★ 다음 세션 첫 작업
+  - #4 Step 3 — 실수율표준 composite (pending)
+  - #5 Step 4 — TypeRealization 검증 (pending)
+  - #6 Step 5 — Customer Action (pending)
+  - #7 Step 6 — Productivity Action (pending)
+  - #8 Step 7 — AnchorBinding (pending)
+  - #9 Step 8 — DB confirm + archive (pending)
+
+### Round 6 진행 상태 — Step 1 까지 합의된 것 (다음 step 들의 ground truth)
+- **공유 atomic 6종** — 모두 `term.scm.shared.*` (신규 sub-domain):
+  - `cmp` (string 2) / `org` (string 1) / `proc` (string 4 enum 8 값) / `grade` (string 10) / `product_kind` (string 3-4) / `customer` (string 10)
+- **4 결정 사항**:
+  1. domain naming = B (`scm.shared` 신규 sub-domain)
+  2. 공정 enum = B-1 (atomic 의 `enum_values` facet 8 값)
+  3. 품종 4 alias = C-1 (1 atomic + 4 PARTIAL TR — 컬럼 맥락 의존성 자동 처리)
+  4. 값 컬럼 = D-1 (composite 의 facet 으로 entity 별 고유)
+- **Customer 7 컬럼 분해 (Step 2 default)** — 4 atomic + 3 facet:
+  - atomic: cmpCd / orgCd / productNameCd → product_kind / customerCd
+  - facet: priority / pkg_wgt_high / pkg_wgt_low
+- **Productivity 7 컬럼 분해 (Step 3 default)** — 6 atomic + 1 facet:
+  - atomic: cmpCd / orgCd / procCd / gradeCd / prodKindCd → product_kind / customerCd
+  - facet: productivity (BigDecimal(7,4))
+
+### 시작 직후 Claude 가 할 일 순서
+1. 이 HANDOFF 본 섹션 확인 + 사용자에게 "Round 6 Step 2 답변 받고 진행하자" 인지 확인
+2. backend 살아있는지 (port 8001 — 153 routes, ontology 32, authoring 27) ping
+3. 사용자가 Step 2 답변을 form 으로 채워서 채팅에 붙여넣음 → archive-step-2 추가 → Step 3 form 작성
+4. 위 흐름 반복 — 각 step 답변 → archive → 다음 step. 8 step 완료까지.
+5. Step 8 에서 ontology API (`/api/ontology/repos/slab-design-real/{terms|actions|type-realizations}/{fqn}/confirm` 등) 로 모든 합의 row confirm + round6-archive 마무리.
+
+### 이번 세션 (2026-05-07~05-09) 에서 별개로 만든 산출물 — 향후 가이드 참고자료
+0. **`toClaude/modeling/reference-materials.md`** ★ 인덱스 — 아래 산출물의 단일 진입점. 최종 가이드 작성 시 시작점.
+1. **`toClaude/modeling/section1-2-3-overview.html`** — 다른 관계자 (팀 외부) 발표용 풀 가이드. Section 1 (Wiki) + Section 2 (Modeling) + Section 3 (Simulation) 통합 흐름. 디테일 — 원리 / 구조 / 데이터 모델 / drama DNA / 핵심 차별 / 통합 시나리오.
+2. **`toClaude/modeling/design-gaps-and-questions.md`** — 현재 ground truth (project_decisions v3 + v4) 안에서 논리적으로 막히거나 미해결 / 모호한 영역 13 항목. 사용자 결정 필요한 질문들.
+3. **`toClaude/modeling/anchor-binding-deep-dive.html`** — AnchorBinding 인터랙티브 심층 가이드. 6 탭 (큰 그림 / 7 종 anchor / 실제 예시 9 anchor 마커 클릭 / 시뮬 흐름 stepper / 영향도 3 시나리오 토글 / 셀프 체크). cumulativeProductivity + findFirstMatch 풀 분석.
+
+### 컨텍스트 메모 (변하지 않음)
+- 사용자 = 팀 리더, Section 2 직접 담당
+- 비판적 검토 선호
+- "MVP 제안 금지, 풀 시연 가정"
+- "일정/시간/우선순위 분기 제안 금지"
+- HTML 인터뷰 패턴: 각 Q 마다 textarea + recommend hint + 「📋 답변 복사」 버튼. 사용자가 form 채워서 채팅에 붙여넣음.
+
+### 백엔드 / 프론트엔드 상태
+- Backend uvicorn (port 8001) — 153 routes 라이브 (ontology 32 + authoring 27). 변경 시 `pkill -f uvicorn ; set -a && . ./.env && set +a && ./.venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8001 --log-level warning &` 로 재시작.
+- Frontend Next.js (port 3000) — Turbopack dev mode.
+- 새 세션 시작 시 backend / frontend 둘 다 살아있는지 먼저 확인.
+
+### 큐 현황 (Step 8 confirm 시점에 변경될 것)
+현재 (2026-05-07): 29 term / 35 action / 34 TR (모두 draft, recommend 가 자동 적재).
+
+Round 6 Step 8 confirm 후 예상 변화:
+- +6 신규 atomic terms (cmp/org/proc/grade/product_kind/customer)
+- +11 신규 PARTIAL TR (Customer 4 + Productivity 6 + 보너스)
+- 기존 2 composite term (customer_std, productivity_std) 의 description/parts/facets 보강 + confirmed=True
+- 기존 1 action (cumulative_productivity) 의 description/realization 보강
+- 신규 actions (findFirstMatch / lookup / lookupOrDefault — Step 5/6 결정)
+- 신규 AnchorBinding (Step 7 결정)
+
+마지막 업데이트: 2026-05-07 (Round 6 G1+M1 모드 진행 중. Step 0 ✓ Step 1 ✓ Step 2 답변 대기. 발표 가이드 + 디자인 갭 별도 산출.)

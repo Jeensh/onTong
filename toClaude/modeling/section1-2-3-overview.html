@@ -1,0 +1,1198 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>onTong — 레거시 기반 온톨로지 모델링 + 시뮬레이션 풀 가이드</title>
+<style>
+  :root {
+    --bg: #0b1120; --card: #1e293b; --line: #334155;
+    --fg: #e2e8f0; --muted: #94a3b8; --dim: #64748b;
+    --primary: #38bdf8; --emerald: #10b981; --amber: #f59e0b;
+    --rose: #fb7185; --violet: #a78bfa; --orange: #fb923c;
+    --cyan: #22d3ee; --pink: #f472b6;
+    /* Section 컬러 */
+    --s1: #22d3ee;   /* Wiki — 청록 */
+    --s2: #a78bfa;   /* Modeling — 보라 */
+    --s3: #fb923c;   /* Simulation — 주황 */
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font:14px/1.6 -apple-system,"Pretendard","Apple SD Gothic Neo",sans-serif;background:var(--bg);color:var(--fg)}
+  .wrap{max-width:1180px;margin:0 auto;padding:32px 32px 100px}
+
+  /* 표지 */
+  .cover{padding:60px 0 40px;border-bottom:1px solid var(--line);margin-bottom:40px}
+  .cover .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--primary);font-weight:600;margin-bottom:8px}
+  .cover h1{font-size:40px;line-height:1.15;margin:0 0 14px;font-weight:700;letter-spacing:-0.02em}
+  .cover h1 small{display:block;font-size:18px;color:var(--muted);font-weight:400;margin-top:8px;letter-spacing:0}
+  .cover .sub{font-size:14.5px;color:var(--muted);max-width:780px;line-height:1.6}
+  .cover .meta{margin-top:18px;font-size:11.5px;color:var(--dim)}
+
+  /* TOC */
+  .toc{background:rgba(56,189,248,0.04);border:1px solid rgba(56,189,248,0.25);border-radius:10px;padding:18px 22px;margin-bottom:48px}
+  .toc h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--primary)}
+  .toc ol{margin:0;padding:0 0 0 22px;column-count:2;column-gap:24px;font-size:13px;line-height:1.95}
+  .toc a{color:var(--fg);text-decoration:none;border-bottom:1px dotted transparent}
+  .toc a:hover{color:var(--primary);border-bottom-color:var(--primary)}
+
+  /* Section header */
+  section.major{margin:60px 0 0;scroll-margin-top:20px}
+  section.major > h2{font-size:30px;margin:0 0 8px;letter-spacing:-0.01em;font-weight:700;border-left:4px solid var(--primary);padding-left:14px}
+  section.major > .lead{font-size:14.5px;color:var(--muted);max-width:840px;margin:0 0 22px}
+  section.major.s1 > h2{border-color:var(--s1)}
+  section.major.s2 > h2{border-color:var(--s2)}
+  section.major.s3 > h2{border-color:var(--s3)}
+
+  h3{margin:30px 0 8px;font-size:18px;font-weight:600;color:var(--fg)}
+  h4{margin:20px 0 4px;font-size:14.5px;font-weight:600;color:var(--violet)}
+  h5{margin:14px 0 4px;font-size:13px;font-weight:600;color:var(--cyan);text-transform:uppercase;letter-spacing:0.04em}
+  p{margin:8px 0 12px}
+
+  ul, ol{margin:8px 0 14px 22px;padding:0}
+  li{padding:4px 0}
+
+  code{font-family:"JetBrains Mono","SF Mono",monospace;font-size:91%;background:rgba(255,255,255,0.06);padding:1.5px 6px;border-radius:4px;color:#c4b5fd}
+  pre{background:rgba(0,0,0,0.40);border:1px solid var(--line);border-radius:8px;padding:14px 16px;font-family:"JetBrains Mono",monospace;font-size:12.3px;overflow-x:auto;color:#cbd5e1;margin:10px 0;line-height:1.55}
+  pre.korean{color:#fef3c7}
+  pre b{color:var(--cyan)}
+
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:rgba(255,255,255,0.05);color:var(--primary);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:0.04em}
+  tr:nth-child(even) td{background:rgba(255,255,255,0.015)}
+
+  .panel{background:rgba(0,0,0,0.22);border:1px solid var(--line);border-radius:8px;padding:14px 18px;margin:12px 0}
+  .panel.tip{background:rgba(56,189,248,0.05);border-color:rgba(56,189,248,0.3)}
+  .panel.warn{background:rgba(245,158,11,0.06);border-color:rgba(245,158,11,0.4)}
+  .panel.gap{background:rgba(251,113,133,0.05);border-color:rgba(251,113,133,0.4)}
+  .panel.diff{background:rgba(167,139,250,0.05);border-color:rgba(167,139,250,0.4)}
+  .panel .label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;margin-bottom:6px}
+  .panel.tip .label{color:var(--primary)}
+  .panel.tip .label::before{content:"💡 "}
+  .panel.warn .label{color:var(--amber)}
+  .panel.warn .label::before{content:"⚠️ "}
+  .panel.gap .label{color:var(--rose)}
+  .panel.gap .label::before{content:"🚧 "}
+  .panel.diff .label{color:var(--violet)}
+  .panel.diff .label::before{content:"✨ "}
+
+  .quote{background:rgba(167,139,250,0.05);border-left:3px solid var(--violet);padding:11px 16px;border-radius:0 4px 4px 0;margin:12px 0;font-size:13.5px}
+  .quote .label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.08em;color:var(--violet);font-weight:600;margin-bottom:4px}
+
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:0.03em}
+  .p-s1{background:rgba(34,211,238,0.15);color:var(--s1)}
+  .p-s2{background:rgba(167,139,250,0.18);color:var(--s2)}
+  .p-s3{background:rgba(251,146,60,0.18);color:var(--s3)}
+  .p-emerald{background:rgba(16,185,129,0.18);color:var(--emerald)}
+  .p-amber{background:rgba(245,158,11,0.18);color:var(--amber)}
+  .p-rose{background:rgba(251,113,133,0.18);color:var(--rose)}
+  .p-primary{background:rgba(56,189,248,0.18);color:var(--primary)}
+
+  /* 카드 그리드 */
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:16px 0}
+  .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:16px 0}
+  @media(max-width:880px){.grid3,.grid2{grid-template-columns:1fr}}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+  .card h4{margin:0 0 6px;color:var(--fg);font-size:14.5px}
+  .card .num{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:4px}
+  .card.s1{border-left:4px solid var(--s1)}
+  .card.s2{border-left:4px solid var(--s2)}
+  .card.s3{border-left:4px solid var(--s3)}
+
+  /* 다이어그램 (ASCII / SVG-like) */
+  .diagram{background:rgba(0,0,0,0.40);border:1px solid var(--line);border-radius:8px;padding:18px 20px;margin:14px 0;font-family:"JetBrains Mono",monospace;font-size:12px;line-height:1.5;color:#cbd5e1;overflow-x:auto;white-space:pre}
+  .diagram .arrow{color:var(--primary)}
+  .diagram .label{color:var(--violet)}
+  .diagram .accent{color:var(--cyan)}
+
+  hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+
+  .small{font-size:11.5px;color:var(--muted)}
+  .key{display:inline-block;padding:0 6px;background:#0f172a;border:1px solid var(--line);border-radius:3px;font-family:"JetBrains Mono",monospace;font-size:11px}
+
+  .step-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--primary);color:var(--bg);font-size:11.5px;font-weight:700;margin-right:8px}
+
+  .biglead{font-size:16px;line-height:1.65;color:var(--fg);max-width:880px;margin:14px 0 18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ====================================================================== -->
+<!-- 표지 -->
+<!-- ====================================================================== -->
+<div class="cover">
+  <div class="eyebrow">onTong · 모델링 + 시뮬레이션 통합 가이드</div>
+  <h1>레거시 코드를 도메인 의미로 끌어올리고 시뮬레이션까지<small>— 자바독 없는 5,000+ 클래스를 풀어내는 한 흐름</small></h1>
+  <p class="sub">
+    철강 제조 SCM (slab-design 시스템) 의 21-step 알고리즘. 자바독 부재, 같은 도메인이 4 종류 컬럼명으로 흩어진 레거시.
+    이걸 (1) 코드 자동 분석으로 ontology 초안 만들고, (2) 사용자-AI 협업으로 합의된 ontology 로 끌어올리고,
+    (3) 그 ontology 위에서 한국어 Python 시뮬레이션을 돌려 도메인 룰 변경 영향을 미리 봅니다.
+  </p>
+  <p class="sub">
+    이 문서 하나로 처음부터 원리·구조·흐름을 모두 따라잡을 수 있도록 작성했습니다.
+    각 섹션 끝에 "구체 예시 (Customer/Productivity)" + "솔직한 미해결 영역" 표시.
+  </p>
+  <div class="meta">버전 2026-05-07 · 작성: onTong 모델링 팀 · 발표 / 외부 공유 가능</div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- TOC -->
+<!-- ====================================================================== -->
+<div class="toc">
+  <h3>목차</h3>
+  <ol>
+    <li><a href="#sec0">한눈에 — 5분 요약</a></li>
+    <li><a href="#sec1">왜 이 문제가 어려운가 (drama DNA)</a></li>
+    <li><a href="#sec2">도메인 — slab-design (철강 SCM)</a></li>
+    <li><a href="#sec3">솔루션 큰 그림 — 3 Section</a></li>
+    <li><a href="#sec4">Section 1 — Wiki (도메인 가이드)</a></li>
+    <li><a href="#sec5">Section 2 — Modeling (메인)</a></li>
+    <li><a href="#sec5-1">└ 5.1 4-Layer 아키텍처</a></li>
+    <li><a href="#sec5-2">└ 5.2 Code Layer</a></li>
+    <li><a href="#sec5-3">└ 5.3 Domain Layer (BusinessTerm)</a></li>
+    <li><a href="#sec5-4">└ 5.4 Mapping Layer</a></li>
+    <li><a href="#sec5-5">└ 5.5 VerificationLevel</a></li>
+    <li><a href="#sec5-6">└ 5.6 자동 추천 vs 사용자 합의</a></li>
+    <li><a href="#sec5-7">└ 5.7 Authoring AI (graph-aware ReAct)</a></li>
+    <li><a href="#sec6">Section 3 — Simulation (한국어 Python)</a></li>
+    <li><a href="#sec7">통합 흐름 — 큰 시나리오</a></li>
+    <li><a href="#sec8">구체 예시 — Customer / Productivity 풀 사이클</a></li>
+    <li><a href="#sec9">핵심 차별 (Palantir 비교)</a></li>
+    <li><a href="#sec10">미해결 영역 (솔직한 라벨링)</a></li>
+    <li><a href="#sec11">데이터 모델 reference</a></li>
+    <li><a href="#sec12">FAQ</a></li>
+  </ol>
+</div>
+
+<!-- ====================================================================== -->
+<!-- Section 0 — 한눈에 -->
+<!-- ====================================================================== -->
+<section class="major" id="sec0">
+  <h2>한눈에 — 5분 요약</h2>
+  <p class="lead">
+    이 페이지의 끝까지 안 읽어도 이 한 섹션만 보면 솔루션 전체 모습을 잡을 수 있습니다.
+  </p>
+
+  <h3>한 문장으로</h3>
+  <div class="biglead">
+    <strong>레거시 자바 코드</strong> →
+    <strong style="color:var(--s1)">Wiki(도메인 가이드)</strong> +
+    <strong style="color:var(--s2)">Ontology(코드 ↔ 도메인 의미 매핑)</strong> +
+    <strong style="color:var(--s3)">Simulation(한국어 Python 으로 룰 변경 영향 측정)</strong>.
+    셋이 같은 그래프 위에서 돌아가, "도메인 룰 하나 바꿨을 때 어떤 코드 + 어떤 결과가 어떻게 바뀌나" 를 자동 시각화.
+  </div>
+
+  <h3>큰 흐름 다이어그램</h3>
+  <div class="diagram">
+<span class="accent">[1] 레거시 Java 코드</span>          <span class="accent">[2] Section 1 — Wiki</span>
+   slab-design 5,000+ class    ←→     도메인 가이드 (자연어, 사람이 읽음)
+       │
+       │ <span class="arrow">자동 import + AST 분석</span>
+       ↓
+<span class="accent">[3] Code Layer (Section 2)</span>
+   CodeType / CodeMethod / CodeField / CallSite — Java 충실 mirror
+       │
+       │ <span class="arrow">자동 recommend + 사용자 합의 인터뷰</span>
+       ↓
+<span class="accent">[4] Domain Layer (Section 2)</span>      <span class="label">← 사용자가 confirm 한 ontology</span>
+   BusinessTerm (atomic / composite, with facets) + Inheritance + Composition
+       │
+       │ <span class="arrow">매핑 정의</span>
+       ↓
+<span class="accent">[5] Mapping Layer (Section 2)</span>     <span class="label">← 코드 ↔ 도메인 다리</span>
+   TypeRealization (PRIMARY / PARTIAL) + Action + Realization + AnchorBinding
+       │
+       │ <span class="arrow">VerificationLevel 6 단계 자동 진행</span>
+       │   UNMAPPED → DRAFT → SIGNATURE_LOCKED → BODY_ANCHORED → SIM_VERIFIED → PR_PROVEN
+       ↓
+<span class="accent">[6] Section 3 — Simulation</span>
+   ChangeSpec (룰 변경) → 한국어 Python 자동 생성 → RestrictedPython sandbox → output diff
+       │
+       │ <span class="arrow">통과 시</span>
+       ↓
+<span class="accent">[7] 자동 Java draft PR</span>            <span class="label">← review-only, 운영자가 검토</span>
+  </div>
+
+  <h3>핵심 3 가치</h3>
+  <div class="grid3">
+    <div class="card s1">
+      <div class="num">VALUE 1</div>
+      <h4>도메인 의미 가시화</h4>
+      <p>4 alias chaos (PRODUCT_NAME / KIND / TYPE) 같은 비표준 컬럼이 같은 atomic 으로 묶임.
+      "이 컬럼이 도메인적으로 무엇" 을 검색·그래프 한 번에 확인.</p>
+    </div>
+    <div class="card s2">
+      <div class="num">VALUE 2</div>
+      <h4>영향도 분석</h4>
+      <p>"Customer 단중 제한 룰 바꾸면" 영향 받는 메서드 / 다른 룰 / 시뮬 결과 변화를 그래프로 추적.
+      코드 변경 전 비용 측정.</p>
+    </div>
+    <div class="card s3">
+      <div class="num">VALUE 3</div>
+      <h4>시뮬레이션 + 자동 PR</h4>
+      <p>한국어 변수 Python 으로 도메인 룰 재구현 + 격리 sandbox 실행 + 결과 diff.
+      통과 시 Java draft PR 자동 생성. 운영자는 review 만.</p>
+    </div>
+  </div>
+
+  <h3>발표 흐름 권장</h3>
+  <ol>
+    <li><strong>왜</strong> 레거시 modernization 이 어려운가 (Section 1)</li>
+    <li><strong>어떻게</strong> ontology 가 그걸 푸는가 (Section 5)</li>
+    <li><strong>구체 예시</strong> Customer/Productivity 풀 사이클 (Section 8)</li>
+    <li><strong>시뮬</strong> 데모 — 룰 바꾼 결과 (Section 6 + 7)</li>
+    <li><strong>차별 포인트</strong> Palantir 와 다른 점 (Section 9)</li>
+    <li><strong>솔직한 미해결</strong> (Section 10)</li>
+  </ol>
+</section>
+
+<!-- ====================================================================== -->
+<!-- Section 1 — drama DNA -->
+<!-- ====================================================================== -->
+<section class="major" id="sec1">
+  <h2>1. 왜 이 문제가 어려운가 — drama DNA</h2>
+  <p class="lead">
+    레거시 modernization 이 일반적인 코드 리팩토링과 다른 이유. 우리가 의도적으로 "victim 코드" 에 박아둔 6 종류 drama DNA.
+  </p>
+
+  <div class="grid2">
+    <div class="card">
+      <h4>① 같은 도메인의 4 alias chaos</h4>
+      <p>품종 (= product kind) 이 4 컬럼명으로 흩어짐:</p>
+      <ul>
+        <li><code>CustomerStd.PRODUCT_NAME_CD</code></li>
+        <li><code>SdProductivityStd.PROD_KIND_CD</code></li>
+        <li><code>HrSpec.PRODUCT_TYPE_CD</code></li>
+        <li>그 외 PROD_TYPE_CD / KIND_CD 등</li>
+      </ul>
+      <p class="small">→ 같은 의미인데 검색·매핑 못 묶음. 사람이 일일이 매핑하면 5,000+ class × 평균 10 컬럼 = 50K 매핑.</p>
+    </div>
+
+    <div class="card">
+      <h4>② 자바독 / 매뉴얼 부재</h4>
+      <p>운영 코드 주석은 <code>// 2018-09-12 정XX: ...</code> 같은 변경 이력만. 의미 설명은 없음.</p>
+      <p>매뉴얼이 있어도 stale (실제 코드 동작과 다름).</p>
+      <p class="small">→ 코드 자체가 유일한 ground truth. 자바독 의존 도구는 0.4 이하 정확도.</p>
+    </div>
+
+    <div class="card">
+      <h4>③ 다형성 dispatch (factory / interface)</h4>
+      <p>룰엔진 fallback 가 <code>List&lt;RuleAction&gt;</code> 에 다수 구현 + instanceof + cast + 메서드 호출.
+      static 분석으로만 추적 가능 (runtime 데이터 없으면 답 없음).</p>
+      <p class="small">→ 우리 차별: <strong>CallSiteAnalyzer 7-case</strong> 정적 분석 + 모호 case 만 사용자 큐.</p>
+    </div>
+
+    <div class="card">
+      <h4>④ Magic literal + 운영 history</h4>
+      <p>예: <code>DEFAULT_PRODUCTIVITY = 0.95</code> — 2017 0.90 → 2019 0.92 → 2021 0.95 변경 이력.
+      0.50 (안전 하한) / 1.0 (안전 상한) 같은 magic literal.</p>
+      <p class="small">→ AnchorBinding 으로 literal 자체를 도메인 의미와 연결.</p>
+    </div>
+
+    <div class="card">
+      <h4>⑤ 8 공정 8자리 string</h4>
+      <p><code>confirmedPlantCd</code> 가 8자리 char string. 자리 i (0~7) ↔ 공정 (SM/HR/HRF/CR/ANL1/ANL2/GAL/CRF). <code>' '</code> = 비활성.</p>
+      <p>코드 한 줄: <code>if (confirmedPlantCd.charAt(i) == ' ') continue;</code></p>
+      <p class="small">→ 단순 string 이지만 도메인적으로 "8 공정 활성/비활성" 의 표현. ontology 가 이 의미를 잡아야 시뮬 가능.</p>
+    </div>
+
+    <div class="card">
+      <h4>⑥ 운영 이슈 누적 + 보류 패치</h4>
+      <p>예: <code>P-2018-0721 "실수율 과다 → 분할수 폭주"</code> + <code>P-2020-0834 "std 1.05 등록 → 누적값 비정상"</code>.</p>
+      <p>보류 패치는 코드 주석으로 남음 (// if (p.compareTo(MAX) > 0) ...).</p>
+      <p class="small">→ ontology 의 BusinessRule 또는 Action.metadata 에 그대로 보존 → 시뮬 시 "보류 패치 적용 케이스" 분기 가능.</p>
+    </div>
+  </div>
+
+  <div class="quote">
+    <div class="label">핵심 통찰</div>
+    드라마 DNA 가 많은 코드일수록 우리 도구의 가치가 큼. <strong>"깔끔한 코드는 이미 modernization 됐다"</strong>.
+    온톨로지 + 매핑은 "사람이 일일이 읽어 의미를 잡아주던 시간" 을 자동화하는 도구.
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- Section 2 — 도메인 -->
+<!-- ====================================================================== -->
+<section class="major" id="sec2">
+  <h2>2. 도메인 — slab-design (철강 SCM)</h2>
+  <p class="lead">
+    "demo repo" 로 사용하는 slab-design 시스템의 핵심. 단어가 처음이라도 21-step 알고리즘 흐름은 이해 가능하도록.
+  </p>
+
+  <h3>도메인 한 줄</h3>
+  <div class="biglead">
+    철강 제조 SCM 의 <strong>slab(슬랩) 설계</strong> — 고객 주문 들어오면 어떤 크기 / 무게 / 화학 성분의 중간 제품 (slab) 을 몇 개 만들지 결정.
+    21-step 알고리즘으로 폭/길이/단중/공정 별 실수율 계산.
+  </div>
+
+  <h3>핵심 용어</h3>
+  <table>
+    <tr><th>용어</th><th>의미</th><th>참고</th></tr>
+    <tr><td>슬랩 (slab)</td><td>중간 제품. 제강 (SM) 출력 → 열연 (HR) 입력.</td><td>1 주문 → N 슬랩</td></tr>
+    <tr><td>주문 (order)</td><td>고객 주문. 4 sub (om/os/qd/chemical) 합성.</td><td>분산 시스템에서 Kafka 로 모음</td></tr>
+    <tr><td>강종 (grade)</td><td>철 화학 성분 분류 코드</td><td>품질설계 룩업 키</td></tr>
+    <tr><td>품종 (product kind)</td><td>제품 카테고리</td><td>★ 4 alias chaos</td></tr>
+    <tr><td>실수율 (productivity / yield)</td><td>공정 수율 (output / input)</td><td>8 공정 곱 = 누적 실수율</td></tr>
+    <tr><td>단중 (unit weight)</td><td>제품 1개 무게 (kg)</td><td>알고리즘의 핵심 driver</td></tr>
+    <tr><td>포장단중 (pkg weight)</td><td>고객 포장 단위 무게 제한</td><td>Customer 표준의 hi/lo</td></tr>
+    <tr><td>8 공정</td><td>SM / HR / HRF / CR / ANL1 / ANL2 / GAL / CRF</td><td>제조 라인 chain</td></tr>
+    <tr><td>confirmedPlantCd</td><td>8자리 char (자리=공정)</td><td>' ' = 비활성</td></tr>
+    <tr><td>회사 / 소</td><td>composite key prefix (모든 std 테이블)</td><td>cmpCd + orgCd</td></tr>
+    <tr><td>EDGING</td><td>슬랩 폭 변환 룰 (* wildcard fallback)</td><td>비대칭 매핑 가능</td></tr>
+  </table>
+
+  <h3>데모 코드 구조 (slab-design 4 module Maven)</h3>
+  <div class="diagram">
+slab-design/
+├── slab-design-boot/      <span class="label"># Spring Boot 진입점</span>
+├── slab-design-facade/    <span class="label"># REST API (@RestController)</span>
+├── slab-design-feature/   <span class="label"># 비즈니스 로직 (designer / driver / action / service)</span>
+└── slab-design-store/     <span class="label"># JPA / MyBatis (jpo / entity / repository / logic)</span>
+
+★ 약 122 파일 / 123 CodeType / 956 메서드 / 1,018 CallSite
+★ 운영 환경: 5,000+ 클래스 / 100K+ 도메인 entity 가정
+  </div>
+
+  <h3>21-step 알고리즘 (간략)</h3>
+  <p><code>SdDesigner.java</code> 의 메인 흐름. step 별로 1~3 Action 호출.</p>
+  <div class="diagram">
+Step 1   초기화 (confirmedPlantCd 8자리 검증)
+Step 2~4 주문 데이터 정리 (om/os/qd/chemical 합성)
+<span class="accent">Step 5   단중하한 = max(EdgingMin, HrMinWgt, <b>CustomerStd.pkgWgtLow</b>, ...) ← Customer 룰엔진</span>
+<span class="accent">Step 6   단중상한 = min(EdgingMax, HrMaxWgt, <b>CustomerStd.pkgWgtHigh</b>, ...) ← Customer 룰엔진</span>
+Step 7   maxSplit = ceil(secondWgtHigh / orderWgtHigh / productivity)
+<span class="accent">Step 6/9/13 productivity = <b>cumulativeProductivity</b>(8 공정 활성 자리 lookup 결과의 곱) ← Productivity</span>
+Step 14~21 분할수 / slab 개수 / 폭 / 길이 결정 + slab 결과 저장
+  </div>
+  <p class="small">Customer / Productivity 는 21-step 의 fallback 룩업 데이터. 8 표준 중 마지막 2 개 (다른 6: HrSpec, CastSpec, EdgingSpec, EdgingGroup, HrMinWgt, HrMaxWgt).</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- Section 3 — 솔루션 큰 그림 -->
+<!-- ====================================================================== -->
+<section class="major" id="sec3">
+  <h2>3. 솔루션 큰 그림 — 3 Section</h2>
+  <p class="lead">
+    onTong 은 한 화면에 3 Section 으로 나뉘어 있고, 같은 도메인 그래프를 공유합니다.
+  </p>
+
+  <div class="grid3">
+    <div class="card s1">
+      <div class="num">SECTION 1</div>
+      <h4>Wiki — 도메인 가이드</h4>
+      <p>사람이 읽는 자연어. AI 채팅 (RAG) + 위키 페이지 작성 / 편집.</p>
+      <p>우리 솔루션의 <strong>입구</strong>. 도메인 처음 보는 사람에게 가르쳐줌.</p>
+      <p class="small">완성 상태. 진행 중 작업 없음.</p>
+    </div>
+    <div class="card s2">
+      <div class="num">SECTION 2 ★ 메인</div>
+      <h4>Modeling — 코드 ↔ 도메인 매핑</h4>
+      <p>Code Layer (자바 mirror) + Domain Layer (BusinessTerm) + Mapping Layer (TR / Action / AnchorBinding).</p>
+      <p>"이 컬럼은 도메인 의미상 무엇" 을 자동 추천 + 사용자 합의로 채움.</p>
+      <p class="small">진행 중 (Round 6 — Customer/Productivity 풀 사이클).</p>
+    </div>
+    <div class="card s3">
+      <div class="num">SECTION 3</div>
+      <h4>Simulation — 한국어 Python 시뮬</h4>
+      <p>ChangeSpec 입력 → ontology 매핑 활용해 Python 함수 자동 생성 → RestrictedPython sandbox 실행 → output diff.</p>
+      <p>도메인 룰 변경 영향 측정. 통과 시 Java PR 자동.</p>
+      <p class="small">설계 합의 완료. 구현 진행 중 (Section 2 self-validation 부터).</p>
+    </div>
+  </div>
+
+  <h3>같은 그래프 공유 — 핵심 통합 포인트</h3>
+  <p>3 Section 이 모두 <strong>같은 ontology graph</strong> 위에서 작동:</p>
+  <ul>
+    <li>Wiki 의 한 페이지 = ontology 의 한 BusinessTerm 에 link</li>
+    <li>Modeling 의 한 매핑 = Wiki 페이지 + 코드 위치 + 시뮬 시나리오에 연결</li>
+    <li>Simulation 의 한 시나리오 = ontology Action + 입력 fixture + expected output</li>
+  </ul>
+  <div class="panel tip">
+    <div class="label">왜 한 그래프가 중요한가</div>
+    별 시스템이면 매번 ontology 재구축. 한 그래프면 사용자가 한 곳 합의 → 다른 두 Section 자동 활용.
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- Section 4 — Wiki -->
+<!-- ====================================================================== -->
+<section class="major s1" id="sec4">
+  <h2>4. Section 1 — Wiki (도메인 가이드)</h2>
+  <p class="lead">
+    이미 완성된 영역. 깊이 들어가지 않고, 다른 두 Section 과 어떻게 연결되는지만.
+  </p>
+
+  <h3>핵심 기능</h3>
+  <ul>
+    <li><strong>RAG 채팅</strong> — 위키 페이지 + ontology BusinessTerm description 기반 질의응답</li>
+    <li><strong>위키 페이지 작성 / 편집</strong> — markdown 자유 형식 (v3 결정 Q-U8)</li>
+    <li><strong>이미지 검색</strong> (Phase 1 완료) — diagram / 화면 캡처 검색</li>
+    <li><strong>채팅 → 페이지 변환</strong> — AI 응답을 위키 페이지로 승급</li>
+  </ul>
+
+  <h3>Section 2 와의 연결</h3>
+  <p>Wiki 페이지에 ontology BusinessTerm 인용:</p>
+  <pre>고객 주문이 들어오면 [[term.scm.shared.customer]] 별 단중 제한이
+[[term.scm.std.customer_std]] 표준에서 룩업되어 알고리즘 step 5/6 의 fallback 으로 사용됩니다.</pre>
+  <p>onTong 이 자동으로 link 렌더 → 클릭하면 Section 2 의 Workbench 로 이동하여 해당 term 의 코드 매핑 / 시뮬 / 다른 term 관계 확인.</p>
+
+  <div class="panel tip">
+    <div class="label">발표 권장</div>
+    Wiki 는 짧게. 외부 관계자에게는 <strong>"이미 작동하는 입구"</strong> 정도로만 설명 → 본 메시지는 Section 2 + 3.
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- Section 5 — Modeling 메인 -->
+<!-- ====================================================================== -->
+<section class="major s2" id="sec5">
+  <h2>5. Section 2 — Modeling (메인)</h2>
+  <p class="lead">
+    이 페이지의 가장 큰 부분. 4-Layer 아키텍처 + 핵심 데이터 모델 + 자동 추천 vs 사용자 합의 + Authoring AI.
+  </p>
+
+  <!-- 5.1 -->
+  <h3 id="sec5-1">5.1 — 4-Layer 아키텍처 (project_decisions_v4 Q3 / Q1' / D1)</h3>
+
+  <div class="diagram">
+┌────────────────────────────────────────────────────────────────┐
+│  <span class="accent">Simulation Layer</span>                                              │
+│  SimulationScenario · ScenarioInputAdapter (plugin)            │
+│  ChangeSpec · PythonGenerator · Sandbox · DraftPR              │
+└────────────────────────────────────────────────────────────────┘
+                          ↑ 사용
+┌────────────────────────────────────────────────────────────────┐
+│  <span class="accent">Mapping Layer</span>  <span class="label">("코드 ↔ 도메인 다리")</span>                         │
+│  TypeRealization (PRIMARY/PARTIAL)                             │
+│  Action (pure_function/workflow) + Realization (다형성)         │
+│  AnchorBinding (fragment-level: field/branch/literal/...)      │
+│  VerificationLevel state machine 6 단계                         │
+└────────────────────────────────────────────────────────────────┘
+        ↑ 가리킴                              ↑ 가리킴
+┌─────────────────────────────────┐  ┌────────────────────────────┐
+│  <span class="accent">Domain Layer</span>                     │  │  <span class="accent">Code Layer</span>                  │
+│  BusinessTerm                   │  │  CodeType                  │
+│   ├─ kind: atomic / composite   │  │   ├─ extends/implements    │
+│   ├─ facets (struct_like/...)   │  │   ├─ role: domain/...      │
+│   └─ inheritance + composition  │  │   └─ fields                │
+│  BusinessRule (Action 안)       │  │  CodeMethod (signature/    │
+│                                 │  │              body)          │
+│                                 │  │  CallSite (D3 dispatch)    │
+└─────────────────────────────────┘  └────────────────────────────┘
+        ↑ 사용자 합의 ground truth        ↑ Java AST 자동 분석
+  </div>
+
+  <ul>
+    <li><strong>Two-Layer 분리 (D1=C)</strong>: Code 와 Domain 을 따로 둠. Code 는 Java 충실 mirror, Domain 은 사용자 합의 ground truth. 둘을 Mapping Layer 가 다리.</li>
+    <li><strong>Process 폐기 (Q3=A)</strong>: Action 단일 동사로 통일. workflow 도 Action.kind="workflow" 로 표현.</li>
+    <li><strong>Plugin Simulation (Q1'=A + C3)</strong>: 시뮬은 별 layer. InputAdapter 로 외부 시스템 연계.</li>
+  </ul>
+
+  <!-- 5.2 -->
+  <h3 id="sec5-2">5.2 — Code Layer (Java 충실 mirror)</h3>
+  <p>Java 코드를 가능한 그대로 mirror. 도메인 노이즈 (framework / infra / 비즈니스 무관) 도 일단 다 잡고, 나중에 <code>role</code> 분류로 거름.</p>
+
+  <table>
+    <tr><th>entity</th><th>주요 필드</th><th>비고</th></tr>
+    <tr><td>CodeType</td><td>fqn, name, kind (class/interface), extends, implements, abstract, role</td><td>role 자동 분류: domain / framework / infra / unknown (D2=A)</td></tr>
+    <tr><td>CodeField</td><td>name, type, annotations</td><td>Jpo 의 @Column 도 보존</td></tr>
+    <tr><td>CodeMethod</td><td>fqn, signature, body_text, body_hash, params, return_type, role</td><td>Method.role: business / helper / adapter / unknown</td></tr>
+    <tr><td>CallSite</td><td>caller_method_fqn, callee_signature, dispatch_source (9-enum)</td><td>★ CallSiteAnalyzer 7-case 자동 분석</td></tr>
+  </table>
+
+  <h4>★ CallSiteAnalyzer 7-case (D3=A+)</h4>
+  <p>Java polymorphism 의 dispatch 를 정적 분석으로 추적:</p>
+  <ol>
+    <li><strong>Case 1 SINGLE_IMPL</strong> — interface 의 구현체가 1 개 → 자동 결정</li>
+    <li><strong>Case 2 INSTANCEOF_GUARD</strong> — instanceof 분기로 cast → body AST 분석</li>
+    <li><strong>Case 3 ANNOTATION</strong> — @Service / @Component 의 단일 구현 → 자동</li>
+    <li><strong>Case 4 FACTORY_BRANCH</strong> — factory 메서드의 분기 → AST 분석</li>
+    <li><strong>Case 5 GENERIC</strong> — generic type 의 dispatch → 사용자 큐</li>
+    <li><strong>Case 6 STRATEGY_MAP</strong> — Map&lt;Key, Action&gt; 룩업 → 사용자 큐</li>
+    <li><strong>Case 7 REFLECTION</strong> — Class.forName / getMethod → 사용자 큐</li>
+  </ol>
+  <p class="small">Case 1~4 자동, Case 5~7 사용자 큐 + LLM 추천 보조.</p>
+
+  <!-- 5.3 -->
+  <h3 id="sec5-3">5.3 — Domain Layer (BusinessTerm)</h3>
+
+  <h4>BusinessTerm — 2 kind + facets</h4>
+  <pre>BusinessTerm:
+  fqn          str          # 예: term.scm.shared.customer
+  label        str          # 한국어 — "고객사"
+  description  markdown
+  domain       str          # 예: scm.shared
+  <b>kind</b>         "atomic" | "composite"
+  parts        list[BusinessTerm.fqn]  <span class="label">## composite 만</span>
+  facets       dict {
+                 is_abstract:    bool
+                 is_interface:   bool
+                 is_root_entity: bool
+                 struct_like_hint: bool
+                 enum_values:    list[str]   <span class="label">## atomic enum 일 때</span>
+                 ...
+               }
+  inheritance  parent_fqn?              <span class="label">## extends</span>
+  composition  composed_of: list        <span class="label">## composes (DAG)</span>
+  confirmed    bool                     <span class="label">## 사용자 합의?</span></pre>
+
+  <h4>kind 의 의미</h4>
+  <ul>
+    <li><strong>atomic</strong> — 더 분해 안 되는 도메인 의미 단위 (cmp, org, customer, productivity, ...). 코드의 한 컬럼 / 한 enum / 한 literal 에 직접 매핑.</li>
+    <li><strong>composite</strong> — 여러 atomic + facets 의 묶음 (CustomerStd, Order, Slab, ...). 코드의 한 entity (= class) 와 PRIMARY 매핑.</li>
+  </ul>
+
+  <h4>Inheritance + Composition (DAG)</h4>
+  <p>BusinessTerm 끼리 두 가지 관계:</p>
+  <ul>
+    <li><strong>extends</strong> — IS-A. 자식이 부모의 parts/facets 를 자동 inherit.</li>
+    <li><strong>composes</strong> — HAS-A. 다른 term 을 부분으로 가짐.</li>
+  </ul>
+  <p>둘 다 사이클 검출. <code>Resolver.effective_parts</code> 가 자식 우선 override.</p>
+
+  <div class="panel warn">
+    <div class="label">미해결</div>
+    extends 시 effective_parts 의 정확한 override 규칙은 <a href="design-gaps-and-questions.md">design-gaps #3</a>.
+  </div>
+
+  <!-- 5.4 -->
+  <h3 id="sec5-4">5.4 — Mapping Layer (TR + Action + Realization + AnchorBinding)</h3>
+
+  <h4>TypeRealization — 코드 ↔ 도메인 다리</h4>
+  <pre>TypeRealization:
+  term_fqn       BusinessTerm.fqn
+  code_type_fqn  CodeType.fqn
+  <b>scope</b>          "PRIMARY" | "PARTIAL"
+  partial_parts  list[atomic.fqn]?         <span class="label">## PARTIAL 일 때, 어느 atomic 들이 매핑되는지</span>
+  confirmed      bool</pre>
+
+  <table>
+    <tr><th>scope</th><th>의미</th><th>예시</th></tr>
+    <tr><td>PRIMARY</td><td>composite term 이 한 entity (class) 의 통째 mirror. 모든 entity field 가 composite 의 part / facet 으로 매핑.</td><td>term.scm.std.customer_std → CustomerStdEntity</td></tr>
+    <tr><td>PARTIAL</td><td>atomic 또는 composite 가 entity 의 일부 field 만 매핑. 한 entity 는 여러 atomic 의 PARTIAL 매핑 동시 가능.</td><td>term.scm.shared.customer → CustomerStdJpo.customerCd field</td></tr>
+  </table>
+
+  <div class="panel diff">
+    <div class="label">우리 차별 ★</div>
+    PARTIAL 의 매핑 단위 = <strong>(atomic, codeType, codeField) 3-tuple</strong>. 같은 컬럼명도 entity 별 독립 매핑 가능 →
+    drama DNA "4 alias chaos" 자동 처리. Foundry 의 MDO multiplicity 와 정반대 (그건 PARTIAL 금지).
+  </div>
+
+  <h4>Action — 동사 (도메인 행위)</h4>
+  <pre>Action:
+  fqn              str       # 예: action.scm.product.cumulative_productivity
+  label            str       # 한국어 — "누적 실수율 계산"
+  description      markdown
+  <b>kind</b>             "pure_function" | "workflow"
+  params           list[{name, term_fqn, type}]
+  return_term_fqn  str?
+  effects          list[{op, target_term, target_attr}]   <span class="label">## kind=workflow 만</span>
+  realizations     list[Realization]                       <span class="label">## 다형성</span>
+  precondition     markdown
+  postcondition    markdown
+  metadata         dict {
+                     known_issues: ["P-2018-0721 ...", "P-2020-0834 ..."]
+                     default_value: 0.95
+                     ...
+                   }</pre>
+
+  <h4>Action.kind 의 invariant (Q9=C)</h4>
+  <ul>
+    <li><strong>pure_function</strong> — 입력 → 출력. effects 비어있어야 함. 예: cumulativeProductivity.</li>
+    <li><strong>workflow</strong> — 상태 변경. realizations 비어있어야 함. effects 정형 (op + target_term + target_attr).</li>
+  </ul>
+
+  <h4>Realization — Action 의 코드 구현 (다형성 ★)</h4>
+  <pre>Realization:
+  action_fqn        Action.fqn
+  code_method_fqn   CodeMethod.fqn          # 어느 메서드가 이 Action 을 구현
+  <b>dispatch_source</b>   "single_impl" | "annotation" | "instanceof_guard"
+                    | "factory_branch" | "generic" | "strategy_map"
+                    | "reflection" | "user_confirmed" | "static_unresolved"</pre>
+  <p class="small">한 Action 의 realizations 가 여러 row → polymorphism 표현. 시뮬 시 dispatch table 자동 생성.</p>
+
+  <h4>AnchorBinding — fragment-level 매핑 (Q4'=A)</h4>
+  <p>method body 내부의 한 표현식 / 분기 / literal 자체를 도메인 의미와 연결. 메서드 단위 매핑 없이도 anchor binding 가능.</p>
+  <pre>AnchorBinding:
+  code_method_fqn  CodeMethod.fqn
+  <b>anchor_kind</b>      "field" | "field_access" | "param" | "local"
+                   | "return" | "branch" | "literal"
+  fragment_path    str    # 예: "method body line 25 col 8-22, AST node BinaryOp"
+  binding_target   {
+                     kind: "term" | "action" | "rule"
+                     fqn:  ...
+                   }
+  confidence       0.0 ~ 1.0
+  confirmed        bool</pre>
+
+  <h5>구체 예시 — cumulativeProductivity body</h5>
+  <pre class="korean"><b>// Java 코드</b>
+public BigDecimal cumulativeProductivity(...) {
+    if (confirmedPlantCd == null || confirmedPlantCd.length() &lt; 8) {
+        return DEFAULT_PRODUCTIVITY;            <span class="label">// ← AnchorBinding(literal): 0.95 → term.scm.product.default_productivity</span>
+    }
+    BigDecimal product = BigDecimal.ONE;
+    for (int i = 0; i &lt; 8; i++) {
+        if (confirmedPlantCd.charAt(i) == ' ') continue;   <span class="label">// ← AnchorBinding(branch): 8 공정 활성 검증</span>
+        BigDecimal p = lookupOrDefault(
+            cmpCd, orgCd, <b>PROC_CODES[i]</b>, ...);          <span class="label">// ← AnchorBinding(literal): PROC_CODES → term.scm.shared.proc.enum_values</span>
+        product = product.multiply(p);          <span class="label">// ← AnchorBinding(local): product → 누적 실수율</span>
+    }
+    return product;
+}</pre>
+
+  <!-- 5.5 -->
+  <h3 id="sec5-5">5.5 — VerificationLevel (state machine 6 단계 ★ 우리 차별)</h3>
+
+  <p>매핑의 신뢰도를 6 단계로 표현. 시뮬 가능성 / PR 자동 가능성의 게이트.</p>
+
+  <table>
+    <tr><th>단계</th><th>조건</th><th>의미</th></tr>
+    <tr><td><span class="pill p-rose">1. UNMAPPED</span></td><td>TR 미존재</td><td>코드만 있고 도메인 매핑 X</td></tr>
+    <tr><td><span class="pill p-amber">2. DRAFT</span></td><td>TR 존재 (자동 또는 사용자)</td><td>매핑 시도됨, 검증 X</td></tr>
+    <tr><td><span class="pill p-amber">3. SIGNATURE_LOCKED</span></td><td>signature_hash 매칭 + Action.params 일치</td><td>signature 안정</td></tr>
+    <tr><td><span class="pill p-primary">4. BODY_ANCHORED</span></td><td>모든 anchor 등록 + body_hash 일치</td><td>body 까지 매핑 OK</td></tr>
+    <tr><td><span class="pill p-emerald">5. SIM_VERIFIED</span></td><td>SimulationScenario 통과</td><td>시뮬 시 정확성 확인됨</td></tr>
+    <tr><td><span class="pill p-emerald">6. PR_PROVEN</span></td><td>Java draft PR 통과 (CI 통과 + 사람 review)</td><td>실제 코드 변경 검증됨</td></tr>
+  </table>
+
+  <p>1~4 는 <strong>자동 계산</strong>. 5~6 은 <strong>외부 신호</strong> (시뮬 / PR).</p>
+
+  <div class="panel diff">
+    <div class="label">왜 이게 차별인가</div>
+    Palantir Foundry 는 ontology 신뢰도 표현이 약함 (있다 / 없다). 우리는 6 단계 + 자동 진행 →
+    <strong>"신뢰도 calibration"</strong> 을 시스템에 박아둠. 시뮬 + PR 자동 흐름의 게이트.
+  </div>
+
+  <div class="panel warn">
+    <div class="label">미해결</div>
+    SIM_VERIFIED 의 자동 결정 기준은 <a href="design-gaps-and-questions.md">design-gaps #1</a>.
+  </div>
+
+  <!-- 5.6 -->
+  <h3 id="sec5-6">5.6 — 자동 추천 vs 사용자 합의</h3>
+
+  <h4>자동 추천 (recommend bulk)</h4>
+  <ul>
+    <li>repo import 후 코드 분석 + glossary 매칭으로 BusinessTerm + Action + TR 초안 자동 생성</li>
+    <li>예시 (slab-design-real, 122 file): 29 term + 36 action + 34 TR (29 PRIMARY + 5 PARTIAL) 자동 적재</li>
+    <li><strong>한계</strong>: description / parts / facets / AnchorBinding 비어있음. 자동 분류 일관성 부재 (8 표준 domain 흩어짐).</li>
+  </ul>
+
+  <h4>사용자 합의 (Round 5/6 식 인터뷰)</h4>
+  <ul>
+    <li>HTML 인터뷰 페이지로 사용자-Claude 가 step 별 토론 + 합의</li>
+    <li>각 step: 코드 fact 정리 + 추천 + Q + textarea 답변 + 「📋 답변 복사」</li>
+    <li>합의 후 confirm → 큐 row 가 ground truth 로 전환</li>
+    <li>예시: Round 6 = Customer/Productivity 8 step 풀 사이클 (atomic → composite → TR → Action → AnchorBinding → confirm)</li>
+  </ul>
+
+  <h4>비교</h4>
+  <table>
+    <tr><th>축</th><th>자동 추천</th><th>사용자 합의</th></tr>
+    <tr><td>비용</td><td>0 (1회 import + LLM 약간)</td><td>1~2h / entity (M1) 또는 ~$5 (M2)</td></tr>
+    <tr><td>커버리지</td><td>5,000+ class 다 잡음</td><td>핵심 entity 만 (50 ~ 500)</td></tr>
+    <tr><td>품질</td><td>label + kind + 기본 매핑</td><td>+ description + parts + facets + AnchorBinding + Action realizations</td></tr>
+    <tr><td>시뮬 가능성</td><td>BODY_ANCHORED 도달 어려움</td><td>BODY_ANCHORED + SIM_VERIFIED 가능</td></tr>
+  </table>
+
+  <p class="small">→ <strong>Pareto 운영</strong> 권장. 핵심 50~500 entity 는 사용자 합의, 나머지는 자동 + spot confirm.</p>
+
+  <!-- 5.7 -->
+  <h3 id="sec5-7">5.7 — Authoring AI (graph-aware ReAct ★ 우리 차별)</h3>
+
+  <p>사용자 합의 인터뷰를 도구화. 도메인 코드 그래프 위에서 추론하는 ReAct 에이전트.</p>
+
+  <h4>왜 graph-aware 인가</h4>
+  <p>raw text 만 prompt 에 넣으면 (자바독 부재 시) 정확도 0.4. graph 를 ReAct 루프로 탐색하면 0.85+.</p>
+  <ul>
+    <li><strong>Code 12 tools</strong>: code_lookup / code_search / find_related_jpos / get_method_body / find_callers / ...</li>
+    <li><strong>Ontology 6 tools</strong>: term_lookup / domain_search / find_terms_in_domain / find_term_realizations / ...</li>
+    <li><strong>Mapping 3 tools</strong>: find_existing_mapping / type_realizations_for_term / anchor_bindings_for_method</li>
+    <li><strong>Operational 2 tools</strong>: note_observation (long-term context) / log_decision</li>
+  </ul>
+
+  <h4>5 PRESETS (per-cap 권한)</h4>
+  <table>
+    <tr><th>PRESET</th><th>used by cap</th><th>tools</th><th>max_calls</th></tr>
+    <tr><td>authoring_full</td><td>5 (gap_detector) / 6 (option_proposer)</td><td>22 (전체)</td><td>12 / 10</td></tr>
+    <tr><td>authoring_extract</td><td>1 (code_extractor)</td><td>5 (code only)</td><td>5</td></tr>
+    <tr><td>authoring_hypothesize</td><td>2 (hypothesis)</td><td>10 (ontology + code + mapping)</td><td>8</td></tr>
+    <tr><td>authoring_pattern_check</td><td>7 (pattern_checker)</td><td>5 (ontology only)</td><td>6</td></tr>
+    <tr><td>authoring_naming</td><td>8 (naming)</td><td>3 (ontology lookup)</td><td>3</td></tr>
+  </table>
+
+  <h4>ReAct B — forced reflection</h4>
+  <p>N tool call 마다 (default 5) 자동 정리·결정 step 강제. agent 가 길어질수록 정리 강제 → 자기 설득 방지.</p>
+
+  <h4>UI trace surfacing — β + γ</h4>
+  <ul>
+    <li><strong>β</strong>: 진행 중 라이브 카드 (🔍 HrPlant 조회 중...)</li>
+    <li><strong>γ</strong>: 완료 후 결과 카드 footer 「🔍 어떻게 알아냈나」 토글 → tool 시퀀스 + duration + cached + error</li>
+  </ul>
+
+  <div class="panel diff">
+    <div class="label">차별 포인트</div>
+    "AI 가 뭐 하는지 모르겠다" 우려 해결. tool trace 가 evidence trail 이 됨. 단일 RAG agent 가 아닌
+    <strong>"도메인 코드 그래프 위에서 추론하는 agent"</strong>.
+  </div>
+
+  <h4>R6-VAL 검증 (실측)</h4>
+  <p>자바독 strip HrSpecJpo 로 cap 1+2+5+6+7 풀 사이클 검증:</p>
+  <ul>
+    <li>cap 2 confidence: <strong>0.50 (with doc) → 0.45 (blind)</strong> — 5pt drop only</li>
+    <li>graph 가 doc 부재를 거의 완전 회복</li>
+    <li>cap 7 (pattern_checker) 가 5 findings 정확히 잡아냄</li>
+    <li>전체 cold cache 비용 $6.34 (warm cache 정상 세션 $2-3)</li>
+  </ul>
+</section>
+
+<!-- ====================================================================== -->
+<!-- Section 6 — Simulation -->
+<!-- ====================================================================== -->
+<section class="major s3" id="sec6">
+  <h2>6. Section 3 — Simulation (한국어 Python)</h2>
+  <p class="lead">
+    "도메인 룰 바꾸면 어떻게 되나" 를 ontology 위에서 실제로 돌려보는 영역.
+  </p>
+
+  <h3>핵심 원칙 (memory feedback_simulation_design)</h3>
+  <ol>
+    <li><strong>한국어 Python (NOT Docker, NOT mvn)</strong> — 가벼운 sandbox + 도메인어 가독</li>
+    <li><strong>코드가 ground truth</strong> — Javadoc / 매뉴얼 의존 X. body AST 가 진실</li>
+    <li><strong>method body 변수 + 로직까지 매핑</strong> — 필드 매핑만으론 함수 본문 재구성 불가</li>
+    <li><strong>Section 2 self-validation 도 풀 사이클</strong> — Section 3 별 팀 작업 분리, Section 2 안에 sandbox 완비</li>
+    <li><strong>풀 시연 가정</strong> — MVP / 해커톤 / 부분 구현 제안 X</li>
+  </ol>
+
+  <h3>흐름 — ChangeSpec 입력 ~ 결과 diff</h3>
+  <div class="diagram">
+<span class="accent">[1] 사용자 입력</span> <span class="label"># ChangeSpec — "Customer 의 priority 룩업 우선순위를 ASC → DESC 로"</span>
+        ↓
+<span class="accent">[2] 영향 entity 그래프 추출</span>
+        target_action = action.customer_std.find_first_match
+        영향 받는 메서드: SdSecondWgtLowAction (Step 5), SdSecondWgtHighAction (Step 6)
+        영향 받는 BusinessTerm: customer_std (priority facet)
+        ↓
+<span class="accent">[3] PythonGenerator</span>
+        ontology + AnchorBinding 활용해 한국어 Python 함수 자동 생성
+        ↓
+<span class="accent">[4] RestrictedPython sandbox</span>
+        import / open / eval / __import__ 차단
+        한국어 변수 그대로 사용 (PEP-3131)
+        ↓
+<span class="accent">[5] 출력 diff</span>
+        before (현재 룰): 단중하한 = 7.5, slab 매수 = 6
+        after  (변경 룰): 단중하한 = 8.0, slab 매수 = 5
+        ↓ 통과 시
+<span class="accent">[6] Java draft PR 자동 생성</span>
+        review-only. 운영자가 검토 + 승인.
+  </div>
+
+  <h3>한국어 Python 예시</h3>
+  <pre class="korean"><b># 자동 생성된 한국어 Python 함수 (cumulativeProductivity 의 ontology mirror)</b>
+def 누적_실수율_계산(<b>회사: str, 소: str, 확정통과공장코드: str,</b>
+                  <b>강종: str, 품종: str, 고객사: str</b>) -&gt; float:
+    if 확정통과공장코드 is None or len(확정통과공장코드) &lt; 8:
+        return <b>0.95</b>  <span class="label"># DEFAULT_PRODUCTIVITY</span>
+    누적 = 1.0
+    for i in range(8):
+        if 확정통과공장코드[i] == ' ':
+            continue
+        실수율 = 실수율_정확매칭_or_default(
+            회사, 소, <b>공정[i]</b>, 강종, 품종, 고객사
+        )
+        누적 *= 실수율
+    return 누적
+
+<b># 시뮬 시나리오 input fixture (사용자 form 입력)</b>
+ProductivityStd_Fixture = [
+    {"회사":"K","소":"K01","공정":"SM","강종":"A1","품종":"PA","고객사":"C001","실수율":0.92},
+    ...
+]
+
+<b># sandbox 실행</b>
+result = 누적_실수율_계산("K", "K01", "SM HRF GAL  ", "A1", "PA", "C001")
+print(result)  <span class="label"># 0.92 * 0.95 * 0.93 = 0.812952</span></pre>
+
+  <h3>RestrictedPython sandbox (Q-A=A2)</h3>
+  <ul>
+    <li><code>import</code> / <code>open</code> / <code>eval</code> / <code>__import__</code> 차단</li>
+    <li>호환성 약간 손실 (예: f-string 일부 제한) 받아들임</li>
+    <li>중간 격리 — 무거운 Docker 은 default 가 아님</li>
+  </ul>
+
+  <h3>SimulationScenario entity</h3>
+  <pre>SimulationScenario:
+  fqn              str
+  target_action    Action.fqn       <span class="label">## 어느 Action 을 시뮬</span>
+  input_fixture    list[dict]       <span class="label">## DB 룩업 row + atomic 입력값</span>
+  expected_output  any?             <span class="label">## 통과 기준 (사용자 정의)</span>
+  change_spec      ChangeSpec?      <span class="label">## 적용할 룰 변경</span>
+  result_history   list             <span class="label">## 실행 결과 기록</span></pre>
+
+  <div class="panel warn">
+    <div class="label">미해결</div>
+    input fixture 의 source / SIM_VERIFIED 의 자동 결정 / Java dispatch sandbox 재현 — <a href="design-gaps-and-questions.md">design-gaps #1, #4, #5</a>.
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- Section 7 — 통합 흐름 -->
+<!-- ====================================================================== -->
+<section class="major" id="sec7">
+  <h2>7. 통합 흐름 — 큰 시나리오</h2>
+  <p class="lead">
+    실제 운영자가 onTong 을 어떻게 사용하는지 한 시나리오로 따라가기.
+  </p>
+
+  <h3>시나리오 — "Customer 단중 제한 룰을 PRIORITY DESC 로 바꾸면?"</h3>
+
+  <table>
+    <tr><th>단계</th><th>운영자 행동</th><th>onTong 동작</th></tr>
+    <tr>
+      <td><span class="step-num">1</span> 입구</td>
+      <td>Wiki 검색 "고객사 단중 제한"</td>
+      <td>Section 1 — 위키 페이지 + ontology link [[term.scm.std.customer_std]]</td>
+    </tr>
+    <tr>
+      <td><span class="step-num">2</span> 모델 보기</td>
+      <td>link 클릭 → Workbench (Section 2) 진입</td>
+      <td>그래프 모드 — customer_std 중심 1-hop neighbors (atomic 4 + Action 2)</td>
+    </tr>
+    <tr>
+      <td><span class="step-num">3</span> 영향 추적</td>
+      <td>Action <code>find_first_match</code> 우클릭 → "이 Action 의 영향 코드"</td>
+      <td>Realization 2 row 표시 — SdSecondWgtLowAction / HighAction (Step 5/6)</td>
+    </tr>
+    <tr>
+      <td><span class="step-num">4</span> 룰 변경 시도</td>
+      <td>"PRIORITY DESC 로 바꾸고 싶다" → 시뮬레이션 mode 진입</td>
+      <td>ChangeSpec 카드 — order_by 필드 변경 + 영향 entity 자동 추출</td>
+    </tr>
+    <tr>
+      <td><span class="step-num">5</span> Python 자동 생성</td>
+      <td>"시뮬 실행" 버튼</td>
+      <td>한국어 Python 함수 + input fixture form. 사용자가 fixture 6 row 입력 (회사/소/품종/고객사 = K/K01/PA/C001 등)</td>
+    </tr>
+    <tr>
+      <td><span class="step-num">6</span> 결과 비교</td>
+      <td>실행</td>
+      <td>before (ASC): 첫 row priority=10, pkgWgtLow=7.5 → after (DESC): 첫 row priority=99, pkgWgtLow=8.5. 단중하한 +1.0, slab 매수 -1.</td>
+    </tr>
+    <tr>
+      <td><span class="step-num">7</span> 시나리오 저장</td>
+      <td>"이 시나리오 통과 = 의도대로" 확인</td>
+      <td>SimulationScenario 저장 + VerificationLevel SIM_VERIFIED 자동 전환</td>
+    </tr>
+    <tr>
+      <td><span class="step-num">8</span> Java PR</td>
+      <td>"Java 코드 변경 적용" 버튼</td>
+      <td>Java draft PR 자동 생성 — CustomerStdRepository 의 OrderByPriorityAsc → Desc. review 대기.</td>
+    </tr>
+  </table>
+
+  <p class="small">→ 8 step 이 한 화면에서 끊김 없이. 도메인 룰 변경의 비용을 PR review 전에 측정.</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- Section 8 — 구체 예시 -->
+<!-- ====================================================================== -->
+<section class="major" id="sec8">
+  <h2>8. 구체 예시 — Customer / Productivity 풀 사이클</h2>
+  <p class="lead">
+    Round 6 (현재 진행 중 작업) 의 8 step 인터뷰가 어떤 식으로 ontology 를 채우는지.
+  </p>
+
+  <h3>입력 — 자동 추천 baseline (recommend bulk)</h3>
+  <table>
+    <tr><th>Layer</th><th>row 수</th><th>비어있는 항목</th></tr>
+    <tr><td>BusinessTerm</td><td>2 (customer_std + productivity_std composite)</td><td>description, parts, facets, atomic 분해 X</td></tr>
+    <tr><td>Action</td><td>1 (cumulative_productivity)</td><td>description, params, output, realizations 모두 X</td></tr>
+    <tr><td>TypeRealization</td><td>2 PRIMARY (Entity → composite)</td><td>다른 layer (Jpo/Logic/Service) TR 미생성</td></tr>
+    <tr><td>AnchorBinding</td><td>0</td><td>전부</td></tr>
+  </table>
+
+  <h3>합의 풀 사이클 — 8 step</h3>
+  <table>
+    <tr><th>Step</th><th>주제</th><th>출력 (큐 변경)</th></tr>
+    <tr><td>0</td><td>시작 + 합의 (코드 인벤토리 + 큐 baseline + 흐름)</td><td>—</td></tr>
+    <tr><td>1</td><td>공유 atomic 6종</td><td>+6 atomic terms (cmp/org/proc/grade/product_kind/customer)</td></tr>
+    <tr><td>2</td><td>고객표준 composite 보강</td><td>customer_std description + parts (4) + facets (3) + confirmed</td></tr>
+    <tr><td>3</td><td>실수율표준 composite 보강</td><td>productivity_std description + parts (6) + facets (1) + confirmed</td></tr>
+    <tr><td>4</td><td>TypeRealization 검증/추가</td><td>+11 PARTIAL TR (atomic ↔ codeField) · 기존 PRIMARY 2 검증</td></tr>
+    <tr><td>5</td><td>Customer Action</td><td>+findFirstMatch action + 사용처 SdSecondWgt[Low/High]Action realization</td></tr>
+    <tr><td>6</td><td>Productivity Action</td><td>+lookup / lookupOrDefault + 보강된 cumulativeProductivity</td></tr>
+    <tr><td>7</td><td>AnchorBinding</td><td>cumulativeProductivity body 의 PROC_CODES / DEFAULT / 8자리 loop fragment</td></tr>
+    <tr><td>8</td><td>DB confirm + archive</td><td>모든 row confirm (curl) + round6-archive HTML 마무리</td></tr>
+  </table>
+
+  <h3>Step 1 의 4 결정 — 패턴 ★ 다른 6 표준에도 재사용</h3>
+  <ul>
+    <li><strong>① domain naming</strong> = <code>scm.shared</code> 신규 sub-domain (atomic 그룹화)</li>
+    <li><strong>② 공정 enum</strong> = atomic 의 <code>enum_values</code> facet (8 값: SM/HR/HRF/CR/ANL1/ANL2/GAL/CRF)</li>
+    <li><strong>③ 품종 4 alias chaos</strong> = 1 atomic + 4 PARTIAL TR (컬럼 맥락 의존성 자동 처리 — 같은 컬럼명도 entity 별 독립 매핑)</li>
+    <li><strong>④ 값 컬럼</strong> (pkgWgtHigh/Low, priority, productivity) = composite 의 facet (entity 고유)</li>
+  </ul>
+
+  <h3>Customer 7 컬럼 분해 (Step 2 default)</h3>
+  <table>
+    <tr><th>컬럼</th><th>type</th><th>매핑 종류</th><th>대상</th></tr>
+    <tr><td>cmpCd</td><td>string(2)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.cmp</code></td></tr>
+    <tr><td>orgCd</td><td>string(1)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.org</code></td></tr>
+    <tr><td>priority</td><td>integer</td><td>composite facet</td><td>(entity 고유)</td></tr>
+    <tr><td>productNameCd ★</td><td>string(3)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.product_kind</code> (alias chaos)</td></tr>
+    <tr><td>customerCd</td><td>string(10)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.customer</code></td></tr>
+    <tr><td>pkgWgtHigh</td><td>BigDecimal(10,3)</td><td>composite facet</td><td>(entity 고유)</td></tr>
+    <tr><td>pkgWgtLow</td><td>BigDecimal(10,3)</td><td>composite facet</td><td>(entity 고유)</td></tr>
+  </table>
+
+  <h3>Productivity 7 컬럼 분해 (Step 3 default)</h3>
+  <table>
+    <tr><th>컬럼</th><th>type</th><th>매핑 종류</th><th>대상</th></tr>
+    <tr><td>cmpCd</td><td>string(2)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.cmp</code> (공유 ★)</td></tr>
+    <tr><td>orgCd</td><td>string(1)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.org</code> (공유 ★)</td></tr>
+    <tr><td>procCd</td><td>string(4) enum 8</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.proc</code></td></tr>
+    <tr><td>gradeCd</td><td>string(10)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.grade</code></td></tr>
+    <tr><td>prodKindCd ★</td><td>string(4)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.product_kind</code> (alias chaos — Customer 의 productNameCd 와 같은 atomic)</td></tr>
+    <tr><td>customerCd</td><td>string(10)</td><td>atomic PARTIAL TR</td><td><code>term.scm.shared.customer</code> (공유 ★)</td></tr>
+    <tr><td>productivity</td><td>BigDecimal(7,4)</td><td>composite facet</td><td>(entity 고유)</td></tr>
+  </table>
+
+  <p class="small">→ Customer 와 Productivity 가 5 atomic (cmp/org/customer/product_kind/+ Productivity 의 grade/proc) 공유. atomic 의 가치 = 한 번 정의하면 다른 entity 에 재사용.</p>
+
+  <h3>큐 변화 미리 보기 (Step 8 confirm 시점)</h3>
+  <pre>현재 (자동 추천 baseline): 29 term + 35 action + 34 TR (모두 draft)
+   ↓ Round 6 confirm 후
++ 6 신규 atomic terms
++ 11 신규 PARTIAL TR (Customer 4 + Productivity 6 + 보너스 1)
++ 기존 2 composite 의 description / parts / facets 보강 + confirmed=True
++ 1 기존 action 보강 (cumulative_productivity)
++ 3~5 신규 action (findFirstMatch / lookup / lookupOrDefault / Step 5/6 Action realization)
++ 5~10 AnchorBinding (cumulativeProductivity body)</pre>
+
+  <p class="small">한 사이클 (1~2h, M1) → 30+ row 가 ground truth 로 전환 → 다른 도구 (시뮬 / Wiki / 영향도) 가 신뢰하고 사용 시작.</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- Section 9 — Palantir 비교 -->
+<!-- ====================================================================== -->
+<section class="major" id="sec9">
+  <h2>9. 핵심 차별 (Palantir Foundry 비교)</h2>
+  <p class="lead">
+    Round 4 에서 Palantir Foundry 4-stage 심층 조사. 차별 포인트 + 차용 후보 정리.
+  </p>
+
+  <h3>우리 차별 강점 ★</h3>
+  <table>
+    <tr><th>차별</th><th>우리</th><th>Foundry</th></tr>
+    <tr>
+      <td>PARTIAL TR (alias chaos 처리)</td>
+      <td><code>scope=PARTIAL</code> + (atomic, codeType, codeField) 3-tuple unique</td>
+      <td>MDO multiplicity 금지 — 정반대</td>
+    </tr>
+    <tr>
+      <td>다형성 dispatch 정적 분석</td>
+      <td>CallSiteAnalyzer 7-case + 9-enum dispatch_source</td>
+      <td>Code Layer 자체 부재</td>
+    </tr>
+    <tr>
+      <td>fragment-level AnchorBinding</td>
+      <td>method body 의 literal / branch / local 까지</td>
+      <td>field level 만</td>
+    </tr>
+    <tr>
+      <td>VerificationLevel 6 단계</td>
+      <td>UNMAPPED → ... → SIM_VERIFIED → PR_PROVEN (자동 진행)</td>
+      <td>SemVer (직교 axis 만)</td>
+    </tr>
+    <tr>
+      <td>한국어 변수 시뮬</td>
+      <td>한국어 그대로 (PEP-3131)</td>
+      <td>비공개</td>
+    </tr>
+    <tr>
+      <td>graph-aware Authoring AI</td>
+      <td>23 tool / per-cap 권한 / forced reflection</td>
+      <td>비공개 (Stage 1 기준)</td>
+    </tr>
+  </table>
+
+  <h3>Foundry 에서 차용한 (Round 4)</h3>
+  <ul>
+    <li>Perspective entity (저장된 view)</li>
+    <li>3-pane workspace IA (bottom overlay graph 전용)</li>
+    <li>5 kind 노드 (Domain + 2 Term + CodeType + Action) + Domain compound (ELK nest)</li>
+    <li>Saved + ad-hoc URL 공유</li>
+  </ul>
+</section>
+
+<!-- ====================================================================== -->
+<!-- Section 10 — 미해결 -->
+<!-- ====================================================================== -->
+<section class="major" id="sec10">
+  <h2>10. 미해결 영역 (솔직한 라벨링)</h2>
+  <p class="lead">
+    외부 발표 시 솔직하게 말할 영역. 별도 파일 <a href="design-gaps-and-questions.md"><code>design-gaps-and-questions.md</code></a> 에 12 항목 상세.
+  </p>
+
+  <h3>🔴 풀 시연 / 외부 발표 전 결정 권장 (5건)</h3>
+  <ol>
+    <li><strong>SIM_VERIFIED 자동 결정 기준</strong> — 시뮬 "통과" 가 무엇? (#1)</li>
+    <li><strong>Anchor invalidation 자동 흐름</strong> — 코드 변경 후 stale anchor 처리 (#2)</li>
+    <li><strong>시뮬 input fixture source</strong> — DB 룩업 sandbox 데이터 (#4)</li>
+    <li><strong>Java dispatch sandbox 재현</strong> — 다형성 코드의 Python 표현 (#5)</li>
+    <li><strong>코드 vs ontology ground truth 충돌</strong> — 누가 우선 + 갭 처리 (#11)</li>
+  </ol>
+
+  <h3>🟡 운영 중 다듬기 (5건)</h3>
+  <ol start="6">
+    <li>composite inheritance override 명세 (#3)</li>
+    <li>Gap Inspector 보류 풀기 (#6)</li>
+    <li>(codeType, codeField) → atomic invariant DB 강제 (#7)</li>
+    <li>PRIMARY vs PARTIAL invariant 명시 (#8)</li>
+    <li>Authoring AI 비용 모델 — Pareto 운영 (#10)</li>
+  </ol>
+
+  <h3>🟢 점진 보강 (2건)</h3>
+  <ol start="11">
+    <li>8 표준 domain naming 일관성 정정 (#9)</li>
+    <li>dispatch user_confirmed UX 검증 (#12)</li>
+  </ol>
+
+  <div class="panel tip">
+    <div class="label">발표 권장</div>
+    🔴 5개 결정은 발표 전 사용자 합의 받기.
+    🟡 / 🟢 는 "작동하는 영역 + 점진 보강 영역" 로 묶어 발표.
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- Section 11 — 데이터 모델 reference -->
+<!-- ====================================================================== -->
+<section class="major" id="sec11">
+  <h2>11. 데이터 모델 reference (별첨)</h2>
+  <p class="lead">발표 후 추가 질문 대응용 ref.</p>
+
+  <h3>Code Layer</h3>
+  <pre>CodeType:                              CodeMethod:
+  fqn          str (PK)                  fqn               str (PK)
+  name         str                       declaring_type    CodeType.fqn
+  kind         "class" | "interface"     signature         str
+  abstract     bool                      body_text         str
+  extends      CodeType.fqn?             body_hash         str
+  implements   list[CodeType.fqn]        signature_hash    str
+  role         "domain" | "framework"    params            list[{name, type}]
+               | "infra" | "unknown"     return_type       str
+  fields       list[CodeField]           role              "business" | "helper"
+  module_path  str                                         | "adapter" | "unknown"
+
+CodeField:                              CallSite:
+  name         str                       caller_method_fqn  CodeMethod.fqn
+  type         str                       callee_signature   str
+  annotations  list[str]                 dispatch_source    9-enum (D3)</pre>
+
+  <h3>Domain Layer</h3>
+  <pre>BusinessTerm:                          BusinessRule (Action 안 effect 등):
+  fqn           str (PK)                 (별 entity 없음 — Action.effects 안에)
+  label         str (한국어)
+  description   markdown                Inheritance:
+  domain        str                      child_fqn  parent_fqn
+  kind          "atomic" | "composite"
+  parts         list[atomic.fqn]?       Composition:
+  facets        dict                     parent_fqn  composes_fqn
+  confirmed     bool</pre>
+
+  <h3>Mapping Layer</h3>
+  <pre>TypeRealization:                       Action:
+  id              auto                   fqn               str (PK)
+  repo_id         str                    label             str (한국어)
+  term_fqn        BusinessTerm.fqn       description       markdown
+  code_type_fqn   CodeType.fqn           kind              "pure_function" | "workflow"
+  scope           "PRIMARY" | "PARTIAL"  params            list[{name, term_fqn, type}]
+  partial_parts   list[atomic.fqn]?      return_term_fqn   str?
+  confirmed       bool                   effects           list[{op, target_term, target_attr}]
+                                         metadata          dict
+Realization:
+  action_fqn        Action.fqn          AnchorBinding:
+  code_method_fqn   CodeMethod.fqn        id                auto
+  dispatch_source   9-enum                code_method_fqn   CodeMethod.fqn
+                                          anchor_kind       7-enum
+VerificationLevel (computed):             fragment_path     str
+  level: 1~6                              binding_target    {kind, fqn}
+  computed_from: {                        confidence        0.0~1.0
+    has_tr, signature_locked,             confirmed         bool
+    body_anchored, sim_passed_count,
+    pr_proven_count
+  }</pre>
+
+  <h3>Simulation Layer</h3>
+  <pre>SimulationScenario:                    ChangeSpec:
+  fqn              str (PK)              target_action_fqn  Action.fqn
+  target_action    Action.fqn            change_kind        "param" | "literal"
+  input_fixture    list[dict]                               | "branch" | "...."
+  expected_output  any?                  before             value
+  result_history   list                  after              value
+                                         description        markdown
+ScenarioInputAdapter (plugin):
+  kind   "form" | "csv" | "db"
+  config dict</pre>
+</section>
+
+<!-- ====================================================================== -->
+<!-- Section 12 — FAQ -->
+<!-- ====================================================================== -->
+<section class="major" id="sec12">
+  <h2>12. FAQ — 외부 관계자 예상 질문</h2>
+
+  <h3>Q1. 이 도구를 도입하려면 코드 변경이 필요한가?</h3>
+  <p>아니. 코드는 그대로. import 시 정적 분석만. 단 Java 21 + Spring Boot 3.x 처럼 표준 스택이면 자동 분석 정확도 높음.</p>
+
+  <h3>Q2. 5,000+ 클래스 / 100K entity 가정에서 graph viz 가 작동하나?</h3>
+  <p>전체 노드 렌더 X. 검색 우선 + 1~N hop subgraph navigation. 노드 100+ 면 경고 + auto-collapse.
+  ELK 풀 마이그 후 117 노드 = 13ms / 5K 노드 = 88ms (compound). React Flow + ELK Layered.</p>
+
+  <h3>Q3. AI 비용은?</h3>
+  <p>자동 recommend = 1 회 import 시 LLM 약간 (1 repo ~$1).
+  Authoring AI 풀 사이클 = ~$5 / entity. 5K entity 풀 자동화 = 비현실 → Pareto 운영 (핵심 50~500 entity 만).</p>
+
+  <h3>Q4. 시뮬 결과 정확도는?</h3>
+  <p>VerificationLevel 6 단계로 calibration. SIM_VERIFIED = 사용자 정의 시나리오 통과. PR_PROVEN = 실제 코드 변경 검증. 단계 별 신뢰도 다름.</p>
+
+  <h3>Q5. 한국어 변수 / 도메인어가 다른 언어에도 적용되나?</h3>
+  <p>Python PEP-3131 unicode identifier 활용. 일본어 / 중국어도 가능. 단 시뮬 코드 가독성은 그 언어 운영자에게.</p>
+
+  <h3>Q6. "도메인 룰 변경" 의 범위는?</h3>
+  <p>현재 단계: literal 변경 (0.95 → 0.93) / branch 변경 (PRIORITY ASC → DESC). param 변경은 SIGNATURE_LOCKED 해제 → 재confirm 흐름.</p>
+
+  <h3>Q7. Section 1 Wiki 와 Section 2 Modeling 이 분리된 이유?</h3>
+  <p>역할 분리. Wiki = 사람이 읽는 가이드 (자연어 자유). Modeling = 기계가 다루는 ontology (정형 데이터). 같은 그래프 공유 (BusinessTerm fqn link).</p>
+
+  <h3>Q8. Round 5/6 식 인터뷰가 필수인가? 자동 recommend 만으로 충분?</h3>
+  <p>자동 recommend 는 ~ DRAFT 단계 (label + kind + 기본 매핑). BODY_ANCHORED + SIM_VERIFIED 까지 가려면 사용자 합의 필요.
+  핵심 entity 50~500 만 인터뷰, 나머지는 자동.</p>
+
+  <h3>Q9. 다른 산업 (금융 / 의료 / ...) 에 적용 가능?</h3>
+  <p>도메인 의존 부분 = atomic / composite 정의 + Action label. 그 외 (Java 분석 + ontology 모델 + 시뮬 sandbox + Authoring AI) 는 도메인 무관.
+  도메인 마다 새 인터뷰 필요 (혹은 기존 ontology base 차용).</p>
+
+  <h3>Q10. 운영 비용 (서버 / DB / LLM API)?</h3>
+  <p>SQLite 단일 파일 (Q1=A) + FastAPI + Next.js. 단일 노드에서 5K class 처리 가능.
+  LLM API = Authoring AI 사용 시 발생. Workbench / Wiki / 시뮬 자체는 LLM 없이 작동.</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- 끝 -->
+<!-- ====================================================================== -->
+<hr>
+<div style="margin-top:30px;color:var(--muted);font-size:12px;text-align:center">
+  onTong — 레거시 기반 온톨로지 모델링 + 시뮬레이션 풀 가이드 · v2026-05-07 ·
+  <a href="design-gaps-and-questions.md" style="color:var(--primary)">디자인 갭 별첨</a>
+</div>
+
+</div>
+</body>
+</html>

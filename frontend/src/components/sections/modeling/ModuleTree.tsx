@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   ontologyApi,
+  type ModuleActionInventoryItemDTO,
   type ModuleInventoryItemDTO,
   type ModuleNodeDTO,
   type ModulesResponseDTO,
@@ -49,6 +50,9 @@ export function ModuleTree() {
   // user actually opens, so the 5K-class assumption stays cheap.
   const [invByPkg, setInvByPkg] = useState<Record<string, ModuleInventoryItemDTO[]>>({});
   const [invByPkgLoading, setInvByPkgLoading] = useState<Record<string, boolean>>({});
+  // Action 버전 — direct_actions>0 인 패키지 expand 시 그 패키지 의 Action 들을 leaf 로 표시
+  const [actByPkg, setActByPkg] = useState<Record<string, ModuleActionInventoryItemDTO[]>>({});
+  const [actByPkgLoading, setActByPkgLoading] = useState<Record<string, boolean>>({});
 
   // Backend full-text search across class / method / term / action / rule.
   // The previous local-only filter only matched package paths, so classes
@@ -170,6 +174,18 @@ export function ModuleTree() {
       .finally(() => setInvByPkgLoading((s) => ({ ...s, [path]: false })));
   };
 
+  // Action 인벤토리도 같은 방식으로 lazy load.
+  const ensureActionsFor = (path: string) => {
+    if (actByPkg[path] !== undefined) return;
+    if (actByPkgLoading[path]) return;
+    setActByPkgLoading((s) => ({ ...s, [path]: true }));
+    ontologyApi
+      .getModuleInventoryActions(activeRepoId, { package: path, recursive: false })
+      .then((items) => setActByPkg((s) => ({ ...s, [path]: items })))
+      .catch(() => setActByPkg((s) => ({ ...s, [path]: [] })))
+      .finally(() => setActByPkgLoading((s) => ({ ...s, [path]: false })));
+  };
+
   // 검색 매치 (path / name / 그 아래 모든 자식 path)
   const matchedPaths = useMemo(() => {
     if (!searchQ.trim() || !data) return null;
@@ -208,11 +224,17 @@ export function ModuleTree() {
 
     const inlineClasses = invByPkg[n.path];
     const inlineLoading = invByPkgLoading[n.path];
+    const hasDirectActions = n.direct_actions > 0;
+    const inlineActions = actByPkg[n.path];
+    const inlineActionLoading = actByPkgLoading[n.path];
 
     // When the user expands a package with direct classes, fetch its
     // inventory once so we can render classes inline as tree leaves.
     if (isExpanded && hasDirectClasses && inlineClasses === undefined && !inlineLoading) {
       ensureInventoryFor(n.path);
+    }
+    if (isExpanded && hasDirectActions && inlineActions === undefined && !inlineActionLoading) {
+      ensureActionsFor(n.path);
     }
 
     return (
@@ -291,6 +313,39 @@ export function ModuleTree() {
                 </button>
               );
             })}
+            {/* Action leaves — 그 패키지에 매핑된 Action 들. 한 화면에서 매핑 검수
+                가능하도록 class leaf 아래 같은 들여쓰기로 노출. */}
+            {hasDirectActions && inlineActionLoading && (
+              <div
+                className="text-[10px] text-muted-foreground py-0.5 flex items-center gap-1"
+                style={{ paddingLeft: 4 + (depth + 1) * 12 + 16 }}
+              >
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>Action 로딩…</span>
+              </div>
+            )}
+            {hasDirectActions && inlineActions && inlineActions.map((a) => (
+              <button
+                key={a.fqn}
+                onClick={() => setSelectedAction(a.fqn)}
+                className="w-full text-left px-1 py-0.5 text-[11.5px] flex items-center gap-1 hover:bg-muted/50 transition-colors"
+                style={{ paddingLeft: 4 + (depth + 1) * 12 + 16 }}
+                title={`${a.fqn}\nkind: ${a.kind}\nlevel: ${a.verification_level}${a.primary_method_fqn ? `\n→ ${a.primary_method_fqn}` : ""}`}
+              >
+                <span className="w-2 h-2 shrink-0 rounded-sm bg-orange-500" aria-label="action" />
+                <span className="truncate flex-1 font-mono text-foreground">
+                  {a.name}
+                </span>
+                {a.confirmed ? (
+                  <span className="text-[9px] text-emerald-700 shrink-0" title="confirmed (signature_locked 이상)">✓</span>
+                ) : (
+                  <span className="text-[9px] text-amber-700 shrink-0" title="draft (큐에서 confirm 대기)">·</span>
+                )}
+                <span className="text-[9px] text-muted-foreground/60 font-mono shrink-0">
+                  {a.realization_count}r
+                </span>
+              </button>
+            ))}
           </div>
         )}
       </div>

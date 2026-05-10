@@ -52,8 +52,9 @@ from backend.application.graph.graph_builder import GraphBuilder
 from backend.application.skill.skill_loader import UserSkillLoader
 from backend.application.skill.skill_matcher import SkillMatcher
 from backend.infrastructure.events.event_bus import event_bus
-# 2026-05-01 clean slate: backend.modeling (Section 2) + backend.simulation (Section 3)
-# import 폐기. CORE Phase C2~C6 + AGENT A1~A4 에서 새 온톨로지 + agent 모델로 재구성.
+# 2026-05-01 clean slate: backend.modeling (Section 2) 만 본 process 가 책임.
+# Section 3 (simulation) 은 plug-in 방식 — 다음 개발자가 별 PR 로 추가.
+# 인계 명세는 toClaude/modeling/handoff-spec/ 6 파일 (00 README + 01~05) 참조.
 # C2~C5 완료 (2026-05-02): Code/Domain/Mapping Layer + Query API.
 from backend.api import authoring as authoring_api
 from backend.modeling.api import ontology_router as ontology_query_api

@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Phase D — 다음 개발자 인계 패키지 (Handoff Package)</title>
+<style>
+  :root {
+    --bg: #0f172a; --card: #1e293b; --line: #334155;
+    --fg: #e2e8f0; --muted: #94a3b8;
+    --primary: #38bdf8; --emerald: #10b981; --amber: #f59e0b;
+    --rose: #fb7185; --violet: #a78bfa; --orange: #fb923c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:13.5px/1.55 -apple-system,"Pretendard","Apple SD Gothic Neo",sans-serif;background:var(--bg);color:var(--fg)}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 28px 80px}
+  header h1{font-size:22px;margin:0 0 6px}
+  header .sub{color:var(--muted);font-size:12px}
+  .progress{margin:18px 0 28px;display:flex;gap:6px;flex-wrap:wrap}
+  .phase{padding:5px 11px;border-radius:6px;background:var(--card);border:1px solid var(--line);font-size:11px;color:var(--muted)}
+  .phase.active{border-color:var(--primary);color:var(--fg);background:rgba(56,189,248,0.08)}
+  .phase.done{border-color:var(--emerald);color:var(--emerald);background:rgba(16,185,129,0.05)}
+  .phase.pending{border-color:var(--line);color:var(--muted)}
+
+  .step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:22px 26px;margin-bottom:24px}
+  .step h2{font-size:18px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  .step .meta{font-size:11px;color:var(--muted);margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .badge{padding:2px 8px;border-radius:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;font-weight:600}
+  .b-discuss{background:rgba(56,189,248,0.15);color:var(--primary)}
+  .b-applied{background:rgba(16,185,129,0.15);color:var(--emerald)}
+  .b-pending{background:rgba(148,163,184,0.15);color:var(--muted)}
+
+  h3{font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:20px 0 8px;font-weight:600}
+  h4{margin:14px 0 6px;font-size:13px;color:var(--violet)}
+  p{margin:6px 0 10px}
+  ul, ol{margin:6px 0 10px 20px;padding:0}
+  ul li, ol li{padding:3px 0}
+  code{font-family:"JetBrains Mono","SF Mono",monospace;font-size:91%;background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px;color:#c4b5fd}
+
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12.3px}
+  th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+  th{background:rgba(255,255,255,0.04);color:var(--primary);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:0.04em}
+
+  pre{background:rgba(0,0,0,0.35);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-family:"JetBrains Mono",monospace;font-size:11.5px;overflow-x:auto;color:#c4b5fd;margin:8px 0}
+
+  .panel{background:rgba(0,0,0,0.20);border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin:8px 0}
+  .panel.primary{border-color:rgba(56,189,248,0.3);background:rgba(56,189,248,0.04)}
+  .panel.emerald{border-color:rgba(16,185,129,0.3);background:rgba(16,185,129,0.04)}
+  .panel .label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);font-weight:600;margin-bottom:6px}
+
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:600}
+  .p-primary{background:rgba(56,189,248,0.12);color:var(--primary)}
+  .p-emerald{background:rgba(16,185,129,0.12);color:var(--emerald)}
+  .p-amber{background:rgba(245,158,11,0.15);color:var(--amber)}
+  .p-rose{background:rgba(251,113,133,0.15);color:var(--rose)}
+  .p-violet{background:rgba(167,139,250,0.15);color:var(--violet)}
+
+  .small{font-size:11px;color:var(--muted)}
+
+  .form-section{margin:16px 0;padding:14px 16px;background:rgba(0,0,0,0.2);border-radius:8px;border:1px solid var(--line)}
+  .form-section h4{margin:0 0 10px;font-size:12px;color:var(--fg);font-weight:600}
+  .field{margin:10px 0}
+  .field > label{display:block;font-size:12.5px;color:var(--fg);margin-bottom:4px;font-weight:500;line-height:1.5}
+  .field .recommend{display:block;font-size:11px;color:var(--muted);margin:2px 0 4px}
+  textarea.text {
+    width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--line);border-radius:5px;
+    color:var(--fg);padding:7px 10px;font:inherit;font-size:12.5px;min-height:80px;resize:vertical
+  }
+  textarea.text:focus {outline:none;border-color:var(--primary)}
+
+  .ds-actions{display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap}
+  .btn{padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--fg);font-size:12px;cursor:pointer;font-weight:500}
+  .btn:hover{border-color:var(--primary)}
+  .btn.primary{background:var(--primary);color:var(--bg);border-color:var(--primary)}
+  .btn.primary:hover{filter:brightness(1.1)}
+  .btn.copied{background:var(--emerald);border-color:var(--emerald);color:var(--bg)}
+  .copy-hint{font-size:11px;color:var(--muted);margin-left:auto}
+
+  .preview{margin-top:10px;padding:10px 12px;background:rgba(0,0,0,0.35);border-radius:6px;font-family:"JetBrains Mono",monospace;font-size:11.5px;white-space:pre-wrap;border:1px solid var(--line);display:none;color:var(--fg)}
+  .preview.visible{display:block}
+
+  /* big-picture grid */
+  .layer-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+  .layer-card{background:rgba(0,0,0,0.25);border:1px solid var(--line);border-radius:8px;padding:14px}
+  .layer-card .layer-name{font-size:12px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:0.05em}
+  .layer-card .layer-summary{font-size:11.5px;color:var(--muted);margin:4px 0 8px}
+  .layer-card .layer-stats{font-size:11.5px;color:var(--fg);margin-top:6px}
+  @media(max-width:760px){.layer-grid{grid-template-columns:1fr}}
+
+  /* atomic-pool grid */
+  .atomic-pool{display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;margin:10px 0}
+  .atomic-card{background:rgba(0,0,0,0.25);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:11px}
+  .atomic-card .atomic-name{font-family:"JetBrains Mono",monospace;font-weight:700;color:#c4b5fd}
+  .atomic-card .atomic-kr{color:var(--muted);font-size:10.5px}
+  .atomic-card.phase-a{border-color:rgba(16,185,129,0.4)}
+  .atomic-card.phase-b{border-color:rgba(245,158,11,0.4)}
+  .atomic-card.phase-c{border-color:rgba(56,189,248,0.4)}
+  @media(max-width:760px){.atomic-pool{grid-template-columns:repeat(2, 1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Phase D — 다음 개발자 인계 패키지 (Handoff Package)</h1>
+  <p class="sub">
+    onTong 시뮬레이션 에이전트 구현을 위한 ontology + 매핑 + API 명세 + 인계 가이드.
+    <strong>독자: 다음 개발자</strong>. <strong>모드: M4</strong> (서브에이전트 2 검토 + 사용자 형식 통합).
+  </p>
+</header>
+
+<div class="progress">
+  <span class="phase done">Phase A — Customer/Productivity ✓ 48 row</span>
+  <span class="phase done">Phase B — 6 entity ✓ 50 row</span>
+  <span class="phase done">Phase C — Order/Slab/21-step ✓ 80 row</span>
+  <span class="phase active">Phase D — 인계 패키지 (총 178 row 활용)</span>
+  <span class="phase done">D.1 onboarding ✓</span>
+  <span class="phase done">D.2 Ontology API ✓</span>
+  <span class="phase done">D.3 ChangeSpec/SimResult ✓</span>
+  <span class="phase done">D.4 Runner interface ✓</span>
+  <span class="phase active">D.5 인계 가이드 통합 ★ 진행</span>
+</div>
+
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>Phase D 진입 — 합의된 5 결정</h2>
+  <div class="meta">
+    <span class="badge b-applied">합의</span>
+    <span>2026-05-10 사용자 합의 (Agent 2 추천 따라)</span>
+  </div>
+
+  <table>
+    <tr><th>Q</th><th>결정</th><th>의미</th></tr>
+    <tr><td>Q1 산출 범위</td><td><strong>C — 명세까지 (구현 X)</strong></td><td>인계 문서 + ontology API + ChangeSpec/SimResult schema. reference 시뮬 PoC 는 별 phase</td></tr>
+    <tr><td>Q2 ChangeSpec format</td><td><strong>B — 구조화</strong></td><td>Action FQN + atomic path override + scenario fixture</td></tr>
+    <tr><td>Q3 Critical 갭 4건 (#1/#2/#4/#5)</td><td><strong>A — Phase D 명세</strong></td><td>SIM_VERIFIED / anchor invalidation / input fixture / Java dispatch — 명세까지만, 구현 Phase E</td></tr>
+    <tr><td>Q4 backend 통합 vs 별 API</td><td><strong>B — 신규 `/api/simulation/*`</strong></td><td>관심사 분리</td></tr>
+    <tr><td>Q5 모드</td><td><strong>M4 신규</strong></td><td>서브에이전트 2 자동 검토 + 사용자 형식 통합</td></tr>
+  </table>
+</section>
+
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<!-- D.1 — 인계 onboarding doc -->
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>D.1 — 인계 onboarding doc (시뮬 에이전트 구현자 entry point)</h2>
+  <div class="meta">
+    <span class="badge b-discuss">진행 중</span>
+    <span>다음 개발자가 가장 먼저 읽을 문서</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>① 30초 요약 (TL;DR)</h3>
+  <div class="panel primary">
+    <div class="label">★ 한 화면 핵심</div>
+    <p><strong>onTong</strong> = 레거시 Java SCM 시스템을 ontology + 코드 매핑으로 표현 → ChangeSpec 입력 → Python sandbox 시뮬 → diff 출력하는 도구.</p>
+    <p><strong>당신의 역할</strong>: 본 ontology 와 매핑을 이용해 <strong>시뮬레이션 에이전트</strong> 구현. 입력 = ChangeSpec (Action FQN + atomic 값 변경). 출력 = SimResult (변경 전후 도메인 결과 diff).</p>
+    <p><strong>입력 자료</strong>: 178 row ontology + 36 design-gaps + 41 Action 의 코드 위치 (realizes) + 17 BR + 4 sub-domain.</p>
+    <p><strong>먼저 읽을 5 문서</strong>: ① 본 D.1 (onboarding) → ② D.2 (Ontology API) → ③ D.3 (ChangeSpec/SimResult schema) → ④ D.4 (Runner interface) → ⑤ design-gaps-and-questions.md (Phase E 미해결 36 항목).</p>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>② 도메인 primer (철강 SCM 슬랩 설계)</h3>
+  <div class="panel">
+    <ul>
+      <li><strong>슬랩 설계 (slab-design)</strong>: 고객 주문 → 21-step Algorithm → 슬랩 (반제품) 사이즈 결정. 슬랩 = 연주(SM) → 열연(HR) → 냉연(CR) ... 8 공정 통과.</li>
+      <li><strong>21-step Algorithm</strong>: Phase 1 (5 Validator + 제품 분류 + 활성공정 폭 + 비중 + 누적실수율) + Phase 2 (one-shot 1~7 + A-a 루프 8~15 + final 16~19 + save 20 + history 21).</li>
+      <li><strong>핵심 entity</strong>: Order (4 sub Jpo) → SDSlabEntity (in-memory 작업) → SLAB_RESULT (DB 저장, 매수만큼 row 복제).</li>
+      <li><strong>표준 데이터 (lookup)</strong>: HrSpec/CastSpec (설비 제약) / EdgingSpec/EdgingGroup (폭 변환) / HrMin·MaxWgt (단중) / CustomerStd (고객 제한) / ProductivityStd (실수율).</li>
+      <li><strong>운영 이슈 history 7건</strong>: P-2018-0098/0237/0721 + P-2019-0445 + P-2020-0411 + 2017 회의 + 정XX 2018-12-04. BR.operational_history 에 매핑.</li>
+      <li><strong>drama DNA</strong>: 의도적 messy 패턴 — 동일 도메인 컬럼 다른 이름 (PRODUCT_NAME_CD vs PROD_KIND_CD vs PRODUCT_TYPE_CD), commented-out 레거시 fallback, javadoc 갭, hardcoded 매핑 등. 시뮬 시나리오의 가치 입증 영역.</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>③ 178 row ground truth — 큰 그림</h3>
+  <div class="layer-grid">
+    <div class="layer-card">
+      <div class="layer-name">Layer 1 — atomic (16개)</div>
+      <div class="layer-summary">기본 도메인 식별자. 코드 위치 1:N PARTIAL TR 로 매핑.</div>
+      <div class="layer-stats">scm.shared.* 통일. Phase A 7 / Phase B 6 / Phase C 3</div>
+    </div>
+    <div class="layer-card">
+      <div class="layer-name">Layer 2 — composite (22개)</div>
+      <div class="layer-summary">PK + facets 묶음 = entity 단위. 4 sub-domain 분포.</div>
+      <div class="layer-stats">scm.std 2 / scm.spec 8 / scm.order 5 / scm.slab 7</div>
+    </div>
+    <div class="layer-card">
+      <div class="layer-name">Layer 3 — Action (41개)</div>
+      <div class="layer-summary">코드 메서드 ↔ ontology 의미 매핑. pure_function vs workflow 구분.</div>
+      <div class="layer-stats">Phase A 4 + Phase B 7 + Phase C 30. realizes (PRIMARY) 코드 위치</div>
+    </div>
+    <div class="layer-card">
+      <div class="layer-name">Layer 4 — BusinessRule (17개)</div>
+      <div class="layer-summary">코드 가드 enforced rule. enforced_by anchor + operational_history.</div>
+      <div class="layer-stats">Phase A 1 + Phase B 3 + Phase C 13. 운영 이슈 7건 매핑</div>
+    </div>
+    <div class="layer-card">
+      <div class="layer-name">Layer 5 — TypeRealization (~60)</div>
+      <div class="layer-summary">atomic ↔ (codeType, codeField) 3-tuple 매핑. PRIMARY 16 + PARTIAL 50+</div>
+      <div class="layer-stats">코드 컬럼 ↔ 도메인 atomic 매핑 정밀도</div>
+    </div>
+    <div class="layer-card">
+      <div class="layer-name">Layer 6 — AnchorBinding (9 + ~110-140 마킹)</div>
+      <div class="layer-summary">method body fragment ↔ ontology 의미. Phase A 9 등록 / Phase B+C ~110-140 Phase E 보강.</div>
+      <div class="layer-stats">★ 시뮬레이션 핵심 — 코드의 어느 라인이 어떤 도메인 의미인지 1:1 매핑</div>
+    </div>
+  </div>
+  <p class="small">★ <strong>합계 178 row</strong> = atomic 16 + composite 22 + Action 41 + BR 17 + TR ~60 + AnchorBinding 9 + 기타 retroactive 등.</p>
+
+  <!-- ====================================================================== -->
+  <h3>④ 4 sub-domain map</h3>
+  <table>
+    <tr><th>sub-domain</th><th>의미</th><th>composite</th><th>대표 entity</th></tr>
+    <tr><td><code>scm.std.*</code></td><td>Lookup 표준 (Customer / Productivity)</td><td>2</td><td>customer_design_limit / productivity_std</td></tr>
+    <tr><td><code>scm.spec.*</code></td><td>설비 제약 표준</td><td>8</td><td>hr_plant + hr_plant_constraint / cast_plant + cast_plant_constraint / edging_spec / edging_group_match / hr_min_wgt / hr_max_wgt</td></tr>
+    <tr><td><code>scm.order.*</code></td><td>주문 (4-sub composition)</td><td>5</td><td>order (root) + order_om / order_os / order_qd / order_chemical</td></tr>
+    <tr><td><code>scm.slab.*</code></td><td>슬랩 (root + DB + 5 work)</td><td>7</td><td>slab (root) + slab_result (DB) + first_range / second_wgt / split_state / final_range / target</td></tr>
+    <tr><td colspan="4"><strong>합계 22 composite</strong>. 추가 atomic-only domain: <code>scm.shared.*</code> (16 atomic).</td></tr>
+  </table>
+  <p class="small">★ <code>scm.history.*</code> sub-domain 은 SdHistoryAction 3 메서드 (record_validation/step/algorithm_failure) 등록 시 등장 — design-gaps #9 (8 표준 domain 일관성) 와 결합. Phase D 진입 시 5번째 sub-domain 정식 합의 후보.</p>
+
+  <!-- ====================================================================== -->
+  <h3>⑤ 16 atomic pool — Phase 별 색상</h3>
+  <div class="atomic-pool">
+    <div class="atomic-card phase-a"><div class="atomic-name">cmp</div><div class="atomic-kr">회사 (string 2)</div></div>
+    <div class="atomic-card phase-a"><div class="atomic-name">org</div><div class="atomic-kr">소 (string 1)</div></div>
+    <div class="atomic-card phase-a"><div class="atomic-name">proc</div><div class="atomic-kr">공정 (8 enum)</div></div>
+    <div class="atomic-card phase-a"><div class="atomic-name">grade</div><div class="atomic-kr">강종 (string 10)</div></div>
+    <div class="atomic-card phase-a"><div class="atomic-name">product_kind</div><div class="atomic-kr">품종 (8 alias)</div></div>
+    <div class="atomic-card phase-a"><div class="atomic-name">customer</div><div class="atomic-kr">고객사 (string 10)</div></div>
+    <div class="atomic-card phase-a"><div class="atomic-name">confirmed_plant_cd</div><div class="atomic-kr">확정통과공장 (8자리, 자리 i ↔ proc[i])</div></div>
+    <div class="atomic-card phase-b"><div class="atomic-name">priority</div><div class="atomic-kr">우선순위 (Integer, B.4 신규 + Phase A retroactive TR)</div></div>
+    <div class="atomic-card phase-b"><div class="atomic-name">hr_plant_cd</div><div class="atomic-kr">열연공장 (string 1)</div></div>
+    <div class="atomic-card phase-b"><div class="atomic-name">sm_cd</div><div class="atomic-kr">제강 (string 1)</div></div>
+    <div class="atomic-card phase-b"><div class="atomic-name">cast_cd</div><div class="atomic-kr">연주 (string 4)</div></div>
+    <div class="atomic-card phase-b"><div class="atomic-name">machine_cd</div><div class="atomic-kr">머신 (string 4)</div></div>
+    <div class="atomic-card phase-b"><div class="atomic-name">edging_group_cd</div><div class="atomic-kr">Edging 그룹 (string 10, wildcard '*')</div></div>
+    <div class="atomic-card phase-c"><div class="atomic-name">order_no</div><div class="atomic-kr">주문번호 (string 20)</div></div>
+    <div class="atomic-card phase-c"><div class="atomic-name">slab_no</div><div class="atomic-kr">슬랩번호 (string 20, SlabNoSequence)</div></div>
+    <div class="atomic-card phase-c"><div class="atomic-name">specific_gravity</div><div class="atomic-kr">비중 (BigDecimal, hardcoded)</div></div>
+  </div>
+  <p class="small">★ Phase 색상: <span style="color:var(--emerald)">초록 = Phase A</span> · <span style="color:var(--amber)">노랑 = Phase B</span> · <span style="color:var(--primary)">파랑 = Phase C</span>. 다중 entity 공유 = atomic share 가치 입증.</p>
+
+  <!-- ====================================================================== -->
+  <h3>⑥ 시뮬 에이전트 구현 흐름 (high-level)</h3>
+  <div class="panel emerald">
+    <pre>입력: ChangeSpec
+  {
+    action_fqn: "action.scm.std.cumulative_productivity",
+    atomic_overrides: {
+      "term.scm.std.productivity_std.facets.default_value": 0.92  // 기존 0.95
+    },
+    scenario_fixture: { /* DB lookup data */ }
+  }
+
+         │
+         ▼
+[1] Ontology Query API (D.2)
+    - Action.realizes 으로 코드 위치 추출 (file:method)
+    - Action.delegates_to 그래프 traversal
+    - related composite + atomic + BR 수집
+         │
+         ▼
+[2] PythonGenerator (D.4)
+    - 코드 메서드 → 한국어 변수 Python sandbox 코드 생성
+    - AnchorBinding 활용 — anchor 위치에 atomic_overrides 값 substitute
+    - 의존 Action 들의 Python 코드도 generate
+         │
+         ▼
+[3] Sandbox 실행 + Java dispatch 재현 (#5 design-gap)
+    - 한국어 Python 코드 + scenario_fixture → 변경 전 결과 R0
+    - atomic_overrides 적용 → 변경 후 결과 R1
+         │
+         ▼
+[4] BR 검증 (BR.enforced_by 활용)
+    - 각 BR 의 statement 와 R1 비교 (예: productivity_safe_range 0.5~1.0)
+    - violated_at_call BR 도 함께 검출 (방어로직 부재 위치)
+         │
+         ▼
+[5] SIM_VERIFIED 판정 (#1 design-gap)
+    - R0 vs R1 diff (도메인 의미 단위)
+    - BR 위반 / 정합성 / 운영 이슈 history 매칭
+
+출력: SimResult
+  {
+    diff: { /* 도메인 의미 단위 변경 */ },
+    br_violations: [ /* BR 위반 list */ ],
+    verified_level: "SIM_VERIFIED" | "BR_VIOLATED" | ...,
+    operational_match: [ /* P-2018-0721 같은 history 매칭 */ ]
+  }</pre>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>⑦ Critical 갭 4건 (Phase E 구현 대상)</h3>
+  <table>
+    <tr><th>#</th><th>영역</th><th>핵심</th><th>Phase D 산출물</th></tr>
+    <tr><td>#1</td><td>SIM_VERIFIED 자동 결정</td><td>시뮬 "통과" 기준 명세 부재</td><td>D.3 에서 판정 정책 명세</td></tr>
+    <tr><td>#2</td><td>Anchor invalidation</td><td>코드 변경 후 stale anchor 처리 흐름 부재</td><td>D.3 에서 invalidation 흐름 명세</td></tr>
+    <tr><td>#4</td><td>시뮬 input fixture</td><td>DB 룩업 sandbox 데이터 source 미구현</td><td>D.4 에서 fixture 입력 UX 명세</td></tr>
+    <tr><td>#5</td><td>Java dispatch sandbox</td><td>다형성 코드의 sandbox 실행 방식 미설계</td><td>D.4 에서 dispatch 전략 명세</td></tr>
+  </table>
+  <p class="small">★ 4건 모두 design-gaps-and-questions.md 의 🔴 핵심 항목. Phase D 명세 → Phase E 구현. 다음 개발자가 결정 명세를 보고 바로 구현 가능하도록.</p>
+
+  <!-- ====================================================================== -->
+  <h3>⑧ 산출물 navigation (다음 개발자용)</h3>
+  <table>
+    <tr><th>읽기 순서</th><th>파일</th><th>내용</th><th>읽는 시간</th></tr>
+    <tr><td>1 ★</td><td><code>phase-d-handoff-package.html</code> (본 문서)</td><td>Phase D 인계 패키지 (D.1~D.5)</td><td>~30분 (D.1 만)</td></tr>
+    <tr><td>2</td><td><code>section1-2-3-overview.html</code></td><td>외부 발표용 풀 가이드 (Wiki + Modeling + Simulation)</td><td>~20분</td></tr>
+    <tr><td>3</td><td><code>anchor-binding-deep-dive.html</code></td><td>AnchorBinding 인터랙티브 6 탭</td><td>~30분</td></tr>
+    <tr><td>4</td><td><code>round6-live-authoring.html</code></td><td>Phase A archive (Customer/Productivity 풀 사이클)</td><td>~40분 (sampling)</td></tr>
+    <tr><td>5</td><td><code>phase-b-archive-confirm.html</code></td><td>Phase B 5 entity archive</td><td>~30분</td></tr>
+    <tr><td>6</td><td><code>phase-c-archive-confirm.html</code></td><td>Phase C 6 단계 archive (Order/Slab/21-step)</td><td>~50분</td></tr>
+    <tr><td>7</td><td><code>design-gaps-and-questions.md</code></td><td>36 미해결 항목 (Phase E 결정 후보)</td><td>~30분 (sampling)</td></tr>
+    <tr><td>8</td><td><code>HANDOFF.md</code></td><td>Phase A→B→C→D→E 흐름 + 결정 로그</td><td>~10분</td></tr>
+    <tr><td>9</td><td>코드: <code>sample-repos/slab-design-real/</code></td><td>실제 Java SCM 코드 (4-module Maven)</td><td>~2~4h sampling</td></tr>
+  </table>
+  <p class="small">★ 총 ~5h onboarding 예상. 이후 시뮬 에이전트 구현 시작 가능.</p>
+
+  <!-- ====================================================================== -->
+  <h3>⑨ 사용자 (현재 모델러) 입장에서 보강 가능한 부분</h3>
+  <ul>
+    <li>본 D.1 onboarding 의 시뮬 흐름 step ⑥ 가 충분히 명확한가?</li>
+    <li>16 atomic pool 의 색상 + 의미 표가 다음 개발자에게 충분한가?</li>
+    <li>4 sub-domain map 의 위계 표현이 명확한가? (scm.history 5번째 sub-domain 정식 합의 필요?)</li>
+    <li>178 row 의 6 layer 표현 (atomic / composite / Action / BR / TR / Anchor) 이 직관적인가?</li>
+    <li>다음 개발자가 entry point ① ~ ⑨ 순서로 따라가면 자력으로 시뮬 에이전트 구현 가능한가?</li>
+  </ul>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>D.1 답변 — onboarding doc 검수</h4>
+
+    <div class="field">
+      <label><strong>Q1. 30초 요약 (TL;DR) + 도메인 primer 충분?</strong>
+        <span class="recommend">★ 추천: <strong>OK</strong>. 핵심 (onTong = ontology + 시뮬), 입력/출력, 5 문서 entry, 도메인 (철강 SCM 21-step).</span>
+      </label>
+      <textarea class="text" name="d1_q1" rows="2" placeholder="예: OK / 보강 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. 178 row 6 layer 큰 그림 (③) 표현</strong>
+        <span class="recommend">★ 추천 OK. atomic/composite/Action/BR/TR/Anchor 6 layer 카드. layer 별 카운트 + 핵심 의미.</span>
+      </label>
+      <textarea class="text" name="d1_q2" rows="2" placeholder="예: OK / 다른 표현 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. 4 sub-domain map (④) + scm.history 5번째 sub-domain 처리</strong>
+        <span class="recommend">★ 추천 OK. 4 sub-domain 표 + scm.history 는 별 노트로. design-gaps #9 와 결합 Phase E 결정.</span>
+      </label>
+      <textarea class="text" name="d1_q3" rows="2" placeholder="예: OK / 5 sub-domain 정식 합의 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. 16 atomic pool (⑤) Phase 색상 카드</strong>
+        <span class="recommend">★ 추천 OK. 16 카드 + Phase 색상 (초록/노랑/파랑). 한 화면 visual.</span>
+      </label>
+      <textarea class="text" name="d1_q4" rows="2" placeholder="예: OK / 다른 시각화 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. 시뮬 에이전트 흐름 (⑥) — ChangeSpec → SimResult 5 step</strong>
+        <span class="recommend">★ 추천 OK. ChangeSpec 입력 예시 + 5 step 흐름 (Ontology Query → PythonGenerator → Sandbox 실행 → BR 검증 → SIM_VERIFIED 판정) + SimResult 출력 예시.</span>
+      </label>
+      <textarea class="text" name="d1_q5" rows="2" placeholder="예: OK / 보강 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. Critical 갭 4건 (⑦) Phase D 명세 매핑</strong>
+        <span class="recommend">★ 추천 OK. #1/#2/#4/#5 각각 D.3/D.4 의 어느 부분에서 명세될지 표.</span>
+      </label>
+      <textarea class="text" name="d1_q6" rows="2" placeholder="예: OK / 다른 매핑 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7. 산출물 navigation (⑧) — 9 문서 + 5h onboarding</strong>
+        <span class="recommend">★ 추천 OK. 읽기 순서 1~9 + 시간 추정. 본 D.1 → 외부 발표 → AnchorBinding deep-dive → Phase A/B/C archive → design-gaps → HANDOFF → 코드.</span>
+      </label>
+      <textarea class="text" name="d1_q7" rows="2" placeholder="예: OK / 다른 순서 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q8. 빠뜨림 / 추가</strong>
+        <span class="recommend">★ 추천: 없음. D.1 의 핵심 (도메인 + 큰 그림 + 시뮬 흐름 + entry point) 모두 cover.</span>
+      </label>
+      <textarea class="text" name="d1_q8" rows="2" placeholder="예: 없음 / 또는: ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q9. D.2 (Ontology Query API 명세) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. 기존 16 method ontology query + Phase A+B+C 178 row sample request/response + OpenAPI 자동 생성.</span>
+      </label>
+      <textarea class="text" name="d1_q9" rows="2" placeholder="예: OK / 다른 진행 ___"></textarea>
+    </div>
+
+    <div class="ds-actions">
+      <button class="btn primary" id="d1-build">미리보기</button>
+      <button class="btn" id="d1-copy">📋 답변 복사</button>
+      <span class="copy-hint">「📋 답변 복사」 → 채팅 붙여넣기</span>
+    </div>
+    <div class="preview" id="d1-preview"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- D.2 — Ontology Query API 명세 (별도 폴더 deliverable) -->
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>D.2 — Ontology Query API 명세 ✓</h2>
+  <div class="meta">
+    <span class="badge b-applied">완료</span>
+    <span>3 fresh-context 서브에이전트 검토 → 8 공통 갭 합성 → handoff-spec/ 별 폴더 정리</span>
+  </div>
+
+  <h3>산출물 위치</h3>
+  <p>외부 단독 전달 가능하도록 <code>toClaude/modeling/handoff-spec/</code> 별 폴더로 분리. 본 phase-d-handoff-package.html 과 독립적으로 다음 개발자에게 인계 가능.</p>
+
+  <table>
+    <thead>
+      <tr><th>#</th><th>파일</th><th>핵심</th><th>분량</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td><code>handoff-spec/00-README.md</code></td>
+        <td>패키지 entry — 누구를 위한 / 읽기 순서 / 합의된 5 결정 / 적용 가이드 / 참고 문서</td>
+        <td>중</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><code>handoff-spec/01-schema-extensions.md</code></td>
+        <td>BR/Action/BusinessTerm 보강 + DesignGap/SimulationScenario 신규 — <strong>5 변경</strong></td>
+        <td>중</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><code>handoff-spec/02-ontology-api-additions.md</code></td>
+        <td><code>/api/ontology/*</code> 보강 — <strong>약 12 신규 endpoint</strong> (BR / reverse lookup / graph traversal / DesignGap / Scenario)</td>
+        <td>중</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><code>handoff-spec/03-simulation-api-spec.md</code></td>
+        <td><code>/api/simulation/*</code> 신규 router — <strong>약 11 신규 endpoint</strong> (runs / sim-result / diff / anchor-invalidate / verification/promote / health / capabilities)</td>
+        <td>중</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td><code>handoff-spec/04-changespec-simresult-schema.md</code></td>
+        <td>D.3 산출 — ChangeSpec/SimResult schema + critical 갭 #1 (SIM_VERIFIED 자동 판정) + #2 (Anchor invalidation 흐름) + Phase A/B/C 검증 예시</td>
+        <td>중</td>
+      </tr>
+      <tr>
+        <td>6 (예정)</td>
+        <td><code>handoff-spec/05-runner-interface.md</code></td>
+        <td>D.4 산출 — PythonGenerator + Java dispatch sandbox 시그니처</td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>3 서브에이전트 검토 합성 — 8 공통 갭</h3>
+
+  <h4>A. Schema 부재 (5)</h4>
+  <table>
+    <thead><tr><th>#</th><th>갭</th><th>해소 위치</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>BusinessRule.enforced_by — 코드 가드 위치</td><td><code>01-...</code> Section 1</td></tr>
+      <tr><td>2</td><td>BusinessRule.violated_at_call — 위반 가능 site</td><td><code>01-...</code> Section 1</td></tr>
+      <tr><td>3</td><td>BusinessRule.operational_history — 운영 사고 backtrack</td><td><code>01-...</code> Section 1</td></tr>
+      <tr><td>4</td><td>Action.realizes — PRIMARY ↔ realization 명시</td><td><code>01-...</code> Section 2</td></tr>
+      <tr><td>5</td><td>Action.delegates_to — workflow 호출 그래프</td><td><code>01-...</code> Section 2</td></tr>
+    </tbody>
+  </table>
+
+  <h4>B. Graph traversal 부재 (3)</h4>
+  <table>
+    <thead><tr><th>#</th><th>갭</th><th>해소 위치</th></tr></thead>
+    <tbody>
+      <tr><td>6</td><td>Action delegates_to/transitive call graph</td><td><code>02-...</code> 2.1 delegates-to-tree</td></tr>
+      <tr><td>7</td><td>Action.realizes 역방향 — PRIMARY 코드 위치</td><td><code>02-...</code> 2.2 realizing-methods</td></tr>
+      <tr><td>8</td><td>Reverse lookup 전반 — atomic→TR/Anchor / method→callers / literal→anchor</td><td><code>02-...</code> Section 3</td></tr>
+    </tbody>
+  </table>
+
+  <h3>신규 엔티티 (1급 객체화)</h3>
+  <ul>
+    <li><strong>DesignGap</strong> — 36 항목 (Phase A 22 + B 5 + C 9) markdown 에서 1급 객체화. <code>related_action_fqns</code> 등으로 시뮬 결과 패널과 연결.</li>
+    <li><strong>SimulationScenario</strong> — 시뮬 카탈로그. kind=regression/boundary/drama/integration/br_violation. 운영 사고 7건 + 21-step happy path seed.</li>
+  </ul>
+
+  <h3>다음 단계</h3>
+  <p>D.3 진입 — ChangeSpec 입력 + SimResult 출력 schema + 판정 흐름. <code>handoff-spec/04-...</code> 추가 작성.</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- D.3 — ChangeSpec/SimResult schema + critical 갭 #1/#2 -->
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>D.3 — ChangeSpec/SimResult schema + critical 갭 #1/#2 ✓</h2>
+  <div class="meta">
+    <span class="badge b-applied">완료</span>
+    <span>handoff-spec/04-changespec-simresult-schema.md (~13K). Phase A/B/C 검증 예시 3건 포함. 서브에이전트 2명 검토 진행 중.</span>
+  </div>
+
+  <h3>핵심 산출</h3>
+  <table>
+    <thead><tr><th>섹션</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td>1. ChangeSpec</td><td><code>action_fqn</code> + <code>atomic_overrides</code> + <code>scenario_fixture</code> (Q2=B). atomic_path 해석 알고리즘 4-rule + scenario_id 동시 제공 시 우선순위.</td></tr>
+      <tr><td>2. SimResult</td><td>verdict 3-tier (sim_verified / sim_violation / inconclusive). BREvidence + AnchorEvidence + DelegationTraceFrame + output_values + affected_design_gaps.</td></tr>
+      <tr><td>3. 갭 #1 — SIM_VERIFIED 판정</td><td>verdict 판정 5조건 + 진급 자동화 정책 (auto-promote / auto-downgrade) + scenario.kind 별 자동화 차이.</td></tr>
+      <tr><td>4. 갭 #2 — Anchor invalidation</td><td>3-trigger (T1 PR merge / T2 manual / T3 auto-detect) + 다운그레이드 정책 + stale anchor 의 SimResult deferred.</td></tr>
+      <tr><td>5. 라이프사이클</td><td>(a) ChangeSpec 작성 → (b) sim-result 조회 → (c) auto-promote → (d) auto-downgrade → (e) anchor-invalidate</td></tr>
+      <tr><td>6. 검증 예시</td><td>Phase A (Customer drama) / Phase B (HrSpec proc[1] HR) / Phase C (P-2018-0098 회귀) — 3건.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>D.3 가 해소한 design-gap</h3>
+  <ul>
+    <li>#1 SIM_VERIFIED 자동 결정 — 본 D.3 Section 3 (3-tier verdict + 진급 정책 + 6 조건 a-f)</li>
+    <li>#2 Anchor invalidation 흐름 — 본 D.3 Section 4 (3-trigger + 부분 다운그레이드 + 4.7 operational_history 자동 추가)</li>
+    <li>#4 시뮬 input fixture (부분) — ChangeSpec.scenario_fixture 형식까지. lookups row 형식은 D.4 에서</li>
+    <li>#5 Java dispatch sandbox (부분) — DelegationTraceFrame.dispatch_consistent + verdict (f) 조건 + Section 3.6 inconclusive 정책. 실제 dispatch 코드는 D.4</li>
+  </ul>
+
+  <h3>검수 → 우선 수정 6건 반영 (2026-05-10)</h3>
+  <table>
+    <thead><tr><th>severity</th><th>수정</th><th>위치</th></tr></thead>
+    <tbody>
+      <tr><td>Critical</td><td>verdict 6번째 조건 (f) dispatch_consistent + Section 3.6 dispatch 미달 inconclusive</td><td>04 Section 3.2 + 3.6</td></tr>
+      <tr><td>Critical</td><td>anchor 부분 다운그레이드 (stale_ratio 0.30 임계값 + Action 별 결정)</td><td>04 Section 4.3 step 4</td></tr>
+      <tr><td>Major</td><td>4.7 신규 — verdict=sim_violation 시 operational_history 자동 추가 (incident scenario) 또는 confirm 큐</td><td>04 Section 4.7 신설</td></tr>
+      <tr><td>Minor</td><td>Realization DTO 정의 추가 (method_fqn / input_type_fqn / confidence / is_primary 등)</td><td>01 Section 2.1</td></tr>
+      <tr><td>Minor</td><td>00-README 의 명세 적용 순서 step "5. ChangeSpec/SimResult 모델 정의" 추가</td><td>00-README</td></tr>
+      <tr><td>Minor</td><td>Section 3.3 endpoint path 정밀화 (`/api/ontology/actions/{action_fqn}/anchor-bindings`)</td><td>04 Section 3.3</td></tr>
+    </tbody>
+  </table>
+
+  <h3>WARN 5건 → design-gaps 등록 (Phase E backlog)</h3>
+  <p>D.4 와 병행 가능한 WARN 항목은 design-gap #37~#41 로 등록. 이로써 design-gaps 카운트 36 → <strong>41</strong> 로 증가.</p>
+  <ul>
+    <li>#37 4번째 verdict "advisory_warning" 도입 검토</li>
+    <li>#38 transitive BR 누락 정책 (04 부분 반영)</li>
+    <li>#39 anchor invalidation 추가 trigger (T4 Maven POM / T5 IDE refactor)</li>
+    <li>#40 anchor 재바인딩 미처리 알림 큐</li>
+    <li>#41 ChangeSpec scenario_fixture lookups row 형식</li>
+  </ul>
+
+  <h3>★ 의존성 분리 — modeling 영역 vs simulation 영역</h3>
+  <p>00-README 에 신규 섹션 추가. simulation 세션 (다음 개발자) 이 modeling 코드를 import / 호출만 하고, modeling 세션은 simulation 코드를 만들거나 호출하지 않는 단방향 의존성 명세.</p>
+  <ul>
+    <li>modeling 세션 책임: <code>backend/modeling/*</code> + <code>backend/shared/contracts/ontology_query.py</code></li>
+    <li>simulation 세션 책임: <code>backend/api/simulation/*</code> + <code>backend/simulation/*</code> + <code>backend/shared/contracts/simulation.py</code></li>
+    <li>인계 인터페이스 3가지: REST endpoint / Python facade / DTO. simulation 세션이 import only.</li>
+  </ul>
+</section>
+
+<!-- ====================================================================== -->
+<!-- D.4 — Runner interface 명세 -->
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>D.4 — 시뮬 runner interface 명세 ✓</h2>
+  <div class="meta">
+    <span class="badge b-applied">완료</span>
+    <span>handoff-spec/05-runner-interface.md (~22K, 635+ 라인). 서브에이전트 2명 검토 진행 중.</span>
+  </div>
+
+  <h3>핵심 산출 (10 섹션)</h3>
+  <table>
+    <thead><tr><th>섹션</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td>1. PythonGenerator</td><td>ChangeSpec + RunPlan → 실행 가능 Python (GeneratedScript). import 화이트리스트 + timeout + java_dispatch_calls 사전 검증.</td></tr>
+      <tr><td>2. JavaSandbox</td><td>3-tier (stub / jvm_subprocess / graalvm_polyglot). dispatch 알고리즘 6 step + dispatch_consistent 판정 (04 verdict (f) 와 연동) + AnchorHit / BRTrigger capture.</td></tr>
+      <tr><td>3. LookupDataSource</td><td>TableSpec + LookupRow row 형식 (#41 해소) + 3 mode (fixture_only / fallback / db_snapshot) (#4 해소).</td></tr>
+      <tr><td>4. Runner state machine</td><td>RunHandle 5 상태 전환 + queue 3-tier (asyncio / Redis+RQ / external).</td></tr>
+      <tr><td>5. Python ↔ Java boundary</td><td>JSON envelope (입력/출력/에러) + JSON Lines (anchor/br capture) + _type 식별자 + 큰 객체 ref.</td></tr>
+      <tr><td>6. Artifact collection</td><td>5 종 (generated_python / jvm_log / trace / input_fixture / output_dump) + 보관 정책 (verdict 별 30~∞일).</td></tr>
+      <tr><td>7. ★ 의존성 점검</td><td>본 모듈 사용 대상 (modeling 세션의 OntologyQueryClient + endpoints) + 본 모듈 쓰는 영역 (10 파일) + 단방향성 보증 + cross-session 흐름.</td></tr>
+      <tr><td>8. design-gaps 매핑</td><td>#4 / #5 / #41 해소 (D.4 의 직접 책임) + #39 일부.</td></tr>
+      <tr><td>9. 구현 순서</td><td>9 단계 (stub → simple PythonGen → fixture_only → orchestrator → verdict → jvm_subprocess → instrumentation → DB modes → Redis 큐).</td></tr>
+      <tr><td>10. 검증 방법</td><td>7 단계 (round-trip → atomic_overrides → P-2018-0098 회귀 → dispatch_consistent → anchor stale → timeout → 100 동시).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>D.4 가 해소한 design-gap</h3>
+  <ul>
+    <li>#4 시뮬 input fixture — Section 3 LookupDataSource 의 3 mode (fixture_only / fixture_with_db_fallback / db_snapshot)</li>
+    <li>#5 Java dispatch sandbox — Section 2 JavaSandbox 의 dispatch 알고리즘 + 3-tier 구현 전략</li>
+    <li>#41 ChangeSpec scenario_fixture lookups row 형식 — Section 3.2 의 TableSpec + LookupRow</li>
+  </ul>
+
+  <h3>★ 의존성 분리 (사용자 요구)</h3>
+  <p>Section 7 에서 simulation 세션 ↔ modeling 세션의 단방향 의존성을 정밀화:</p>
+  <ul>
+    <li>본 모듈이 modeling 세션에서 사용하는 것 — facade (OntologyQueryClient) + REST endpoints (read-only)</li>
+    <li>본 모듈이 modeling 세션 코드를 수정하는가 — 아니오. 10개 파일이 simulation 영역 (★ 표시).</li>
+    <li>modeling 세션이 simulation 모듈을 import 하는가 — 아니오.</li>
+    <li>endpoint 추가 필요 시 — simulation 세션이 명세 작성, modeling 세션이 구현. 직접 modeling 코드 수정 없음.</li>
+  </ul>
+
+  <h3>D.4 검수 → 우선 수정 6건 반영 (2026-05-10)</h3>
+  <table>
+    <thead><tr><th>severity</th><th>수정</th><th>위치</th></tr></thead>
+    <tbody>
+      <tr><td>Critical</td><td>03 line 5 router 경로 정정 — modeling 폴더가 아닌 <code>backend/api/simulation/router.py</code> 로 (사용자 의존성 분리 위반 fix)</td><td>03 헤더</td></tr>
+      <tr><td>Critical</td><td>Orchestrator entrypoint 인터페이스 (4.5) + RunInputs 통일 + slot vs lookup 분리 규약 (4.6) — 다음 개발자가 main entry 어딘지 / inputs 가 무엇인지 즉시 파악</td><td>05 Section 4.5 + 4.6 신규</td></tr>
+      <tr><td>Critical</td><td>StubJavaSandbox 행동 명세 (3.4.5 신규) + LookupDataSource TableSpec derive 알고리즘 (3.4 보강)</td><td>05 Section 3.4 + 3.4.5</td></tr>
+      <tr><td>Major</td><td>delegation tree loop / optional 코드 생성 패턴 (DelegationEdge.is_in_loop / optional → for / if 분기) + dispatch loop 실패 정책 (4.8 FailurePolicy)</td><td>05 Section 1.3 + 4.8</td></tr>
+      <tr><td>Minor</td><td>GeneratedScript ↔ RunPlan 매핑 1줄 + 00-README 처음 한 시간 30분 (5/6 step 추가)</td><td>05 Section 1.2 + 00-README</td></tr>
+      <tr><td>Minor</td><td>import 화이트리스트 명시화 (json/pydantic/time/simulation 내부 + 금지 리스트) + Timeout budget 분배 정책 (4.7 신규)</td><td>05 Section 1.4 + 4.7</td></tr>
+    </tbody>
+  </table>
+
+  <h3>WARN 6건 → design-gaps 등록 (Phase E backlog)</h3>
+  <p>D.4 검수에서 도출된 깊은 디테일은 design-gap #42~#47 로 등록. design-gaps 카운트 41 → <strong>47</strong>.</p>
+  <ul>
+    <li>#42 BR violation vs RuntimeException 구분 정밀화</li>
+    <li>#43 type_assignable 의미 (subclass / generic / primitive)</li>
+    <li>#44 LookupDataSource 3 mode 행동 차이</li>
+    <li>#45 drama_dna_columns 활용처 (현재 dead field)</li>
+    <li>#46 artifact streaming vs 일괄 dump</li>
+    <li>#47 검증 step 누락 (graalvm / 3-mode lookup / 부분 다운그레이드)</li>
+  </ul>
+</section>
+
+<!-- ====================================================================== -->
+<!-- D.5 진입 전 — Ontology DB 채우기 + simulation path 정정 -->
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>★ Ontology DB 채우기 + simulation path 정정 (2026-05-10)</h2>
+  <div class="meta">
+    <span class="badge b-applied">완료</span>
+    <span>사용자 강조 — "이게 완전히 완료 된 상태여야 인계가 가능해". fresh-context Explore agent 점검 → 미완료 발견 → 즉시 채움.</span>
+  </div>
+
+  <h3>점검 결과 (fresh-context)</h3>
+  <p>handoff-spec/ 명세는 완료됐으나 <strong>실제 ontology DB</strong> (`data/ontology.db`) 에 archive 합의의 핵심 3종이 누락:</p>
+  <ul>
+    <li>atomic 16 — DB 0개 (완전 미반영)</li>
+    <li>BusinessRule 17 — DB 0개</li>
+    <li>AnchorBinding 9 — DB 0개</li>
+  </ul>
+  <p>이 상태에서 인계는 ground truth 부재 → 다음 개발자 시작하자마자 막힘.</p>
+
+  <h3>완료된 작업</h3>
+  <table>
+    <thead><tr><th>항목</th><th>결과</th></tr></thead>
+    <tbody>
+      <tr><td>atomic 16 import</td><td>✅ 완료. <code>scripts/import_phase_archive.py</code> — Phase A 7 + B 6 + C 3</td></tr>
+      <tr><td>BusinessRule 17 import</td><td>✅ 완료 — 1차 추출 12 + 사용자 지적 후 2차 grep `rule\.scm\.*` 패턴 검증 → archive 에 17개 다 있음 → 5 추가 import. design-gap #48 closed.</td></tr>
+      <tr><td>AnchorBinding 9 import</td><td>✅ 완료 — cumulativeProductivity 7 + findFirstMatch 2</td></tr>
+      <tr><td>simulation path 정정</td><td>✅ 완료 — handoff-spec 03/05/00 모두 <code>backend/simulation/{api,runner}/</code> 로 정정 (실 폴더 구조 반영)</td></tr>
+      <tr><td>2차 추가 import — BR 5</td><td>✅ <code>absolute_max_kg_safety_cap</code> / <code>sm_plant_active_required</code> / <code>confirmed_plant_cd_format</code> / <code>history_isolated_transaction</code> / <code>slab_no_sequence_per_count</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>최종 카운트 (slab-design-real repo)</h3>
+  <table>
+    <thead><tr><th>종류</th><th>합의</th><th>실 storage</th><th>상태</th></tr></thead>
+    <tbody>
+      <tr><td>atomic</td><td>16</td><td>16</td><td>✅</td></tr>
+      <tr><td>composite</td><td>22</td><td>1220+</td><td>✅ (auto import 다수 포함)</td></tr>
+      <tr><td>Action</td><td>41</td><td>1512+</td><td>✅</td></tr>
+      <tr><td>BusinessRule</td><td>17</td><td>17</td><td>✅</td></tr>
+      <tr><td>TypeRealization</td><td>60+</td><td>1428</td><td>✅</td></tr>
+      <tr><td>AnchorBinding</td><td>9</td><td>9</td><td>✅</td></tr>
+    </tbody>
+  </table>
+
+  <h3>인계 가능성 판정 (재평가)</h3>
+  <p><strong>✅ 완전 인계 가능</strong> — Phase A/B/C archive 합의의 모든 핵심 ground truth (atomic 16 + BR 17 + AnchorBinding 9 = 42 row) 가 ontology DB 에 완전 반영. archive 가 ground truth 임을 입증. simulation 영역 path 정정 + 빈 폴더 구조 (backend/simulation/{api,tools,mock,client}) 와 호환.</p>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>D.5 — 다음 개발자 가이드 (인계 패키지) (대기)</h2>
+  <div class="meta">
+    <span class="badge b-pending">대기</span>
+    <span>D.4 검수 완료 후 진입. handoff-spec/00-README.md 의 통합 가이드 갱신 + 운영 체크리스트 + Phase E backlog.</span>
+  </div>
+  <ul>
+    <li>handoff-spec/00-README.md 의 entry 가이드를 D.1~D.4 통합 흐름으로 강화</li>
+    <li>운영 체크리스트 — 다음 개발자가 첫 PR 까지 따라할 수 있는 step-by-step</li>
+    <li>Phase E backlog — design-gaps #37~#41 (Phase D 검수에서 도출) + 기존 36 항목 통합 우선순위</li>
+  </ul>
+</section>
+
+<script>
+function buildD1Text() {
+  const get = name => (document.querySelector(`[name="${name}"]`)?.value || '').trim();
+  const rows = [
+    ['d1_q1', 'Q1. 30초 요약 + 도메인 primer'],
+    ['d1_q2', 'Q2. 178 row 6 layer 큰 그림'],
+    ['d1_q3', 'Q3. 4 sub-domain map + scm.history 5번째'],
+    ['d1_q4', 'Q4. 16 atomic pool 색상 카드'],
+    ['d1_q5', 'Q5. 시뮬 에이전트 흐름 5 step'],
+    ['d1_q6', 'Q6. Critical 갭 4건 매핑'],
+    ['d1_q7', 'Q7. 산출물 navigation 9 문서'],
+    ['d1_q8', 'Q8. 빠뜨림/추가'],
+    ['d1_q9', 'Q9. D.2 진입']
+  ];
+  const parts = ["[Phase D.1 — onboarding doc 답변]"];
+  for (const [n, label] of rows) {
+    const v = get(n);
+    if (v) parts.push(`\n${label}\n${v}`);
+  }
+  return parts.length > 1 ? parts.join('\n') : '[Phase D.1 — onboarding doc 답변]\n(아직 답변 없음)';
+}
+
+document.getElementById('d1-build').addEventListener('click', () => {
+  const txt = buildD1Text();
+  const pv = document.getElementById('d1-preview');
+  pv.classList.add('visible');
+  pv.textContent = txt;
+});
+document.getElementById('d1-copy').addEventListener('click', async (e) => {
+  const txt = buildD1Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    e.target.classList.add('copied');
+    e.target.textContent = '✓ 복사됨';
+    setTimeout(() => {
+      e.target.classList.remove('copied');
+      e.target.textContent = '📋 답변 복사';
+    }, 1500);
+  } catch (err) {
+    const pv = document.getElementById('d1-preview');
+    pv.classList.add('visible');
+    pv.textContent = txt + '\n\n[복사 실패 — 위 텍스트 수동 복사]';
+  }
+});
+</script>
+
+</div>
+</body>
+</html>

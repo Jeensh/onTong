@@ -1,0 +1,1918 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Phase B — Round 5 Archive 6 Entity Confirm (M1 빠른 confirm)</title>
+<style>
+  :root {
+    --bg: #0f172a; --card: #1e293b; --line: #334155;
+    --fg: #e2e8f0; --muted: #94a3b8;
+    --primary: #38bdf8; --emerald: #10b981; --amber: #f59e0b;
+    --rose: #fb7185; --violet: #a78bfa; --orange: #fb923c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:13.5px/1.55 -apple-system,"Pretendard","Apple SD Gothic Neo",sans-serif;background:var(--bg);color:var(--fg)}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 28px 80px}
+  header h1{font-size:22px;margin:0 0 6px}
+  header .sub{color:var(--muted);font-size:12px}
+  .progress{margin:18px 0 28px;display:flex;gap:6px;flex-wrap:wrap}
+  .phase{padding:5px 11px;border-radius:6px;background:var(--card);border:1px solid var(--line);font-size:11px;color:var(--muted)}
+  .phase.active{border-color:var(--primary);color:var(--fg);background:rgba(56,189,248,0.08)}
+  .phase.done{border-color:var(--emerald);color:var(--emerald);background:rgba(16,185,129,0.05)}
+  .phase.pending{border-color:var(--line);color:var(--muted)}
+
+  .step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:22px 26px;margin-bottom:24px}
+  .step h2{font-size:18px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  .step .meta{font-size:11px;color:var(--muted);margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .badge{padding:2px 8px;border-radius:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;font-weight:600}
+  .b-discuss{background:rgba(56,189,248,0.15);color:var(--primary)}
+  .b-applied{background:rgba(16,185,129,0.15);color:var(--emerald)}
+  .b-pending{background:rgba(148,163,184,0.15);color:var(--muted)}
+
+  h3{font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:20px 0 8px;font-weight:600}
+  h4{margin:14px 0 6px;font-size:13px;color:var(--violet)}
+  p{margin:6px 0 10px}
+  ul, ol{margin:6px 0 10px 20px;padding:0}
+  ul li, ol li{padding:3px 0}
+  code{font-family:"JetBrains Mono","SF Mono",monospace;font-size:91%;background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px;color:#c4b5fd}
+
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12.3px}
+  th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+  th{background:rgba(255,255,255,0.04);color:var(--primary);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:0.04em}
+
+  pre{background:rgba(0,0,0,0.35);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-family:"JetBrains Mono",monospace;font-size:11.5px;overflow-x:auto;color:#c4b5fd;margin:8px 0}
+
+  .my-guess{background:rgba(245,158,11,0.05);border-left:3px solid var(--amber);padding:12px 14px;border-radius:4px;margin:10px 0}
+  .my-guess .label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--amber);font-weight:700;margin-bottom:6px}
+  .my-guess .label::before{content:"🤔 "}
+
+  .applied{background:rgba(16,185,129,0.06);border-left:3px solid var(--emerald);padding:12px 14px;border-radius:4px;margin:10px 0}
+  .applied .label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--emerald);font-weight:700;margin-bottom:6px}
+  .applied .label::before{content:"✅ "}
+
+  .panel{background:rgba(0,0,0,0.20);border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin:8px 0}
+  .panel .label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);font-weight:600;margin-bottom:6px}
+
+  .archive-quote{background:rgba(167,139,250,0.06);border-left:3px solid var(--violet);padding:10px 14px;border-radius:4px;margin:10px 0;font-size:12.5px}
+  .archive-quote .label{font-size:10px;color:var(--violet);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;font-weight:600}
+  .archive-quote .label::before{content:"📚 "}
+
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:600}
+  .p-primary{background:rgba(56,189,248,0.12);color:var(--primary)}
+  .p-emerald{background:rgba(16,185,129,0.12);color:var(--emerald)}
+  .p-amber{background:rgba(245,158,11,0.15);color:var(--amber)}
+  .p-rose{background:rgba(251,113,133,0.15);color:var(--rose)}
+  .p-violet{background:rgba(167,139,250,0.15);color:var(--violet)}
+
+  .row2col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:10px 0}
+  @media(max-width:760px){.row2col{grid-template-columns:1fr}}
+
+  .small{font-size:11px;color:var(--muted)}
+
+  /* form section */
+  .form-section{margin:16px 0;padding:14px 16px;background:rgba(0,0,0,0.2);border-radius:8px;border:1px solid var(--line)}
+  .form-section h4{margin:0 0 10px;font-size:12px;color:var(--fg);font-weight:600}
+  .field{margin:10px 0}
+  .field > label{display:block;font-size:12.5px;color:var(--fg);margin-bottom:4px;font-weight:500;line-height:1.5}
+  .field .recommend{display:block;font-size:11px;color:var(--muted);margin:2px 0 4px}
+  input.text, textarea.text {
+    width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--line);border-radius:5px;
+    color:var(--fg);padding:7px 10px;font:inherit;font-size:12.5px
+  }
+  input.text:focus, textarea.text:focus {outline:none;border-color:var(--primary)}
+  textarea.text{min-height:80px;resize:vertical;font-family:"Pretendard",sans-serif}
+
+  .ds-actions{display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap}
+  .btn{padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--fg);font-size:12px;cursor:pointer;font-weight:500}
+  .btn:hover{border-color:var(--primary)}
+  .btn.primary{background:var(--primary);color:var(--bg);border-color:var(--primary)}
+  .btn.primary:hover{filter:brightness(1.1)}
+  .btn.copied{background:var(--emerald);border-color:var(--emerald);color:var(--bg)}
+  .copy-hint{font-size:11px;color:var(--muted);margin-left:auto}
+
+  .preview{margin-top:10px;padding:10px 12px;background:rgba(0,0,0,0.35);border-radius:6px;font-family:"JetBrains Mono",monospace;font-size:11.5px;white-space:pre-wrap;border:1px solid var(--line);display:none;color:var(--fg)}
+  .preview.visible{display:block}
+  .preview-label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px;font-family:"Pretendard",sans-serif}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Phase B — Round 5 Archive 6 Entity Confirm</h1>
+  <p class="sub">
+    <strong>M1 빠른 confirm</strong> 모드. Round 5 archive 의 도메인 fact 를 ontology row 로 옮김. 재인터뷰 X — 추천 그대로 / 정정 / 추가만.
+    각 entity 끝의 form 에 답변 → 「📋 답변 복사」 → 채팅 붙여넣기.
+  </p>
+</header>
+
+<div class="progress">
+  <span class="phase done">Phase A — Customer/Productivity ✓ 47 row</span>
+  <span class="phase active">Phase B — 6 entity confirm</span>
+  <span class="phase done">B.1 HrSpec ✓ (8 row)</span>
+  <span class="phase done">B.2 CastSpec ✓ (13 row)</span>
+  <span class="phase done">B.3 EdgingSpec ✓ (7 row)</span>
+  <span class="phase done">B.4 EdgingGroup ✓ (11 row)</span>
+  <span class="phase done">B.5 HrMin/MaxWgt ✓ (11 row)</span>
+  <span class="phase active">B.6 종결 ★ 진행</span>
+</div>
+
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>Phase B 진입 — 합의된 4 결정 + 흐름</h2>
+  <div class="meta">
+    <span class="badge b-applied">합의</span>
+    <span>2026-05-09 사용자 합의 (A/A/A/A)</span>
+  </div>
+
+  <h3>Phase A→B→C→D→E 흐름</h3>
+  <table>
+    <tr><th>Phase</th><th>내용</th><th>모드</th><th>상태</th></tr>
+    <tr><td>A</td><td>Round 6 — Customer / Productivity 풀 사이클 (47 row ground truth)</td><td>M1</td><td><span class="pill p-emerald">완료</span></td></tr>
+    <tr><td><strong>B</strong></td><td>Round 5 archive 6 entity 흡수 (HrSpec / CastSpec / EdgingSpec / EdgingGroup / HrMinWgt / HrMaxWgt)</td><td>M1 빠른 confirm</td><td><span class="pill p-primary">진행 중</span></td></tr>
+    <tr><td>C</td><td>Order (4 sub) + Slab + 21-step Algorithm Action 12~15</td><td>M3 hybrid</td><td><span class="pill p-amber">대기</span></td></tr>
+    <tr><td>D</td><td>다음 개발자용 API 설계 + 인계 가이드 + API 문서</td><td>—</td><td><span class="pill p-amber">대기</span></td></tr>
+    <tr><td>E</td><td>검증 + design-gaps 결정 + 빠진 entity 보완</td><td>—</td><td><span class="pill p-amber">대기</span></td></tr>
+  </table>
+
+  <h3>Phase B 합의된 4 결정</h3>
+  <table>
+    <tr><th>Q</th><th>결정</th><th>의미</th></tr>
+    <tr><td>Q1 범위</td><td><strong>A — 6 entity 만</strong></td><td>Order/Slab 은 Phase C 에서 21-step 과 같이</td></tr>
+    <tr><td>Q2 atomic share</td><td><strong>A — 적극 share</strong></td><td><code>scm.shared.*</code> 재사용. 신규 의미 발견 시 등록 (Phase A confirmed_plant_cd 패턴)</td></tr>
+    <tr><td>Q3 BR 정책</td><td><strong>A — enforced_by + violated_at_call</strong></td><td>코드 가드 있는 rule 만 등록. 단순 값 범위는 facets</td></tr>
+    <tr><td>Q4 PK 결함</td><td><strong>A — minimal + 결함 마킹</strong></td><td><code>facets.pk_quality_issue</code> + design-gaps 항목 등록</td></tr>
+  </table>
+
+  <h3>Phase B 작업 패턴 (각 entity 공통)</h3>
+  <ol>
+    <li><strong>Round 5 archive 핵심 사실</strong> 인용 — 도메인 의미 (재해석 X)</li>
+    <li><strong>코드 컬럼 분해</strong> — Jpo class 의 PK + facet 컬럼 → atomic / facet 분류</li>
+    <li><strong>추천 ontology row</strong> — composite + parts (atomic 재사용 강조) + facets + Action + TR</li>
+    <li><strong>form 답변</strong> — 추천대로 / 정정 / 추가 (~3 Q per entity)</li>
+    <li><strong>archive section</strong> — 합의 → row 누적</li>
+  </ol>
+
+  <h3>Phase A 47 row 입력자료 (Phase B atomic 재사용 대상)</h3>
+  <pre>atomic 7 (모두 scm.shared.*):
+  cmp / org / proc / grade / product_kind / customer / confirmed_plant_cd
+
+composite 2 (scm.std.*):
+  customer_design_limit / productivity_std
+
+Action 4 (scm.std.*):
+  match_customer_limit_for_order / lookup_productivity / lookup_productivity_or_default / cumulative_productivity
+
+BusinessRule 1:
+  rule.scm.std.productivity_safe_range</pre>
+  <p class="small">★ Phase B 의 6 entity 는 위 atomic 7 중 cmp/org/grade/product_kind 를 다수 재사용. 신규 atomic 후보: hrPlantCd / castCd / edgingCd 등.</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<!-- B.1 — HrSpec  -->
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>B.1 — HrSpec (열연공장 표준)</h2>
+  <div class="meta">
+    <span class="badge b-discuss">진행 중</span>
+    <span>Phase B 첫 entity · ~30분 예상</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>① Round 5 archive 핵심 사실</h3>
+  <div class="archive-quote">
+    <div class="label">round5-live-authoring.html Step 4 ~ Step 5 archive</div>
+    <ul>
+      <li><strong>실체</strong>: 열연공장 (HR plant). 특정 열연공장이 특정 품종에 대해 가능한 폭/길이 범위.</li>
+      <li><strong>매칭 패턴</strong>: 와일드카드 가능 — <code>*</code> / <code>%LIKE</code> / <code>LIKE%</code> / <code>NULL</code> = 자동 true / 정확매칭.<br>
+        ⚠️ 코드 (<code>HrSpecService.lookup</code>) 는 <code>findById</code> 정확매칭만 함 — <strong>운영 룩업 vs 데모 코드 갭</strong>.</li>
+      <li><strong>매칭 실패 시</strong>: 데이터 결함. 레거시는 NPE. 이상적 동작은 HIST "열연공장 없음" FAIL 기록 (현재 미구현).</li>
+      <li><strong>소유 sub-system</strong>: 공정계획. 변경 트리거: 실제 설비 변경 시. row 규모: 수십.</li>
+      <li><strong>모델링 패턴 (Round 5 Step 5 채택)</strong>: 옵션 C — Plant + Constraint 분리, Composition.<br>
+        <code>HrPlant 1 ── N HrPlantConstraint</code>. HR_SPEC row ↔ HrPlantConstraint 1:1.</li>
+      <li><strong>와일드카드 표현</strong>: 일반 entity 1개 + facet <code>matchPattern</code> (EXACT / WILDCARD / LIKE_PREFIX / LIKE_SUFFIX / NULL).</li>
+      <li><strong>표시명/식별자</strong>: UI 한국어 ("열연공장", "열연공장제약"), 내부 PascalCase (HrPlant, HrPlantConstraint).</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>② 코드 컬럼 분해 — HrSpecJpo</h3>
+  <div class="panel">
+    <div class="label">slab-design-store/.../jpo/HrSpecJpo.java</div>
+    <pre>@Entity @Table(name = "HR_SPEC") @IdClass(HrSpecPK.class)
+public class HrSpecJpo {
+    @Id @Column(name = "CMP_CD",          length = 2)  String cmpCd;          // 회사
+    @Id @Column(name = "ORG_CD",          length = 1)  String orgCd;          // 소
+    @Id @Column(name = "HR_PLANT_CD",     length = 1)  String hrPlantCd;      // 열연공장코드 (확통2자리)
+    @Id @Column(name = "PRODUCT_TYPE_CD", length = 4)  String productTypeCd;  // 품종
+
+    @Column WIDTH_LOW  / WIDTH_HIGH  (BigDecimal 10,2)   // 폭 범위
+    @Column LENGTH_LOW / LENGTH_HIGH (BigDecimal 10,2)   // 길이 범위
+}</pre>
+    <p class="small">PK = 4 컬럼 (cmp + org + hrPlantCd + productType). facet = 4 컬럼 (widthLow/High + lengthLow/High).</p>
+  </div>
+
+  <h3>③ 컬럼별 매핑 후보</h3>
+  <table>
+    <tr><th>코드 컬럼</th><th>type</th><th>매핑 후보</th><th>Phase A 재사용?</th><th>비고</th></tr>
+    <tr><td><code>cmpCd</code></td><td>string(2)</td><td><code>term.scm.shared.cmp</code></td><td><span class="pill p-emerald">재사용</span></td><td>—</td></tr>
+    <tr><td><code>orgCd</code></td><td>string(1)</td><td><code>term.scm.shared.org</code></td><td><span class="pill p-emerald">재사용</span></td><td>—</td></tr>
+    <tr><td><code>hrPlantCd</code></td><td>string(1)</td><td><code>term.scm.shared.hr_plant_cd</code> ★ 신규</td><td><span class="pill p-amber">신규</span></td><td>"확통 2자리" comment = <code>confirmedPlantCd[1]</code> (HR 위치 = proc[1])</td></tr>
+    <tr><td><code>productTypeCd</code></td><td>string(4)</td><td><code>term.scm.shared.product_kind</code></td><td><span class="pill p-emerald">재사용</span></td><td>품종 4 alias 중 1개 (PARTIAL TR 추가)</td></tr>
+    <tr><td><code>widthLow / widthHigh</code></td><td>BigDecimal(10,2)</td><td>composite facet</td><td>—</td><td>폭 범위</td></tr>
+    <tr><td><code>lengthLow / lengthHigh</code></td><td>BigDecimal(10,2)</td><td>composite facet</td><td>—</td><td>길이 범위</td></tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>④ 추천 ontology row (Q3 정책 반영)</h3>
+
+  <h4>(A) 신규 atomic 1개</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>type</th><th>facets</th></tr>
+    <tr>
+      <td><code>term.scm.shared.hr_plant_cd</code></td>
+      <td>열연공장코드</td>
+      <td>string(1)</td>
+      <td><code>encoding: "confirmedPlantCd[1] = HR 위치 (proc[1]=HR)"</code> · <code>related_atomic: term.scm.shared.confirmed_plant_cd</code></td>
+    </tr>
+  </table>
+  <p class="small">★ Round 5 archive 와 Phase A confirmedPlantCd 의 "자리 i ↔ proc[i]" 패턴 연결. HR_PLANT_CD = confirmedPlantCd[1] (proc[1] = HR, 열연 위치) 와 같은 도메인. 검증: <code>SdWidthRangeAction.java:58</code> <code>char hrChar = confirmed.charAt(1);</code></p>
+
+  <h4>(B) 신규 entity 2개 (Round 5 Step 5 옵션 C)</h4>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>한국어</th><th>parts (atomic)</th><th>facets</th></tr>
+    <tr>
+      <td>composite</td>
+      <td><code>term.scm.spec.hr_plant</code></td>
+      <td>열연공장</td>
+      <td>cmp + org + hr_plant_cd</td>
+      <td><code>owner_subsystem: "공정계획"</code> · <code>row_scale: "수십"</code></td>
+    </tr>
+    <tr>
+      <td>composite</td>
+      <td><code>term.scm.spec.hr_plant_constraint</code></td>
+      <td>열연공장제약</td>
+      <td>cmp + org + hr_plant_cd + product_kind</td>
+      <td><code>width_low/high</code> (BigDecimal 10,2) · <code>length_low/high</code> (BigDecimal 10,2) · <code>match_pattern: ["EXACT"]</code> (와일드카드 미구현 마킹)</td>
+    </tr>
+  </table>
+  <p class="small">★ <code>scm.spec.*</code> 신규 sub-domain — 설비 제약 표준. <code>scm.std.*</code> (Customer/Productivity 같은 lookup 표준) 와 구분.</p>
+
+  <h4>(C) Action 1개 (단순화 버전)</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>params</th><th>return</th><th>realizes (PRIMARY)</th></tr>
+    <tr>
+      <td><code>action.scm.spec.lookup_hr_constraint</code></td>
+      <td>열연공장제약 룩업 (정확매칭)</td>
+      <td>cmp / org / hr_plant_cd / product_kind</td>
+      <td><code>term.scm.spec.hr_plant_constraint</code> (or null)</td>
+      <td><code>HrSpecService.lookup</code> · <code>HrSpecRepository.findById</code></td>
+    </tr>
+  </table>
+  <p class="small">★ <code>match_pattern</code> facet 이 <code>["EXACT"]</code> 인 이유 — 운영 룩업은 wildcard 지원, 코드는 정확매칭만. design-gaps 항목으로 등록.</p>
+
+  <h4>(D) TypeRealization (Q2 atomic share 정책)</h4>
+  <table>
+    <tr><th>atomic</th><th>code position</th><th>scope</th></tr>
+    <tr><td><code>term.scm.shared.cmp</code></td><td>HrSpecJpo.cmpCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>term.scm.shared.org</code></td><td>HrSpecJpo.orgCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>term.scm.shared.hr_plant_cd</code></td><td>HrSpecJpo.hrPlantCd</td><td>PRIMARY (이 atomic 의 첫 등장)</td></tr>
+    <tr><td><code>term.scm.shared.product_kind</code></td><td>HrSpecJpo.productTypeCd</td><td>PARTIAL (5번째 alias 추가)</td></tr>
+  </table>
+
+  <h4>(E) BusinessRule (Q3 정책 — 코드 가드 있는 rule 만)</h4>
+  <p class="small">⚠ <strong>등록 안 함</strong>. <code>HrSpecService.lookup</code> 코드에 가드 없음 (NPE 정책). 단 design-gaps 항목으로:</p>
+  <ul>
+    <li><strong>design-gaps #23 (신규)</strong>: HrSpec 룩업 실패 시 NPE — HIST "열연공장 없음" FAIL 기록 미구현. Q3 의 violated_at_call 후보.</li>
+  </ul>
+
+  <h4>(F) 결함 마킹 (Q4 정책)</h4>
+  <ul>
+    <li>코드 데모와 운영 룩업 갭 — <code>match_pattern: ["EXACT"]</code> 만 구현. wildcard 미구현 → <code>facets.pk_quality_issue: "wildcard_match_not_implemented"</code></li>
+  </ul>
+
+  <!-- ====================================================================== -->
+  <h3>⑤ 누적 row (B.1 종료 시)</h3>
+  <pre>+ 1 atomic        : term.scm.shared.hr_plant_cd
++ 2 composite     : term.scm.spec.hr_plant
+                    term.scm.spec.hr_plant_constraint
++ 1 Action        : action.scm.spec.lookup_hr_constraint
++ 4 TR            : cmp / org / hr_plant_cd (PRIMARY) / product_kind (PARTIAL)
++ 1 design-gaps  : #23 HrSpec NPE → HIST FAIL 기록 미구현
+─────────────────────────────────
+B.1 누적: 8 row (atomic 1 + composite 2 + Action 1 + TR 4)</pre>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>B.1 답변 — HrSpec 합의</h4>
+
+    <div class="field">
+      <label><strong>Q1. 추천 row 8개 OK?</strong> (atomic 1 + composite 2 + Action 1 + TR 4)
+        <span class="recommend">★ 추천: <strong>OK</strong>. Round 5 Step 5 의 옵션 C 패턴 적용.</span>
+      </label>
+      <textarea class="text" name="q1_rows" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. <code>term.scm.spec</code> 신규 sub-domain naming OK?</strong>
+        <span class="recommend">★ 추천: <strong>OK</strong>. <code>scm.std.*</code> (lookup 표준) 와 <code>scm.spec.*</code> (설비 제약) 구분. EdgingSpec/EdgingGroup/HrMin·MaxWgt 도 같은 패턴.</span>
+      </label>
+      <textarea class="text" name="q2_domain" rows="2" placeholder="예: OK / 다른 naming 제안 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. <code>hr_plant_cd</code> 와 Phase A <code>confirmed_plant_cd</code> 관계 표현</strong>
+        <span class="recommend">★ 추천: atomic facets 에 <code>related_atomic: confirmed_plant_cd</code> + 자리 매핑 encoding (HR=자리 1 = proc[1], 검증: <code>SdWidthRangeAction.java:58</code>). 향후 anchor binding 에서 활용.</span>
+      </label>
+      <textarea class="text" name="q3_relation" rows="2" placeholder="예: 추천대로 / 다른 방식 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. wildcard 미구현 결함 표현</strong> — composite facets 에 <code>match_pattern: ["EXACT"]</code> + design-gaps 항목 등록 OK?
+        <span class="recommend">★ 추천 OK. Q4 정책 (PK 결함 minimal + 마킹) 그대로 적용.</span>
+      </label>
+      <textarea class="text" name="q4_defect" rows="2" placeholder="예: OK / 다른 방식 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. 빠뜨림 / 추가</strong>
+        <span class="recommend">★ 추천: 없음. 코드 4 PK + 4 facet 모두 매핑.</span>
+      </label>
+      <textarea class="text" name="q5_missing" rows="2" placeholder="예: 없음 / 또는: ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. B.2 (CastSpec) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. CastSpec 도 동일 패턴 (CastPlant + CastPlantConstraint).</span>
+      </label>
+      <textarea class="text" name="q6_next" rows="2" placeholder="예: OK / 다른 진행 ___"></textarea>
+    </div>
+
+    <div class="ds-actions">
+      <button class="btn primary" id="b1-build">미리보기</button>
+      <button class="btn" id="b1-copy">📋 답변 복사</button>
+      <span class="copy-hint">「📋 답변 복사」 → 채팅 붙여넣기</span>
+    </div>
+    <div class="preview" id="b1-preview"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- B.1 archive -->
+<!-- ====================================================================== -->
+<section class="step" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 B.1 답변 받음 — HrSpec 합의 (8 row)</h2>
+  <div class="meta">
+    <span class="badge b-applied">archive</span>
+    <span>모두 추천대로</span>
+  </div>
+
+  <h3>답변 그대로</h3>
+  <div class="applied">
+    <div class="label">사용자 답변 (2026-05-09)</div>
+    <ul>
+      <li><strong>Q1</strong> 추천 row 8개: OK</li>
+      <li><strong>Q2</strong> <code>scm.spec</code> sub-domain: 추천대로</li>
+      <li><strong>Q3</strong> hr_plant_cd ↔ confirmed_plant_cd 관계: 추천 정정 — <strong>자리 0~1 (X)</strong> → <strong>자리 1 (proc[1] = HR)</strong>. 검증: <code>SdWidthRangeAction.java:58 charAt(1)</code> = HR. Phase A confirmed_plant_cd encoding "자리 i ↔ proc[i]" 일반 규칙 그대로.</li>
+      <li><strong>Q4</strong> wildcard 미구현 결함: 추천대로 (<code>match_pattern: ["EXACT"]</code> + design-gaps #23)</li>
+      <li><strong>Q5</strong> 빠뜨림: 응답 없음 → 없음 추정</li>
+      <li><strong>Q6</strong> B.2 진입: OK</li>
+    </ul>
+  </div>
+
+  <h3>★ B.1 합의 row (Phase B 누적 +8)</h3>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>요약</th></tr>
+    <tr><td>atomic</td><td><code>term.scm.shared.hr_plant_cd</code></td><td>열연공장코드 (string 1, related_atomic: confirmed_plant_cd <strong>자리 1</strong> = proc[1] = HR. 검증: <code>SdWidthRangeAction.java:58 charAt(1)</code>)</td></tr>
+    <tr><td>composite</td><td><code>term.scm.spec.hr_plant</code></td><td>열연공장 (cmp+org+hr_plant_cd, owner=공정계획)</td></tr>
+    <tr><td>composite</td><td><code>term.scm.spec.hr_plant_constraint</code></td><td>열연공장제약 (4 atomic, facets: width/length range, match_pattern=EXACT)</td></tr>
+    <tr><td>Action</td><td><code>action.scm.spec.lookup_hr_constraint</code></td><td>realizes HrSpecService.lookup (정확매칭만)</td></tr>
+    <tr><td>TR</td><td>cmp / org</td><td>PARTIAL (Phase A 재사용)</td></tr>
+    <tr><td>TR</td><td>hr_plant_cd</td><td>PRIMARY (이 atomic 첫 등장)</td></tr>
+    <tr><td>TR</td><td>product_kind</td><td>PARTIAL (5번째 alias 추가)</td></tr>
+  </table>
+
+  <h3>★ design-gaps 추가</h3>
+  <ul>
+    <li><strong>#23</strong> — HrSpec 룩업 실패 시 NPE. HIST "열연공장 없음" FAIL 기록 미구현. (BR violated_at_call 후보)</li>
+    <li><strong>#24</strong> (B.1 의 wildcard 결함) — <code>HrSpecService.lookup</code> 정확매칭만, 운영은 wildcard. <code>facets.pk_quality_issue: "wildcard_match_not_implemented"</code></li>
+  </ul>
+
+  <p class="small">★ Phase B 누적: <strong>8 row</strong>. 다음 → B.2 CastSpec.</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<!-- B.2 — CastSpec  -->
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>B.2 — CastSpec (연주공장 표준)</h2>
+  <div class="meta">
+    <span class="badge b-discuss">진행 중</span>
+    <span>Phase B 2번째 entity · ~30분 예상</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>① Round 5 archive 핵심 사실</h3>
+  <div class="archive-quote">
+    <div class="label">round5-live-authoring.html Step 4 archive</div>
+    <ul>
+      <li><strong>실체</strong>: 연주공장 (Cast plant) — <strong>머신 단위</strong>. 특정 연주머신이 특정 품종에 대해 뽑는 두께·폭/길이 범위.</li>
+      <li><strong>★ 두께는 머신당 고정값</strong> — slabThickness facet 의 도메인 의미.</li>
+      <li><strong>매칭 패턴</strong>: HrSpec 과 동일 (wildcard 가능, 코드 정확매칭만).</li>
+      <li><strong>매칭 실패 시</strong>: NPE (HrSpec 과 동일).</li>
+      <li><strong>WGT_LOW/HIGH</strong>: 다른 공정계획 비즈니스 프로세스에서 사용. <strong>21-step 데모 범위에선 미참조</strong>.</li>
+      <li><strong>모델링 패턴</strong>: 옵션 C — CastPlant + CastPlantConstraint Composition.</li>
+      <li><strong>표시명/식별자</strong>: UI 한국어 ("연주공장", "연주공장제약"), 내부 PascalCase.</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>② 코드 컬럼 분해 — CastSpecJpo</h3>
+  <div class="panel">
+    <div class="label">slab-design-store/.../jpo/CastSpecJpo.java</div>
+    <pre>@Entity @Table(name = "CAST_SPEC") @IdClass(CastSpecPK.class)
+public class CastSpecJpo {
+    @Id @Column CMP_CD          (string 2)  // 회사
+    @Id @Column ORG_CD          (string 1)  // 소
+    @Id @Column SM_CD           (string 1)  // 제강코드 (확통 1자리)
+    @Id @Column CAST_CD         (string 4)  // 연주코드
+    @Id @Column MACHINE_CD      (string 4)  // 머신코드
+    @Id @Column PRODUCT_TYPE_CD (string 4)  // 품종
+
+    @Column SLAB_THICKNESS  (BigDecimal 6,2)   // ★ step 1 두께 (머신당 고정)
+    @Column WIDTH_LOW/HIGH  (BigDecimal 10,2)  // step 2 폭 범위
+    @Column LENGTH_LOW/HIGH (BigDecimal 10,2)  // step 3 길이 범위
+    @Column WGT_LOW/HIGH    (BigDecimal 10,3)  // 21-step 미참조 (참고용)
+}
+
+// 룩업: ORDER_OS.CONFIRMED_PLANT_CD[0] (제강위치) → SM_CD 매칭
+// (CAST_CD, MACHINE_CD) 는 PlantMappingService 가 SM_CD 기반 하드코딩 매핑 제공</pre>
+    <p class="small">PK 6 컬럼 (HrSpec 4 보다 2 많음 — 제강·연주·머신 3-단계). facet 8 컬럼 (slab_thickness ★ + width 2 + length 2 + wgt 2).</p>
+  </div>
+
+  <h3>③ 컬럼별 매핑 후보</h3>
+  <table>
+    <tr><th>코드 컬럼</th><th>type</th><th>매핑 후보</th><th>Phase A/B 재사용?</th><th>비고</th></tr>
+    <tr><td><code>cmpCd</code></td><td>string(2)</td><td><code>term.scm.shared.cmp</code></td><td><span class="pill p-emerald">재사용</span></td><td>—</td></tr>
+    <tr><td><code>orgCd</code></td><td>string(1)</td><td><code>term.scm.shared.org</code></td><td><span class="pill p-emerald">재사용</span></td><td>—</td></tr>
+    <tr><td><code>smCd</code></td><td>string(1)</td><td><code>term.scm.shared.sm_cd</code> ★ 신규</td><td><span class="pill p-amber">신규</span></td><td>제강코드. confirmedPlantCd 자리 [0] 와 매핑 (anchor 후보)</td></tr>
+    <tr><td><code>castCd</code></td><td>string(4)</td><td><code>term.scm.shared.cast_cd</code> ★ 신규</td><td><span class="pill p-amber">신규</span></td><td>연주코드. PlantMappingService 가 sm→cast 매핑</td></tr>
+    <tr><td><code>machineCd</code></td><td>string(4)</td><td><code>term.scm.shared.machine_cd</code> ★ 신규</td><td><span class="pill p-amber">신규</span></td><td>머신코드. PlantMappingService 가 sm→machine 매핑</td></tr>
+    <tr><td><code>productTypeCd</code></td><td>string(4)</td><td><code>term.scm.shared.product_kind</code></td><td><span class="pill p-emerald">재사용</span></td><td>품종 6번째 alias (PARTIAL TR 추가)</td></tr>
+    <tr><td><code>slabThickness</code></td><td>BigDecimal(6,2)</td><td>composite facet ★</td><td>—</td><td>머신당 고정값 (도메인 의미)</td></tr>
+    <tr><td><code>widthLow/High</code></td><td>BigDecimal(10,2)</td><td>composite facet</td><td>—</td><td>폭 범위</td></tr>
+    <tr><td><code>lengthLow/High</code></td><td>BigDecimal(10,2)</td><td>composite facet</td><td>—</td><td>길이 범위</td></tr>
+    <tr><td><code>wgtLow/High</code></td><td>BigDecimal(10,3)</td><td>composite facet (unused 마킹)</td><td>—</td><td>21-step 미참조 — Q4 결함 마킹 적용</td></tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>④ 추천 ontology row</h3>
+
+  <h4>(A) 신규 atomic 3개</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>type</th><th>facets</th></tr>
+    <tr>
+      <td><code>term.scm.shared.sm_cd</code></td>
+      <td>제강코드</td>
+      <td>string(1)</td>
+      <td><code>related_atomic: term.scm.shared.confirmed_plant_cd</code> · <code>encoding: "confirmedPlantCd[0] = SM 위치"</code></td>
+    </tr>
+    <tr>
+      <td><code>term.scm.shared.cast_cd</code></td>
+      <td>연주코드</td>
+      <td>string(4)</td>
+      <td><code>derived_from: sm_cd</code> · <code>derivation_source: "PlantMappingService (hardcoded)"</code></td>
+    </tr>
+    <tr>
+      <td><code>term.scm.shared.machine_cd</code></td>
+      <td>머신코드</td>
+      <td>string(4)</td>
+      <td><code>derived_from: sm_cd</code> · <code>derivation_source: "PlantMappingService (hardcoded)"</code></td>
+    </tr>
+  </table>
+
+  <h4>(B) 신규 entity 2개 (HrSpec 와 같은 패턴)</h4>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>한국어</th><th>parts (atomic)</th><th>facets</th></tr>
+    <tr>
+      <td>composite</td>
+      <td><code>term.scm.spec.cast_plant</code></td>
+      <td>연주공장</td>
+      <td>cmp + org + sm_cd + cast_cd + machine_cd</td>
+      <td><code>owner_subsystem: "공정계획"</code> · <code>row_scale: "수십"</code> · <code>granularity: "machine"</code></td>
+    </tr>
+    <tr>
+      <td>composite</td>
+      <td><code>term.scm.spec.cast_plant_constraint</code></td>
+      <td>연주공장제약</td>
+      <td>cmp + org + sm_cd + cast_cd + machine_cd + product_kind</td>
+      <td>
+        <code>slab_thickness</code> (BigDecimal 6,2, <code>fixed_per_machine: true</code> ★) ·
+        <code>width_low/high</code> (BigDecimal 10,2) ·
+        <code>length_low/high</code> (BigDecimal 10,2) ·
+        <code>wgt_low/high</code> (BigDecimal 10,3, <code>unused_in_21step: true</code>) ·
+        <code>match_pattern: ["EXACT"]</code> (wildcard 미구현)
+      </td>
+    </tr>
+  </table>
+  <p class="small">★ <code>fixed_per_machine: true</code> 가 핵심 도메인 사실 (Round 5 archive). 머신 1개당 두께 1개. 향후 anchor binding 또는 BR 의 facet hint.</p>
+
+  <h4>(C) Action 2개 — lookup + plant mapping</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>params</th><th>return</th><th>realizes</th></tr>
+    <tr>
+      <td><code>action.scm.spec.lookup_cast_constraint</code></td>
+      <td>연주공장제약 룩업 (정확매칭)</td>
+      <td>cmp / org / sm_cd / cast_cd / machine_cd / product_kind</td>
+      <td><code>term.scm.spec.cast_plant_constraint</code> (or null)</td>
+      <td>PRIMARY: <code>CastSpecService.lookup</code> · <code>CastSpecRepository.findById</code></td>
+    </tr>
+    <tr>
+      <td><code>action.scm.spec.map_sm_to_cast_machine</code> ★</td>
+      <td>제강 → 연주/머신 하드코딩 매핑</td>
+      <td>cmp / org / sm_cd</td>
+      <td>tuple (cast_cd, machine_cd)</td>
+      <td>PRIMARY: <code>PlantMappingService.*</code> — <em>코드 hardcoded, 데이터 매핑 X</em></td>
+    </tr>
+  </table>
+  <p class="small">★ 두 번째 Action 은 HrSpec 에 없던 패턴 — sm_cd 로부터 cast/machine 도출. design-gaps 후보 (hardcoded 매핑은 운영 변경 시 코드 수정 필요).</p>
+
+  <h4>(D) TypeRealization</h4>
+  <table>
+    <tr><th>atomic</th><th>code position</th><th>scope</th></tr>
+    <tr><td><code>term.scm.shared.cmp</code></td><td>CastSpecJpo.cmpCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>term.scm.shared.org</code></td><td>CastSpecJpo.orgCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>term.scm.shared.sm_cd</code></td><td>CastSpecJpo.smCd</td><td>PRIMARY (이 atomic 첫 등장)</td></tr>
+    <tr><td><code>term.scm.shared.cast_cd</code></td><td>CastSpecJpo.castCd</td><td>PRIMARY</td></tr>
+    <tr><td><code>term.scm.shared.machine_cd</code></td><td>CastSpecJpo.machineCd</td><td>PRIMARY</td></tr>
+    <tr><td><code>term.scm.shared.product_kind</code></td><td>CastSpecJpo.productTypeCd</td><td>PARTIAL (6번째 alias)</td></tr>
+  </table>
+
+  <h4>(E) BusinessRule (Q3 정책)</h4>
+  <p class="small">⚠ <strong>등록 안 함</strong>. 코드 가드 없음 (NPE 동일).</p>
+  <ul>
+    <li><strong>design-gaps #23 확장</strong>: HrSpec + CastSpec 둘 다 NPE → HIST FAIL 기록 미구현 (공통 패턴).</li>
+    <li><strong>design-gaps #25 (신규)</strong>: PlantMappingService 의 sm→(cast,machine) 하드코딩 매핑. 데이터로 분리되지 않음 → 운영 변경 시 코드 수정. <code>action.map_sm_to_cast_machine</code> 의 facets 에 <code>has_hardcoded_mapping: true</code>.</li>
+  </ul>
+
+  <h4>(F) 결함 마킹 (Q4 정책)</h4>
+  <ul>
+    <li><strong>wildcard 미구현</strong> — HrSpec 와 동일. <code>match_pattern: ["EXACT"]</code></li>
+    <li><strong>WGT_LOW/HIGH 미사용</strong> — 21-step 데모 범위 외. <code>facets.unused_in_21step: ["wgt_low", "wgt_high"]</code></li>
+    <li><strong>hardcoded plant mapping</strong> — Action facets <code>has_hardcoded_mapping: true</code> + design-gaps #25</li>
+  </ul>
+
+  <!-- ====================================================================== -->
+  <h3>⑤ 누적 row (B.2 종료 시 예상)</h3>
+  <pre>+ 3 atomic        : sm_cd / cast_cd / machine_cd
++ 2 composite     : term.scm.spec.cast_plant
+                    term.scm.spec.cast_plant_constraint
++ 2 Action        : lookup_cast_constraint
+                    map_sm_to_cast_machine
++ 6 TR            : cmp / org (PARTIAL) + sm_cd / cast_cd / machine_cd (PRIMARY) + product_kind (PARTIAL)
++ 2 design-gaps  : #23 확장 (NPE) / #25 신규 (hardcoded mapping)
+─────────────────────────────────
+B.2 추가: 13 row (atomic 3 + composite 2 + Action 2 + TR 6)
+B.1+B.2 누적: 8 + 13 = 21 row</pre>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>B.2 답변 — CastSpec 합의</h4>
+
+    <div class="field">
+      <label><strong>Q1. 추천 row 13개 OK?</strong> (atomic 3 + composite 2 + Action 2 + TR 6)
+        <span class="recommend">★ 추천: <strong>OK</strong>. HrSpec 패턴 + sm→cast,machine 하드코딩 매핑 별도 Action.</span>
+      </label>
+      <textarea class="text" name="b2_q1" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. atomic 3개 (sm_cd / cast_cd / machine_cd) 모두 <code>scm.shared</code>?</strong>
+        <span class="recommend">★ 추천 OK. cast/machine 도 향후 Order 등에서 재사용 가능. <code>scm.shared</code> 일관성.</span>
+      </label>
+      <textarea class="text" name="b2_q2" rows="2" placeholder="예: OK / cast/machine 은 scm.spec.private 등 다른 위치 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. <code>slab_thickness</code> 의 <code>fixed_per_machine: true</code> facet</strong>
+        <span class="recommend">★ 추천 OK. 머신당 고정값 (Round 5 archive 핵심 사실) 을 facet 으로 박음. 향후 anchor / BR 후보.</span>
+      </label>
+      <textarea class="text" name="b2_q3" rows="2" placeholder="예: OK / 다른 표현 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. <code>action.map_sm_to_cast_machine</code> 별도 Action 등록</strong>
+        <span class="recommend">★ 추천 OK. PlantMappingService 의 hardcoded 매핑 → 명시적 Action 으로 노출. design-gaps #25 등록.</span>
+      </label>
+      <textarea class="text" name="b2_q4" rows="2" placeholder="예: OK / facet 으로만 표현 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. <code>WGT_LOW/HIGH</code> 처리</strong> — composite facet 으로 등록 + <code>unused_in_21step: true</code> 마킹 OK?
+        <span class="recommend">★ 추천 OK. ontology 는 코드 ground truth. 미사용 column 도 표현 + 마킹 (Q4 정책).</span>
+      </label>
+      <textarea class="text" name="b2_q5" rows="2" placeholder="예: OK / 다른 처리 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. 빠뜨림 / 추가</strong>
+        <span class="recommend">★ 추천: 없음. 코드 6 PK + 8 facet 모두 매핑.</span>
+      </label>
+      <textarea class="text" name="b2_q6" rows="2" placeholder="예: 없음 / 또는: ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7. B.3 (EdgingSpec) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. EdgingSpec 은 wildcard fallback (Round 5 D-3″ 채택) 이 핵심 차별점.</span>
+      </label>
+      <textarea class="text" name="b2_q7" rows="2" placeholder="예: OK / 다른 진행 ___"></textarea>
+    </div>
+
+    <div class="ds-actions">
+      <button class="btn primary" id="b2-build">미리보기</button>
+      <button class="btn" id="b2-copy">📋 답변 복사</button>
+      <span class="copy-hint">「📋 답변 복사」 → 채팅 붙여넣기</span>
+    </div>
+    <div class="preview" id="b2-preview"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- B.2 archive -->
+<!-- ====================================================================== -->
+<section class="step" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 B.2 답변 받음 — CastSpec 합의 (13 row)</h2>
+  <div class="meta">
+    <span class="badge b-applied">archive</span>
+    <span>모두 추천대로</span>
+  </div>
+
+  <h3>답변 그대로</h3>
+  <div class="applied">
+    <div class="label">사용자 답변 (2026-05-10)</div>
+    <ul>
+      <li><strong>Q1</strong> 추천 row 13개: 추천대로</li>
+      <li><strong>Q2</strong> atomic 3개 (sm/cast/machine) 모두 <code>scm.shared</code>: 추천대로</li>
+      <li><strong>Q3</strong> <code>slab_thickness</code> <code>fixed_per_machine: true</code>: 추천대로</li>
+      <li><strong>Q4</strong> <code>action.map_sm_to_cast_machine</code> 별도 등록: 추천대로</li>
+      <li><strong>Q5</strong> WGT_LOW/HIGH composite facet + <code>unused_in_21step</code> 마킹: 추천대로</li>
+      <li><strong>Q6</strong> 빠뜨림: 응답 없음 → 없음 추정</li>
+      <li><strong>Q7</strong> B.3 진입: OK</li>
+    </ul>
+  </div>
+
+  <h3>★ B.2 합의 row (Phase B 누적 +13)</h3>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>요약</th></tr>
+    <tr><td>atomic</td><td><code>term.scm.shared.sm_cd</code></td><td>제강코드 (string 1, related: confirmed_plant_cd[0])</td></tr>
+    <tr><td>atomic</td><td><code>term.scm.shared.cast_cd</code></td><td>연주코드 (string 4, derived_from: sm_cd via PlantMappingService hardcoded)</td></tr>
+    <tr><td>atomic</td><td><code>term.scm.shared.machine_cd</code></td><td>머신코드 (string 4, derived_from: sm_cd via PlantMappingService hardcoded)</td></tr>
+    <tr><td>composite</td><td><code>term.scm.spec.cast_plant</code></td><td>연주공장 (5 atomic, granularity=machine, owner=공정계획)</td></tr>
+    <tr><td>composite</td><td><code>term.scm.spec.cast_plant_constraint</code></td><td>연주공장제약 (6 atomic, slab_thickness ★ fixed_per_machine, width/length range, wgt unused_in_21step)</td></tr>
+    <tr><td>Action</td><td><code>action.scm.spec.lookup_cast_constraint</code></td><td>realizes CastSpecService.lookup (정확매칭만)</td></tr>
+    <tr><td>Action</td><td><code>action.scm.spec.map_sm_to_cast_machine</code> ★</td><td>realizes PlantMappingService (hardcoded 매핑)</td></tr>
+    <tr><td>TR</td><td>cmp / org</td><td>PARTIAL (Phase A 재사용)</td></tr>
+    <tr><td>TR</td><td>sm_cd / cast_cd / machine_cd</td><td>PRIMARY (3 신규 atomic 첫 등장)</td></tr>
+    <tr><td>TR</td><td>product_kind</td><td>PARTIAL (6번째 alias)</td></tr>
+  </table>
+
+  <h3>★ design-gaps 추가</h3>
+  <ul>
+    <li><strong>#23 확장</strong> — HrSpec + CastSpec 둘 다 NPE 정책 (HIST FAIL 기록 미구현 공통 패턴).</li>
+    <li><strong>#25 신규</strong> — PlantMappingService 의 sm→(cast,machine) 하드코딩 매핑. 운영 변경 시 코드 수정 필요. <code>action.facets.has_hardcoded_mapping: true</code>.</li>
+  </ul>
+
+  <p class="small">★ Phase B 누적: <strong>21 row</strong> (B.1 8 + B.2 13). 다음 → B.3 EdgingSpec.</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<!-- B.3 — EdgingSpec  -->
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>B.3 — EdgingSpec (Edging 능력 표준)</h2>
+  <div class="meta">
+    <span class="badge b-discuss">진행 중</span>
+    <span>Phase B 3번째 entity · BR 첫 등장 ★</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>① Round 5 archive 핵심 사실</h3>
+  <div class="archive-quote">
+    <div class="label">round5-live-authoring.html Phase A.7 archive</div>
+    <ul>
+      <li><strong>실체</strong>: EDGING_SPEC = 슬랩 폭 변환 능력 (열연목표폭 → slab 폭 변환 시 추가/감소 가능 범위).</li>
+      <li><strong>★ wildcard fallback 정책</strong>: <code>EDGING_GROUP_CD = '*'</code> row 가 catchall. 룩업 시 정확매칭 우선, 미존재 시 <code>'*'</code> fallback.</li>
+      <li><strong>매칭 실패 시</strong>: 양쪽 (정확매칭 + '*') 모두 미존재 → <code>IllegalStateException</code>. HrSpec/CastSpec 의 NPE 와 다른 <strong>명시적 에러</strong>.</li>
+      <li><strong>운영 이슈 history</strong>: P-2018-0237 (2018-02) — '*' fallback 도입 전 NPE 로 일부 라인 작업 중단. fallback 추가로 해결.</li>
+      <li><strong>채택 패턴</strong>: Round 5 D-3″ — wildcard row 도 일반 entity 1개로 등록 + facet <code>match_pattern</code> 으로 마킹.</li>
+      <li><strong>EdgingGroup 별도 entity</strong>: B.4 에서 다룸. EdgingSpec 은 (cmp/org/group) 의 cap 범위만.</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>② 코드 컬럼 분해 — EdgingSpecJpo + EdgingService.findSpec</h3>
+  <div class="panel">
+    <div class="label">slab-design-store/.../jpo/EdgingSpecJpo.java</div>
+    <pre>@Entity @Table(name = "EDGING_SPEC") @IdClass(EdgingSpecPK.class)
+public class EdgingSpecJpo {
+    @Id @Column CMP_CD          (string 2)   // 회사
+    @Id @Column ORG_CD          (string 1)   // 소
+    @Id @Column EDGING_GROUP_CD (string 10)  // ★ '*' wildcard 가능
+
+    @Column EDGING_CAP_LOW   (BigDecimal 10,2)  // step 2 폭하한 계산 (열연목표폭 + 이 값)
+    @Column EDGING_CAP_HIGH  (BigDecimal 10,2)  // step 2 폭상한 계산 (열연목표폭 + 이 값)
+}</pre>
+    <p class="small">PK 3 컬럼. facet 2 컬럼 (cap_low / cap_high).</p>
+  </div>
+
+  <div class="panel">
+    <div class="label">slab-design-feature/.../service/EdgingService.java — findSpec</div>
+    <pre>public EdgingSpecEntity findSpec(String cmpCd, String orgCd, String edgingGroupCd) {
+    // 1) 정확매칭
+    Optional&lt;EdgingSpecJpo&gt; exact = specRepository.findById(
+        new EdgingSpecPK(cmpCd, orgCd, edgingGroupCd));
+    if (exact.isPresent()) return specLogic.toEntity(exact.get());
+
+    // 2) '*' fallback
+    Optional&lt;EdgingSpecJpo&gt; wildcard = specRepository.findById(
+        new EdgingSpecPK(cmpCd, orgCd, "*"));
+    if (wildcard.isPresent()) return specLogic.toEntity(wildcard.get());
+
+    // 3) 양쪽 모두 미존재 — 데이터 정합성 운영 이슈
+    throw new IllegalStateException(
+        "EDGING_SPEC not found: groupCd=" + edgingGroupCd + " AND '*' fallback both missing");
+}</pre>
+    <p class="small">★ <strong>3-단계 fallback chain</strong> 코드에 enforce. Q3 정책의 <strong>BR 첫 등장 후보</strong>.</p>
+  </div>
+
+  <h3>③ 컬럼별 매핑 후보</h3>
+  <table>
+    <tr><th>코드 컬럼</th><th>type</th><th>매핑 후보</th><th>재사용?</th><th>비고</th></tr>
+    <tr><td><code>cmpCd</code></td><td>string(2)</td><td><code>term.scm.shared.cmp</code></td><td><span class="pill p-emerald">재사용</span></td><td>—</td></tr>
+    <tr><td><code>orgCd</code></td><td>string(1)</td><td><code>term.scm.shared.org</code></td><td><span class="pill p-emerald">재사용</span></td><td>—</td></tr>
+    <tr><td><code>edgingGroupCd</code></td><td>string(10)</td><td><code>term.scm.shared.edging_group_cd</code> ★ 신규</td><td><span class="pill p-amber">신규</span></td><td>wildcard <code>'*'</code> 값 허용. atomic facets 에 <code>wildcard_value: "*"</code> 마킹 (Q4 결함 표현).<br>EdgingGroup (B.4) 의 PK 와 동일 도메인 — composite vs atomic 모델링은 B.4 에서 결정.</td></tr>
+    <tr><td><code>edgingCapLow / edgingCapHigh</code></td><td>BigDecimal(10,2)</td><td>composite facet</td><td>—</td><td>"열연목표폭 + 이 값" — 도메인 의미 (offset 의미)</td></tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>④ 추천 ontology row</h3>
+
+  <h4>(A) 신규 atomic 1개</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>type</th><th>facets</th></tr>
+    <tr>
+      <td><code>term.scm.shared.edging_group_cd</code></td>
+      <td>Edging 그룹코드</td>
+      <td>string(10)</td>
+      <td><code>wildcard_value: "*"</code> · <code>match_pattern: ["EXACT", "WILDCARD_FALLBACK"]</code> · <code>shared_with: ["EdgingSpec.PK", "EdgingGroup.PK"]</code></td>
+    </tr>
+  </table>
+
+  <h4>(B) 신규 composite 1개</h4>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>한국어</th><th>parts (atomic)</th><th>facets</th></tr>
+    <tr>
+      <td>composite</td>
+      <td><code>term.scm.spec.edging_spec</code></td>
+      <td>Edging 능력기준</td>
+      <td>cmp + org + edging_group_cd</td>
+      <td>
+        <code>edging_cap_low / edging_cap_high</code> (BigDecimal 10,2, semantic: "offset_from_hr_target_width") ·
+        <code>match_pattern: ["EXACT", "WILDCARD_FALLBACK"]</code> ·
+        <code>fallback_kind: "wildcard_row"</code> (PK 의 '*' row 사용) ·
+        <code>owner_subsystem: "공정계획"</code>
+      </td>
+    </tr>
+  </table>
+  <p class="small">★ HrSpec/CastSpec 와 다르게 <strong>명시적 wildcard 지원</strong>. <code>fallback_kind: "wildcard_row"</code> 로 표현. HrSpec 의 <code>match_pattern: ["EXACT"]</code> + 결함 마킹 과 대비.</p>
+
+  <h4>(C) Action 1개</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>params</th><th>return</th><th>realizes (PRIMARY)</th></tr>
+    <tr>
+      <td><code>action.scm.spec.lookup_edging_spec</code></td>
+      <td>Edging 능력 룩업 (3-단계 fallback)</td>
+      <td>cmp / org / edging_group_cd</td>
+      <td><code>term.scm.spec.edging_spec</code> (or throws IllegalStateException)</td>
+      <td><code>EdgingService.findSpec</code> · <code>EdgingSpecRepository.findById</code> (2회 호출)</td>
+    </tr>
+  </table>
+  <p class="small">★ Action.metadata 에 <code>lookup_strategy: "exact_then_wildcard_then_throw"</code> + <code>fallback_throws: "IllegalStateException"</code> 박음.</p>
+
+  <h4>(D) BusinessRule 1개 ★ Phase B 첫 BR</h4>
+  <table>
+    <tr><th>fqn</th><th>statement</th><th>enforced_by</th><th>violated_at_call</th></tr>
+    <tr>
+      <td><code>rule.scm.spec.edging_spec_lookup_strategy</code></td>
+      <td>EDGING_SPEC 룩업은 (cmp, org, edging_group_cd) 정확매칭 우선, 미존재 시 <code>'*'</code> fallback. 양쪽 모두 미존재 시 <code>IllegalStateException</code>.</td>
+      <td>
+        <code>EdgingService.findSpec</code> 의 3 branch anchor:<br>
+        ① <code>exact.isPresent()</code> 분기 (정확매칭 hit)<br>
+        ② <code>wildcard.isPresent()</code> 분기 (wildcard hit)<br>
+        ③ <code>throw new IllegalStateException</code> (양쪽 부재)
+      </td>
+      <td>없음 (현재 코드 enforce 함)</td>
+    </tr>
+  </table>
+  <p class="small">★ Q3 정책 첫 적용. 코드에 가드 있음 → 등록. operational_history facet 에 P-2018-0237 (2018-02 NPE 사고 → fallback 도입) 기록.</p>
+
+  <h4>(E) TypeRealization</h4>
+  <table>
+    <tr><th>atomic</th><th>code position</th><th>scope</th></tr>
+    <tr><td><code>term.scm.shared.cmp</code></td><td>EdgingSpecJpo.cmpCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>term.scm.shared.org</code></td><td>EdgingSpecJpo.orgCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>term.scm.shared.edging_group_cd</code></td><td>EdgingSpecJpo.edgingGroupCd</td><td>PRIMARY (이 atomic 첫 등장)</td></tr>
+  </table>
+
+  <h4>(F) 결함 마킹 (Q4 정책)</h4>
+  <ul>
+    <li><strong>wildcard 운영 정책 + 코드 일치</strong> — HrSpec 와 다르게 결함 X (코드가 wildcard 정상 처리). 단 <code>'*'</code> 가 magic value 라는 점은 atomic facet 에 마킹.</li>
+  </ul>
+
+  <h4>(G) AnchorBinding 후보 (Phase E 에서 확정)</h4>
+  <ul>
+    <li><strong>branch anchor 3개</strong>: <code>findSpec</code> 의 if/throw 분기 — Phase E 에서 BR enforced_by 와 연결</li>
+    <li><strong>literal anchor 1개</strong>: <code>"*"</code> string literal — atomic.edging_group_cd.wildcard_value 와 연결</li>
+  </ul>
+
+  <!-- ====================================================================== -->
+  <h3>⑤ 누적 row (B.3 종료 시 예상)</h3>
+  <pre>+ 1 atomic        : edging_group_cd
++ 1 composite     : term.scm.spec.edging_spec
++ 1 Action        : lookup_edging_spec (3-단계 fallback)
++ 1 BusinessRule  : rule.edging_spec_lookup_strategy ★ Phase B 첫 BR
++ 3 TR            : cmp / org (PARTIAL) + edging_group_cd (PRIMARY)
++ 운영 history   : P-2018-0237 (BR.operational_history facet)
+─────────────────────────────────
+B.3 추가: 7 row (atomic 1 + composite 1 + Action 1 + BR 1 + TR 3)
+B.1+B.2+B.3 누적: 8 + 13 + 7 = 28 row</pre>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>B.3 답변 — EdgingSpec 합의</h4>
+
+    <div class="field">
+      <label><strong>Q1. 추천 row 7개 OK?</strong> (atomic 1 + composite 1 + Action 1 + BR 1 + TR 3)
+        <span class="recommend">★ 추천: <strong>OK</strong>. Phase B 첫 BR 등록 (Q3 정책 enforced_by 있는 rule).</span>
+      </label>
+      <textarea class="text" name="b3_q1" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. <code>edging_group_cd</code> atomic 처리</strong> — wildcard <code>'*'</code> 가능 값 → atomic facets 에 <code>wildcard_value: "*"</code> + <code>shared_with: [EdgingSpec.PK, EdgingGroup.PK]</code> OK?
+        <span class="recommend">★ 추천 OK. EdgingGroup (B.4) 의 PK 와 동일 atomic 재사용 예고. atomic share 정책 Q2 그대로 적용.</span>
+      </label>
+      <textarea class="text" name="b3_q2" rows="2" placeholder="예: OK / 다른 처리 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. <code>match_pattern: ["EXACT", "WILDCARD_FALLBACK"]</code> 표현</strong> — composite facets 에 fallback 정책 명시 OK?
+        <span class="recommend">★ 추천 OK. HrSpec/CastSpec 의 <code>["EXACT"]</code> + 결함 마킹 과 대비됨 (의도적 wildcard).</span>
+      </label>
+      <textarea class="text" name="b3_q3" rows="2" placeholder="예: OK / 다른 표현 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. BusinessRule <code>edging_spec_lookup_strategy</code> 등록</strong> — 3-단계 룩업 정책 + enforced_by 3 branch + P-2018-0237 history 포함 OK?
+        <span class="recommend">★ 추천 OK. Q3 정책 (코드 가드 있는 rule 등록) 첫 적용. 향후 ChangeSpec "fallback 정책 변경" 시뮬 핵심.</span>
+      </label>
+      <textarea class="text" name="b3_q4" rows="2" placeholder="예: OK / 단순화 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. <code>edging_cap_low/high</code> 의 "offset_from_hr_target_width" semantic</strong> — facet 에 의미 박음 OK?
+        <span class="recommend">★ 추천 OK. 코드 주석 ("열연목표폭 + 이 값") 을 ontology semantic 으로 박음. 향후 Action 의 입력 의미 명확화.</span>
+      </label>
+      <textarea class="text" name="b3_q5" rows="2" placeholder="예: OK / 다른 표현 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. 빠뜨림 / 추가</strong>
+        <span class="recommend">★ 추천: 없음. 코드 3 PK + 2 facet + Service 3-단계 룩업 모두 매핑. AnchorBinding 은 Phase E 에서.</span>
+      </label>
+      <textarea class="text" name="b3_q6" rows="2" placeholder="예: 없음 / 또는: ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7. B.4 (EdgingGroup) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. EdgingGroup = (cmp/org/edging_group_cd) PK 인데 매칭 조건 (강종/품종/고객/HR목표폭 범위) + PRIORITY tiebreaker. EdgingService.findGroup 와 매핑.</span>
+      </label>
+      <textarea class="text" name="b3_q7" rows="2" placeholder="예: OK / 다른 진행 ___"></textarea>
+    </div>
+
+    <div class="ds-actions">
+      <button class="btn primary" id="b3-build">미리보기</button>
+      <button class="btn" id="b3-copy">📋 답변 복사</button>
+      <span class="copy-hint">「📋 답변 복사」 → 채팅 붙여넣기</span>
+    </div>
+    <div class="preview" id="b3-preview"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- B.3 archive -->
+<!-- ====================================================================== -->
+<section class="step" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 B.3 답변 받음 — EdgingSpec 합의 (7 row + Phase B 첫 BR)</h2>
+  <div class="meta">
+    <span class="badge b-applied">archive</span>
+    <span>모두 추천대로</span>
+  </div>
+
+  <h3>답변 그대로</h3>
+  <div class="applied">
+    <div class="label">사용자 답변 (2026-05-10)</div>
+    <ul>
+      <li><strong>Q1</strong> 추천 row 7개: 추천대로</li>
+      <li><strong>Q2</strong> <code>edging_group_cd</code> atomic + wildcard <code>'*'</code> 처리: 추천대로</li>
+      <li><strong>Q3</strong> <code>match_pattern</code> 표현: 추천대로 (<code>["EXACT","WILDCARD_FALLBACK"]</code>)</li>
+      <li><strong>Q4</strong> BR <code>edging_spec_lookup_strategy</code> 등록: 추천대로 ★ Phase B 첫 BR</li>
+      <li><strong>Q5</strong> cap offset semantic: 추천대로 (<code>"offset_from_hr_target_width"</code>)</li>
+      <li><strong>Q6</strong> 빠뜨림: 응답 없음 → 없음 추정</li>
+      <li><strong>Q7</strong> B.4 진입: OK</li>
+    </ul>
+  </div>
+
+  <h3>★ B.3 합의 row (Phase B 누적 +7)</h3>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>요약</th></tr>
+    <tr><td>atomic</td><td><code>term.scm.shared.edging_group_cd</code></td><td>Edging 그룹코드 (string 10, wildcard_value="*", shared_with: [EdgingSpec.PK, EdgingGroup output])</td></tr>
+    <tr><td>composite</td><td><code>term.scm.spec.edging_spec</code></td><td>Edging 능력기준 (cmp+org+edging_group_cd, cap_low/high "offset_from_hr_target_width", match_pattern=[EXACT,WILDCARD_FALLBACK])</td></tr>
+    <tr><td>Action</td><td><code>action.scm.spec.lookup_edging_spec</code></td><td>realizes EdgingService.findSpec, metadata: lookup_strategy="exact_then_wildcard_then_throw"</td></tr>
+    <tr><td><strong>BR</strong> ★</td><td><code>rule.scm.spec.edging_spec_lookup_strategy</code></td><td>3-단계 룩업 정책 enforced. enforced_by 3 branch + operational_history P-2018-0237</td></tr>
+    <tr><td>TR</td><td>cmp / org</td><td>PARTIAL (재사용)</td></tr>
+    <tr><td>TR</td><td>edging_group_cd</td><td>PRIMARY (이 atomic 첫 등장 — 다음 B.4 EdgingGroup output 에서 재사용)</td></tr>
+  </table>
+
+  <p class="small">★ Phase B 누적: <strong>28 row</strong> (B.1 8 + B.2 13 + B.3 7). 다음 → B.4 EdgingGroup.</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<!-- B.4 — EdgingGroup  -->
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>B.4 — EdgingGroup (Edging 그룹 매칭 룰)</h2>
+  <div class="meta">
+    <span class="badge b-discuss">진행 중</span>
+    <span>Phase B 4번째 entity · ★ matching rule 패턴 (HrSpec/CastSpec 와 다름)</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>① Round 5 archive 핵심 사실</h3>
+  <div class="archive-quote">
+    <div class="label">round5 + 코드 분석</div>
+    <ul>
+      <li><strong>실체</strong>: EDGING_GROUP = <strong>매칭 룰 테이블</strong>. 주문 (강종/품종/고객/열연목표폭) → 매칭되는 row 들 중 PRIORITY ASC 첫 row → <code>EDGING_GROUP_CD</code> 출력.</li>
+      <li><strong>출력값 사용</strong>: 출력 <code>EDGING_GROUP_CD</code> 가 <strong>EDGING_SPEC.PK 룩업 키</strong> (B.3). 두 단계 룩업 chain.</li>
+      <li><strong>매칭 조건</strong>: AND 조합 — <code>GRADE_CD = ?</code> AND <code>PRODUCT_TYPE_CD = ?</code> AND <code>CUSTOMER_CD = ?</code> AND <code>HR_TGT_WIDTH ∈ [LOW, HIGH]</code></li>
+      <li><strong>Tiebreaker</strong>: PRIORITY ASC 정렬 후 첫 row 선택. 매칭 없으면 null.</li>
+      <li><strong>★ PK 디자인 quirk</strong>: PK = <code>(CMP_CD, ORG_CD, PRIORITY)</code> — PRIORITY 가 PK 일부. <strong>매칭 조건 (grade/product/customer/widths) 은 PK 가 아님</strong>. → 일반적이지 않은 디자인 (Q4 PK 결함 마킹 후보).</li>
+      <li><strong>같은 패턴</strong>: Phase A Customer.findFirstMatch 도 PRIORITY ASC + first row tiebreaker. 도메인 공통 패턴.</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>② 코드 컬럼 분해 — EdgingGroupJpo + EdgingService.findGroup</h3>
+  <div class="panel">
+    <div class="label">slab-design-store/.../jpo/EdgingGroupJpo.java</div>
+    <pre>@Entity @Table(name = "EDGING_GROUP") @IdClass(EdgingGroupPK.class)
+public class EdgingGroupJpo {
+    @Id @Column CMP_CD     (string 2)   // 회사
+    @Id @Column ORG_CD     (string 1)   // 소
+    @Id @Column PRIORITY   (Integer)    // ★ PK 일부 (특이 디자인)
+
+    @Column EDGING_GROUP_CD    (string 10)         // 출력값 ★
+    @Column GRADE_CD           (string 10)         // 매칭 조건
+    @Column PRODUCT_TYPE_CD    (string 4)          // 매칭 조건
+    @Column CUSTOMER_CD        (string 10)         // 매칭 조건
+    @Column HR_TGT_WIDTH_HIGH  (BigDecimal 10,2)   // 매칭 조건 (range high)
+    @Column HR_TGT_WIDTH_LOW   (BigDecimal 10,2)   // 매칭 조건 (range low)
+}</pre>
+  </div>
+
+  <div class="panel">
+    <div class="label">slab-design-feature/.../service/EdgingService.java — findGroup</div>
+    <pre>public EdgingGroupEntity findGroup(String cmpCd, String orgCd,
+                                   String gradeCd, String productTypeCd, String customerCd,
+                                   BigDecimal hrTgtWidth) {
+    List&lt;EdgingGroupJpo&gt; matches = groupRepository
+        .findByCmpCdAndOrgCdAndGradeCdAndProductTypeCdAndCustomerCdAnd
+            HrTgtWidthLowLessThanEqualAndHrTgtWidthHighGreaterThanEqualOrderByPriorityAsc(
+            cmpCd, orgCd, gradeCd, productTypeCd, customerCd, hrTgtWidth, hrTgtWidth);
+    if (matches.isEmpty()) return null;
+    return groupLogic.toEntity(matches.get(0));
+}</pre>
+    <p class="small">★ Spring Data JPA derived query. AND 조건 + range (≤ AND ≥) + ORDER BY PRIORITY ASC. design-gaps #22 (자동 생성 SQL anchor 한계) 와 관련.</p>
+  </div>
+
+  <h3>③ 컬럼별 매핑 후보</h3>
+  <table>
+    <tr><th>코드 컬럼</th><th>type</th><th>매핑 후보</th><th>재사용?</th><th>비고</th></tr>
+    <tr><td><code>cmpCd</code></td><td>string(2)</td><td><code>term.scm.shared.cmp</code></td><td><span class="pill p-emerald">재사용</span></td><td>—</td></tr>
+    <tr><td><code>orgCd</code></td><td>string(1)</td><td><code>term.scm.shared.org</code></td><td><span class="pill p-emerald">재사용</span></td><td>—</td></tr>
+    <tr><td><code>priority</code></td><td>Integer</td><td><code>term.scm.shared.priority</code> ★ 신규 (Q2 적극 share)</td><td><span class="pill p-amber">신규</span></td><td>Customer (Phase A) 도 priority facet — 의미 동일. ★ Phase A retroactive TR 추가 후보</td></tr>
+    <tr><td><code>gradeCd</code></td><td>string(10)</td><td><code>term.scm.shared.grade</code></td><td><span class="pill p-emerald">재사용</span></td><td>매칭 조건 (PARTIAL TR)</td></tr>
+    <tr><td><code>productTypeCd</code></td><td>string(4)</td><td><code>term.scm.shared.product_kind</code></td><td><span class="pill p-emerald">재사용</span></td><td>품종 7번째 alias (PARTIAL TR)</td></tr>
+    <tr><td><code>customerCd</code></td><td>string(10)</td><td><code>term.scm.shared.customer</code></td><td><span class="pill p-emerald">재사용</span></td><td>매칭 조건 (PARTIAL TR)</td></tr>
+    <tr><td><code>edgingGroupCd</code></td><td>string(10)</td><td><code>term.scm.shared.edging_group_cd</code></td><td><span class="pill p-emerald">재사용</span></td><td>출력값 (PARTIAL TR — B.3 의 동일 atomic)</td></tr>
+    <tr><td><code>hrTgtWidthLow / High</code></td><td>BigDecimal(10,2)</td><td>composite facet</td><td>—</td><td>매칭 range 표현</td></tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>④ 추천 ontology row</h3>
+
+  <h4>(A) 신규 atomic 1개</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>type</th><th>facets</th></tr>
+    <tr>
+      <td><code>term.scm.shared.priority</code></td>
+      <td>우선순위</td>
+      <td>Integer</td>
+      <td><code>semantic: "tiebreaker — lower number = higher priority, ASC sort"</code> · <code>typical_usage: "matching rule + first row 선택"</code></td>
+    </tr>
+  </table>
+  <p class="small">★ Q2 "적극 share" 정책 적용 — Phase A Customer.priority 와 의미 같음. Phase A confirmed_plant_cd 패턴 (Step 7 retroactive 추가) 와 동일. 별도 Q (아래) 로 retroactive update 의사 확인.</p>
+
+  <h4>(B) 신규 composite 1개</h4>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>한국어</th><th>parts (PK atomic)</th><th>facets</th></tr>
+    <tr>
+      <td>composite</td>
+      <td><code>term.scm.spec.edging_group_match</code></td>
+      <td>Edging 그룹매칭규칙</td>
+      <td>cmp + org + priority</td>
+      <td>
+        <strong>매칭 조건 (atomic_ref + value)</strong>:
+        <code>grade_value</code> (atomic_ref: grade) ·
+        <code>product_kind_value</code> (atomic_ref: product_kind) ·
+        <code>customer_value</code> (atomic_ref: customer) ·
+        <code>hr_tgt_width_low / hr_tgt_width_high</code> (BigDecimal 10,2, semantic: "range_match") ·
+        <strong>출력</strong>: <code>edging_group_cd_value</code> (atomic_ref: edging_group_cd) ·
+        <strong>전략</strong>: <code>match_strategy: "AND_of_conditions"</code> · <code>tiebreaker: "PRIORITY_ASC_first_row"</code> ·
+        <strong>결함 마킹</strong>: <code>pk_quality_issue: "priority_in_pk_unusual"</code>
+      </td>
+    </tr>
+  </table>
+  <p class="small">★ HrSpec/CastSpec 와 다른 패턴 — <strong>matching rule entity</strong>. parts = PK 그대로. 매칭 조건은 facets 에 atomic_ref + value 로 표현 (PK 가 아니므로). 이 모델링이 옳은지 Q (아래).</p>
+
+  <h4>(C) Action 1개</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>params</th><th>return</th><th>realizes (PRIMARY)</th></tr>
+    <tr>
+      <td><code>action.scm.spec.find_edging_group</code></td>
+      <td>Edging 그룹 매칭 (PRIORITY ASC first row)</td>
+      <td>cmp / org / grade / product_kind / customer / hr_tgt_width</td>
+      <td>edging_group_cd (string) or null</td>
+      <td><code>EdgingService.findGroup</code> · derived JPA query</td>
+    </tr>
+  </table>
+  <p class="small">★ Action.metadata 에 <code>match_strategy: "AND_of_conditions"</code> + <code>tiebreaker: "PRIORITY_ASC_first_row"</code> + <code>output_atomic: edging_group_cd</code>.</p>
+
+  <h4>(D) BusinessRule 1개</h4>
+  <table>
+    <tr><th>fqn</th><th>statement</th><th>enforced_by</th></tr>
+    <tr>
+      <td><code>rule.scm.spec.edging_group_match_strategy</code></td>
+      <td>EDGING_GROUP 매칭은 (grade=X AND product=X AND customer=X AND hr_tgt_width ∈ [low, high]) 모두 만족 row 들 중 PRIORITY ASC 첫 row 선택. 매칭 없으면 null.</td>
+      <td>
+        <code>EdgingService.findGroup</code> 의 2 anchor:<br>
+        ① Spring Data JPA derived query (AND + range + ORDER BY PRIORITY ASC)<br>
+        ② <code>matches.isEmpty()</code> 분기 (null 반환)
+      </td>
+    </tr>
+  </table>
+  <p class="small">★ Phase A Customer.findFirstMatch 와 동일 패턴 (PRIORITY ASC + first row + null on empty). Phase A 에는 BR 미등록 — Phase E 에서 retroactive 추가 검토 항목 (design-gaps).</p>
+
+  <h4>(E) TypeRealization (7개)</h4>
+  <table>
+    <tr><th>atomic</th><th>code position</th><th>scope</th></tr>
+    <tr><td><code>term.scm.shared.cmp</code></td><td>EdgingGroupJpo.cmpCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>term.scm.shared.org</code></td><td>EdgingGroupJpo.orgCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>term.scm.shared.priority</code></td><td>EdgingGroupJpo.priority</td><td>PRIMARY (이 atomic 첫 등장)</td></tr>
+    <tr><td><code>term.scm.shared.grade</code></td><td>EdgingGroupJpo.gradeCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>term.scm.shared.product_kind</code></td><td>EdgingGroupJpo.productTypeCd</td><td>PARTIAL (7번째 alias)</td></tr>
+    <tr><td><code>term.scm.shared.customer</code></td><td>EdgingGroupJpo.customerCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>term.scm.shared.edging_group_cd</code></td><td>EdgingGroupJpo.edgingGroupCd</td><td>PARTIAL (B.3 atomic 재사용 — 출력 컬럼)</td></tr>
+  </table>
+
+  <h4>(F) 결함 마킹 (Q4 정책)</h4>
+  <ul>
+    <li><strong>PRIORITY in PK</strong> — 일반적으로 tiebreaker 는 column, PK 아님. composite facets <code>pk_quality_issue: "priority_in_pk_unusual"</code></li>
+    <li><strong>design-gaps #26 (신규)</strong>: PRIORITY 가 PK 일부 → 실수로 같은 priority 등록 시 DB 제약 위반. 이상적 PK = (cmp/org/grade/product/customer/hr_width range) + PRIORITY 는 column.</li>
+  </ul>
+
+  <h4>(G) Phase A retroactive 후보 (사용자 결정)</h4>
+  <ul>
+    <li>Customer.priority 가 facet 으로만 등록됨 (Phase A). 이제 atomic.scm.shared.priority 등장 → Customer.priority 에 PARTIAL TR 추가하면 일관성 ↑.</li>
+    <li>Phase A confirmed_plant_cd 패턴 (Step 7 에서 retroactive 추가) 와 동일.</li>
+  </ul>
+
+  <!-- ====================================================================== -->
+  <h3>⑤ 누적 row (B.4 종료 시 예상)</h3>
+  <pre>+ 1 atomic        : priority
++ 1 composite     : term.scm.spec.edging_group_match
++ 1 Action        : find_edging_group
++ 1 BR            : rule.edging_group_match_strategy
++ 7 TR            : cmp / org / priority (PRIMARY) / grade / product_kind / customer / edging_group_cd (모두 PARTIAL 재사용)
++ 1 design-gaps  : #26 priority_in_pk_unusual
+─────────────────────────────────
+B.4 추가: 11 row (atomic 1 + composite 1 + Action 1 + BR 1 + TR 7)
+B.1+B.2+B.3+B.4 누적: 28 + 11 = 39 row
+
+★ Phase A retroactive (Q6 결정 대기): Customer.priority 에 PARTIAL TR 1 row 추가 시 → 40 row</pre>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>B.4 답변 — EdgingGroup 합의</h4>
+
+    <div class="field">
+      <label><strong>Q1. 추천 row 11개 OK?</strong> (atomic 1 + composite 1 + Action 1 + BR 1 + TR 7)
+        <span class="recommend">★ 추천: <strong>OK</strong>. matching rule entity 패턴 (HrSpec/CastSpec 와 다름).</span>
+      </label>
+      <textarea class="text" name="b4_q1" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. <code>priority</code> atomic 신규 등록</strong> — Customer (Phase A) 와 의미 동일 (tiebreaker integer) → Q2 정책 (적극 share) 적용.
+        <span class="recommend">★ 추천 OK. Phase A confirmed_plant_cd retroactive 패턴 동일.</span>
+      </label>
+      <textarea class="text" name="b4_q2" rows="2" placeholder="예: OK / facet 으로만 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. <code>edging_group_match</code> composite 모델링</strong> — parts = PK 3 atomic (cmp/org/priority), 매칭 조건 (grade/product/customer/widths) = facets 에 <code>atomic_ref + value</code> 로 표현. OK?
+        <span class="recommend">★ 추천 OK. PK 디자인 quirk 그대로 표현. 매칭 조건은 facet (PK 아니므로). 결함은 <code>pk_quality_issue</code> 마킹.</span>
+      </label>
+      <textarea class="text" name="b4_q3" rows="2" placeholder="예: OK / 다른 모델링 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. BR <code>edging_group_match_strategy</code> 등록</strong> — AND 매칭 + PRIORITY ASC + first row + null on empty 정책. enforced_by = derived JPA query + isEmpty 분기.
+        <span class="recommend">★ 추천 OK. Q3 정책 (코드 가드 있는 rule 등록) 두 번째 적용.</span>
+      </label>
+      <textarea class="text" name="b4_q4" rows="2" placeholder="예: OK / 단순화 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. PK 결함 마킹</strong> — PRIORITY 가 PK 일부인 디자인 quirk → composite facets <code>pk_quality_issue: "priority_in_pk_unusual"</code> + design-gaps #26 등록 OK?
+        <span class="recommend">★ 추천 OK. Q4 정책 (PK 결함 minimal + 마킹) 그대로 적용.</span>
+      </label>
+      <textarea class="text" name="b4_q5" rows="2" placeholder="예: OK / 결함 아니다 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. Phase A retroactive — Customer.priority 에 PARTIAL TR 추가?</strong>
+        <span class="recommend">★ 추천 <strong>OK (추가)</strong>. Customer.priority 의 의미가 새 atomic.scm.shared.priority 와 동일. Phase A confirmed_plant_cd Step 7 retroactive 패턴 동일. Phase A archive 갱신 + ground truth 47 → 48 row.</span>
+      </label>
+      <textarea class="text" name="b4_q6" rows="2" placeholder="예: OK 추가 / 추가 X (Customer.priority 는 facet 만)"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7. 빠뜨림 / 추가</strong>
+        <span class="recommend">★ 추천: 없음. 코드 3 PK + 7 column 모두 매핑 + Service findGroup 매핑.</span>
+      </label>
+      <textarea class="text" name="b4_q7" rows="2" placeholder="예: 없음 / 또는: ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q8. B.5 (HrMinWgt + HrMaxWgt) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. 단중 표준 — Round 5 archive 의 단순한 lookup 표준. HrSpec 와 PK 구조 다름 (단중상한/하한 별도 entity).</span>
+      </label>
+      <textarea class="text" name="b4_q8" rows="2" placeholder="예: OK / 다른 진행 ___"></textarea>
+    </div>
+
+    <div class="ds-actions">
+      <button class="btn primary" id="b4-build">미리보기</button>
+      <button class="btn" id="b4-copy">📋 답변 복사</button>
+      <span class="copy-hint">「📋 답변 복사」 → 채팅 붙여넣기</span>
+    </div>
+    <div class="preview" id="b4-preview"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- B.4 archive -->
+<!-- ====================================================================== -->
+<section class="step" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 B.4 답변 받음 — EdgingGroup 합의 (11 row + Phase A retroactive)</h2>
+  <div class="meta">
+    <span class="badge b-applied">archive</span>
+    <span>모두 추천대로 (Q6 retroactive 도 OK)</span>
+  </div>
+
+  <h3>답변 그대로</h3>
+  <div class="applied">
+    <div class="label">사용자 답변 (2026-05-10)</div>
+    <ul>
+      <li><strong>Q1</strong> 추천 row 11개: 추천대로</li>
+      <li><strong>Q2</strong> <code>priority</code> atomic 등록: 추천대로</li>
+      <li><strong>Q3</strong> composite 모델링 (parts=PK, 매칭조건=facet): 추천대로</li>
+      <li><strong>Q4</strong> BR <code>edging_group_match_strategy</code> 등록: 추천대로</li>
+      <li><strong>Q5</strong> PRIORITY in PK 결함 마킹: 추천대로 (design-gaps #26)</li>
+      <li><strong>Q6</strong> Phase A retroactive — Customer.priority TR 추가: 추천대로 ★</li>
+      <li><strong>Q7</strong> 빠뜨림: 응답 없음 → 없음 추정</li>
+      <li><strong>Q8</strong> B.5 진입: OK</li>
+    </ul>
+  </div>
+
+  <h3>★ B.4 합의 row (Phase B 누적 +11)</h3>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>요약</th></tr>
+    <tr><td>atomic</td><td><code>term.scm.shared.priority</code></td><td>우선순위 (Integer, tiebreaker semantic)</td></tr>
+    <tr><td>composite</td><td><code>term.scm.spec.edging_group_match</code></td><td>Edging 그룹매칭규칙 (parts: cmp+org+priority, facets: 매칭 조건 atomic_ref + range + 출력 + match_strategy + tiebreaker + pk_quality_issue)</td></tr>
+    <tr><td>Action</td><td><code>action.scm.spec.find_edging_group</code></td><td>realizes EdgingService.findGroup, metadata: AND match + PRIORITY ASC + first row</td></tr>
+    <tr><td>BR</td><td><code>rule.scm.spec.edging_group_match_strategy</code></td><td>매칭 전략 enforced. enforced_by: derived JPA query + isEmpty 분기</td></tr>
+    <tr><td>TR (7개)</td><td>cmp / org / grade / product_kind / customer / edging_group_cd</td><td>모두 PARTIAL (재사용)</td></tr>
+    <tr><td>TR (1개)</td><td>priority</td><td>PRIMARY (이 atomic 첫 등장)</td></tr>
+  </table>
+
+  <h3>★ Phase A retroactive (Q6 적용)</h3>
+  <div class="my-guess" style="border-color:rgba(16,185,129,0.5);background:rgba(16,185,129,0.04)">
+    <div class="label" style="color:var(--emerald)">✅ Phase A 47 → 48 row (retroactive)</div>
+    <p>Phase A Customer.priority 가 facet 으로만 등록됨. 새 atomic <code>term.scm.shared.priority</code> 등장으로 의미 통합.</p>
+    <ul>
+      <li><strong>+1 PARTIAL TR</strong>: <code>term.scm.shared.priority</code> ↔ <code>CustomerStdJpo.priority</code> (Phase A composite <code>scm.std.customer_design_limit</code> 의 facet → atomic_ref)</li>
+      <li><strong>round6-live-authoring.html 갱신</strong>: B.6 archive 종결 시 Phase A archive section 에 retroactive 노트 추가 예정 (Phase A confirmed_plant_cd Step 7 패턴 동일)</li>
+      <li><strong>HANDOFF 갱신</strong>: ground truth 47 → 48 row 업데이트 예정</li>
+    </ul>
+  </div>
+
+  <h3>★ design-gaps 추가</h3>
+  <ul>
+    <li><strong>#26</strong> — EdgingGroup PRIORITY in PK 디자인 quirk. <code>composite.facets.pk_quality_issue: "priority_in_pk_unusual"</code>.</li>
+  </ul>
+
+  <p class="small">★ Phase B 누적: <strong>39 row</strong> (B.1 8 + B.2 13 + B.3 7 + B.4 11). + Phase A retroactive 1 row → Phase A+B 합계 = 47+1+39 = <strong>87 row</strong>. 다음 → B.5 HrMinWgt + HrMaxWgt.</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<!-- B.5 — HrMinWgt + HrMaxWgt -->
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>B.5 — HrMinWgt + HrMaxWgt (압연 단중 기준 2D sheet)</h2>
+  <div class="meta">
+    <span class="badge b-discuss">진행 중</span>
+    <span>Phase B 5번째 entity · ★ 통합 vs 분리 결정</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>① Round 5 archive 핵심 사실</h3>
+  <div class="archive-quote">
+    <div class="label">round5-live-authoring.html Step 6 + 코드 분석</div>
+    <ul>
+      <li><strong>실체</strong>: HR_MIN_WGT + HR_MAX_WGT = 압연 공정의 단중 (kg) 제약. 두 표준 = 동일 PK 구조 + 동일 lookup 패턴, 값만 min vs max.</li>
+      <li><strong>2D sheet 룩업</strong>: 입력 (thickness, width) 을 cover 하는 가장 작은 cell 의 단중값 반환. 즉 cell.thickness ≥ input.thickness AND cell.width ≥ input.width ORDER BY thickness ASC, width ASC LIMIT 1.</li>
+      <li><strong>★ HR_CD = HR_PLANT_CD 동일 도메인</strong> (코드 주석 명시) — 열연공장 1자리. <strong>레거시 비표준 컬럼명</strong>. B.1 의 atomic.scm.shared.hr_plant_cd 재사용 (PARTIAL TR + 다른 codeField).</li>
+      <li><strong>매칭 실패</strong>: <code>null</code> 반환. 호출자 (DG106 / DG107) 에서 fail 처리. <em>(Round 5 archive 의 "AlgorithmException" 추측은 코드와 다름 — 코드 = ground truth)</em></li>
+      <li><strong>소유</strong>: 공정계획. 변경 트리거: 압연 설비 변경.</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>② 코드 컬럼 분해 — HrMinWgtJpo + HrMaxWgtJpo + Service</h3>
+  <div class="panel">
+    <div class="label">slab-design-store/.../jpo/HrMinWgtJpo.java + HrMaxWgtJpo.java (거의 동일)</div>
+    <pre>@Entity @Table(name = "HR_MIN_WGT")  // or "HR_MAX_WGT"
+public class HrMinWgtJpo {           // or HrMaxWgtJpo
+    @Id @Column CMP_CD     (string 2)
+    @Id @Column ORG_CD     (string 1)
+    @Id @Column HR_CD      (string 1)         // ★ HR_PLANT_CD 동일 도메인 (열연공장 1자리)
+    @Id @Column THICKNESS  (BigDecimal 6,2)   // cell 좌표 - 두께
+    @Id @Column WIDTH      (BigDecimal 10,2)  // cell 좌표 - 폭
+
+    @Column MIN_WGT  // or MAX_WGT  (BigDecimal 10,3)   // 단중값
+}</pre>
+    <p class="small">PK 5 컬럼 (cmp/org/hrCd/thickness/width). thickness/width 가 PK 자체 — 2D sheet grid coordinate. 비-PK 1 컬럼 (단중값).</p>
+  </div>
+
+  <div class="panel">
+    <div class="label">slab-design-feature/.../service/HrMinWgtService.java (HrMaxWgtService 동일)</div>
+    <pre>public HrMinWgtEntity lookup(String cmpCd, String orgCd, String hrCd,
+                              BigDecimal thickness, BigDecimal width) {
+    return repository
+        .findFirstByCmpCdAndOrgCdAndHrCdAndThicknessGreaterThanEqualAndWidthGreaterThanEqualOrderByThicknessAscWidthAsc(
+            cmpCd, orgCd, hrCd, thickness, width)
+        .map(logic::toEntity)
+        .orElse(null);
+}</pre>
+    <p class="small">★ 2D ceiling lookup pattern. <code>findFirst...GreaterThanEqual...OrderByAsc</code> = ceiling first row. 미매칭 시 null. design-gaps #22 (자동 생성 SQL anchor) 와 동일 카테고리.</p>
+  </div>
+
+  <h3>③ 컬럼별 매핑 후보</h3>
+  <table>
+    <tr><th>코드 컬럼</th><th>type</th><th>매핑 후보</th><th>재사용?</th><th>비고</th></tr>
+    <tr><td><code>cmpCd</code></td><td>string(2)</td><td><code>term.scm.shared.cmp</code></td><td><span class="pill p-emerald">재사용</span></td><td>—</td></tr>
+    <tr><td><code>orgCd</code></td><td>string(1)</td><td><code>term.scm.shared.org</code></td><td><span class="pill p-emerald">재사용</span></td><td>—</td></tr>
+    <tr><td><code>hrCd</code></td><td>string(1)</td><td><code>term.scm.shared.hr_plant_cd</code> (B.1)</td><td><span class="pill p-emerald">재사용</span></td><td>★ 컬럼명만 다름 (HR_CD vs HR_PLANT_CD). 의미 동일 (코드 주석 명시).</td></tr>
+    <tr><td><code>thickness</code></td><td>BigDecimal(6,2)</td><td>composite facet (scalar)</td><td>—</td><td>2D sheet cell 좌표 - 두께. atomic 으로 승격하지 않음 (scalar dimension)</td></tr>
+    <tr><td><code>width</code></td><td>BigDecimal(10,2)</td><td>composite facet (scalar)</td><td>—</td><td>2D sheet cell 좌표 - 폭. 동일 이유</td></tr>
+    <tr><td><code>minWgt / maxWgt</code></td><td>BigDecimal(10,3)</td><td>composite facet (scalar)</td><td>—</td><td>단중값</td></tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>④ 통합 vs 분리 결정 (Round 5 의 미해결 질문)</h3>
+
+  <h4>옵션 A — 통합 (1 composite, min/max 둘 다 facet)</h4>
+  <pre>composite term.scm.spec.hr_wgt_limit
+  parts:  cmp + org + hr_plant_cd + thickness + width
+  facets: min_wgt (BigDecimal 10,3) + max_wgt (BigDecimal 10,3)
+  Action 1 + BR 1</pre>
+  <ul>
+    <li><span style="color:var(--emerald)">+ ontology 단순</span></li>
+    <li><span style="color:var(--rose)">- 코드 = 2 table / 2 service. ontology 와 매핑 갭 발생</span></li>
+    <li><span style="color:var(--rose)">- 같은 cell 에 min+max 둘 다 있다고 오해 가능 (실제 DB 는 별도 row)</span></li>
+  </ul>
+
+  <h4>옵션 B — 분리 ★ (2 composite, drama DNA 보존)</h4>
+  <pre>composite term.scm.spec.hr_min_wgt   composite term.scm.spec.hr_max_wgt
+  (똑같은 PK + facet 단 min_wgt만)        (똑같은 PK + facet 단 max_wgt만)
+Action 2 + BR 1 (shared)</pre>
+  <ul>
+    <li><span style="color:var(--emerald)">+ 코드 구조 그대로 매핑 (drama DNA 보존)</span></li>
+    <li><span style="color:var(--emerald)">+ 도메인 의미 명확: MIN 검사 / MAX 검사 별 용도</span></li>
+    <li><span style="color:var(--emerald)">+ BR 은 1개 공유 (룩업 패턴 동일)</span></li>
+    <li><span style="color:var(--rose)">- ontology 약간 중복 (동일 PK 구조 2번)</span></li>
+  </ul>
+
+  <h4>옵션 C — 통합 + kind atomic (1 composite + 단중종류 atomic)</h4>
+  <pre>atomic  term.scm.shared.wgt_kind  (enum_values: ["MIN", "MAX"])
+composite term.scm.spec.hr_wgt_limit
+  parts:  cmp + org + hr_plant_cd + thickness + width + wgt_kind
+  facets: wgt (BigDecimal 10,3)</pre>
+  <ul>
+    <li><span style="color:var(--emerald)">+ 가장 단순 (1 composite + enum)</span></li>
+    <li><span style="color:var(--rose)">- 실제 DB 와 다름 (code = 2 table). 매핑 인위적</span></li>
+    <li><span style="color:var(--rose)">- "wgt_kind = MIN/MAX" 은 ontology 에서 만든 추상화 (코드 ground truth 아님)</span></li>
+  </ul>
+
+  <p class="small">★ 추천: <strong>옵션 B (분리)</strong>. CLAUDE.md 의 drama DNA 보존 원칙 + 코드 = ground truth + 도메인 의미 명확.</p>
+
+  <!-- ====================================================================== -->
+  <h3>⑤ 추천 ontology row (옵션 B 기준)</h3>
+
+  <h4>(A) 신규 atomic</h4>
+  <p class="small"><strong>없음</strong>. thickness/width/wgt 는 scalar BigDecimal facet (atomic 승격 X). hr_plant_cd 는 B.1 재사용.</p>
+
+  <h4>(B) 신규 composite 2개</h4>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>한국어</th><th>parts (atomic)</th><th>facets</th></tr>
+    <tr>
+      <td>composite</td>
+      <td><code>term.scm.spec.hr_min_wgt</code></td>
+      <td>압연 MIN 단중 기준</td>
+      <td>cmp + org + hr_plant_cd</td>
+      <td>
+        <code>thickness</code> (BigDecimal 6,2, semantic: "2d_grid_coord_thickness") ·
+        <code>width</code> (BigDecimal 10,2, semantic: "2d_grid_coord_width") ·
+        <code>min_wgt</code> (BigDecimal 10,3) ·
+        <code>match_pattern: ["2D_CEILING"]</code> ·
+        <code>thickness_in_pk: true</code> · <code>width_in_pk: true</code> ·
+        <code>caller_failure_code: "DG106"</code>
+      </td>
+    </tr>
+    <tr>
+      <td>composite</td>
+      <td><code>term.scm.spec.hr_max_wgt</code></td>
+      <td>압연 MAX 단중 기준</td>
+      <td>cmp + org + hr_plant_cd</td>
+      <td>
+        <code>thickness</code> (BigDecimal 6,2, 동일) ·
+        <code>width</code> (BigDecimal 10,2, 동일) ·
+        <code>max_wgt</code> (BigDecimal 10,3) ·
+        <code>match_pattern: ["2D_CEILING"]</code> ·
+        <code>caller_failure_code: "DG107"</code>
+      </td>
+    </tr>
+  </table>
+  <p class="small">★ parts = (cmp, org, hr_plant_cd) — 자연 PK 만 atomic 으로. thickness/width 는 PK 이지만 grid coordinate scalar 이므로 facet 으로. <code>thickness_in_pk: true</code> 마킹으로 "PK 에 들어 있음" 표현.</p>
+
+  <h4>(C) Action 2개</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>params</th><th>return</th><th>realizes</th></tr>
+    <tr>
+      <td><code>action.scm.spec.lookup_hr_min_wgt</code></td>
+      <td>MIN 단중 2D ceiling 룩업</td>
+      <td>cmp / org / hr_plant_cd / thickness / width</td>
+      <td>min_wgt or null</td>
+      <td><code>HrMinWgtService.lookup</code> · derived JPA query</td>
+    </tr>
+    <tr>
+      <td><code>action.scm.spec.lookup_hr_max_wgt</code></td>
+      <td>MAX 단중 2D ceiling 룩업</td>
+      <td>동일</td>
+      <td>max_wgt or null</td>
+      <td><code>HrMaxWgtService.lookup</code> · 동일 패턴</td>
+    </tr>
+  </table>
+
+  <h4>(D) BusinessRule 1개 (shared)</h4>
+  <table>
+    <tr><th>fqn</th><th>statement</th><th>enforced_by</th></tr>
+    <tr>
+      <td><code>rule.scm.spec.hr_wgt_2d_ceiling_lookup</code></td>
+      <td>HR_MIN/MAX_WGT 룩업은 입력 (input_thickness, input_width) 을 cover 하는 가장 작은 cell 의 단중값 반환. 즉 cell.thickness ≥ input.thickness AND cell.width ≥ input.width ORDER BY thickness ASC, width ASC LIMIT 1. 미매칭 시 null (caller 가 DG106/DG107 fail 처리).</td>
+      <td>
+        <code>HrMinWgtService.lookup</code> + <code>HrMaxWgtService.lookup</code> 의 derived JPA query (양쪽 동일 패턴)
+      </td>
+    </tr>
+  </table>
+  <p class="small">★ 1 BR 가 두 entity 동시 적용 — composite 2 + Action 2 인데 lookup 패턴이 동일. <code>BR.applies_to: [hr_min_wgt, hr_max_wgt]</code> 으로 표현.</p>
+
+  <h4>(E) TypeRealization (6개)</h4>
+  <table>
+    <tr><th>atomic</th><th>code position</th><th>scope</th></tr>
+    <tr><td><code>term.scm.shared.cmp</code></td><td>HrMinWgtJpo.cmpCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>term.scm.shared.org</code></td><td>HrMinWgtJpo.orgCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>term.scm.shared.hr_plant_cd</code></td><td>HrMinWgtJpo.<strong>hrCd</strong></td><td>PARTIAL ★ (B.1 atomic 재사용, 컬럼명 alias 추가)</td></tr>
+    <tr><td><code>term.scm.shared.cmp</code></td><td>HrMaxWgtJpo.cmpCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>term.scm.shared.org</code></td><td>HrMaxWgtJpo.orgCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>term.scm.shared.hr_plant_cd</code></td><td>HrMaxWgtJpo.<strong>hrCd</strong></td><td>PARTIAL</td></tr>
+  </table>
+  <p class="small">★ <code>hr_plant_cd</code> atomic 는 이제 4 위치에서 사용: HrSpecJpo.hrPlantCd (B.1 PRIMARY), HrMinWgtJpo.hrCd, HrMaxWgtJpo.hrCd. PARTIAL TR 3 row. atomic share 정책의 가치 입증.</p>
+
+  <h4>(F) 결함 마킹 (Q4 정책)</h4>
+  <ul>
+    <li><strong>HR_CD vs HR_PLANT_CD 컬럼명 mismatch</strong> — 의미 동일이지만 컬럼명 다름. drama DNA. <code>atomic.hr_plant_cd.facets.legacy_aliases: ["HR_PLANT_CD", "HR_CD"]</code></li>
+    <li><strong>thickness/width 가 PK</strong> — 일반적 (2D grid coordinate). 결함 X.</li>
+    <li><strong>2D sheet 의 row 수 폭증 위험</strong> — N thickness × M width = N×M row. 운영 부담 가능 → design-gaps #27 후보.</li>
+  </ul>
+
+  <!-- ====================================================================== -->
+  <h3>⑥ 누적 row (B.5 종료 시 예상)</h3>
+  <pre>+ 0 atomic        : 신규 atomic 없음
++ 2 composite     : term.scm.spec.hr_min_wgt
+                    term.scm.spec.hr_max_wgt
++ 2 Action        : lookup_hr_min_wgt
+                    lookup_hr_max_wgt
++ 1 BR (shared)   : rule.hr_wgt_2d_ceiling_lookup (applies_to 2 composites)
++ 6 TR            : (cmp + org + hr_plant_cd) × 2 entities, 모두 PARTIAL
++ 1 design-gaps  : #27 2D sheet row 폭증 위험 (optional)
+─────────────────────────────────
+B.5 추가: 11 row (atomic 0 + composite 2 + Action 2 + BR 1 + TR 6)
+B.1+B.2+B.3+B.4+B.5 누적: 39 + 11 = 50 row</pre>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>B.5 답변 — HrMinWgt + HrMaxWgt 합의</h4>
+
+    <div class="field">
+      <label><strong>Q1. 통합 vs 분리</strong> — 옵션 A (통합 1 composite) / <strong>옵션 B (분리 2 composite) ★</strong> / 옵션 C (통합 + wgt_kind atomic)?
+        <span class="recommend">★ 추천 <strong>B 분리</strong>. drama DNA 보존 + 코드 ground truth + 도메인 의미 명확. BR 만 shared (1 BR applies_to 2).</span>
+      </label>
+      <textarea class="text" name="b5_q1" rows="2" placeholder="예: B (분리) / A (통합) / C (통합+kind)"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. 추천 row 11개 OK?</strong> (atomic 0 + composite 2 + Action 2 + BR 1 + TR 6)
+        <span class="recommend">★ 추천: <strong>OK</strong>. 옵션 B 기준.</span>
+      </label>
+      <textarea class="text" name="b5_q2" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. thickness/width atomic 승격 X</strong> — scalar dimension 으로 facet 만 등록. atomic 으로 승격하지 않음.
+        <span class="recommend">★ 추천 OK. 측정값 (mm 단위) 은 ID 가 아니므로 atomic 으로 승격하지 않음. 대신 facet semantic 으로 "2d_grid_coord_thickness/width" 박음.</span>
+      </label>
+      <textarea class="text" name="b5_q3" rows="2" placeholder="예: OK / atomic 으로 승격 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. BR 1 shared (applies_to 2)</strong> — 2D ceiling lookup 패턴이 min/max 동일. 1 BR 이 2 composite 동시 적용.
+        <span class="recommend">★ 추천 OK. ontology 의 BR 는 abstract pattern — 여러 entity 적용 가능. <code>applies_to: [hr_min_wgt, hr_max_wgt]</code>.</span>
+      </label>
+      <textarea class="text" name="b5_q4" rows="2" placeholder="예: OK / BR 도 분리 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. HR_CD ↔ HR_PLANT_CD 컬럼명 mismatch 표현</strong> — atomic.hr_plant_cd.facets <code>legacy_aliases: ["HR_PLANT_CD", "HR_CD"]</code> + TR 3-tuple 그대로 OK?
+        <span class="recommend">★ 추천 OK. drama DNA 보존 (컬럼명 mismatch 그대로 노출). atomic 의 legacy_aliases facet 으로 hint.</span>
+      </label>
+      <textarea class="text" name="b5_q5" rows="2" placeholder="예: OK / 다른 표현 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. 2D sheet row 폭증 위험 → design-gaps #27 등록?</strong>
+        <span class="recommend">★ 추천 OK. 운영 부담 항목 — Phase E 결정 후보.</span>
+      </label>
+      <textarea class="text" name="b5_q6" rows="2" placeholder="예: OK 등록 / 등록 X ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7. 빠뜨림 / 추가</strong>
+        <span class="recommend">★ 추천: 없음. 코드 5 PK + 1 facet × 2 entities + 2 service 모두 매핑.</span>
+      </label>
+      <textarea class="text" name="b5_q7" rows="2" placeholder="예: 없음 / 또는: ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q8. B.6 (Phase B 종결 archive) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. B.1~B.5 ground truth 정리 + Phase A retroactive 적용 + HANDOFF 갱신 + memory 갱신.</span>
+      </label>
+      <textarea class="text" name="b5_q8" rows="2" placeholder="예: OK / 다른 진행 ___"></textarea>
+    </div>
+
+    <div class="ds-actions">
+      <button class="btn primary" id="b5-build">미리보기</button>
+      <button class="btn" id="b5-copy">📋 답변 복사</button>
+      <span class="copy-hint">「📋 답변 복사」 → 채팅 붙여넣기</span>
+    </div>
+    <div class="preview" id="b5-preview"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- B.5 archive -->
+<!-- ====================================================================== -->
+<section class="step" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 B.5 답변 받음 — HrMinWgt + HrMaxWgt 합의 (11 row)</h2>
+  <div class="meta">
+    <span class="badge b-applied">archive</span>
+    <span>모두 추천대로</span>
+  </div>
+
+  <h3>답변 그대로</h3>
+  <div class="applied">
+    <div class="label">사용자 답변 (2026-05-10)</div>
+    <ul>
+      <li><strong>Q1</strong> 통합 vs 분리: 추천대로 (옵션 B 분리)</li>
+      <li><strong>Q2</strong> 추천 row 11개: 추천대로</li>
+      <li><strong>Q3</strong> thickness/width atomic 승격 X: 추천대로</li>
+      <li><strong>Q4</strong> BR 1 shared: 추천대로</li>
+      <li><strong>Q5</strong> HR_CD legacy alias 표현: 추천대로</li>
+      <li><strong>Q6</strong> design-gaps #27 등록: 추천대로</li>
+      <li><strong>Q7</strong> 빠뜨림: 없음</li>
+      <li><strong>Q8</strong> B.6 진입: OK</li>
+    </ul>
+  </div>
+
+  <h3>★ B.5 합의 row (Phase B 누적 +11)</h3>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>요약</th></tr>
+    <tr><td>composite</td><td><code>term.scm.spec.hr_min_wgt</code></td><td>압연 MIN 단중 기준 (cmp+org+hr_plant_cd, 2D grid coord facet, DG106)</td></tr>
+    <tr><td>composite</td><td><code>term.scm.spec.hr_max_wgt</code></td><td>압연 MAX 단중 기준 (동일 PK, DG107)</td></tr>
+    <tr><td>Action</td><td><code>action.scm.spec.lookup_hr_min_wgt</code></td><td>2D ceiling lookup, realizes HrMinWgtService.lookup</td></tr>
+    <tr><td>Action</td><td><code>action.scm.spec.lookup_hr_max_wgt</code></td><td>동일 패턴, realizes HrMaxWgtService.lookup</td></tr>
+    <tr><td>BR ★ shared</td><td><code>rule.scm.spec.hr_wgt_2d_ceiling_lookup</code></td><td>applies_to: [hr_min_wgt, hr_max_wgt]. 1 BR → 2 entity</td></tr>
+    <tr><td>TR (3+3=6)</td><td>cmp / org / hr_plant_cd × 2 entities</td><td>모두 PARTIAL (재사용)</td></tr>
+  </table>
+
+  <h3>★ design-gaps 추가</h3>
+  <ul>
+    <li><strong>#27</strong> — 2D sheet row 폭증 위험 (N thickness × M width). 운영 부담 가능. Phase E 결정 후보.</li>
+  </ul>
+
+  <p class="small">★ Phase B 누적: <strong>50 row</strong> (B.1 8 + B.2 13 + B.3 7 + B.4 11 + B.5 11). hr_plant_cd atomic 4 위치 사용 — atomic share 가치 입증.</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<!-- B.6 — Phase B 종결 archive  -->
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<section class="step" style="background:rgba(56,189,248,0.04);border-color:rgba(56,189,248,0.4)">
+  <h2>🏁 B.6 — Phase B 종결 archive</h2>
+  <div class="meta">
+    <span class="badge b-applied">완료</span>
+    <span>Phase A 47 + retroactive 1 + Phase B 50 = 98 row ground truth</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>① Phase B 누적 ground truth (B.1~B.5 합계)</h3>
+  <table>
+    <tr><th>kind</th><th>count</th><th>fqn 목록</th></tr>
+    <tr>
+      <td>atomic</td>
+      <td>6</td>
+      <td><code>scm.shared</code>: hr_plant_cd / sm_cd / cast_cd / machine_cd / edging_group_cd / priority<br>
+      <em>(주: priority 는 Phase B B.4 에서 신규 등록되며, Phase A Customer.priority TR 은 retroactive 추가 — 아래 ② 표 참조)</em></td>
+    </tr>
+    <tr>
+      <td>composite</td>
+      <td>8</td>
+      <td><code>scm.spec</code>: hr_plant / hr_plant_constraint / cast_plant / cast_plant_constraint / edging_spec / edging_group_match / hr_min_wgt / hr_max_wgt</td>
+    </tr>
+    <tr>
+      <td>Action</td>
+      <td>7</td>
+      <td><code>scm.spec</code>: lookup_hr_constraint / lookup_cast_constraint / map_sm_to_cast_machine / lookup_edging_spec / find_edging_group / lookup_hr_min_wgt / lookup_hr_max_wgt</td>
+    </tr>
+    <tr>
+      <td>BusinessRule</td>
+      <td>3</td>
+      <td><code>scm.spec</code>: edging_spec_lookup_strategy / edging_group_match_strategy / hr_wgt_2d_ceiling_lookup (shared)</td>
+    </tr>
+    <tr>
+      <td>TR</td>
+      <td>~26</td>
+      <td>4 (B.1) + 6 (B.2) + 3 (B.3) + 7 (B.4) + 6 (B.5) = 26 (이 중 PRIMARY 6: hr_plant_cd / sm_cd / cast_cd / machine_cd / edging_group_cd / priority)</td>
+    </tr>
+    <tr>
+      <td>design-gaps</td>
+      <td>5 신규</td>
+      <td>#23 NPE→HIST 미구현 (B.1, B.2 확장) / #24 wildcard 미구현 (B.1) / #25 hardcoded plant mapping (B.2) / #26 PRIORITY in PK (B.4) / #27 2D sheet row 폭증 (B.5)</td>
+    </tr>
+    <tr>
+      <td><strong>Phase B 합계</strong></td>
+      <td><strong>50</strong></td>
+      <td>(atomic 6 + composite 8 + Action 7 + BR 3 + TR 26 = 50)</td>
+    </tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>② Phase A retroactive 적용 (Q6 따라)</h3>
+  <table>
+    <tr><th>대상</th><th>변경</th><th>적용 위치</th></tr>
+    <tr>
+      <td>Customer (Phase A composite <code>scm.std.customer_design_limit</code>)</td>
+      <td><code>priority</code> facet → <code>atomic_ref: term.scm.shared.priority</code> 추가 + 1 PARTIAL TR (CustomerStdJpo.priority)</td>
+      <td>round6-live-authoring.html Round 6 종료 archive section + reference-materials.md</td>
+    </tr>
+  </table>
+  <p class="small">★ Phase A confirmed_plant_cd Step 7 retroactive 패턴 동일. atomic share 정책 (Q2) 의 일관성 확보.</p>
+
+  <h3>③ Phase A+B ground truth 총합</h3>
+  <table>
+    <tr><th>구간</th><th>row 수</th><th>비고</th></tr>
+    <tr><td>Phase A 원안</td><td>47</td><td>Round 6 종료 시점</td></tr>
+    <tr><td>Phase A retroactive</td><td>+1</td><td>Customer.priority PARTIAL TR (B.4 Q6 합의)</td></tr>
+    <tr><td>Phase B</td><td>+50</td><td>B.1 8 + B.2 13 + B.3 7 + B.4 11 + B.5 11</td></tr>
+    <tr><td><strong>합계</strong></td><td><strong>98</strong></td><td>Phase C (Order/Slab/21-step) 진입 입력</td></tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>④ atomic 사용 빈도 (atomic share 효과 분석)</h3>
+  <pre>atomic                            Phase A   Phase B   합계 (TR 위치)
+─────────────────────────────────────────────────────────────────
+cmp                                  2          5          7  ★ 모든 entity
+org                                  2          5          7  ★ 모든 entity
+proc                                 1          0          1
+grade                                1          1          2
+product_kind (4-7 alias)            1          5          6  ★ 6 alias chaos
+customer                             2          1          3
+confirmed_plant_cd (Phase A 7번째)   1          0          1
+─────────────────────────────────────────────────────────────────
+hr_plant_cd (B.1)                    -          3          3  ★ HrSpec/HrMin/HrMaxWgt
+sm_cd (B.2)                          -          1          1
+cast_cd (B.2)                        -          1          1
+machine_cd (B.2)                     -          1          1
+edging_group_cd (B.3)                -          2          2  EdgingSpec/EdgingGroup
+priority (B.4 + Phase A retroactive) 1*         1          2  ★ retroactive
+─────────────────────────────────────────────────────────────────
+총 atomic 13개 / TR 위치 합 37 (PRIMARY 13 + PARTIAL 24)</pre>
+  <p class="small">★ Q2 적극 share 정책의 효과 — cmp/org/product_kind 가 모든 entity 에서 재사용. atomic 등록 1번으로 N entity 일관성 보장.</p>
+
+  <!-- ====================================================================== -->
+  <h3>⑤ Phase C 입력 자료 (Order / Slab / 21-step)</h3>
+  <ul>
+    <li>Phase A+B 98 row ground truth</li>
+    <li>round5-live-authoring.html Step 1~3 archive (Order/Slab 인터뷰)</li>
+    <li>슬랩설계 21-step Algorithm (SdDesigner.java + 21개 SdXxxAction.java)</li>
+    <li>모드: M3 hybrid (M1 빠른 confirm + 새로운 Action 추론은 M2 깊이 인터뷰)</li>
+  </ul>
+
+  <h3>⑥ design-gaps 통합 (Phase A 22 + Phase B 5 = 27 항목)</h3>
+  <ul>
+    <li>Phase A 22 항목 (이전 합의)</li>
+    <li>Phase B 5 신규: #23 / #24 / #25 / #26 / #27</li>
+    <li>Phase E 에서 일괄 결정</li>
+  </ul>
+</section>
+
+<script>
+function buildB1Text() {
+  const get = name => (document.querySelector(`[name="${name}"]`)?.value || '').trim();
+  const rows = [
+    ['q1_rows', 'Q1. 추천 row 8개'],
+    ['q2_domain', 'Q2. scm.spec sub-domain'],
+    ['q3_relation', 'Q3. hr_plant_cd ↔ confirmed_plant_cd 관계'],
+    ['q4_defect', 'Q4. wildcard 미구현 결함 표현'],
+    ['q5_missing', 'Q5. 빠뜨림/추가'],
+    ['q6_next', 'Q6. B.2 진입']
+  ];
+  const parts = ["[Phase B.1 — HrSpec 답변]"];
+  for (const [n, label] of rows) {
+    const v = get(n);
+    if (v) parts.push(`\n${label}\n${v}`);
+  }
+  return parts.length > 1 ? parts.join('\n') : '[Phase B.1 — HrSpec 답변]\n(아직 답변 없음)';
+}
+
+document.getElementById('b1-build').addEventListener('click', () => {
+  const txt = buildB1Text();
+  const pv = document.getElementById('b1-preview');
+  pv.classList.add('visible');
+  pv.textContent = txt;
+});
+document.getElementById('b1-copy').addEventListener('click', async (e) => {
+  const txt = buildB1Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    e.target.classList.add('copied');
+    e.target.textContent = '✓ 복사됨';
+    setTimeout(() => {
+      e.target.classList.remove('copied');
+      e.target.textContent = '📋 답변 복사';
+    }, 1500);
+  } catch (err) {
+    const pv = document.getElementById('b1-preview');
+    pv.classList.add('visible');
+    pv.textContent = txt + '\n\n[복사 실패 — 위 텍스트 수동 복사]';
+  }
+});
+
+// =====================================================================
+// B.2 — CastSpec
+// =====================================================================
+function buildB2Text() {
+  const get = name => (document.querySelector(`[name="${name}"]`)?.value || '').trim();
+  const rows = [
+    ['b2_q1', 'Q1. 추천 row 13개'],
+    ['b2_q2', 'Q2. atomic 3개 모두 scm.shared'],
+    ['b2_q3', 'Q3. slab_thickness fixed_per_machine facet'],
+    ['b2_q4', 'Q4. action.map_sm_to_cast_machine 별도 등록'],
+    ['b2_q5', 'Q5. WGT_LOW/HIGH 처리'],
+    ['b2_q6', 'Q6. 빠뜨림/추가'],
+    ['b2_q7', 'Q7. B.3 진입']
+  ];
+  const parts = ["[Phase B.2 — CastSpec 답변]"];
+  for (const [n, label] of rows) {
+    const v = get(n);
+    if (v) parts.push(`\n${label}\n${v}`);
+  }
+  return parts.length > 1 ? parts.join('\n') : '[Phase B.2 — CastSpec 답변]\n(아직 답변 없음)';
+}
+
+document.getElementById('b2-build').addEventListener('click', () => {
+  const txt = buildB2Text();
+  const pv = document.getElementById('b2-preview');
+  pv.classList.add('visible');
+  pv.textContent = txt;
+});
+document.getElementById('b2-copy').addEventListener('click', async (e) => {
+  const txt = buildB2Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    e.target.classList.add('copied');
+    e.target.textContent = '✓ 복사됨';
+    setTimeout(() => {
+      e.target.classList.remove('copied');
+      e.target.textContent = '📋 답변 복사';
+    }, 1500);
+  } catch (err) {
+    const pv = document.getElementById('b2-preview');
+    pv.classList.add('visible');
+    pv.textContent = txt + '\n\n[복사 실패 — 위 텍스트 수동 복사]';
+  }
+});
+
+// =====================================================================
+// B.3 — EdgingSpec
+// =====================================================================
+function buildB3Text() {
+  const get = name => (document.querySelector(`[name="${name}"]`)?.value || '').trim();
+  const rows = [
+    ['b3_q1', 'Q1. 추천 row 7개'],
+    ['b3_q2', 'Q2. edging_group_cd atomic + wildcard 처리'],
+    ['b3_q3', 'Q3. match_pattern 표현'],
+    ['b3_q4', 'Q4. BR edging_spec_lookup_strategy 등록'],
+    ['b3_q5', 'Q5. cap offset semantic'],
+    ['b3_q6', 'Q6. 빠뜨림/추가'],
+    ['b3_q7', 'Q7. B.4 진입']
+  ];
+  const parts = ["[Phase B.3 — EdgingSpec 답변]"];
+  for (const [n, label] of rows) {
+    const v = get(n);
+    if (v) parts.push(`\n${label}\n${v}`);
+  }
+  return parts.length > 1 ? parts.join('\n') : '[Phase B.3 — EdgingSpec 답변]\n(아직 답변 없음)';
+}
+
+document.getElementById('b3-build').addEventListener('click', () => {
+  const txt = buildB3Text();
+  const pv = document.getElementById('b3-preview');
+  pv.classList.add('visible');
+  pv.textContent = txt;
+});
+document.getElementById('b3-copy').addEventListener('click', async (e) => {
+  const txt = buildB3Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    e.target.classList.add('copied');
+    e.target.textContent = '✓ 복사됨';
+    setTimeout(() => {
+      e.target.classList.remove('copied');
+      e.target.textContent = '📋 답변 복사';
+    }, 1500);
+  } catch (err) {
+    const pv = document.getElementById('b3-preview');
+    pv.classList.add('visible');
+    pv.textContent = txt + '\n\n[복사 실패 — 위 텍스트 수동 복사]';
+  }
+});
+
+// =====================================================================
+// B.4 — EdgingGroup
+// =====================================================================
+function buildB4Text() {
+  const get = name => (document.querySelector(`[name="${name}"]`)?.value || '').trim();
+  const rows = [
+    ['b4_q1', 'Q1. 추천 row 11개'],
+    ['b4_q2', 'Q2. priority atomic 등록'],
+    ['b4_q3', 'Q3. composite 모델링 (parts=PK, 매칭조건=facet)'],
+    ['b4_q4', 'Q4. BR edging_group_match_strategy 등록'],
+    ['b4_q5', 'Q5. PRIORITY in PK 결함 마킹'],
+    ['b4_q6', 'Q6. Phase A retroactive — Customer.priority TR 추가'],
+    ['b4_q7', 'Q7. 빠뜨림/추가'],
+    ['b4_q8', 'Q8. B.5 진입']
+  ];
+  const parts = ["[Phase B.4 — EdgingGroup 답변]"];
+  for (const [n, label] of rows) {
+    const v = get(n);
+    if (v) parts.push(`\n${label}\n${v}`);
+  }
+  return parts.length > 1 ? parts.join('\n') : '[Phase B.4 — EdgingGroup 답변]\n(아직 답변 없음)';
+}
+
+document.getElementById('b4-build').addEventListener('click', () => {
+  const txt = buildB4Text();
+  const pv = document.getElementById('b4-preview');
+  pv.classList.add('visible');
+  pv.textContent = txt;
+});
+document.getElementById('b4-copy').addEventListener('click', async (e) => {
+  const txt = buildB4Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    e.target.classList.add('copied');
+    e.target.textContent = '✓ 복사됨';
+    setTimeout(() => {
+      e.target.classList.remove('copied');
+      e.target.textContent = '📋 답변 복사';
+    }, 1500);
+  } catch (err) {
+    const pv = document.getElementById('b4-preview');
+    pv.classList.add('visible');
+    pv.textContent = txt + '\n\n[복사 실패 — 위 텍스트 수동 복사]';
+  }
+});
+
+// =====================================================================
+// B.5 — HrMinWgt + HrMaxWgt
+// =====================================================================
+function buildB5Text() {
+  const get = name => (document.querySelector(`[name="${name}"]`)?.value || '').trim();
+  const rows = [
+    ['b5_q1', 'Q1. 통합 vs 분리 (A/B/C)'],
+    ['b5_q2', 'Q2. 추천 row 11개'],
+    ['b5_q3', 'Q3. thickness/width atomic 승격 X'],
+    ['b5_q4', 'Q4. BR 1 shared (applies_to 2)'],
+    ['b5_q5', 'Q5. HR_CD ↔ HR_PLANT_CD legacy alias 표현'],
+    ['b5_q6', 'Q6. design-gaps #27 (2D sheet 폭증) 등록'],
+    ['b5_q7', 'Q7. 빠뜨림/추가'],
+    ['b5_q8', 'Q8. B.6 (Phase B 종결) 진입']
+  ];
+  const parts = ["[Phase B.5 — HrMinWgt + HrMaxWgt 답변]"];
+  for (const [n, label] of rows) {
+    const v = get(n);
+    if (v) parts.push(`\n${label}\n${v}`);
+  }
+  return parts.length > 1 ? parts.join('\n') : '[Phase B.5 — HrMinWgt + HrMaxWgt 답변]\n(아직 답변 없음)';
+}
+
+document.getElementById('b5-build').addEventListener('click', () => {
+  const txt = buildB5Text();
+  const pv = document.getElementById('b5-preview');
+  pv.classList.add('visible');
+  pv.textContent = txt;
+});
+document.getElementById('b5-copy').addEventListener('click', async (e) => {
+  const txt = buildB5Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    e.target.classList.add('copied');
+    e.target.textContent = '✓ 복사됨';
+    setTimeout(() => {
+      e.target.classList.remove('copied');
+      e.target.textContent = '📋 답변 복사';
+    }, 1500);
+  } catch (err) {
+    const pv = document.getElementById('b5-preview');
+    pv.classList.add('visible');
+    pv.textContent = txt + '\n\n[복사 실패 — 위 텍스트 수동 복사]';
+  }
+});
+</script>
+
+</div>
+</body>
+</html>

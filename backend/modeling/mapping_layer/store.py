@@ -343,6 +343,14 @@ class MappingLayerStore:
             stmt = select(AnchorBindingRow).where(AnchorBindingRow.code_method_fqn == code_method_fqn)
             return [_row_to_ab(r) for r in s.execute(stmt).scalars()]
 
+    def list_anchor_bindings(self, repo_id: str | None = None) -> list[AnchorBinding]:
+        """모든 AnchorBinding 조회. repo_id 지정 시 그 repo 만."""
+        with session_scope() as s:
+            stmt = select(AnchorBindingRow)
+            if repo_id is not None:
+                stmt = stmt.where(AnchorBindingRow.repo_id == repo_id)
+            return [_row_to_ab(r) for r in s.execute(stmt).scalars()]
+
     # ---- delete / cleanup ----
     def delete_repo(self, repo_id: str) -> int:
         with session_scope() as s:

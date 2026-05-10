@@ -13,9 +13,11 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.modeling.api.ontology_query import OntologyQueryClientImpl
+from backend.modeling.domain_layer.store import DomainLayerStore
+from backend.modeling.mapping_layer.store import MappingLayerStore
 from backend.shared.contracts.ontology_query import (
-    ActionDTO, AmbiguousCallSiteDTO, AnchorBindingDTO, CallSiteDTO,
-    CodeTypeDTO, CompositionDTO, RealizationDTO, SearchHitDTO,
+    ActionDTO, AmbiguousCallSiteDTO, AnchorBindingDTO, BusinessRuleDTO,
+    CallSiteDTO, CodeTypeDTO, CompositionDTO, RealizationDTO, SearchHitDTO,
     TermDTO, UnmappedMethodDTO, VerificationLevel, VerificationProgressDTO,
 )
 
@@ -178,3 +180,63 @@ def search(
     limit: int = Query(20, ge=1, le=200),
 ) -> list[SearchHitDTO]:
     return _q().search(q, repo_id=repo_id, limit=limit)
+
+
+# ---------------------------------------------------------------------------
+# BusinessRule + AnchorBinding list (전체) — UI 의 "온톨로지" 탭에서 노출용.
+# 02-ontology-api-additions.md 의 신규 endpoint 일부 1차 구현.
+# ---------------------------------------------------------------------------
+@router.get("/business-rules", response_model=list[BusinessRuleDTO])
+def list_business_rules(repo_id: str | None = Query(None)) -> list[BusinessRuleDTO]:
+    rules = DomainLayerStore().list_rules(repo_id=repo_id)
+    return [BusinessRuleDTO.model_validate(r.model_dump()) for r in rules]
+
+
+@router.get("/anchor-bindings", response_model=list[AnchorBindingDTO])
+def list_anchor_bindings(repo_id: str | None = Query(None)) -> list[AnchorBindingDTO]:
+    bindings = MappingLayerStore().list_anchor_bindings(repo_id=repo_id)
+    return [AnchorBindingDTO.model_validate(b.model_dump()) for b in bindings]
+
+
+# ---------------------------------------------------------------------------
+# delegates-to-tree — workflow 의 transitive sub_actions 펼침
+# (02 명세 Section 2.1, 핵심 신규 endpoint).
+# ---------------------------------------------------------------------------
+@router.get("/actions/{action_fqn:path}/delegates-to-tree", response_model=dict[str, Any])
+def get_delegates_to_tree(
+    action_fqn: str,
+    max_depth: int = Query(10, ge=1, le=30),
+) -> dict[str, Any]:
+    """Action 의 sub_actions 를 BFS 로 transitive 펼침.
+
+    Returns:
+        {action_fqn, kind, children: [{action_fqn, kind, children: [...]}], cycle_detected: bool}
+    """
+    store = MappingLayerStore()
+    visited: set[str] = set()
+
+    def build(fqn: str, depth: int) -> dict[str, Any]:
+        node: dict[str, Any] = {
+            "action_fqn": fqn,
+            "kind": "unknown",
+            "children": [],
+            "cycle_detected": False,
+        }
+        if depth >= max_depth:
+            return node
+        if fqn in visited:
+            node["cycle_detected"] = True
+            return node
+        visited.add(fqn)
+        action = store.get_action(fqn)
+        if action is None:
+            return node
+        node["kind"] = action.kind.value
+        for sub_fqn in action.sub_actions:
+            node["children"].append(build(sub_fqn, depth + 1))
+        return node
+
+    root_action = store.get_action(action_fqn)
+    if root_action is None:
+        raise HTTPException(status_code=404, detail=f"Action not found: {action_fqn}")
+    return build(action_fqn, 0)

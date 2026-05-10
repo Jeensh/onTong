@@ -6,7 +6,7 @@
  */
 import { create } from "zustand";
 
-export type LeftTab = "code" | "queue";
+export type LeftTab = "code" | "ontology" | "queue";
 export type MainMode = "detail" | "split" | "authoring";
 export type Direction = "fwd" | "bwd";
 export type Lens = "verify" | "domain" | "confidence" | "simulation" | "none";

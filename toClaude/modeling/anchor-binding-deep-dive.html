@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>AnchorBinding — 인터랙티브 심층 가이드</title>
+<style>
+  :root {
+    --bg: #0b1120; --card: #1e293b; --line: #334155;
+    --fg: #e2e8f0; --muted: #94a3b8; --dim: #64748b;
+    --primary: #38bdf8; --emerald: #10b981; --amber: #f59e0b;
+    --rose: #fb7185; --violet: #a78bfa; --orange: #fb923c;
+    --cyan: #22d3ee; --pink: #f472b6;
+    /* 7 anchor_kind 색 코드 */
+    --a-field:        #38bdf8;  /* sky */
+    --a-field-access: #06b6d4;  /* cyan */
+    --a-param:        #14b8a6;  /* teal */
+    --a-local:        #22d3ee;  /* cyan-400 */
+    --a-return:       #a78bfa;  /* violet */
+    --a-branch:       #fb7185;  /* rose */
+    --a-literal:      #f59e0b;  /* amber */
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font:14px/1.6 -apple-system,"Pretendard","Apple SD Gothic Neo",sans-serif;background:var(--bg);color:var(--fg)}
+  .wrap{max-width:1200px;margin:0 auto;padding:32px 32px 100px}
+
+  /* 표지 */
+  .cover{padding:40px 0 28px;border-bottom:1px solid var(--line);margin-bottom:18px}
+  .cover .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--primary);font-weight:600;margin-bottom:6px}
+  .cover h1{font-size:34px;line-height:1.15;margin:0 0 8px;font-weight:700;letter-spacing:-0.02em}
+  .cover h1 small{display:block;font-size:16px;color:var(--muted);font-weight:400;margin-top:6px;letter-spacing:0}
+  .cover .sub{font-size:14px;color:var(--muted);max-width:820px}
+  .cover .meta{margin-top:14px;font-size:11.5px;color:var(--dim)}
+
+  /* Tab navigation */
+  .tabs{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 24px;padding:6px;background:rgba(0,0,0,0.25);border-radius:10px;border:1px solid var(--line)}
+  .tab-btn{flex:1;min-width:140px;padding:10px 14px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--muted);font:inherit;font-size:12.5px;cursor:pointer;font-weight:500;transition:all 0.15s}
+  .tab-btn:hover{color:var(--fg);background:rgba(255,255,255,0.04)}
+  .tab-btn.active{background:var(--card);color:var(--primary);border-color:var(--primary);box-shadow:0 2px 8px rgba(56,189,248,0.15)}
+  .tab-btn .num{display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;background:rgba(255,255,255,0.08);margin-right:6px;font-size:11px;font-weight:600}
+  .tab-btn.active .num{background:var(--primary);color:var(--bg)}
+
+  .panel-tab{display:none}
+  .panel-tab.active{display:block;animation:fadeIn 0.25s ease-in}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  h2{font-size:24px;margin:0 0 8px;letter-spacing:-0.01em;font-weight:700}
+  h2 .lead{display:block;font-size:13px;color:var(--muted);font-weight:400;margin-top:4px}
+  h3{margin:24px 0 8px;font-size:17px;font-weight:600;color:var(--fg)}
+  h4{margin:18px 0 6px;font-size:14.5px;font-weight:600;color:var(--violet)}
+  h5{margin:12px 0 4px;font-size:12.5px;font-weight:600;color:var(--cyan);text-transform:uppercase;letter-spacing:0.04em}
+  p{margin:8px 0 12px}
+
+  ul, ol{margin:8px 0 14px 22px;padding:0}
+  li{padding:4px 0}
+
+  code{font-family:"JetBrains Mono","SF Mono",monospace;font-size:90%;background:rgba(255,255,255,0.06);padding:1.5px 6px;border-radius:4px;color:#c4b5fd}
+  pre{background:rgba(0,0,0,0.40);border:1px solid var(--line);border-radius:8px;padding:14px 16px;font-family:"JetBrains Mono",monospace;font-size:12.3px;overflow-x:auto;color:#cbd5e1;margin:10px 0;line-height:1.55}
+
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:rgba(255,255,255,0.05);color:var(--primary);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:0.04em}
+
+  .panel{background:rgba(0,0,0,0.22);border:1px solid var(--line);border-radius:8px;padding:14px 18px;margin:12px 0}
+  .panel.tip{background:rgba(56,189,248,0.05);border-color:rgba(56,189,248,0.3)}
+  .panel.warn{background:rgba(245,158,11,0.06);border-color:rgba(245,158,11,0.4)}
+  .panel.gap{background:rgba(251,113,133,0.05);border-color:rgba(251,113,133,0.4)}
+  .panel.diff{background:rgba(167,139,250,0.05);border-color:rgba(167,139,250,0.4)}
+  .panel.ok{background:rgba(16,185,129,0.05);border-color:rgba(16,185,129,0.4)}
+  .panel .label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;margin-bottom:6px}
+  .panel.tip .label{color:var(--primary)}
+  .panel.tip .label::before{content:"💡 "}
+  .panel.warn .label{color:var(--amber)}
+  .panel.warn .label::before{content:"⚠️ "}
+  .panel.gap .label{color:var(--rose)}
+  .panel.gap .label::before{content:"🚧 "}
+  .panel.diff .label{color:var(--violet)}
+  .panel.diff .label::before{content:"✨ "}
+  .panel.ok .label{color:var(--emerald)}
+  .panel.ok .label::before{content:"✅ "}
+
+  /* anchor 카드 grid */
+  .anchor-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin:16px 0}
+  .anchor-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;cursor:pointer;transition:all 0.15s;border-left:4px solid var(--line)}
+  .anchor-card:hover{border-color:var(--primary);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.3)}
+  .anchor-card.expanded{border-color:var(--primary);background:rgba(56,189,248,0.04)}
+  .anchor-card .kind{font-family:"JetBrains Mono",monospace;font-size:13px;font-weight:700;margin-bottom:4px}
+  .anchor-card .summary{font-size:12.5px;color:var(--muted);line-height:1.5}
+  .anchor-card .detail{display:none;margin-top:14px;padding-top:14px;border-top:1px dashed var(--line);font-size:12.5px}
+  .anchor-card.expanded .detail{display:block}
+  .anchor-card .example{background:rgba(0,0,0,0.4);padding:8px 10px;border-radius:5px;font-family:"JetBrains Mono",monospace;font-size:11.5px;color:#fcd34d;margin:8px 0}
+
+  /* 색 코드 */
+  .a-field        .kind {color:var(--a-field)}
+  .a-field-access .kind {color:var(--a-field-access)}
+  .a-param        .kind {color:var(--a-param)}
+  .a-local        .kind {color:var(--a-local)}
+  .a-return       .kind {color:var(--a-return)}
+  .a-branch       .kind {color:var(--a-branch)}
+  .a-literal      .kind {color:var(--a-literal)}
+  .a-field        {border-left-color:var(--a-field)}
+  .a-field-access {border-left-color:var(--a-field-access)}
+  .a-param        {border-left-color:var(--a-param)}
+  .a-local        {border-left-color:var(--a-local)}
+  .a-return       {border-left-color:var(--a-return)}
+  .a-branch       {border-left-color:var(--a-branch)}
+  .a-literal      {border-left-color:var(--a-literal)}
+
+  /* 코드 highlight + anchor 마커 */
+  .code-highlight{background:rgba(0,0,0,0.50);border:1px solid var(--line);border-radius:8px;padding:16px 18px;font-family:"JetBrains Mono",monospace;font-size:12.5px;line-height:1.7;overflow-x:auto;color:#cbd5e1;margin:14px 0;position:relative}
+  .anchor-mark{display:inline-block;cursor:pointer;border-radius:3px;padding:0 4px;font-weight:700;color:var(--bg);position:relative;transition:all 0.15s}
+  .anchor-mark:hover{transform:scale(1.1)}
+  .anchor-mark.am-1{background:var(--a-branch)}
+  .anchor-mark.am-2{background:var(--a-literal)}
+  .anchor-mark.am-3{background:var(--a-literal)}
+  .anchor-mark.am-4{background:var(--a-branch)}
+  .anchor-mark.am-5{background:var(--a-literal)}
+  .anchor-mark.am-6{background:var(--a-local)}
+  .anchor-mark.am-7{background:var(--a-return)}
+  .anchor-mark.am-8{background:var(--a-branch)}
+  .anchor-mark.am-9{background:var(--a-local)}
+  .anchor-mark.active{outline:2px solid #fff;outline-offset:1px}
+
+  .anchor-detail-panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin:14px 0;min-height:120px;display:none}
+  .anchor-detail-panel.visible{display:block;animation:fadeIn 0.2s}
+  .anchor-detail-panel h4{margin-top:0;display:flex;align-items:center;gap:10px}
+  .anchor-detail-panel h4 .badge{padding:3px 10px;border-radius:4px;font-size:11px;font-family:"JetBrains Mono",monospace;color:var(--bg);font-weight:700}
+
+  /* 단계별 진행 */
+  .stepper{margin:18px 0}
+  .step-nav{display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+  .step-dot{width:32px;height:32px;border-radius:50%;background:var(--card);border:1px solid var(--line);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.15s}
+  .step-dot.active{background:var(--primary);color:var(--bg);border-color:var(--primary)}
+  .step-dot.completed{background:rgba(16,185,129,0.2);color:var(--emerald);border-color:var(--emerald)}
+  .step-dot:hover{transform:scale(1.05)}
+  .step-line{flex:1;height:2px;background:var(--line);min-width:24px;max-width:60px}
+  .step-line.completed{background:var(--emerald)}
+  .step-content{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 24px;min-height:240px}
+  .step-controls{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
+
+  .btn{padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--fg);font-size:12.5px;cursor:pointer;font-weight:500;font:inherit}
+  .btn:hover{border-color:var(--primary)}
+  .btn.primary{background:var(--primary);color:var(--bg);border-color:var(--primary);font-weight:600}
+  .btn.primary:hover{filter:brightness(1.1)}
+  .btn:disabled{opacity:0.4;cursor:not-allowed}
+
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:0.03em}
+  .p-emerald{background:rgba(16,185,129,0.18);color:var(--emerald)}
+  .p-amber{background:rgba(245,158,11,0.18);color:var(--amber)}
+  .p-rose{background:rgba(251,113,133,0.18);color:var(--rose)}
+  .p-primary{background:rgba(56,189,248,0.18);color:var(--primary)}
+  .p-violet{background:rgba(167,139,250,0.18);color:var(--violet)}
+
+  .biglead{font-size:15.5px;line-height:1.65;color:var(--fg);max-width:880px;margin:14px 0 18px}
+
+  .small{font-size:11.5px;color:var(--muted)}
+  .quote{background:rgba(167,139,250,0.06);border-left:3px solid var(--violet);padding:11px 16px;border-radius:0 4px 4px 0;margin:12px 0;font-size:13.5px}
+  .quote .label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.08em;color:var(--violet);font-weight:600;margin-bottom:4px}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+  @media(max-width:880px){.grid2{grid-template-columns:1fr}}
+
+  .check-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 20px;margin:14px 0;cursor:pointer;transition:all 0.15s}
+  .check-card:hover{border-color:var(--primary)}
+  .check-card .question{font-weight:600;color:var(--fg);font-size:14px;display:flex;align-items:flex-start;gap:10px}
+  .check-card .answer{display:none;margin-top:14px;padding-top:14px;border-top:1px dashed var(--line);font-size:13px;color:var(--fg)}
+  .check-card.revealed .answer{display:block;animation:fadeIn 0.2s}
+  .check-card.revealed{border-color:var(--emerald);background:rgba(16,185,129,0.03)}
+  .check-card .toggle-hint{font-size:11px;color:var(--muted);margin-top:6px}
+
+  /* 영향도 그래프 노드 */
+  .graph-area{background:rgba(0,0,0,0.30);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin:14px 0;font-family:"JetBrains Mono",monospace;font-size:12px;line-height:1.7;overflow-x:auto;white-space:pre;color:#cbd5e1}
+  .graph-area .node{color:var(--cyan);font-weight:700}
+  .graph-area .changed{color:var(--amber);background:rgba(245,158,11,0.15);padding:1px 4px;border-radius:3px}
+  .graph-area .arrow{color:var(--primary)}
+  .graph-area .impact{color:var(--rose)}
+
+  hr{border:0;border-top:1px solid var(--line);margin:24px 0}
+
+  /* 토글 */
+  .toggle-row{display:flex;gap:8px;margin:12px 0}
+  .toggle-btn{padding:7px 14px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--muted);font:inherit;font-size:12px;cursor:pointer}
+  .toggle-btn.active{background:var(--primary);color:var(--bg);border-color:var(--primary)}
+  .toggle-content{display:none}
+  .toggle-content.active{display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ====================================================================== -->
+<!-- 표지 -->
+<!-- ====================================================================== -->
+<div class="cover">
+  <div class="eyebrow">onTong · AnchorBinding 심층 가이드</div>
+  <h1>AnchorBinding — 코드 fragment 와 도메인 의미를 잇다<small>왜 이 개념이 시뮬레이션 + 영향도 분석 신뢰도의 핵심인가</small></h1>
+  <p class="sub">
+    레거시 코드의 <strong>한 줄 한 줄 (literal / branch / local / return / ...) 자체</strong> 를 ontology 의 도메인 의미에 직접 binding.
+    이게 우리 도구의 시뮬레이션이 진짜 작동하게 만드는 핵심 다리.
+  </p>
+  <div class="meta">버전 2026-05-09 (rev2) · cumulativeProductivity / findFirstMatch 의 9 anchor 실제 예시 + 인터랙티브</div>
+</div>
+
+<!-- 미니 용어집 -->
+<div class="panel tip" style="margin:0 0 24px">
+  <div class="label">📖 30 초 용어집 — 처음 보는 분 먼저</div>
+  <table style="margin:8px 0;font-size:12.5px">
+    <tr><th>용어</th><th>한 줄 설명</th></tr>
+    <tr><td><code>atomic</code></td><td>도메인 의미의 최소 단위. 코드의 한 컬럼 / enum / literal 에 직접 매핑 (예: 회사·소·공정).</td></tr>
+    <tr><td><code>composite</code></td><td>여러 atomic + 고유 facet 의 묶음. 코드 entity (class) 와 PRIMARY 매핑 (예: 고객사설계제한).</td></tr>
+    <tr><td><code>facet</code></td><td>composite 의 entity 고유 속성. atomic 으로 분해 안 됨 (예: pkg_wgt_high, productivity 값).</td></tr>
+    <tr><td><code>Action</code></td><td>도메인 행위. 메서드의 도메인 의미 wrapper. params / return / metadata / realization 가짐.</td></tr>
+    <tr><td><code>BusinessRule</code></td><td>도메인 제약사항 (예: <code>0.5 ≤ productivity ≤ 1.0</code>). enforced_by / violated_at_call 추적.</td></tr>
+    <tr><td><code>FQN</code></td><td>fully qualified name. 모든 entity 의 고유 식별자 (예: <code>term.scm.shared.cmp</code>, <code>action.scm.std.cumulative_productivity</code>).</td></tr>
+    <tr><td><code>AnchorBinding</code></td><td>★ 본 가이드 주제. method body 의 fragment (literal / branch / local / return ...) ↔ ontology 의 atomic / Action.metadata / BusinessRule 직접 매핑.</td></tr>
+    <tr><td>auto / user_queue</td><td>anchor 의 confirm 패턴. 명백 (literal/return) = 자동 / 모호 (branch/local) = 사용자 검증 큐.</td></tr>
+  </table>
+</div>
+
+<!-- Tab navigation -->
+<div class="tabs">
+  <button class="tab-btn active" data-tab="t1"><span class="num">1</span>큰 그림</button>
+  <button class="tab-btn" data-tab="t2"><span class="num">2</span>7 종 anchor</button>
+  <button class="tab-btn" data-tab="t3"><span class="num">3</span>실제 예시</button>
+  <button class="tab-btn" data-tab="t4"><span class="num">4</span>시뮬 흐름</button>
+  <button class="tab-btn" data-tab="t5"><span class="num">5</span>영향도 분석</button>
+  <button class="tab-btn" data-tab="t6"><span class="num">6</span>셀프 체크</button>
+</div>
+
+<!-- ====================================================================== -->
+<!-- Tab 1 — 큰 그림 -->
+<!-- ====================================================================== -->
+<div class="panel-tab active" id="t1">
+  <h2>1. 왜 AnchorBinding 이 필요한가
+    <span class="lead">"운영자는 도메인 의미로 말하고 코드는 literal/분기/loop 로 동작한다" — 둘을 잇는 다리</span>
+  </h2>
+
+  <h3>비유 — 운영자 vs 코드의 거리</h3>
+  <div class="grid2">
+    <div class="panel">
+      <div class="label">운영자가 말하는 방식 (도메인 의미)</div>
+      <ul>
+        <li>"누적 실수율은 모든 활성 공정의 곱이야"</li>
+        <li>"기본값은 0.95 인데 매년 평균 재계산하지"</li>
+        <li>"고객사 제한이 더 빡빡하면 그쪽 따라야 해"</li>
+        <li>"실수율은 0.5 ~ 1.0 안에 있어야 정상"</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="label">코드가 말하는 방식 (literal / branch / loop)</div>
+      <pre style="margin:0;padding:0;background:none;border:none">if (confirmedPlantCd.charAt(i) == ' ')
+    continue;
+BigDecimal p = lookupOrDefault(...);
+product = product.multiply(p);
+return DEFAULT_PRODUCTIVITY;  // 0.95</pre>
+    </div>
+  </div>
+
+  <div class="panel diff">
+    <div class="label">중간에 잃는 정보</div>
+    <p>"<code>charAt(i) == ' '</code>" 가 도메인적으로 <strong>"공정 비활성"</strong> 이라는 사실은 <strong>운영자가 지적해주기 전엔 도구가 모름</strong>.
+      Javadoc 도 부재. 매뉴얼도 stale. <strong>코드 자체에는 도메인 의미가 박혀있지 않음</strong>.</p>
+  </div>
+
+  <h3>해결 — fragment 단위로 직접 매핑</h3>
+  <div class="biglead">
+    AnchorBinding = <strong>method body 의 한 표현식 / 분기 / literal 그 자체</strong> 를 ontology 의 도메인 의미 (atomic / Action / BusinessRule) 에 직접 박는 것.
+    메서드 단위 매핑보다 훨씬 미세. v4 결정 Q4'=A 로 합의된 우리 차별 포인트.
+  </div>
+
+  <h3>4 가지 가치</h3>
+  <div class="grid2">
+    <div class="panel ok">
+      <div class="label">가치 1 — 시뮬레이션 substitute 위치 자동 결정</div>
+      <p>ChangeSpec "0.95 → 0.92" 입력 시, 도구가 <strong>literal anchor ② 위치 (DEFAULT_PRODUCTIVITY 자리)</strong> 자동 검출.
+        Python 코드 generation 시 그 자리에 정확히 0.92 substitute. 사람이 코드 grep 안 해도 됨.</p>
+    </div>
+    <div class="panel ok">
+      <div class="label">가치 2 — 영향도 분석 정밀도</div>
+      <p>한 anchor 변경 시 <strong>영향 받는 다른 anchor / Action / 호출 chain 자동 추적</strong>.
+        "0.95 가 어디 더 쓰이지?" 같은 질문이 자동. 사람이 코드 검색 안 해도.</p>
+    </div>
+    <div class="panel ok">
+      <div class="label">가치 3 — Gap Inspector 입력</div>
+      <p>BusinessRule "0.5 ≤ p ≤ 1.0" 이 등록되면 <strong>각 method body 에 가드 분기 anchor 가 있는지 자동 검사</strong>.
+        없으면 갭 (코드 결함 candidate). design-gaps #13 의 핵심.</p>
+    </div>
+    <div class="panel ok">
+      <div class="label">가치 4 — god-method 사각지대 흡수</div>
+      <p>500 줄짜리 god-method 라도 <strong>그 안의 핵심 anchor 만 매핑</strong> 하면 OK. 메서드 자체를 매핑할 필요 없음.</p>
+    </div>
+  </div>
+
+  <h3>v3 + v4 의 합의 사항</h3>
+  <table>
+    <tr><th>합의</th><th>의미</th></tr>
+    <tr>
+      <td><strong>v4 Q4'=A</strong></td>
+      <td>fragment-level AnchorBinding — 메서드 매핑 없이도 anchor 등록 가능. god-method 사각지대 흡수.</td>
+    </tr>
+    <tr>
+      <td><strong>v3 Q-C</strong></td>
+      <td>혼합 confirm — formula/literal 같은 명백한 패턴은 자동 confirmed, branch/lookup 같은 의미 모호한 것만 사용자 큐.</td>
+    </tr>
+    <tr>
+      <td><strong>v3 anchor 7-enum</strong></td>
+      <td>field / field_access / param / local / return / branch / literal — 7 종.</td>
+    </tr>
+  </table>
+
+  <p class="small">→ Tab 2 부터: 7 종 anchor 의 실제 의미와 코드 예시.</p>
+</div>
+
+<!-- ====================================================================== -->
+<!-- Tab 2 — 7 종 anchor -->
+<!-- ====================================================================== -->
+<div class="panel-tab" id="t2">
+  <h2>2. 7 종 anchor_kind
+    <span class="lead">카드 클릭 → 코드 예시 + ontology 매핑 + 자동 confirm 여부</span>
+  </h2>
+
+  <p class="small">색 = 카테고리. <span style="color:var(--a-literal);font-weight:700">literal</span> 같은 명백한 anchor 는 자동 confirmed (v3 Q-C).
+    <span style="color:var(--a-branch);font-weight:700">branch</span> 같은 의미 모호한 anchor 는 사용자 큐 (검증 필요).</p>
+
+  <div class="panel" style="background:rgba(56,189,248,0.05);border-color:rgba(56,189,248,0.3)">
+    <p style="margin:0;font-size:13px"><strong>혼합 confirm</strong> = <code>auto</code> (도구가 자동 확정) / <code>user_queue</code> (운영자 검증 큐). v3 Q-C 의 결정 — 명백한 패턴은 자동, 의미 모호한 건 사람 시간 절약.</p>
+  </div>
+
+  <div class="anchor-grid">
+
+    <div class="anchor-card a-field" onclick="this.classList.toggle('expanded')">
+      <div class="kind">① field</div>
+      <div class="summary">Java field 정의 자체. 클래스의 한 멤버 변수.</div>
+      <div class="detail">
+        <h5>코드 예시</h5>
+        <div class="example">private static final BigDecimal DEFAULT_PRODUCTIVITY = new BigDecimal("0.95");</div>
+        <h5>ontology 매핑 가능</h5>
+        <p>field 자체 → atomic 또는 Action.metadata.default. 또는 BusinessRule 의 fallback_value.</p>
+        <h5>예시 매핑</h5>
+        <p><code>DEFAULT_PRODUCTIVITY</code> field → <code>action.cumulative.metadata.default_on_invalid_input</code></p>
+        <h5>confirm</h5>
+        <p><span class="pill p-emerald">auto</span> formula/literal 패턴 (v3 Q-C)</p>
+      </div>
+    </div>
+
+    <div class="anchor-card a-field-access" onclick="this.classList.toggle('expanded')">
+      <div class="kind">② field_access</div>
+      <div class="summary">field 의 읽기/쓰기 접근 (getter / setter / direct access).</div>
+      <div class="detail">
+        <h5>코드 예시</h5>
+        <div class="example">order.getProductivity()  // SDOrderEntity 의 productivity 필드 읽기</div>
+        <h5>ontology 매핑</h5>
+        <p>field 가 atomic 매핑되어 있을 때, 그 atomic 의 사용 위치 추적.</p>
+        <h5>예시 매핑</h5>
+        <p><code>order.getProductivity()</code> → <code>atomic.shared.productivity</code> read access (= 호출처가 productivity 사용)</p>
+        <h5>confirm</h5>
+        <p><span class="pill p-emerald">auto</span> field 가 이미 매핑되어 있으면 자동 추적</p>
+      </div>
+    </div>
+
+    <div class="anchor-card a-param" onclick="this.classList.toggle('expanded')">
+      <div class="kind">③ param</div>
+      <div class="summary">메서드 매개변수 (input).</div>
+      <div class="detail">
+        <h5>코드 예시</h5>
+        <div class="example">public BigDecimal cumulativeProductivity(String <strong>cmpCd</strong>, ...) { ... }</div>
+        <h5>ontology 매핑</h5>
+        <p>param 자체 → atomic. Action 의 params 정의에 등장.</p>
+        <h5>예시 매핑</h5>
+        <p><code>cmpCd</code> param → <code>atomic.shared.cmp</code> (Action.params 의 첫 번째)</p>
+        <h5>confirm</h5>
+        <p><span class="pill p-emerald">auto</span> Action signature 와 매칭</p>
+      </div>
+    </div>
+
+    <div class="anchor-card a-local" onclick="this.classList.toggle('expanded')">
+      <div class="kind">④ local</div>
+      <div class="summary">메서드 안의 지역 변수.</div>
+      <div class="detail">
+        <h5>코드 예시</h5>
+        <div class="example">BigDecimal <strong>product</strong> = BigDecimal.ONE;
+product = product.multiply(p);</div>
+        <h5>ontology 매핑</h5>
+        <p>local var → 누적 결과 / 중간 계산 / 임시 holder 의미.</p>
+        <h5>예시 매핑</h5>
+        <p><code>product</code> local → cumulative aggregation pattern (loop 누적 곱)</p>
+        <h5>confirm</h5>
+        <p><span class="pill p-amber">user_queue</span> 의미 모호 — 사용자 검증 필요</p>
+      </div>
+    </div>
+
+    <div class="anchor-card a-return" onclick="this.classList.toggle('expanded')">
+      <div class="kind">⑤ return</div>
+      <div class="summary">메서드의 return 값.</div>
+      <div class="detail">
+        <h5>코드 예시</h5>
+        <div class="example">return product;
+return DEFAULT_PRODUCTIVITY;
+return null;</div>
+        <h5>ontology 매핑</h5>
+        <p>return → Action 의 return_term_fqn. 여러 return path 가능 (early-exit / 정상 return / null).</p>
+        <h5>예시 매핑</h5>
+        <p><code>return product</code> → composite term.scm.std.productivity_std.productivity 또는 facet</p>
+        <h5>confirm</h5>
+        <p><span class="pill p-emerald">auto</span> Action.return_term_fqn 매칭</p>
+      </div>
+    </div>
+
+    <div class="anchor-card a-branch" onclick="this.classList.toggle('expanded')">
+      <div class="kind">⑥ branch</div>
+      <div class="summary">조건 분기 (if / else / switch / loop guard).</div>
+      <div class="detail">
+        <h5>코드 예시</h5>
+        <div class="example">if (confirmedPlantCd.charAt(i) == ' ') continue;
+if (matches.isEmpty()) return null;
+if (productivity > MAX) productivity = MAX;</div>
+        <h5>ontology 매핑</h5>
+        <p>branch → BusinessRule (constraint) / lookup_strategy / activation_check 등 의미 가짐.</p>
+        <h5>예시 매핑</h5>
+        <p><code>charAt(i) == ' '</code> branch → <code>atomic.confirmed_plant_cd.activation_check</code></p>
+        <h5>confirm</h5>
+        <p><span class="pill p-amber">user_queue</span> 의미 모호 — 사용자 검증 필수 (도메인 의미가 코드에서 자명하지 않음)</p>
+      </div>
+    </div>
+
+    <div class="anchor-card a-literal" onclick="this.classList.toggle('expanded')">
+      <div class="kind">⑦ literal</div>
+      <div class="summary">상수 / magic number / string literal.</div>
+      <div class="detail">
+        <h5>코드 예시</h5>
+        <div class="example">return 0.95;        // DEFAULT_PRODUCTIVITY
+for (int i = 0; i &lt; 8; i++)  // 8 = 공정 수
+PROC_CODES[i] = "SM";  // 공정 enum</div>
+        <h5>ontology 매핑</h5>
+        <p>literal → atomic.facet.value / Action.metadata.default / enum_values[i] 등.</p>
+        <h5>예시 매핑</h5>
+        <p><code>0.95</code> → metadata.default_on_invalid_input + rule.fallback_value (둘 다 참조)</p>
+        <h5>confirm</h5>
+        <p><span class="pill p-emerald">auto</span> magic number 자동 추출 + LLM 추천</p>
+      </div>
+    </div>
+
+  </div>
+
+  <h3>혼합 confirm 패턴 정리</h3>
+  <table>
+    <tr><th>kind</th><th>auto vs user_queue</th><th>이유</th></tr>
+    <tr><td>field / field_access</td><td><span class="pill p-emerald">auto</span></td><td>field 가 매핑되어 있으면 자동 추적</td></tr>
+    <tr><td>param</td><td><span class="pill p-emerald">auto</span></td><td>Action.params 의 signature 매칭</td></tr>
+    <tr><td>return</td><td><span class="pill p-emerald">auto</span></td><td>Action.return_term_fqn 매칭</td></tr>
+    <tr><td>literal</td><td><span class="pill p-emerald">auto</span> (대부분)</td><td>magic number / enum 자동 추출. 사용자 정정 가능.</td></tr>
+    <tr><td>local</td><td><span class="pill p-amber">user_queue</span></td><td>의미 모호 — aggregation / temp / loop var 등 다양</td></tr>
+    <tr><td>branch</td><td><span class="pill p-amber">user_queue</span></td><td>조건의 도메인 의미 (validation / activation / fallback) 모호 — 사용자 검증</td></tr>
+  </table>
+</div>
+
+<!-- ====================================================================== -->
+<!-- Tab 3 — 실제 예시 -->
+<!-- ====================================================================== -->
+<div class="panel-tab" id="t3">
+  <h2>3. 실제 예시 — cumulativeProductivity 풀 anchor 분석
+    <span class="lead">코드의 ① ~ ⑨ 마커 클릭 → ontology 매핑 카드 표시</span>
+  </h2>
+
+  <p class="small">색 코드: <span style="color:var(--a-branch);font-weight:700">branch</span> · <span style="color:var(--a-literal);font-weight:700">literal</span> · <span style="color:var(--a-local);font-weight:700">local</span> · <span style="color:var(--a-return);font-weight:700">return</span></p>
+
+  <h3>cumulativeProductivity body — 7 anchor</h3>
+  <div class="code-highlight">public BigDecimal cumulativeProductivity(String cmpCd, String orgCd,
+                                         String confirmedPlantCd,
+                                         String gradeCd, String prodKindCd, String customerCd) {
+    if (<span class="anchor-mark am-1" data-id="1">①</span> confirmedPlantCd == null || confirmedPlantCd.length() &lt; 8) {
+        return <span class="anchor-mark am-2" data-id="2">②</span> DEFAULT_PRODUCTIVITY;            <span style="color:var(--muted)">// 0.95</span>
+    }
+    BigDecimal product = BigDecimal.ONE;
+    for (int i = 0; i &lt; <span class="anchor-mark am-3" data-id="3">③</span> 8; i++) {
+        if (<span class="anchor-mark am-4" data-id="4">④</span> confirmedPlantCd.charAt(i) == ' ') continue;
+        BigDecimal p = lookupOrDefault(
+            cmpCd, orgCd, <span class="anchor-mark am-5" data-id="5">⑤</span> PROC_CODES[i], gradeCd, prodKindCd, customerCd);
+        <span class="anchor-mark am-6" data-id="6">⑥</span> product = product.multiply(p);
+    }
+    return <span class="anchor-mark am-7" data-id="7">⑦</span> product;
+}</div>
+
+  <h3>findFirstMatch body (Customer) — 2 anchor</h3>
+  <div class="code-highlight">public CustomerStdEntity findFirstMatch(String cmpCd, String orgCd,
+                                        String productNameCd, String customerCd) {
+    List&lt;CustomerStdJpo&gt; matches = repository
+        .findByCmpCdAndOrgCdAndProductNameCdAndCustomerCdOrderByPriorityAsc(...);
+    if (<span class="anchor-mark am-8" data-id="8">⑧</span> matches.isEmpty()) return null;
+    return logic.toEntity(<span class="anchor-mark am-9" data-id="9">⑨</span> matches.get(0));
+}</div>
+
+  <div class="anchor-detail-panel" id="anchor-detail">
+    <p class="small">위 코드의 ① ~ ⑨ 마커 클릭 시 여기에 상세 표시.</p>
+  </div>
+
+  <h3>9 anchor 한눈에 (요약 표)</h3>
+  <table>
+    <tr><th>#</th><th>kind</th><th>fragment</th><th>binding_target</th><th>confirm</th></tr>
+    <tr><td>①</td><td><code>branch</code></td><td><code>== null || length &lt; 8</code></td><td>invalid_check (early-exit guard)</td><td><span class="pill p-amber">user_queue</span></td></tr>
+    <tr><td>②</td><td><code>literal</code></td><td><code>DEFAULT_PRODUCTIVITY</code></td><td>metadata.default + rule.fallback</td><td><span class="pill p-emerald">auto</span></td></tr>
+    <tr><td>③</td><td><code>literal</code></td><td><code>8</code></td><td>atomic.shared.proc.enum_size</td><td><span class="pill p-emerald">auto</span></td></tr>
+    <tr><td>④</td><td><code>branch</code></td><td><code>charAt(i) == ' '</code></td><td>activation_check</td><td><span class="pill p-amber">user_queue</span></td></tr>
+    <tr><td>⑤</td><td><code>literal</code></td><td><code>PROC_CODES[i]</code></td><td>atomic.shared.proc.enum_values[i]</td><td><span class="pill p-emerald">auto</span></td></tr>
+    <tr><td>⑥</td><td><code>local</code></td><td><code>product = product.multiply(p)</code></td><td>aggregation.multiply</td><td><span class="pill p-amber">user_queue</span></td></tr>
+    <tr><td>⑦</td><td><code>return</code></td><td><code>return product</code></td><td>composite.productivity_std.productivity</td><td><span class="pill p-emerald">auto</span></td></tr>
+    <tr><td>⑧</td><td><code>branch</code></td><td><code>matches.isEmpty()</code></td><td>fallback_kind=skip (lookup_strategy=optional)</td><td><span class="pill p-amber">user_queue</span></td></tr>
+    <tr><td>⑨</td><td><code>local</code></td><td><code>matches.get(0)</code></td><td>tiebreaker=PRIORITY ASC (첫 row)</td><td><span class="pill p-amber">user_queue</span></td></tr>
+  </table>
+</div>
+
+<!-- ====================================================================== -->
+<!-- Tab 4 — 시뮬 흐름 -->
+<!-- ====================================================================== -->
+<div class="panel-tab" id="t4">
+  <h2>4. 시뮬 흐름 — anchor 가 어떻게 활성화되나
+    <span class="lead">ChangeSpec "DEFAULT_PRODUCTIVITY 0.95 → 0.92" 시나리오 단계별</span>
+  </h2>
+
+  <div class="stepper" id="sim-stepper">
+    <div class="step-nav" id="sim-nav"></div>
+    <div class="step-content" id="sim-content"></div>
+    <div class="step-controls">
+      <button class="btn" id="sim-prev">← 이전</button>
+      <button class="btn primary" id="sim-next">다음 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- Tab 5 — 영향도 분석 -->
+<!-- ====================================================================== -->
+<div class="panel-tab" id="t5">
+  <h2>5. 영향도 분석 — 한 anchor 변경의 전파
+    <span class="lead">"DEFAULT_PRODUCTIVITY 0.95 변경" / "PROC_CODES 순서 변경" / "BusinessRule 가드 추가" 3 시나리오</span>
+  </h2>
+
+  <div class="toggle-row">
+    <button class="toggle-btn active" data-scenario="s1">시나리오 1: DEFAULT 0.95 변경</button>
+    <button class="toggle-btn" data-scenario="s2">시나리오 2: PROC_CODES 변경</button>
+    <button class="toggle-btn" data-scenario="s3">시나리오 3: BusinessRule 가드 추가</button>
+  </div>
+
+  <!-- 시나리오 1 -->
+  <div class="toggle-content active" id="s1">
+    <h3>시나리오 1 — DEFAULT_PRODUCTIVITY 변경 (literal anchor ②)</h3>
+    <div class="panel">
+      <div class="label">변경 범위</div>
+      <p>literal anchor ② (<code>DEFAULT_PRODUCTIVITY = 0.95</code>) 의 값을 0.92 로 변경.</p>
+    </div>
+
+    <div class="graph-area">
+<span class="changed">[anchor ②]</span> literal: DEFAULT_PRODUCTIVITY (0.95 → 0.92)
+   │
+   │ <span class="arrow">binding_target → 두 Action.metadata.default</span>
+   ↓
+<span class="node">[Action]</span> action.cumulative_productivity.metadata.default_on_invalid_input
+<span class="node">[Action]</span> action.lookup_or_default.metadata.default_value
+   │
+   │ <span class="arrow">delegates_to chain</span>
+   ↓
+<span class="node">[Action]</span> action.lookup_productivity_or_default
+   │ <span class="impact">→ default fallback 시 0.92 반환</span>
+   │
+   ↓
+<span class="node">[caller]</span> algorithm step 6 (단중상한)
+                  step 9 (분할수)
+                  step 13 (slab 단중 재계산)
+   │ <span class="impact">→ productivity 입력값 변경 → 단중 / 분할수 결과 변동</span>
+
+영향 받는 anchor / Action / 호출 chain:
+  - anchor ② (직접 변경)
+  - anchor ⑦ return (간접 — invalid 시 early exit 결과)
+  - Action 3 (cumulative) — metadata.default 갱신
+  - Action 2 (lookupOrDefault) — fallback 동작 변경
+  - BusinessRule (rule.fallback_value) — 검증 기준 변경
+  - 사용처 3 algorithm step (6, 9, 13) — 결과 시뮬 변동
+
+총 <span class="impact">6 영향 점</span>. ChangeSpec 한 줄 입력으로 도구가 자동 추적.
+    </div>
+  </div>
+
+  <!-- 시나리오 2 -->
+  <div class="toggle-content" id="s2">
+    <h3>시나리오 2 — PROC_CODES 순서 변경 (literal anchor ⑤)</h3>
+    <div class="panel warn">
+      <div class="label">위험 — Step 3 Q7b 사용자 답: "순서 변경 불가능"</div>
+      <p>이 시나리오는 의도적으로 ontology 가 막아야 함. anchor ⑤ 의 binding_target 이 <code>atomic.shared.proc.enum_values[i]</code> 로 <strong>순서 의존</strong>. 변경 시 ontology constraint 위반.</p>
+    </div>
+
+    <div class="graph-area">
+<span class="changed">[anchor ⑤]</span> literal: PROC_CODES (순서: SM/HR/HRF/CR/ANL1/ANL2/GAL/CRF)
+   │ <span class="impact">→ 순서 변경 시도</span>
+   ↓
+<span class="node">[atomic]</span> term.scm.shared.proc
+   facets.enum_values: [SM, HR, HRF, CR, ANL1, ANL2, GAL, CRF]
+   facets.<span class="changed">order_fixed: true</span>  <span class="arrow">← Step 3 Q7b 적용</span>
+   │
+   │ <span class="impact">→ 순서 의존 anchor 다수 영향</span>
+   ↓
+<span class="node">[anchor ④]</span> branch: confirmedPlantCd.charAt(i) == ' '
+   <span class="impact">→ 자리 i ↔ proc[i] 매핑 깨짐</span>
+
+<span class="node">[atomic]</span> term.scm.shared.confirmed_plant_cd
+   facets.encoding: "8자리, 자리 i ↔ proc[i]"
+   <span class="impact">→ 의미 깨짐</span>
+
+도구 동작:
+  ← ChangeSpec 입력 시 ontology 가 즉시 거부 (constraint violation)
+  ← 모델러에게 amber 알림: "이 변경은 순서 고정 atomic 의 invariant 위반"
+  ← design-gaps #13 의 UI 흐름 시연
+    </div>
+  </div>
+
+  <!-- 시나리오 3 -->
+  <div class="toggle-content" id="s3">
+    <h3>시나리오 3 — BusinessRule 가드 추가 (코드 결함 fix)</h3>
+    <div class="panel ok">
+      <div class="label">활용 — design-gaps #13 의 정확한 use case</div>
+      <p>BusinessRule <code>0.5 ≤ p ≤ 1.0</code> 이 등록되어 있음. 코드는 가드 분기 부재 (P-2020-0834 보류).
+        ChangeSpec "cumulativeProductivity body 에 가드 분기 추가".</p>
+    </div>
+
+    <div class="graph-area">
+<span class="changed">[ChangeSpec]</span> cumulativeProductivity body 에 가드 추가:
+    if (p &lt; 0.50) p = 0.50;
+    if (p &gt; 1.0)  p = 1.0;
+   │
+   │ <span class="arrow">새 branch anchor 2개 (자동 검출)</span>
+   ↓
+<span class="node">[anchor 신규]</span> branch: p &lt; 0.50  → rule.productivity_safe_range.lower_bound
+<span class="node">[anchor 신규]</span> branch: p &gt; 1.0   → rule.productivity_safe_range.upper_bound
+   │
+   │ <span class="arrow">enforced_by 갱신</span>
+   ↓
+<span class="node">[BusinessRule]</span> rule.productivity_safe_range
+   <span class="changed">enforced_by: [cumulativeProductivity body]</span>  ← 신규 등록
+   <span class="changed">violated_at_call: []</span>                   ← 위반 해소
+   │
+   │ <span class="arrow">UI 배지 변화</span>
+   ↓
+<span class="node">[UI]</span> Workbench 의 BusinessRule 카드:
+   🟡 UNENFORCED  →  🟢 ENFORCED  ← Gap Inspector 의 핵심 시연
+
+   │ <span class="arrow">시뮬 신뢰도</span>
+   ↓
+<span class="node">[VerificationLevel]</span> cumulativeProductivity:
+   BODY_ANCHORED  →  SIM_VERIFIED 가능 (1.05 std 들어와도 안전)
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- Tab 6 — 셀프 체크 -->
+<!-- ====================================================================== -->
+<div class="panel-tab" id="t6">
+  <h2>6. 셀프 체크 — 이해도 측정
+    <span class="lead">각 카드 클릭 → 답 reveal. 답 보지 말고 먼저 본인 답 생각.</span>
+  </h2>
+
+  <div class="check-card" onclick="this.classList.toggle('revealed')">
+    <div class="question">
+      <span style="color:var(--primary);font-weight:700">Q1.</span>
+      <span>왜 메서드 단위 매핑이 아니라 fragment-level 인가?</span>
+    </div>
+    <div class="toggle-hint">클릭 → 답</div>
+    <div class="answer">
+      <p><strong>답:</strong> 메서드 단위 매핑은 너무 거칠다. cumulativeProductivity 메서드 전체를 매핑해도
+        그 안의 <code>0.95</code> literal 이 어디서 어떻게 쓰이는지 모름.
+        ChangeSpec "0.95 → 0.92" 같은 미세 변경은 fragment 단위로만 정확 적용 가능.</p>
+      <p><strong>또</strong> 500 줄짜리 god-method 의 일부분만 도메인 의미 있는 경우, 메서드 매핑은 의미 X.
+        anchor 만 매핑하면 god-method 도 정확히 잡음 (v4 결정 Q4'=A의 근거).</p>
+    </div>
+  </div>
+
+  <div class="check-card" onclick="this.classList.toggle('revealed')">
+    <div class="question">
+      <span style="color:var(--primary);font-weight:700">Q2.</span>
+      <span>literal 0.95 와 branch <code>charAt(i) == ' '</code> 가 둘 다 anchor 인데, 왜 confirm 패턴이 다른가?</span>
+    </div>
+    <div class="toggle-hint">클릭 → 답</div>
+    <div class="answer">
+      <p><strong>답:</strong> v3 Q-C 의 혼합 confirm 패턴 — formula/literal 은 명백 (값이 그대로 의미), branch 는 모호 (조건 표현이 도메인적으로 무엇을 의미하는지 추측 필요).</p>
+      <p><strong>literal 0.95</strong>: 값 자체가 운영 평균. 의미 추측 불필요. → auto.</p>
+      <p><strong>branch <code>charAt(i) == ' '</code></strong>: 코드 표현 자체로는 "공백 문자 비교". 도메인적으로 "비활성 공정" 이라는 의미는 운영자가 알려줘야. → user_queue.</p>
+      <p>이 차이가 도구의 가치 — 명백한 건 자동으로, 모호한 건 사람 시간을 거기 집중.</p>
+    </div>
+  </div>
+
+  <div class="check-card" onclick="this.classList.toggle('revealed')">
+    <div class="question">
+      <span style="color:var(--primary);font-weight:700">Q3.</span>
+      <span>한 anchor (예: literal ②) 의 binding_target 이 metadata + rule 둘 다 가리킬 수 있는가?</span>
+    </div>
+    <div class="toggle-hint">클릭 → 답</div>
+    <div class="answer">
+      <p><strong>답:</strong> 가능. 한 anchor 가 여러 의미 layer 가짐. 0.95 는 (a) Action 의 default 값 + (b) BusinessRule 의 fallback 값 둘 다.
+        binding_target 이 list 또는 multi-target.</p>
+      <p>장점: ChangeSpec 시 자동으로 두 layer 다 갱신. 영향도 분석도 두 갈래로 추적.</p>
+      <p>주의: 단일 매핑 (1 anchor → 1 target) 보다 모델 복잡. design-gaps #7 (TR invariant) 와 비슷한 결정 영역.</p>
+    </div>
+  </div>
+
+  <div class="check-card" onclick="this.classList.toggle('revealed')">
+    <div class="question">
+      <span style="color:var(--primary);font-weight:700">Q4.</span>
+      <span>코드 변경 시 anchor 가 stale 되는 문제는 어떻게 처리?</span>
+    </div>
+    <div class="toggle-hint">클릭 → 답</div>
+    <div class="answer">
+      <p><strong>답:</strong> design-gaps #2 의 미해결 영역. body_hash 변경 감지 → AST diff 분석 → 자동 fuzzy match (line range 갱신) 또는 invalidation + 사용자 큐.</p>
+      <p>현재 v3 Q-C 의 합의는 "혼합 confirm" 까지. 변경 후 흐름 명세 추가 필요.</p>
+      <p>구체:</p>
+      <ul>
+        <li>signature_hash 변경 → SIGNATURE_LOCKED 해제 + 큐</li>
+        <li>body_hash 변경 + AST diff &lt; 30% → 자동 fuzzy match → STALE 표시</li>
+        <li>body_hash 변경 + AST diff ≥ 30% → BODY_ANCHORED 해제 + LLM 재추천</li>
+      </ul>
+      <p>이 흐름이 명세되면 운영 핵심 (5K class * 평균 10 binding = 50K binding 의 자동 관리).</p>
+    </div>
+  </div>
+
+  <div class="check-card" onclick="this.classList.toggle('revealed')">
+    <div class="question">
+      <span style="color:var(--primary);font-weight:700">Q5.</span>
+      <span>BusinessRule 의 enforced_by / violated_at_call 이 anchor 와 어떤 관계?</span>
+    </div>
+    <div class="toggle-hint">클릭 → 답</div>
+    <div class="answer">
+      <p><strong>답:</strong> BusinessRule 이 표현하는 도메인 제약사항 (예: <code>0.5 ≤ p ≤ 1.0</code>) 을 코드의 어느 anchor 가 검증하는지 추적.</p>
+      <p><strong>enforced_by</strong>: 이 rule 을 검증하는 branch anchor 들 (예: <code>if (p &lt; 0.5) p = 0.5;</code>).</p>
+      <p><strong>violated_at_call</strong>: 이 rule 을 검증해야 하는데 안 하는 method body 들 (예: cumulativeProductivity 의 가드 분기 부재).</p>
+      <p><strong>결과</strong>: Gap Inspector 가 자동으로 enforced/violated 분류 → UI 의 🟢 / 🟡 / 🔴 배지 → 모델러가 "이 코드는 결함 있음 (방어로직 도입 필요)" 를 즉시 인식.</p>
+      <p>이것이 design-gaps #13 (사용자 통찰 — Q7d Step 3) 의 정확한 구현.</p>
+    </div>
+  </div>
+
+  <div class="check-card" onclick="this.classList.toggle('revealed')">
+    <div class="question">
+      <span style="color:var(--primary);font-weight:700">Q6.</span>
+      <span>왜 anchor 가 시뮬레이션 신뢰도의 핵심?</span>
+    </div>
+    <div class="toggle-hint">클릭 → 답</div>
+    <div class="answer">
+      <p><strong>답:</strong> 시뮬 = 한국어 Python 코드 generation. 그러려면 PythonGenerator 가 method body 의 어느 위치를 어떤 도메인 의미로 변환할지 알아야.</p>
+      <p>anchor 가 그 매핑 정보 — 이 자리 = 이 atomic, 이 분기 = 이 rule, 이 literal = 이 default.</p>
+      <p>anchor 없으면 PythonGenerator 가 raw text 로 변환 → 의미 보존 안 됨 → 시뮬 결과 신뢰 X.</p>
+      <p>VerificationLevel 6 단계의 BODY_ANCHORED → SIM_VERIFIED 의 입구는 anchor.</p>
+    </div>
+  </div>
+
+  <hr>
+
+  <h3>다음 단계</h3>
+  <div class="panel ok">
+    <div class="label">위 6 질문 다 이해됐다면</div>
+    <p><a href="round6-live-authoring.html#step-7" style="color:var(--primary)">round6-live-authoring.html 의 Step 7</a> 으로 돌아가서 Q1~Q7 답변하세요. 9 anchor + 1 BusinessRule 추천대로 OK 인지 + 도메인 의미상 정정할 부분 있는지.</p>
+  </div>
+</div>
+
+</div>
+
+<script>
+// ============================================================
+// Tab navigation
+// ============================================================
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.panel-tab').forEach(p => p.classList.toggle('active', p.id === tab));
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  });
+});
+
+// ============================================================
+// Tab 3 — anchor mark click → detail panel
+// ============================================================
+const ANCHOR_DATA = {
+  '1': {
+    kind: 'branch', color: 'var(--a-branch)',
+    fragment: 'confirmedPlantCd == null || length < 8',
+    target: 'atomic.confirmed_plant_cd.invalid_check (early-exit guard)',
+    confirm: 'user_queue',
+    why: '비정상 입력 검증. 코드의 자명한 의미는 "null 또는 길이 부족 검사" 지만, 도메인 의미는 "confirmed_plant_cd 가 8 자리 string 이 아니면 비정상" 이라는 것. 운영자 검증 필요.',
+    sim: 'sandbox 코드 generation 시 가장 먼저 검증. early return 으로 default 0.95.'
+  },
+  '2': {
+    kind: 'literal', color: 'var(--a-literal)',
+    fragment: 'DEFAULT_PRODUCTIVITY (값: 0.95)',
+    target: 'action.cumulative.metadata.default_on_invalid_input + action.lookup_or_default.metadata.default_value (★ default — 미매칭 시 사용. rule.fallback_value 가 아니라 별 개념)',
+    confirm: 'auto',
+    why: '운영 평균 (2017 0.90 → 2019 0.92 → 2021 0.95). 매년 코드 patch 로 갱신. ChangeSpec 시뮬의 핵심 substitute 위치. 0.95 는 rule.productivity_safe_range (0.5~1.0) 안의 정상 값일 뿐 rule 의 fallback 은 아님.',
+    sim: 'ChangeSpec "default 0.95 → 0.92" 입력 시 PythonGenerator 가 이 자리에 0.92 substitute. 이 anchor 가 가장 자주 활용.'
+  },
+  '3': {
+    kind: 'literal', color: 'var(--a-literal)',
+    fragment: '8 (loop bound)',
+    target: 'atomic.shared.proc.enum_size',
+    confirm: 'auto',
+    why: '8 공정 enum 의 크기. ChangeSpec 으로 8 → 다른 값 변경 거의 X (공정 추가 시만).',
+    sim: 'sandbox 의 loop range. 보통 변경 안 함.'
+  },
+  '4': {
+    kind: 'branch', color: 'var(--a-branch)',
+    fragment: "charAt(i) == ' '",
+    target: 'atomic.confirmed_plant_cd.activation_check (\' \' = 비활성 공정)',
+    confirm: 'user_queue (branch 일반 규칙 따름. Step 3 Q7b 사용자 합의 후 confirmed 로 transition)',
+    why: '8 자리 string 의 자리 i 가 \' \' 면 비활성 공정. 도메인 약속이지만 코드 표현 자체로는 "공백 비교" — 운영자 합의 필수.',
+    sim: 'sandbox 의 skip 로직. activation 패턴 변경 시 영향.'
+  },
+  '5': {
+    kind: 'literal', color: 'var(--a-literal)',
+    fragment: 'PROC_CODES[i] (8 enum)',
+    target: 'atomic.shared.proc.enum_values[i] (순서 고정)',
+    confirm: 'auto',
+    why: 'SM/HR/HRF/CR/ANL1/ANL2/GAL/CRF — 순서 변경 불가능 (Step 3 Q7b). atomic 의 enum_values facet 으로 박음.',
+    sim: 'sandbox 의 lookup proc 인자. 순서 의존 — 변경 시도 시 ontology 가 거부.'
+  },
+  '6': {
+    kind: 'local', color: 'var(--a-local)',
+    fragment: 'product = product.multiply(p)',
+    target: 'aggregation.multiply (loop 누적 곱 패턴)',
+    confirm: 'user_queue',
+    why: 'local var 의 의미 (누적 / 임시 / 결과 holder) 가 코드 표현으로 자명하지 않음. 운영자가 "누적 곱" 이라고 알려줘야.',
+    sim: 'sandbox 의 핵심 aggregation 패턴. 곱 → 합 / 평균 등으로 변경 시 cumulativeProductivity 의 의미 자체가 바뀜.'
+  },
+  '7': {
+    kind: 'return', color: 'var(--a-return)',
+    fragment: 'return product',
+    target: 'composite term.scm.std.productivity_std.productivity (또는 facet path)',
+    confirm: 'auto',
+    why: 'Action.return_term_fqn 매칭. 정상 종료 시의 결과 값.',
+    sim: 'sandbox 의 함수 출력. before/after diff 계산 점.'
+  },
+  '8': {
+    kind: 'branch', color: 'var(--a-branch)',
+    fragment: 'matches.isEmpty() → return null',
+    target: 'action.match_customer_limit_for_order.metadata.fallback_kind=skip (lookup_strategy=optional)',
+    confirm: 'user_queue',
+    why: '매칭 없음 → null. 도메인 의미는 "이 고객사 제한 없음 → 다른 기준 적용". Customer 의 optional 패턴 표현 (Step 3 Q7e).',
+    sim: 'sandbox 의 호출처 (Step 5/6 max/min) 가 null skip 처리.'
+  },
+  '9': {
+    kind: 'local', color: 'var(--a-local)',
+    fragment: 'matches.get(0)',
+    target: 'tiebreaker.priority_asc.first_row',
+    confirm: 'user_queue',
+    why: '여러 row 중 PRIORITY ASC 정렬 후 첫 row 선택. 도메인 의미는 "우선순위 가장 높은 row".',
+    sim: 'sandbox 의 fixture 정렬 + 첫 row 선택.'
+  }
+};
+
+document.querySelectorAll('.anchor-mark').forEach(mark => {
+  mark.addEventListener('click', () => {
+    const id = mark.dataset.id;
+    const data = ANCHOR_DATA[id];
+    document.querySelectorAll('.anchor-mark').forEach(m => m.classList.remove('active'));
+    mark.classList.add('active');
+    const panel = document.getElementById('anchor-detail');
+    panel.innerHTML = `
+      <h4 style="color: ${data.color}">
+        anchor #${id}
+        <span class="badge" style="background: ${data.color}">${data.kind}</span>
+        <span class="pill ${data.confirm === 'auto' ? 'p-emerald' : 'p-amber'}">${data.confirm}</span>
+      </h4>
+      <h5>fragment</h5>
+      <pre style="margin:4px 0;color:#fcd34d">${data.fragment}</pre>
+      <h5>binding_target</h5>
+      <p style="font-family:'JetBrains Mono',monospace;font-size:12px">${data.target}</p>
+      <h5>왜 이렇게 매핑?</h5>
+      <p>${data.why}</p>
+      <h5>시뮬 시 활용</h5>
+      <p>${data.sim}</p>
+    `;
+    panel.classList.add('visible');
+    panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+  });
+});
+
+// ============================================================
+// Tab 4 — Stepper (시뮬 흐름 단계별)
+// ============================================================
+const SIM_STEPS = [
+  {
+    title: 'Step 1 — ChangeSpec 입력',
+    body: `<p>운영자가 Workbench 에 입력:</p>
+<pre>ChangeSpec:
+  target: action.cumulative_productivity
+  change_kind: literal
+  before: 0.95
+  after:  0.92
+  description: "운영 평균 재계산 결과 0.92 로 갱신"</pre>
+<p>이 시점에서 <strong>도구는 0.95 가 어디 있는지 모름</strong>. anchor 가 그 답.</p>`
+  },
+  {
+    title: 'Step 2 — anchor 검출 (PythonGenerator 의 첫 작업)',
+    body: `<p>도구가 ontology 를 query:</p>
+<pre>SELECT * FROM AnchorBinding
+WHERE binding_target.fqn = 'action.cumulative.metadata.default_on_invalid_input'
+   OR binding_target.fqn = 'rule.productivity_safe_range.fallback_value'</pre>
+<p>결과: <strong>anchor ② (literal: DEFAULT_PRODUCTIVITY @ cumulativeProductivity:line 30)</strong>.
+같은 binding_target 다른 anchor 도 추적 → 영향 받는 모든 위치 list.</p>
+<div class="panel tip">
+  <div class="label">핵심</div>
+  anchor 가 binding_target 으로 indexed → 한 도메인 변경의 코드 위치 자동 해결. 사람이 grep 안 해도 됨.
+</div>`
+  },
+  {
+    title: 'Step 3 — 한국어 Python 코드 generation',
+    body: `<p>PythonGenerator 가 cumulativeProductivity 의 ontology Action 정의를 활용:</p>
+<pre>def 누적_실수율_계산(회사, 소, 확정통과공장코드, 강종, 품종, 고객사):
+    if 확정통과공장코드 is None or len(확정통과공장코드) < 8:  # anchor ① guard
+        return <span style="color:var(--amber);font-weight:700">0.92</span>     # ← anchor ② substitute
+    누적 = 1.0                                              # local product
+    for i in range(<span style="color:var(--amber)">8</span>):                  # anchor ③ enum_size
+        if 확정통과공장코드[i] == ' ':                       # anchor ④ activation
+            continue
+        실수율 = 실수율_정확매칭_or_default(
+            회사, 소, <span style="color:var(--amber)">공정[i]</span>, 강종, 품종, 고객사)  # anchor ⑤
+        누적 *= 실수율                                       # anchor ⑥ multiply
+    return 누적                                              # anchor ⑦
+</pre>
+<p>색칠된 부분이 anchor 가 결정한 위치. 0.92 가 anchor ② 자리에 정확히 substitute.</p>`
+  },
+  {
+    title: 'Step 4 — Sandbox 실행',
+    body: `<p>RestrictedPython sandbox 에서:</p>
+<pre>fixture = ScenarioInputAdapter.load(...)  # 사용자 form fixture
+result_before = 누적_실수율_계산_v0(...)  # 0.95 default
+result_after  = 누적_실수율_계산_v1(...)  # 0.92 default
+
+# ★ 데모 전제: ProductivityStd 테이블 비어있음 → lookupOrDefault 가 8회 모두 default 반환
+# 실제 운영 환경에선 std 테이블의 6-축 row 정확매칭 → 다양한 값
+# 8 공정 모두 활성 가정:
+result_before = 0.95 ** 8 = 0.6634
+result_after  = 0.92 ** 8 = 0.5132</pre>
+<p>두 변수 자동 비교 → 결과 diff 계산. <strong>운영 환경에선 fixture 가 std row 직접 제공</strong>.</p>`
+  },
+  {
+    title: 'Step 5 — Diff 표시',
+    body: `<p>Workbench 의 결과:</p>
+<table style="margin:0">
+  <tr><th>항목</th><th>before (0.95)</th><th>after (0.92)</th><th>변화</th></tr>
+  <tr><td>누적 실수율 (8 공정)</td><td>0.6634</td><td>0.5132</td><td><span class="pill p-rose">-22.6%</span></td></tr>
+  <tr><td>maxSplit (Step 7)</td><td>secondWgtHigh / orderWgtHigh / 0.6634</td><td>÷ 0.5132</td><td><span class="pill p-rose">분할수 ↑</span></td></tr>
+  <tr><td>최종 slab 매수</td><td>예: 5</td><td>예: 7</td><td><span class="pill p-rose">+2 slab</span></td></tr>
+</table>
+<p>운영자가 "default 0.92 로 바꾸면 분할수 폭주 위험 — 보류" 결정 가능.</p>`
+  },
+  {
+    title: 'Step 6 — Java draft PR (시뮬 통과 시)',
+    body: `<p>운영자가 시뮬 결과 OK 후 "Java 적용" 버튼 클릭:</p>
+<pre>// 자동 생성된 Java patch (review only)
+- public static final BigDecimal DEFAULT_PRODUCTIVITY = new BigDecimal("0.95");
++ public static final BigDecimal DEFAULT_PRODUCTIVITY = new BigDecimal("0.92");
+
+// 자동 commit message:
+// "운영 평균 재계산 0.95 → 0.92 (시뮬 통과 — 분할수 22% 증가 예상)"
+// 자동 PR 작성:
+// SIM_VERIFIED with ScenarioBuilder fixture #scn-2026-05-09-A
+</pre>
+<p>운영자는 review 만. anchor 가 정확한 위치 잡아준 덕에 patch 가 자동 정확.</p>
+<div class="panel ok">
+  <div class="label">정리 — anchor 의 핵심 가치</div>
+  ChangeSpec 한 줄 입력 → 6 step 중 <strong>대부분 자동 + 일부 사용자 확인</strong> → 최종 review.
+  자동 단계: anchor 검출 (Step 2) / Python generation (Step 3) / sandbox 실행 (Step 4) / diff 계산 (Step 5).
+  사용자 개입: ChangeSpec 입력 (Step 1) / 시뮬 결과 검토 + Java PR 승인 (Step 6) /
+  + anchor stale 처리 (<a href="design-gaps-and-questions.md" style="color:var(--primary)">design-gaps #2</a> 미해결 시) /
+  + 다중 anchor 충돌 처리 (같은 binding_target 에 여러 anchor 시) /
+  + false-positive 검토 (같은 literal 다른 의미 가능). <strong>anchor 없으면 사람이 5K class grep 해야 함 — 그 부담을 anchor 가 자동화</strong>.
+</div>`
+  }
+];
+
+let currentSimStep = 0;
+function renderSim() {
+  const nav = document.getElementById('sim-nav');
+  nav.innerHTML = '';
+  SIM_STEPS.forEach((_, i) => {
+    if (i > 0) {
+      const line = document.createElement('span');
+      line.className = 'step-line';
+      if (i <= currentSimStep) line.classList.add('completed');
+      nav.appendChild(line);
+    }
+    const dot = document.createElement('span');
+    dot.className = 'step-dot';
+    dot.textContent = i + 1;
+    if (i === currentSimStep) dot.classList.add('active');
+    else if (i < currentSimStep) dot.classList.add('completed');
+    dot.addEventListener('click', () => { currentSimStep = i; renderSim(); });
+    nav.appendChild(dot);
+  });
+  const content = document.getElementById('sim-content');
+  const step = SIM_STEPS[currentSimStep];
+  content.innerHTML = `<h3>${step.title}</h3>${step.body}`;
+  document.getElementById('sim-prev').disabled = currentSimStep === 0;
+  document.getElementById('sim-next').disabled = currentSimStep === SIM_STEPS.length - 1;
+}
+document.getElementById('sim-prev').addEventListener('click', () => {
+  if (currentSimStep > 0) { currentSimStep--; renderSim(); }
+});
+document.getElementById('sim-next').addEventListener('click', () => {
+  if (currentSimStep < SIM_STEPS.length - 1) { currentSimStep++; renderSim(); }
+});
+renderSim();
+
+// ============================================================
+// Tab 5 — Scenario toggle
+// ============================================================
+document.querySelectorAll('.toggle-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.scenario;
+    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.toggle-content').forEach(c => c.classList.toggle('active', c.id === target));
+  });
+});
+</script>
+</body>
+</html>

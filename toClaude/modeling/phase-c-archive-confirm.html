@@ -1,0 +1,2303 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Phase C — Order / Slab / 21-step Algorithm Confirm (M3 hybrid)</title>
+<style>
+  :root {
+    --bg: #0f172a; --card: #1e293b; --line: #334155;
+    --fg: #e2e8f0; --muted: #94a3b8;
+    --primary: #38bdf8; --emerald: #10b981; --amber: #f59e0b;
+    --rose: #fb7185; --violet: #a78bfa; --orange: #fb923c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:13.5px/1.55 -apple-system,"Pretendard","Apple SD Gothic Neo",sans-serif;background:var(--bg);color:var(--fg)}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 28px 80px}
+  header h1{font-size:22px;margin:0 0 6px}
+  header .sub{color:var(--muted);font-size:12px}
+  .progress{margin:18px 0 28px;display:flex;gap:6px;flex-wrap:wrap}
+  .phase{padding:5px 11px;border-radius:6px;background:var(--card);border:1px solid var(--line);font-size:11px;color:var(--muted)}
+  .phase.active{border-color:var(--primary);color:var(--fg);background:rgba(56,189,248,0.08)}
+  .phase.done{border-color:var(--emerald);color:var(--emerald);background:rgba(16,185,129,0.05)}
+  .phase.pending{border-color:var(--line);color:var(--muted)}
+
+  .step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:22px 26px;margin-bottom:24px}
+  .step h2{font-size:18px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  .step .meta{font-size:11px;color:var(--muted);margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap}
+  .badge{padding:2px 8px;border-radius:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;font-weight:600}
+  .b-discuss{background:rgba(56,189,248,0.15);color:var(--primary)}
+  .b-applied{background:rgba(16,185,129,0.15);color:var(--emerald)}
+  .b-pending{background:rgba(148,163,184,0.15);color:var(--muted)}
+
+  h3{font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:20px 0 8px;font-weight:600}
+  h4{margin:14px 0 6px;font-size:13px;color:var(--violet)}
+  p{margin:6px 0 10px}
+  ul, ol{margin:6px 0 10px 20px;padding:0}
+  ul li, ol li{padding:3px 0}
+  code{font-family:"JetBrains Mono","SF Mono",monospace;font-size:91%;background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px;color:#c4b5fd}
+
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12.3px}
+  th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+  th{background:rgba(255,255,255,0.04);color:var(--primary);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:0.04em}
+
+  pre{background:rgba(0,0,0,0.35);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-family:"JetBrains Mono",monospace;font-size:11.5px;overflow-x:auto;color:#c4b5fd;margin:8px 0}
+
+  .my-guess{background:rgba(245,158,11,0.05);border-left:3px solid var(--amber);padding:12px 14px;border-radius:4px;margin:10px 0}
+  .my-guess .label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--amber);font-weight:700;margin-bottom:6px}
+  .my-guess .label::before{content:"🤔 "}
+
+  .applied{background:rgba(16,185,129,0.06);border-left:3px solid var(--emerald);padding:12px 14px;border-radius:4px;margin:10px 0}
+  .applied .label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--emerald);font-weight:700;margin-bottom:6px}
+  .applied .label::before{content:"✅ "}
+
+  .panel{background:rgba(0,0,0,0.20);border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin:8px 0}
+  .panel .label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);font-weight:600;margin-bottom:6px}
+
+  .archive-quote{background:rgba(167,139,250,0.06);border-left:3px solid var(--violet);padding:10px 14px;border-radius:4px;margin:10px 0;font-size:12.5px}
+  .archive-quote .label{font-size:10px;color:var(--violet);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;font-weight:600}
+  .archive-quote .label::before{content:"📚 "}
+
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:600}
+  .p-primary{background:rgba(56,189,248,0.12);color:var(--primary)}
+  .p-emerald{background:rgba(16,185,129,0.12);color:var(--emerald)}
+  .p-amber{background:rgba(245,158,11,0.15);color:var(--amber)}
+  .p-rose{background:rgba(251,113,133,0.15);color:var(--rose)}
+  .p-violet{background:rgba(167,139,250,0.15);color:var(--violet)}
+
+  .small{font-size:11px;color:var(--muted)}
+
+  .form-section{margin:16px 0;padding:14px 16px;background:rgba(0,0,0,0.2);border-radius:8px;border:1px solid var(--line)}
+  .form-section h4{margin:0 0 10px;font-size:12px;color:var(--fg);font-weight:600}
+  .field{margin:10px 0}
+  .field > label{display:block;font-size:12.5px;color:var(--fg);margin-bottom:4px;font-weight:500;line-height:1.5}
+  .field .recommend{display:block;font-size:11px;color:var(--muted);margin:2px 0 4px}
+  input.text, textarea.text {
+    width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--line);border-radius:5px;
+    color:var(--fg);padding:7px 10px;font:inherit;font-size:12.5px
+  }
+  input.text:focus, textarea.text:focus {outline:none;border-color:var(--primary)}
+  textarea.text{min-height:80px;resize:vertical;font-family:"Pretendard",sans-serif}
+
+  .ds-actions{display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap}
+  .btn{padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--fg);font-size:12px;cursor:pointer;font-weight:500}
+  .btn:hover{border-color:var(--primary)}
+  .btn.primary{background:var(--primary);color:var(--bg);border-color:var(--primary)}
+  .btn.primary:hover{filter:brightness(1.1)}
+  .btn.copied{background:var(--emerald);border-color:var(--emerald);color:var(--bg)}
+  .copy-hint{font-size:11px;color:var(--muted);margin-left:auto}
+
+  .preview{margin-top:10px;padding:10px 12px;background:rgba(0,0,0,0.35);border-radius:6px;font-family:"JetBrains Mono",monospace;font-size:11.5px;white-space:pre-wrap;border:1px solid var(--line);display:none;color:var(--fg)}
+  .preview.visible{display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Phase C — Order / Slab / 21-step Algorithm Confirm</h1>
+  <p class="sub">
+    <strong>M3 hybrid</strong> 모드. M1 빠른 confirm (Round 5 archive 기반 Order/Slab schema) + M2 깊이 인터뷰 (21-step Algorithm body / Action / BR / Anchor).
+    Phase A+B 98 row ground truth 입력. 5 결정 합의 (A/A/A/A/A).
+  </p>
+</header>
+
+<div class="progress">
+  <span class="phase done">Phase A — Customer/Productivity ✓ 48 row</span>
+  <span class="phase done">Phase B — 6 entity ✓ 50 row</span>
+  <span class="phase active">Phase C — Order/Slab/21-step</span>
+  <span class="phase done">C.1 Order ✓ (23 row)</span>
+  <span class="phase done">C.2 Slab + SlabResult ✓ (14 row)</span>
+  <span class="phase done">C.3 SdDesigner orchestration ✓ (4 row)</span>
+  <span class="phase done">C.4 Validator BR + Phase 1 ✓ (12 row)</span>
+  <span class="phase done">C.5 21-step Action body ✓ (19 row)</span>
+  <span class="phase done">C.6 SaveAction + 원본=조정 BR ✓ (8 row)</span>
+  <span class="phase active">C.7 종결 ★ 진행</span>
+  <span class="phase pending">C.3 SdDesigner + A-a 루프</span>
+  <span class="phase pending">C.4 Validator BR</span>
+  <span class="phase pending">C.5 21-step Action body</span>
+  <span class="phase pending">C.6 SaveAction + 원본=조정 BR</span>
+  <span class="phase pending">C.7 종결</span>
+</div>
+
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>Phase C 진입 — 합의된 5 결정 + 흐름</h2>
+  <div class="meta">
+    <span class="badge b-applied">합의</span>
+    <span>2026-05-10 사용자 합의 (A/A/A/A/A)</span>
+  </div>
+
+  <h3>Phase C 5 결정</h3>
+  <table>
+    <tr><th>Q</th><th>결정</th><th>의미</th></tr>
+    <tr><td>Q1 SDSlabEntity 38 작업필드</td><td><strong>B — step grouping 5 composite</strong></td><td>first_range/second_wgt/split_state/final_range/target. dataflow 의존성을 composite 단위로</td></tr>
+    <tr><td>Q2 Order 4-sub 결합</td><td><strong>A — PRIMARY + 4 sub inheritance</strong></td><td>order = root composite, om/os/qd/chemical 4 sub 를 parts</td></tr>
+    <tr><td>Q3 order_chemical 24 컬럼</td><td><strong>A — unused_in_21step facet</strong></td><td>composite 1 + 마킹. design-gaps #28 (신규) 향후 보강</td></tr>
+    <tr><td>Q4 A-a 루프 control flow</td><td><strong>A — workflow Action.kind</strong></td><td>SdDesigner.runAaLoop = workflow. facets: iteration_pattern + max_iter + exception_handling + delegates_to</td></tr>
+    <tr><td>Q5 SlabResult 28 원본=조정</td><td><strong>A — BR + composite facets 복합</strong></td><td>rule.scm.slab.original_equals_adjusted (enforced_by: setter) + facets.invariant_pairs</td></tr>
+  </table>
+
+  <h3>Phase A+B 98 row 입력 자료 (Phase C atomic 재사용 대상)</h3>
+  <pre>atomic 13 (Phase A 7 + Phase B 6):
+  Phase A scm.shared: cmp / org / proc / grade / product_kind / customer / confirmed_plant_cd
+  Phase B scm.shared: hr_plant_cd / sm_cd / cast_cd / machine_cd / edging_group_cd / priority
+
+composite 10 (scm.std 2 + scm.spec 8)
+Action 12 (4 + 8)
+BusinessRule 4 (1 Phase A productivity_safe_range + 3 Phase B)
+TR ~50 + AnchorBinding 9 (Phase A only — Phase B retroactive Phase E)
+design-gaps 27 (Phase E 일괄 결정)</pre>
+  <p class="small">★ Phase C 신규 atomic 후보: order_no (확실), 그 외는 코드 분석 후 결정.</p>
+
+  <h3>Phase C 7 단계 흐름</h3>
+  <ol>
+    <li><strong>C.1 Order 4-sub schema</strong> — om/os/qd/chemical Jpo confirm. M1 빠른 confirm. ★ 진행</li>
+    <li><strong>C.2 Slab + SlabResult</strong> — SDSlabEntity 38 → 5 step grouping composite + SlabResult 28 column composite. M2 깊이</li>
+    <li><strong>C.3 SdDesigner orchestration</strong> — 21-step entry + A-a 루프 workflow Action. M2 깊이</li>
+    <li><strong>C.4 Validator BR 5종</strong> — DG001~DG005 + Customer.findFirstMatch retroactive BR. M2 깊이</li>
+    <li><strong>C.5 21-step Action body</strong> — SdSecondWgtHighAction + Thickness/Width/Length/Split + Initial/Recalc Action body 매핑 + BR + AnchorBinding. M2 깊이</li>
+    <li><strong>C.6 SdSlabSaveAction</strong> — SlabResult setter 패턴 + 원본=조정 BR + REQUIRES_NEW BR. M2 깊이</li>
+    <li><strong>C.7 종결 archive</strong> — Phase C 누적 + 2 서브에이전트 검토 + Phase D (API 설계) 진입 준비</li>
+  </ol>
+</section>
+
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<!-- C.1 — Order 4-sub schema -->
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>C.1 — Order 4-sub schema (om / os / qd / chemical)</h2>
+  <div class="meta">
+    <span class="badge b-discuss">진행 중</span>
+    <span>Phase C 첫 단계 · M1 빠른 confirm</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>① Round 5 archive 핵심 사실</h3>
+  <div class="archive-quote">
+    <div class="label">round5-live-authoring.html Step 1~3 + 코드</div>
+    <ul>
+      <li><strong>4 sub-entity</strong>: ORDER_OM (주문처리) / ORDER_OS (주문진행관리) / ORDER_QD (주문품질설계) / ORDER_CHEMICAL (주문성분).</li>
+      <li><strong>공통 PK</strong>: <code>SDOrderPK = (CMP_CD, ORG_CD, ORDER_NO)</code> — 4 Jpo 모두 <code>@IdClass(SDOrderPK.class)</code>. composition pattern.</li>
+      <li><strong>SDOrderEntity</strong>: feature 레이어가 보는 평탄화 entity. <strong>SDOrderLogic 의 reflection 매핑</strong>으로 4 Jpo → 1 Entity 변환 (drama DNA).</li>
+      <li><strong>order_kind 분류</strong>: ORDER_OM.PRODUCT_TYPE_CD = "FS" → 외판, 그 외 → Coil.</li>
+      <li><strong>HR_TGT_WIDTH_1~5</strong>: 5 컬럼 중 ORDER_OS.CONFIRMED_PLANT_CD 의 자리 1 (열연 위치) 따라 매칭 — Phase A confirmed_plant_cd encoding 활용.</li>
+      <li><strong>order_chemical</strong>: 8 성분 (C/Si/Mn/P/S/Cr/Ni/Al) × {MIN/MAX/AIM} = 24 컬럼. <strong>21-step 미참조</strong> (코드 주석 명시) → Q3 결정 따라 unused_in_21step 마킹.</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>② 코드 컬럼 분해 (4 Jpo)</h3>
+
+  <h4>ORDER_OM (주문처리) — 13 컬럼</h4>
+  <div class="panel">
+    <pre>@Entity @Table("ORDER_OM") @IdClass(SDOrderPK.class)
+class SDOrderOmJpo {
+    PK: cmpCd(2) / orgCd(1) / orderNo(20)
+    facets: orderWgtLow/High (BigDecimal 10,3) · orderWidth/Length (10,2) · designPendQty (10,3) ·
+            workDue (LocalDate) · pkgWgtLow/High (10,3) · productTypeCd (4) · customerCd (10) ·
+            prodDue (LocalDate) · deliveryDue (LocalDate)
+}</pre>
+  </div>
+
+  <h4>ORDER_OS (주문진행관리) — 18 컬럼</h4>
+  <div class="panel">
+    <pre>@Entity @Table("ORDER_OS") @IdClass(SDOrderPK.class)
+class SDOrderOsJpo {
+    PK: cmpCd / orgCd / orderNo (동일)
+    facets: osProgress (1) · closeFlag (Integer) · stockCode (Integer, 1=재고주문) ·
+            designPendQtyHigh/Low/Qty (10,3) ·
+            ★ confirmedPlantCd (8) · possiblePlantCd (16) ·
+            smDue/hrDue/hrfDue/crDue/anl1Due/anl2Due/galDue/crfDue (LocalDate × 8 공정)
+}</pre>
+  </div>
+
+  <h4>ORDER_QD (주문품질설계) — 8 컬럼</h4>
+  <div class="panel">
+    <pre>@Entity @Table("ORDER_QD") @IdClass(SDOrderPK.class)
+class SDOrderQdJpo {
+    PK: cmpCd / orgCd / orderNo
+    facets: gradeCd (10) · hrTgtWidth1~5 (BigDecimal 10,2 × 5)
+}</pre>
+  </div>
+
+  <h4>ORDER_CHEMICAL (주문성분) — 27 컬럼 (PK 3 + 24)</h4>
+  <div class="panel">
+    <pre>@Entity @Table("ORDER_CHEMICAL") @IdClass(SDOrderPK.class)
+class SDOrderChemicalJpo {
+    PK: cmpCd / orgCd / orderNo
+    facets: 8 성분 × 3 = 24 (cMin/Max/Aim, siMin/Max/Aim, ..., alMin/Max/Aim)
+    ★ 21-step 미참조 (코드 주석 명시)
+}</pre>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>③ 컬럼별 매핑 후보</h3>
+  <table>
+    <tr><th>코드 컬럼</th><th>Jpo</th><th>매핑 후보</th><th>재사용?</th><th>비고</th></tr>
+    <tr><td><code>cmpCd</code></td><td>4 Jpo 모두</td><td><code>term.scm.shared.cmp</code></td><td><span class="pill p-emerald">재사용</span></td><td>4 PARTIAL TR</td></tr>
+    <tr><td><code>orgCd</code></td><td>4 Jpo 모두</td><td><code>term.scm.shared.org</code></td><td><span class="pill p-emerald">재사용</span></td><td>4 PARTIAL TR</td></tr>
+    <tr><td><code>orderNo</code></td><td>4 Jpo 모두</td><td><code>term.scm.shared.order_no</code> ★ 신규 atomic</td><td><span class="pill p-amber">신규</span></td><td>1 PRIMARY + 3 PARTIAL TR (4 codeField 위치)</td></tr>
+    <tr><td><code>productTypeCd</code></td><td>OM</td><td><code>term.scm.shared.product_kind</code></td><td><span class="pill p-emerald">재사용</span></td><td>★ 8번째 alias</td></tr>
+    <tr><td><code>customerCd</code></td><td>OM</td><td><code>term.scm.shared.customer</code></td><td><span class="pill p-emerald">재사용</span></td><td>—</td></tr>
+    <tr><td><code>gradeCd</code></td><td>QD</td><td><code>term.scm.shared.grade</code></td><td><span class="pill p-emerald">재사용</span></td><td>—</td></tr>
+    <tr><td><code>confirmedPlantCd</code></td><td>OS</td><td><code>term.scm.shared.confirmed_plant_cd</code></td><td><span class="pill p-emerald">재사용</span></td><td>★ Phase A atomic 의 첫 비-shared 등장 — atomic 의 PRIMARY TR 등록 (현재 Phase A 에서 PRIMARY 미설정)</td></tr>
+    <tr><td>scalar (orderWgt/Width/Length/pkgWgt/designPendQty 등)</td><td>OM/OS/QD</td><td>composite facet (scalar)</td><td>—</td><td>Q3 (B.5) 정책 — atomic 승격 X</td></tr>
+    <tr><td>8 *Due dates</td><td>OS</td><td>composite facet (LocalDate)</td><td>—</td><td>—</td></tr>
+    <tr><td>8 성분 × 3</td><td>CHEMICAL</td><td>composite facet (24)</td><td>—</td><td>Q3 (Phase C) 결정 — unused_in_21step 마킹</td></tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>④ 추천 ontology row (Q2 정책 — PRIMARY + 4 sub inheritance)</h3>
+
+  <h4>(A) 신규 atomic 1개</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>type</th><th>facets</th></tr>
+    <tr>
+      <td><code>term.scm.shared.order_no</code></td>
+      <td>주문번호</td>
+      <td>string(20)</td>
+      <td><code>cardinality: "unique_per_(cmp, org)"</code> · <code>shared_with: [Order 4 Jpo, SlabResult, ...]</code></td>
+    </tr>
+  </table>
+
+  <h4>(B) 신규 composite 5개 (root + 4 sub)</h4>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>한국어</th><th>parts</th><th>facets 요약</th></tr>
+    <tr style="background:rgba(56,189,248,0.05)">
+      <td>composite (root)</td>
+      <td><code>term.scm.order.order</code></td>
+      <td>주문 (aggregate)</td>
+      <td>cmp + org + order_no</td>
+      <td>
+        <code>order_kind</code> (enum: FS=외판/Coil, derived from order_om.product_type_cd)<br>
+        <code>composition_pattern: "primary_with_4_sub"</code><br>
+        <code>sub_composites: [order_om, order_os, order_qd, order_chemical]</code>
+      </td>
+    </tr>
+    <tr>
+      <td>composite (sub)</td>
+      <td><code>term.scm.order.order_om</code></td>
+      <td>주문처리</td>
+      <td>cmp + org + order_no (PK shared)</td>
+      <td>
+        <code>order_wgt_low/high</code> · <code>order_width/length</code> · <code>design_pend_qty</code> ·
+        <code>work_due</code> · <code>pkg_wgt_low/high</code> · <code>product_kind</code> (atomic_ref) ·
+        <code>customer</code> (atomic_ref) · <code>prod_due</code> · <code>delivery_due</code>
+      </td>
+    </tr>
+    <tr>
+      <td>composite (sub)</td>
+      <td><code>term.scm.order.order_os</code></td>
+      <td>주문진행관리</td>
+      <td>cmp + org + order_no</td>
+      <td>
+        <code>os_progress</code> · <code>close_flag</code> · <code>stock_code</code> ·
+        <code>design_pend_qty (3종)</code> ·
+        ★ <code>confirmed_plant_cd</code> (atomic_ref) · <code>possible_plant_cd</code> (string 16) ·
+        <code>{sm,hr,hrf,cr,anl1,anl2,gal,crf}_due</code> (LocalDate × 8 공정)
+      </td>
+    </tr>
+    <tr>
+      <td>composite (sub)</td>
+      <td><code>term.scm.order.order_qd</code></td>
+      <td>주문품질설계</td>
+      <td>cmp + org + order_no</td>
+      <td>
+        <code>grade</code> (atomic_ref) · <code>hr_tgt_width_1~5</code> (BigDecimal × 5) ·
+        <code>hr_tgt_width_indexing: "selected by confirmedPlantCd[1] (HR position)"</code>
+      </td>
+    </tr>
+    <tr>
+      <td>composite (sub)</td>
+      <td><code>term.scm.order.order_chemical</code></td>
+      <td>주문성분 ⚠ 미참조</td>
+      <td>cmp + org + order_no</td>
+      <td>
+        <strong><code>unused_in_21step: true</code></strong> ·
+        24 facets (8 성분 × 3 MIN/MAX/AIM) · <code>elements: [C, Si, Mn, P, S, Cr, Ni, Al]</code> ·
+        <code>design_gaps_ref: "#28"</code>
+      </td>
+    </tr>
+  </table>
+
+  <h4>(C) Action 1개 — flatten reflection</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>kind</th><th>realizes</th></tr>
+    <tr>
+      <td><code>action.scm.order.flatten_jpo_to_entity</code></td>
+      <td>4 Jpo 평탄화 (reflection 매핑)</td>
+      <td>workflow ★</td>
+      <td>PRIMARY: <code>SDOrderLogic.toEntity</code> — reflection 으로 4 Jpo getter 호출 → SDOrderEntity 평탄 set</td>
+    </tr>
+  </table>
+  <p class="small">★ Q4 정책 적용 — reflection 매핑은 control flow 패턴 → workflow Action.kind. design-gaps #29 (신규) 등록 — drama DNA reflection 패턴 표현 한계.</p>
+
+  <h4>(D) BusinessRule</h4>
+  <p class="small"><strong>등록 안 함</strong>. 4 Jpo PK 일관성은 SDOrderPK class 가 강제 — DB constraint, ontology BR 아님. order_kind 분류 (FS/Coil) 는 derived value (코드 가드 X) → facet 만.</p>
+
+  <h4>(E) TypeRealization (16개)</h4>
+  <pre>cmp:                4 PARTIAL (om/os/qd/chemical)
+org:                4 PARTIAL (동일)
+order_no:           1 PRIMARY (order_om — alphabetic 첫 Jpo) + 3 PARTIAL (os/qd/chemical)
+product_kind:       1 PARTIAL (order_om.productTypeCd — 8번째 alias)
+customer:           1 PARTIAL (order_om.customerCd)
+grade:              1 PARTIAL (order_qd.gradeCd)
+confirmed_plant_cd: 1 PARTIAL (order_os.confirmedPlantCd) — Phase A atomic 첫 비-shared TR
+─────────────────────────
+총 16 TR (PRIMARY 1 + PARTIAL 15)</pre>
+
+  <h4>(F) 결함 마킹 (Q4 정책)</h4>
+  <ul>
+    <li><strong>SDOrderLogic reflection 매핑</strong> — 4 Jpo → 1 Entity 평탄화. drama DNA. <code>action.flatten_jpo_to_entity.facets.uses_reflection: true</code> + design-gaps #29 (신규)</li>
+    <li><strong>order_chemical 21-step 미참조</strong> — composite facets <code>unused_in_21step: true</code> + design-gaps #28 (신규, Q3 결정 따라)</li>
+  </ul>
+
+  <h4>(G) Phase A retroactive 후보 — confirmed_plant_cd PRIMARY TR</h4>
+  <p class="small">Phase A 에서 atomic <code>term.scm.shared.confirmed_plant_cd</code> 등록되었으나 PRIMARY TR 미설정 (Phase A 의 productivity context 에서 8자리 풀 코드 직접 매핑 위치 부재). 이제 <code>order_os.confirmedPlantCd</code> 가 PRIMARY 위치 — Phase A retroactive 가 필요한지 사용자 결정.</p>
+
+  <!-- ====================================================================== -->
+  <h3>⑤ 누적 row (C.1 종료 시 예상)</h3>
+  <pre>+ 1 atomic        : term.scm.shared.order_no
++ 5 composite     : order (root) + order_om/os/qd/chemical
++ 1 Action        : flatten_jpo_to_entity (workflow kind)
++ 16 TR           : 4×cmp/org + 4×order_no + 4 PARTIAL (product/customer/grade/confirmed_plant_cd)
++ 2 design-gaps   : #28 (chemical unused) / #29 (reflection 매핑)
+─────────────────────────────────
+C.1 추가: 23 row (atomic 1 + composite 5 + Action 1 + TR 16)
+Phase A+B+C.1 누적: 98 + 23 = 121 row</pre>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>C.1 답변 — Order 4-sub schema 합의</h4>
+
+    <div class="field">
+      <label><strong>Q1. 추천 row 23개 OK?</strong> (atomic 1 + composite 5 + Action 1 + TR 16)
+        <span class="recommend">★ 추천: <strong>OK</strong>. Q2 정책 (PRIMARY + 4 sub inheritance) 정확 적용.</span>
+      </label>
+      <textarea class="text" name="c1_q1" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. <code>scm.order</code> 신규 sub-domain naming OK?</strong>
+        <span class="recommend">★ 추천: <strong>OK</strong>. <code>scm.std.*</code> (lookup 표준) / <code>scm.spec.*</code> (설비 제약) / <code>scm.order.*</code> (주문) / 향후 <code>scm.slab.*</code> (slab 설계). 4 sub-domain 분리.</span>
+      </label>
+      <textarea class="text" name="c1_q2" rows="2" placeholder="예: OK / 다른 naming ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. <code>order_no</code> atomic 신규 등록 OK?</strong> (string 20, cardinality unique per (cmp, org))
+        <span class="recommend">★ 추천 OK. 모든 Order Jpo + 향후 SlabResult 까지 공유. Q2 atomic 적극 share 정책.</span>
+      </label>
+      <textarea class="text" name="c1_q3" rows="2" placeholder="예: OK / facet 만 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. PRIMARY + 4 sub composition</strong> — root composite (order) 가 4 sub composite 을 <code>sub_composites</code> facet 으로 가리킴. PK 는 4 모두 동일 <code>(cmp, org, order_no)</code>.
+        <span class="recommend">★ 추천 OK. design-gaps #3 (composite inheritance override) 와 자연스럽게 연결. 도메인 위계 보존.</span>
+      </label>
+      <textarea class="text" name="c1_q4" rows="2" placeholder="예: OK / 다른 결합 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. <code>order_chemical</code> unused_in_21step 마킹</strong> — composite 1 + facets <code>unused_in_21step: true</code> + design-gaps #28.
+        <span class="recommend">★ 추천 OK. Q3 (Phase C) 결정 그대로.</span>
+      </label>
+      <textarea class="text" name="c1_q5" rows="2" placeholder="예: OK / 풀모델 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. <code>flatten_jpo_to_entity</code> workflow Action 등록</strong> — SDOrderLogic reflection 매핑을 명시적 Action 으로. design-gaps #29 (drama DNA reflection 한계).
+        <span class="recommend">★ 추천 OK. reflection 매핑은 ontology 가 단순히 표현 어려움 — Action + design-gaps 항목으로.</span>
+      </label>
+      <textarea class="text" name="c1_q6" rows="2" placeholder="예: OK / Action 미등록 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7. confirmed_plant_cd PRIMARY TR 위치</strong> — Phase A atomic 이지만 PRIMARY TR 미설정. <code>order_os.confirmedPlantCd</code> 를 PRIMARY 로 등록?
+        <span class="recommend">★ 추천 OK. Phase A 의 atomic 정의 위치(논리적) ≠ PRIMARY TR 위치(코드 등장). order_os 가 자연 PRIMARY (8자리 풀 코드 의 메인 source). Phase A retroactive 갱신.</span>
+      </label>
+      <textarea class="text" name="c1_q7" rows="2" placeholder="예: OK / 다른 위치 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q8. 빠뜨림 / 추가</strong>
+        <span class="recommend">★ 추천: 없음. 4 Jpo 의 PK + facet 모두 매핑. SDOrderEntity 평탄화는 Action 으로 처리.</span>
+      </label>
+      <textarea class="text" name="c1_q8" rows="2" placeholder="예: 없음 / 또는: ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q9. C.2 (Slab + SlabResult) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. SDSlabEntity 38 작업필드 → 5 step grouping composite (Q1 결정 적용) + SlabResult 28 컬럼 + 원본=조정 BR 후보.</span>
+      </label>
+      <textarea class="text" name="c1_q9" rows="2" placeholder="예: OK / 다른 진행 ___"></textarea>
+    </div>
+
+    <div class="ds-actions">
+      <button class="btn primary" id="c1-build">미리보기</button>
+      <button class="btn" id="c1-copy">📋 답변 복사</button>
+      <span class="copy-hint">「📋 답변 복사」 → 채팅 붙여넣기</span>
+    </div>
+    <div class="preview" id="c1-preview"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- C.1 archive -->
+<!-- ====================================================================== -->
+<section class="step" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 C.1 답변 받음 — Order 4-sub schema 합의 (23 row)</h2>
+  <div class="meta">
+    <span class="badge b-applied">archive</span>
+    <span>모두 추천대로</span>
+  </div>
+
+  <h3>답변 그대로</h3>
+  <div class="applied">
+    <div class="label">사용자 답변 (2026-05-10)</div>
+    <ul>
+      <li><strong>Q1</strong> 추천 row 23개: 추천대로</li>
+      <li><strong>Q2</strong> <code>scm.order</code> sub-domain: 추천대로</li>
+      <li><strong>Q3</strong> <code>order_no</code> atomic 등록: 추천대로</li>
+      <li><strong>Q4</strong> PRIMARY + 4 sub composition: 추천대로</li>
+      <li><strong>Q5</strong> order_chemical unused 마킹: 추천대로</li>
+      <li><strong>Q6</strong> flatten_jpo_to_entity workflow Action: 추천대로</li>
+      <li><strong>Q7</strong> confirmed_plant_cd PRIMARY TR — order_os.confirmedPlantCd: 추천대로 ★ Phase A retroactive</li>
+      <li><strong>Q8</strong> 빠뜨림: 없음</li>
+      <li><strong>Q9</strong> C.2 진입: OK</li>
+    </ul>
+  </div>
+
+  <h3>★ C.1 합의 row (23)</h3>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>요약</th></tr>
+    <tr><td>atomic</td><td><code>term.scm.shared.order_no</code></td><td>주문번호 (string 20, unique per cmp+org)</td></tr>
+    <tr><td>composite (root)</td><td><code>term.scm.order.order</code></td><td>주문 (aggregate). PRIMARY + 4 sub_composites facet</td></tr>
+    <tr><td>composite (sub × 4)</td><td><code>order_om / order_os / order_qd / order_chemical</code></td><td>4 Jpo 매핑 composite. PK 공통 (cmp+org+order_no)</td></tr>
+    <tr><td>Action</td><td><code>action.scm.order.flatten_jpo_to_entity</code></td><td>workflow kind. realizes SDOrderLogic.toEntity (reflection)</td></tr>
+    <tr><td>TR (16)</td><td>cmp/org × 4 + order_no × 4 + product_kind/customer/grade/confirmed_plant_cd × 1</td><td>1 PRIMARY + 15 PARTIAL</td></tr>
+  </table>
+
+  <h3>★ Phase A retroactive (Q7)</h3>
+  <ul>
+    <li><strong>confirmed_plant_cd PRIMARY TR</strong> 위치 = <code>order_os.confirmedPlantCd</code> (Phase A 의 atomic 정의는 Phase A 에서 했지만 PRIMARY TR 은 비어있었음). 이제 Phase C.1 에서 PRIMARY TR 위치 결정.</li>
+    <li>Phase A row 48 → 48 (변동 없음 — TR 위치만 명시화)</li>
+  </ul>
+
+  <h3>★ design-gaps 추가</h3>
+  <ul>
+    <li><strong>#28</strong> — order_chemical 24 컬럼 풀모델 보강 (향후 chemistry 시뮬)</li>
+    <li><strong>#29</strong> — SDOrderLogic reflection 매핑 drama DNA. ontology 가 reflection 패턴 표현 한계</li>
+  </ul>
+
+  <p class="small">★ Phase A+B+C.1 누적: <strong>121 row</strong> (98 + 23). 다음 → C.2 Slab + SlabResult.</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<!-- C.2 — Slab + SlabResult -->
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>C.2 — Slab + SlabResult (in-memory 5 step grouping + DB 1)</h2>
+  <div class="meta">
+    <span class="badge b-discuss">진행 중</span>
+    <span>Phase C 2단계 · M2 깊이 (Q1 결정 적용)</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>① 코드 분석 — SDSlabEntity 두 영역</h3>
+  <div class="archive-quote">
+    <div class="label">SDSlabEntity.java (in-memory entity, DB 없음) + SlabResultJpo.java (DB)</div>
+    <ul>
+      <li><strong>SDSlabEntity</strong>: in-memory 통합 슬랩 도메인 entity. 두 영역 분리:
+        <ol>
+          <li>DB값 영역 (24 컬럼) — SLAB_RESULT 매핑. SDSlabLogic 변환.</li>
+          <li>작업용 영역 (23 필드) — 21-step 알고리즘 런타임. DB 미저장.</li>
+        </ol>
+      </li>
+      <li><strong>SLAB_RESULT</strong>: DB table. PK = (cmp, org, slab_no). FK to ORDER_OS (cmp+org+order_no 공유).</li>
+      <li><strong>★ 원본/조정 패턴</strong>: 9 원본 (slab_width/length/wgt + low/high) + 9 조정 (_1 suffix). slab_thickness 만 단일 (조정 X).</li>
+      <li><strong>FAIL 시</strong>: SLAB_RESULT 미저장. designStatus + errorCode 만 채워짐. SLAB_DESIGN_HIST 별 적재 (이력).</li>
+      <li><strong>Snapshot</strong>: confirmedPlantCd, possiblePlantCd 는 설계 시점 snapshot (주문 변경 후에도 결과 보존).</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>② 23 작업용 필드 → 5 step grouping (Q1 결정 적용)</h3>
+  <div class="panel">
+    <pre>SDSlabEntity 작업용 영역 (23 필드):
+
+  first_range  (6 facet) — step 2~4: 1차 폭/길이/단중 범위
+    firstWidthLow / firstWidthHigh / firstLengthLow / firstLengthHigh / firstWgtLow / firstWgtHigh
+
+  second_wgt   (2 facet) — step 5~6: 2차 단중 범위
+    secondWgtLow / secondWgtHigh
+
+  split_state  (7 facet) — step 7~15: 분할수 + 작업단중 (A-a 루프)
+    maxSplitCountUpper / currentSplitCount / optimalSplitCount /
+    splitWgtLow / splitWgtHigh / slabCountInProgress / slabWgtInProgress
+
+  final_range  (4 facet) — step 16~17: 최종 폭/길이 범위
+    finalWidthLow / finalWidthHigh / finalLengthLow / finalLengthHigh
+
+  target       (2 facet) — step 18~19: 목표값
+    targetSlabWidth / targetSlabLength
+
+  status       (2 facet) — slab root 의 facet 으로 (5 grouping 이외)
+    designStatus (enum: SUCCESS/FAIL/IN_PROGRESS) / errorCode</pre>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>③ DB값 영역 → SlabResult composite (24 컬럼)</h3>
+  <div class="panel">
+    <pre>SLAB_RESULT (DB table, 24 컬럼):
+
+  PK (3): CMP_CD / ORG_CD / SLAB_NO (string 20)
+  FK (1): ORDER_NO (FK to ORDER_OS, 같은 cmp+org)
+  Snapshot (2): CONFIRMED_PLANT_CD / POSSIBLE_PLANT_CD
+  단일 (1): SLAB_THICKNESS (BigDecimal 6,2)
+  원본 9: SLAB_WIDTH / WIDTH_HIGH / WIDTH_LOW / LENGTH / LENGTH_HIGH / LENGTH_LOW / WGT / WGT_HIGH / WGT_LOW
+  조정 9 (_1): SLAB_WIDTH_1 / WIDTH_HIGH_1 / WIDTH_LOW_1 / LENGTH_1 / LENGTH_HIGH_1 / LENGTH_LOW_1 / WGT_1 / WGT_HIGH_1 / WGT_LOW_1
+  Meta 2: SPLIT_COUNT (Integer) / CREATED_AT (LocalDateTime)
+                                ── ★ 원본/조정 9-pair invariant (Q5 결정 적용)</pre>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>④ 추천 ontology row (Q1 + Q5 정책)</h3>
+
+  <h4>(A) 신규 atomic 1개</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>type</th><th>facets</th></tr>
+    <tr>
+      <td><code>term.scm.shared.slab_no</code></td>
+      <td>슬랩번호</td>
+      <td>string(20)</td>
+      <td><code>cardinality: "unique_per_(cmp, org)"</code> · <code>generated_by: "SlabNoSequence (side effect)"</code> · <code>shared_with: [SlabResult.PK, SDSlabEntity, SLAB_DESIGN_HIST]</code></td>
+    </tr>
+  </table>
+
+  <h4>(B) 신규 composite 7개 (root 1 + DB sub 1 + 작업 sub 5)</h4>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>한국어</th><th>parts</th><th>facets / sub_composites</th></tr>
+    <tr style="background:rgba(56,189,248,0.05)">
+      <td>composite (root)</td>
+      <td><code>term.scm.slab.slab</code></td>
+      <td>슬랩 (in-memory entity)</td>
+      <td>cmp + org + slab_no</td>
+      <td>
+        <code>order_no</code> (atomic_ref) · <code>confirmed_plant_cd</code> (atomic_ref) · <code>possible_plant_cd</code> (string 16) ·
+        <code>slab_thickness</code> (BigDecimal 6,2) · <code>design_status</code> (enum) · <code>error_code</code> ·
+        <code>sub_composites: [slab_result, first_range, second_wgt, split_state, final_range, target]</code> ·
+        <code>lifecycle: "in_memory_only_until_save"</code>
+      </td>
+    </tr>
+    <tr>
+      <td>composite (DB sub)</td>
+      <td><code>term.scm.slab.slab_result</code></td>
+      <td>슬랩 결과 (DB)</td>
+      <td>cmp + org + slab_no</td>
+      <td>
+        9 원본 (slab_width/length/wgt + low/high) · 9 조정 (_1 suffix) · split_count · created_at ·
+        <strong><code>invariant_pairs</code></strong>: 9 pairs (slabWidth↔slabWidth1, ..., slabWgtLow↔slabWgtLow1) ·
+        <code>persistence: "db_table_SLAB_RESULT"</code>
+      </td>
+    </tr>
+    <tr>
+      <td>composite (work sub)</td>
+      <td><code>term.scm.slab.first_range</code></td>
+      <td>1차 범위 (step 2~4)</td>
+      <td>cmp + org + slab_no</td>
+      <td>first_width_low/high (BigDecimal 10,2) · first_length_low/high (10,2) · first_wgt_low/high (10,3) · <code>lifecycle: "step_2_to_4"</code></td>
+    </tr>
+    <tr>
+      <td>composite (work sub)</td>
+      <td><code>term.scm.slab.second_wgt</code></td>
+      <td>2차 단중 범위 (step 5~6)</td>
+      <td>cmp + org + slab_no</td>
+      <td>second_wgt_low/high (BigDecimal 10,3) · <code>lifecycle: "step_5_to_6"</code></td>
+    </tr>
+    <tr>
+      <td>composite (work sub)</td>
+      <td><code>term.scm.slab.split_state</code></td>
+      <td>분할수 + 작업단중 (step 7~15)</td>
+      <td>cmp + org + slab_no</td>
+      <td>
+        max_split_count_upper · current_split_count · optimal_split_count ·
+        split_wgt_low/high (BigDecimal 10,3) · slab_count_in_progress (Integer) · slab_wgt_in_progress (BigDecimal 10,3) ·
+        <code>lifecycle: "step_7_to_15_a_a_loop"</code>
+      </td>
+    </tr>
+    <tr>
+      <td>composite (work sub)</td>
+      <td><code>term.scm.slab.final_range</code></td>
+      <td>최종 범위 (step 16~17)</td>
+      <td>cmp + org + slab_no</td>
+      <td>final_width_low/high (10,2) · final_length_low/high (10,2) · <code>lifecycle: "step_16_to_17"</code></td>
+    </tr>
+    <tr>
+      <td>composite (work sub)</td>
+      <td><code>term.scm.slab.target</code></td>
+      <td>목표값 (step 18~19)</td>
+      <td>cmp + org + slab_no</td>
+      <td>target_slab_width (10,2) · target_slab_length (10,2) · <code>lifecycle: "step_18_to_19"</code></td>
+    </tr>
+  </table>
+  <p class="small">★ work sub 5 composite 의 parts 는 SDSlabEntity 의 (cmp/org/slab_no) — in-memory shadow. DB-backed 와 동일한 PK 구조 사용 (Q1 결정의 step grouping 패턴).</p>
+
+  <h4>(C) Action 0개</h4>
+  <p class="small">이 단계는 entity schema 만. SDSlabLogic.toSlabResultJpo / fromSlabResultJpo 는 C.6 SdSlabSaveAction 에서 같이 처리.</p>
+
+  <h4>(D) BusinessRule 1개 ★ partial (C.6 에서 enforced_by 보강)</h4>
+  <table>
+    <tr><th>fqn</th><th>statement</th><th>enforced_by</th></tr>
+    <tr>
+      <td><code>rule.scm.slab.original_equals_adjusted</code></td>
+      <td>SLAB_RESULT 의 9 원본 컬럼과 9 조정 컬럼은 SdSlabSaveAction.execute 시 동일 값으로 set 됨 (최초 설계 시점). size 변경 시에만 _1 컬럼 변경.</td>
+      <td>★ partial — C.6 에서 SdSlabSaveAction setter 호출 패턴 명시 추가 (현재 schema-level 만)</td>
+    </tr>
+  </table>
+  <p class="small">★ Q5 정책 (BR + composite facets 복합) 의 BR 부분 — schema-level 등록. C.6 에서 enforced_by 의 setter call site 명시 + AnchorBinding 보강.</p>
+
+  <h4>(E) TypeRealization (5개)</h4>
+  <table>
+    <tr><th>atomic</th><th>code position</th><th>scope</th></tr>
+    <tr><td><code>term.scm.shared.cmp</code></td><td>SlabResultJpo.cmpCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>term.scm.shared.org</code></td><td>SlabResultJpo.orgCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>term.scm.shared.slab_no</code></td><td>SlabResultJpo.slabNo</td><td>PRIMARY (이 atomic 첫 등장)</td></tr>
+    <tr><td><code>term.scm.shared.order_no</code></td><td>SlabResultJpo.orderNo</td><td>PARTIAL (C.1 atomic 재사용)</td></tr>
+    <tr><td><code>term.scm.shared.confirmed_plant_cd</code></td><td>SlabResultJpo.confirmedPlantCd</td><td>PARTIAL (Phase A atomic 의 2번째 TR — C.1 OrderOs 가 PRIMARY)</td></tr>
+  </table>
+  <p class="small">★ 작업용 5 composite 의 facet 들 (firstWidthLow 등) 은 atomic 이 아니므로 TR 매핑 안 함. SDSlabEntity 의 in-memory getter/setter 는 composite facets 정의 자체로 처리.</p>
+
+  <h4>(F) 결함 마킹 / design-gaps</h4>
+  <ul>
+    <li><strong>in-memory composite 의 TR 표현 한계</strong> — 5 work composite 가 SDSlabEntity 의 in-memory state 이지만 ontology TR 은 코드 위치 (file + line) 매핑. design-gaps #30 (신규).</li>
+    <li><strong>SLAB_DESIGN_HIST 미모델링</strong> — FAIL 이력 별 table. 현재 schema 에 누락. design-gaps #31 (신규) — Phase E 보강.</li>
+    <li><strong>SlabNoSequence side effect</strong> — slab_no atomic 의 generated_by facet. design-gaps #32 (신규) — Phase E 결정.</li>
+  </ul>
+
+  <!-- ====================================================================== -->
+  <h3>⑤ 누적 row (C.2 종료 시 예상)</h3>
+  <pre>+ 1 atomic        : term.scm.shared.slab_no
++ 7 composite     : slab (root) + slab_result (DB) + 5 work (first_range, second_wgt, split_state, final_range, target)
++ 0 Action        : C.6 에서 일괄
++ 1 BR (partial)  : rule.scm.slab.original_equals_adjusted (schema-level, enforced_by C.6 보강)
++ 5 TR            : cmp / org / slab_no (PRIMARY) / order_no / confirmed_plant_cd (모두 SlabResultJpo)
++ 3 design-gaps   : #30 (in-memory TR 한계) / #31 (SLAB_DESIGN_HIST) / #32 (SlabNoSequence)
+─────────────────────────────────
+C.2 추가: 14 row (atomic 1 + composite 7 + Action 0 + BR 1 + TR 5)
+Phase A+B+C.1+C.2 누적: 121 + 14 = 135 row</pre>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>C.2 답변 — Slab + SlabResult 합의</h4>
+
+    <div class="field">
+      <label><strong>Q1. 추천 row 14개 OK?</strong> (atomic 1 + composite 7 + Action 0 + BR 1 + TR 5)
+        <span class="recommend">★ 추천: <strong>OK</strong>. Q1 결정 (step grouping 5) + Q5 결정 (원본=조정 BR) 정확 적용.</span>
+      </label>
+      <textarea class="text" name="c2_q1" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. <code>scm.slab</code> 신규 sub-domain naming OK?</strong>
+        <span class="recommend">★ 추천: <strong>OK</strong>. <code>scm.std/spec/order/slab</code> 4 sub-domain. 향후 21-step Action 도 <code>scm.slab.action.*</code>.</span>
+      </label>
+      <textarea class="text" name="c2_q2" rows="2" placeholder="예: OK / 다른 naming ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. <code>slab_no</code> atomic 신규 등록</strong> (string 20, generated_by SlabNoSequence)
+        <span class="recommend">★ 추천 OK. SlabResult.PK + SDSlabEntity + SLAB_DESIGN_HIST 공유. Q2 atomic share 정책.</span>
+      </label>
+      <textarea class="text" name="c2_q3" rows="2" placeholder="예: OK / facet 만 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. 7 composite 구조</strong> — root (slab) + DB sub (slab_result) + 5 work sub (Q1 결정 step grouping). work sub 의 parts = (cmp+org+slab_no) in-memory shadow.
+        <span class="recommend">★ 추천 OK. work sub 도 PK 일관 — DB 와 in-memory 가 같은 identifier 공유.</span>
+      </label>
+      <textarea class="text" name="c2_q4" rows="2" placeholder="예: OK / 다른 구조 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. <code>slab_result</code> facets 의 <code>invariant_pairs</code> 9 쌍 표현</strong> — Q5 결정의 facets 부분.
+        <span class="recommend">★ 추천 OK. <code>[[slabWidth, slabWidth1], [slabWidthHigh, slabWidthHigh1], ...]</code> 9 pairs 명시. C.6 BR enforced_by 와 연결.</span>
+      </label>
+      <textarea class="text" name="c2_q5" rows="2" placeholder="예: OK / 다른 표현 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. BR <code>original_equals_adjusted</code> partial 등록</strong> — schema-level. enforced_by 는 C.6 에서 SdSlabSaveAction setter 명시 추가.
+        <span class="recommend">★ 추천 OK. C.6 까지 partial 상태 유지. C.7 종결 시 100% complete.</span>
+      </label>
+      <textarea class="text" name="c2_q6" rows="2" placeholder="예: OK / 지금 등록 X (C.6 까지 보류) ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7. design_status enum 처리</strong> — root composite facet (enum: SUCCESS/FAIL/IN_PROGRESS). atomic 승격 X.
+        <span class="recommend">★ 추천 OK. 도메인 의미 narrow (Slab 만), atomic 승격 부적합. enum_values facet 으로 충분.</span>
+      </label>
+      <textarea class="text" name="c2_q7" rows="2" placeholder="예: OK / atomic 으로 승격 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q8. design-gaps 3 신규 (#30/#31/#32)</strong> — in-memory TR 한계 / SLAB_DESIGN_HIST / SlabNoSequence side effect
+        <span class="recommend">★ 추천 OK. Phase E 일괄 결정 후보.</span>
+      </label>
+      <textarea class="text" name="c2_q8" rows="2" placeholder="예: OK / 일부만 등록 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q9. 빠뜨림 / 추가</strong>
+        <span class="recommend">★ 추천: 없음. SDSlabEntity 두 영역 (DB 24 + 작업 23) + SlabResult PK + Snapshot 모두 매핑.</span>
+      </label>
+      <textarea class="text" name="c2_q9" rows="2" placeholder="예: 없음 / 또는: ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q10. C.3 (SdDesigner orchestration + A-a 루프) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. Q4 결정 (workflow Action.kind) 적용. SdDesigner.runAaLoop = workflow Action 의 첫 등장.</span>
+      </label>
+      <textarea class="text" name="c2_q10" rows="2" placeholder="예: OK / 다른 진행 ___"></textarea>
+    </div>
+
+    <div class="ds-actions">
+      <button class="btn primary" id="c2-build">미리보기</button>
+      <button class="btn" id="c2-copy">📋 답변 복사</button>
+      <span class="copy-hint">「📋 답변 복사」 → 채팅 붙여넣기</span>
+    </div>
+    <div class="preview" id="c2-preview"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- C.2 archive -->
+<!-- ====================================================================== -->
+<section class="step" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 C.2 답변 받음 — Slab + SlabResult 합의 (14 row)</h2>
+  <div class="meta">
+    <span class="badge b-applied">archive</span>
+    <span>모두 추천대로</span>
+  </div>
+
+  <h3>답변 그대로</h3>
+  <div class="applied">
+    <div class="label">사용자 답변 (2026-05-10)</div>
+    <ul>
+      <li><strong>Q1</strong> 추천 row 14개: 추천대로</li>
+      <li><strong>Q2</strong> <code>scm.slab</code> sub-domain: 추천대로</li>
+      <li><strong>Q3</strong> <code>slab_no</code> atomic 등록: 추천대로</li>
+      <li><strong>Q4</strong> 7 composite 구조 (root + DB sub + 5 work): 추천대로</li>
+      <li><strong>Q5</strong> <code>invariant_pairs</code> 9 쌍 표현: 추천대로</li>
+      <li><strong>Q6</strong> BR <code>original_equals_adjusted</code> partial 등록: 추천대로 (C.6 보강)</li>
+      <li><strong>Q7</strong> <code>design_status</code> enum facet: 추천대로</li>
+      <li><strong>Q8</strong> design-gaps #30/#31/#32 등록: 추천대로</li>
+      <li><strong>Q9</strong> 빠뜨림: 응답 없음 → 없음 추정</li>
+      <li><strong>Q10</strong> C.3 진입: OK</li>
+    </ul>
+  </div>
+
+  <h3>★ C.2 합의 row (14)</h3>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>요약</th></tr>
+    <tr><td>atomic</td><td><code>term.scm.shared.slab_no</code></td><td>슬랩번호 (string 20, generated_by SlabNoSequence)</td></tr>
+    <tr><td>composite (root)</td><td><code>term.scm.slab.slab</code></td><td>in-memory 통합 entity. sub_composites 6 facet</td></tr>
+    <tr><td>composite (DB)</td><td><code>term.scm.slab.slab_result</code></td><td>SLAB_RESULT 매핑. invariant_pairs 9 ★</td></tr>
+    <tr><td>composite (work × 5)</td><td><code>first_range / second_wgt / split_state / final_range / target</code></td><td>21-step 작업필드 grouping (Q1 결정)</td></tr>
+    <tr><td>BR (partial)</td><td><code>rule.scm.slab.original_equals_adjusted</code></td><td>schema-level. enforced_by C.6 SdSlabSaveAction setter 보강 예정</td></tr>
+    <tr><td>TR (5)</td><td>cmp/org/order_no/confirmed_plant_cd PARTIAL + slab_no PRIMARY</td><td>SlabResultJpo 매핑</td></tr>
+  </table>
+
+  <h3>★ design-gaps 추가 (3)</h3>
+  <ul>
+    <li><strong>#30</strong> — in-memory composite TR 표현 한계 (5 work composite 가 file/line 매핑 어려움)</li>
+    <li><strong>#31</strong> — SLAB_DESIGN_HIST 미모델링. FAIL 이력 별 table</li>
+    <li><strong>#32</strong> — SlabNoSequence side effect (atomic.slab_no.generated_by)</li>
+  </ul>
+
+  <p class="small">★ Phase A+B+C.1+C.2 누적: <strong>135 row</strong>. 다음 → C.3 SdDesigner orchestration + A-a 루프.</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<!-- C.3 — SdDesigner orchestration -->
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>C.3 — SdDesigner orchestration + A-a 루프 workflow Action</h2>
+  <div class="meta">
+    <span class="badge b-discuss">진행 중</span>
+    <span>Phase C 3단계 · M2 깊이 · ★ Q4 결정 (workflow Action.kind) 첫 등장</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>① 코드 분석 — SdDesigner.design 의 21-step 흐름</h3>
+  <div class="archive-quote">
+    <div class="label">SdDesigner.java + Round 5 archive</div>
+    <ul>
+      <li><strong>Phase 1 (사전 처리)</strong>: 정합성 점검 → 제품 분류 → 작업 필드 채움 (selectedHrTgtWidth + specificGravity + cumulative productivity)</li>
+      <li><strong>Phase 2 (알고리즘)</strong>: SDSlabEntity 생성 + slabNo pre-generate → one-shot 1~7 → A-a 루프 8~15 → one-shot 16~19 → save 20 → history 21</li>
+      <li><strong>★ A-a 루프</strong>: <code>for split = maxSplit downTo 1</code>. 각 iteration 내부 4 step 시도 (split_range / slab_count / initial_wgt / wgt_recalc). 수렴 조건: step 10 OR step 13 success → return. 모든 split 실패 → ALG_NO_CONVERGENCE.</li>
+      <li><strong>운영 이슈 P-2018-0721</strong>: 실수율 과다 → 분할수 폭주 → 무한 루프 가까운 동작. 해결 = A-a 루프 max iteration = maxSplit cap (★ BR 후보).</li>
+      <li><strong>운영 이슈 P-2019-0445</strong>: history 적재 실패 → main tx rollback. 해결 = REQUIRES_NEW 분리 (C.6 처리).</li>
+      <li><strong>예외 처리</strong>: AlgorithmException → history 기록 + designStatus=FAIL + return null. IllegalStateException (EDGING_SPEC) → propagate.</li>
+      <li><strong>TODO (2022-04-01)</strong>: step 14 제품단중 최대화 모드 — 미구현 (보류).</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>② 21-step 분류 (SdDesigner.design 본문 기반)</h3>
+  <table>
+    <tr><th>구간</th><th>step</th><th>내용</th><th>Action</th></tr>
+    <tr><td>Phase 1</td><td>0a</td><td>Validator.validate</td><td>SdOrderValidator (C.4)</td></tr>
+    <tr><td>Phase 1</td><td>0b</td><td>Classifier.classify</td><td>SdProductClassifier</td></tr>
+    <tr><td>Phase 1</td><td>0c</td><td>HrResolver / Gravity / cumulativeProductivity</td><td>SelectedHrTgtWidthResolver / SpecificGravityProvider / ProductivityService (Phase A)</td></tr>
+    <tr><td>Phase 2 init</td><td>—</td><td>SDSlabEntity 생성 + slabNo</td><td>SdDesigner.createInitialSlab + SlabNoSequence</td></tr>
+    <tr><td>one-shot</td><td>1~7</td><td>thickness / width / length / first_wgt / second_low / second_high / max_split</td><td>SdThickness/Width/Length/FirstWeight/SecondWgtLow/High/MaxSplitCount Action (C.5)</td></tr>
+    <tr><td>A-a 루프</td><td>8~15</td><td>split_range / slab_count / initial_wgt / wgt_recalc</td><td>SdSplitRange/SlabCount/InitialSlabWgt/SlabWgtRecalc (C.5)</td></tr>
+    <tr><td>one-shot</td><td>16~19</td><td>final_width / final_length / target_width / target_length</td><td>SdFinal Width/Length / TargetWidth/Length (C.5)</td></tr>
+    <tr><td>save</td><td>20</td><td>SLAB_RESULT 매수 row 저장</td><td>SdSlabSaveAction (C.6)</td></tr>
+    <tr><td>history</td><td>21</td><td>각 step SLAB_DESIGN_HIST 적재</td><td>SdHistoryAction (executeWithHistory wrapper)</td></tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>③ 추천 ontology row (Q4 결정 — workflow Action.kind)</h3>
+
+  <h4>(A) 신규 atomic 0개</h4>
+
+  <h4>(B) 신규 composite 0개 (entity 는 C.2 까지)</h4>
+
+  <h4>(C) 신규 Action 3개 (orchestration core)</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>kind</th><th>realizes (PRIMARY)</th><th>핵심 facets</th></tr>
+    <tr style="background:rgba(56,189,248,0.05)">
+      <td><code>action.scm.slab.design_slab</code></td>
+      <td>슬랩 설계 (root workflow)</td>
+      <td><strong>workflow ★</strong></td>
+      <td><code>SdDesigner.design</code></td>
+      <td>
+        <code>params: order (SDOrderEntity)</code> · <code>return: SDSlabEntity (or null on FAIL)</code> ·
+        <code>delegates_to: [validator, classifier, hrResolver, gravityProvider, productivityService, thickness/width/length/firstWgt/secondLow/secondHigh/maxSplit (1~7), splitRange/slabCount/initialWgt/wgtRecalc (A-a), finalWidth/finalLength/targetWidth/targetLength (16~19), slabSave, historyAction]</code> ·
+        <code>exception_handling: AlgorithmException → FAIL + null. IllegalStateException → propagate</code> ·
+        <code>helper_pattern_executeWithHistory: "step + history.recordStep wrapper"</code> ·
+        <code>operational_history: P-2018-0721 (A-a 도입), P-2019-0445 (REQUIRES_NEW)</code> ·
+        <code>todo: "step 14 제품단중 최대화 모드 미구현 (2022-04-01 박XX)"</code>
+      </td>
+    </tr>
+    <tr style="background:rgba(56,189,248,0.05)">
+      <td><code>action.scm.slab.run_aa_loop</code> ★</td>
+      <td>A-a 루프 (control flow workflow)</td>
+      <td><strong>workflow ★</strong></td>
+      <td><code>SdDesigner.runAaLoop</code></td>
+      <td>
+        <code>params: order, slab</code> · <code>return: void (mutates slab)</code> ·
+        <code>iteration_pattern: "for split = maxSplitCountUpper downTo 1"</code> ·
+        <code>max_iterations: dynamic (= maxSplitCountUpper)</code> ·
+        <code>delegates_to: [splitRangeAction, slabCountAction, initialSlabWgtAction, slabWgtRecalcAction]</code> ·
+        <code>convergence_branches: ["step 10 (initial_wgt) success", "step 13 (wgt_recalc) success"]</code> ·
+        <code>exception_handling: catch ALG_ITERATION_NEEDED → continue, else throw</code> ·
+        <code>failure: "ALG_NO_CONVERGENCE after split=1 fail"</code> ·
+        <code>helper_pattern_tryStep: "silent attempt, ALG_ITERATION_NEEDED → false"</code> ·
+        <code>operational_history: P-2018-0721 (분할수 폭주 → max iter cap 도입)</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>action.scm.slab.create_initial_slab</code></td>
+      <td>슬랩 초기화 (slabNo pre-generate)</td>
+      <td>workflow</td>
+      <td><code>SdDesigner.createInitialSlab</code></td>
+      <td>
+        <code>params: order</code> · <code>return: SDSlabEntity (designStatus=IN_PROGRESS)</code> ·
+        <code>side_effects: ["SlabNoSequence.next() — 12자리 sequence"]</code> ·
+        <code>copies_from_order: [cmp, org, order_no, confirmed_plant_cd, possible_plant_cd]</code>
+      </td>
+    </tr>
+  </table>
+  <p class="small">★ helper Actions (executeWithHistory, tryStep) 는 facets 으로 표현 — 별 Action 미등록. 도메인 의미 없는 wrapper pattern.</p>
+
+  <h4>(D) BusinessRule 1개 ★ Q3 정책 (코드 가드 있는 rule)</h4>
+  <table>
+    <tr><th>fqn</th><th>statement</th><th>enforced_by</th></tr>
+    <tr>
+      <td><code>rule.scm.slab.aa_loop_max_iter_cap</code></td>
+      <td>A-a 루프는 maxSplitCountUpper 부터 1 까지 역순 iterate. maxSplitCountUpper 가 max iteration cap. 모든 split (max → 1) 에서 수렴 실패 시 ALG_NO_CONVERGENCE 예외.</td>
+      <td>
+        <code>SdDesigner.runAaLoop</code> 의 2 anchor:<br>
+        ① <code>for (split = maxSplit; split &gt;= 1; split--)</code> loop guard<br>
+        ② <code>throw new AlgorithmException(8, "A_A_LOOP", ALG_NO_CONVERGENCE, ...)</code>
+      </td>
+    </tr>
+  </table>
+  <p class="small">★ <code>operational_history</code> facet: P-2018-0721 (2018-07-15) — 실수율 과다 시 분할수 폭주 → 무한 루프 가까운 동작. 정XX 가 max iter cap 으로 해결. v3 Q-C 의 "branch user_queue + operational history" 패턴 정확 적용.</p>
+
+  <h4>(E) AnchorBinding (Phase E 보강 — design-gaps #17 폭발 risk)</h4>
+  <p class="small">SdDesigner.design 본문의 21 executeWithHistory 호출 + runAaLoop 의 4 tryStep + try/catch 분기. 약 30+ anchor 후보 — Phase E 일괄 처리.</p>
+
+  <h4>(F) TR / TypeRealization 0개</h4>
+  <p class="small">orchestration Action 만 추가, 신규 atomic 없음.</p>
+
+  <h4>(G) design-gaps 신규 1개</h4>
+  <ul>
+    <li><strong>#33</strong> — SdDesigner.design 의 step 14 (제품단중 최대화 모드) 미구현. TODO (2022-04-01 박XX). Phase E 결정 — 향후 시뮬 시나리오 후보.</li>
+  </ul>
+
+  <!-- ====================================================================== -->
+  <h3>④ 누적 row (C.3 종료 시 예상)</h3>
+  <pre>+ 0 atomic
++ 0 composite
++ 3 Action       : design_slab (root workflow) / run_aa_loop (A-a control flow) / create_initial_slab
++ 1 BR           : rule.scm.slab.aa_loop_max_iter_cap (P-2018-0721 history)
++ 0 TR
++ 1 design-gaps  : #33 (step 14 제품단중 최대화 미구현 TODO)
+─────────────────────────────────
+C.3 추가: 4 row (Action 3 + BR 1)
+Phase A+B+C.1+C.2+C.3 누적: 135 + 4 = 139 row</pre>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>C.3 답변 — SdDesigner orchestration 합의</h4>
+
+    <div class="field">
+      <label><strong>Q1. 추천 row 4개 OK?</strong> (Action 3 + BR 1)
+        <span class="recommend">★ 추천: <strong>OK</strong>. orchestration core. helper Action 2 (executeWithHistory / tryStep) 는 facets 으로 통합.</span>
+      </label>
+      <textarea class="text" name="c3_q1" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. <code>design_slab</code> Action.kind = workflow</strong> — 21-step orchestration. delegates_to 21 sub-Actions.
+        <span class="recommend">★ 추천 OK. v4 결정 (Action 모델 — pure_function vs workflow 2-kind) 그대로 적용.</span>
+      </label>
+      <textarea class="text" name="c3_q2" rows="2" placeholder="예: OK / 다른 kind ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. <code>run_aa_loop</code> Action.kind = workflow</strong> — Q4 결정 (control flow 의 workflow kind). iteration_pattern + convergence_branches + operational_history facets.
+        <span class="recommend">★ 추천 OK. Q4 결정의 첫 등장 — A-a 루프 control flow 표현. P-2018-0721 history 명시.</span>
+      </label>
+      <textarea class="text" name="c3_q3" rows="2" placeholder="예: OK / 다른 kind ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. helper pattern facets vs 별 Action</strong> — executeWithHistory / tryStep 을 design_slab / run_aa_loop facets 으로 통합 (별 Action 미등록).
+        <span class="recommend">★ 추천 OK. helper wrapper 는 도메인 의미 없음. facets <code>helper_pattern_executeWithHistory</code> + <code>helper_pattern_tryStep</code> 로 표현.</span>
+      </label>
+      <textarea class="text" name="c3_q4" rows="2" placeholder="예: OK / 별 Action 등록 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. BR <code>aa_loop_max_iter_cap</code> 등록</strong> — Q3 정책 (코드 가드 있는 rule). enforced_by 2 anchor (loop guard + throw). operational_history P-2018-0721.
+        <span class="recommend">★ 추천 OK. 운영 이슈 history 가 BR 의 가치 (방어 도입 배경) 입증. v3 Q-C 패턴 정확 적용.</span>
+      </label>
+      <textarea class="text" name="c3_q5" rows="2" placeholder="예: OK / 단순화 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. <code>create_initial_slab</code> side_effects 표현</strong> — SlabNoSequence.next() (12자리 sequence) 호출. side_effects facet 명시.
+        <span class="recommend">★ 추천 OK. design-gaps #32 (SlabNoSequence side effect) 와 연결. ChangeSpec 시뮬 시 side effect 처리 명시.</span>
+      </label>
+      <textarea class="text" name="c3_q6" rows="2" placeholder="예: OK / facet 미등록 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7. design-gaps #33 (step 14 미구현 TODO) 등록</strong>
+        <span class="recommend">★ 추천 OK. 2022-04-01 박XX TODO. 향후 시뮬 시나리오 후보 (제품단중 최대화 ChangeSpec).</span>
+      </label>
+      <textarea class="text" name="c3_q7" rows="2" placeholder="예: OK / 등록 X ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q8. 빠뜨림 / 추가</strong>
+        <span class="recommend">★ 추천: 없음. orchestration core 3 Action + BR 1 + TODO design-gaps. AnchorBinding 은 Phase E 보강.</span>
+      </label>
+      <textarea class="text" name="c3_q8" rows="2" placeholder="예: 없음 / 또는: ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q9. C.4 (Validator BR 5종) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. SdOrderValidator 의 DG001~DG005 + Customer.findFirstMatch retroactive BR (Phase A 후속).</span>
+      </label>
+      <textarea class="text" name="c3_q9" rows="2" placeholder="예: OK / 다른 진행 ___"></textarea>
+    </div>
+
+    <div class="ds-actions">
+      <button class="btn primary" id="c3-build">미리보기</button>
+      <button class="btn" id="c3-copy">📋 답변 복사</button>
+      <span class="copy-hint">「📋 답변 복사」 → 채팅 붙여넣기</span>
+    </div>
+    <div class="preview" id="c3-preview"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- C.3 archive -->
+<!-- ====================================================================== -->
+<section class="step" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 C.3 답변 받음 — SdDesigner orchestration 합의 (4 row)</h2>
+  <div class="meta">
+    <span class="badge b-applied">archive</span>
+    <span>모두 추천대로</span>
+  </div>
+
+  <h3>답변 그대로</h3>
+  <div class="applied">
+    <div class="label">사용자 답변 (2026-05-10)</div>
+    <ul>
+      <li><strong>Q1</strong> 추천 row 4개: 추천대로</li>
+      <li><strong>Q2</strong> design_slab Action.kind = workflow: 추천대로</li>
+      <li><strong>Q3</strong> run_aa_loop workflow + Q4 결정 첫 등장: 추천대로 ★</li>
+      <li><strong>Q4</strong> helper pattern facets (별 Action 미등록): 추천대로</li>
+      <li><strong>Q5</strong> BR aa_loop_max_iter_cap 등록: 추천대로 (P-2018-0721)</li>
+      <li><strong>Q6</strong> create_initial_slab side_effects 표현: 추천대로</li>
+      <li><strong>Q7</strong> design-gaps #33 (step 14 미구현 TODO): 추천대로</li>
+      <li><strong>Q8</strong> 빠뜨림: 응답 없음 → 없음 추정</li>
+      <li><strong>Q9</strong> C.4 진입: 추천대로</li>
+    </ul>
+  </div>
+
+  <h3>★ C.3 합의 row (4)</h3>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>요약</th></tr>
+    <tr><td>Action (workflow)</td><td><code>action.scm.slab.design_slab</code></td><td>realizes SdDesigner.design (root). delegates_to 21 sub + exception_handling + operational_history (P-2018-0721 / P-2019-0445)</td></tr>
+    <tr><td>Action (workflow) ★</td><td><code>action.scm.slab.run_aa_loop</code></td><td>realizes SdDesigner.runAaLoop. iteration_pattern + convergence_branches. ★ Q4 결정 첫 등장</td></tr>
+    <tr><td>Action (workflow)</td><td><code>action.scm.slab.create_initial_slab</code></td><td>side_effects: SlabNoSequence.next() (12자리)</td></tr>
+    <tr><td>BR</td><td><code>rule.scm.slab.aa_loop_max_iter_cap</code></td><td>enforced_by 2 anchor (loop guard + throw). operational_history P-2018-0721</td></tr>
+  </table>
+
+  <h3>★ design-gaps 추가 (1)</h3>
+  <ul>
+    <li><strong>#33</strong> — SdDesigner.design step 14 (제품단중 최대화 모드) 미구현 TODO (2022-04-01 박XX). 향후 시뮬 시나리오 후보.</li>
+  </ul>
+
+  <p class="small">★ Phase A+B+C.1+C.2+C.3 누적: <strong>139 row</strong>. 다음 → C.4 Validator BR + Phase 1 services.</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<!-- C.4 — Validator BR + Phase 1 services -->
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>C.4 — Validator BR 5종 + Phase 1 services + Customer retroactive BR</h2>
+  <div class="meta">
+    <span class="badge b-discuss">진행 중</span>
+    <span>Phase C 4단계 · M2 깊이 · ★ Phase B BR 정책 (Q3) 풀 적용</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>① 코드 분석 — SdOrderValidator 5종 점검</h3>
+  <div class="archive-quote">
+    <div class="label">SdOrderValidator.java + Round 5 archive</div>
+    <ul>
+      <li><strong>5종 통합</strong>: 사용자 지정. <code>validate</code> 메서드 = short-circuit (첫 실패 시 즉시 반환). 김XX 2017-08-30 (3종) → 정XX 2018-12-04 (cross-check) → 박XX 2020-06-15 (5종 통합 리팩토링).</li>
+      <li><strong>DG001 — VAL_STOCK_ORDER</strong>: 재고주문 (STOCK_CODE=1) skip. P-2018-0098 (2018-11-22) — 슬랩 중복 생성 사고로 도입.</li>
+      <li><strong>DG002 — VAL_ORDER_SIZE</strong>: 주문 폭/길이 양수 (NULL/0/음수 X).</li>
+      <li><strong>DG003 — VAL_PKG_WGT_RANGE</strong>: 포장단중 하/상한 양수 + 하한 ≤ 상한 (range integrity).</li>
+      <li><strong>DG004 — VAL_DESIGN_PEND_QTY</strong>: 설계대기량 양수 + 상한 ≥ 포장단중하한 (cross-table check). 정XX 2018-12-04 추가.</li>
+      <li><strong>DG005 — VAL_WORK_DUE</strong>: 활성공정 (confirmedPlantCd[i] != ' ') 의 *Due + WORK_DUE 모두 미래 날짜. P-2020-0411 (당일 마감 슬랩 생성) — isAfter strict 변경.</li>
+      <li><strong>★ DG005 활용</strong>: confirmed_plant_cd 자리 0~7 모두 Phase A atomic encoding 활용. (Phase A 의 cumulative_productivity 가 자리 0~7 모두 사용하는 것과 짝).</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>② Phase 1 services 코드 분석 (SdDesigner Phase 1 호출)</h3>
+  <ul>
+    <li><strong>SdProductClassifier.classify</strong> — order_om.product_type_cd → ProductCategory enum (COIL / FS / OTHER). COIL 만 21-step 진입.</li>
+    <li><strong>SelectedHrTgtWidthResolver.resolveAndSet</strong> — confirmedPlantCd[1] (HR 위치) → hr_tgt_width_1~5 중 해당 컬럼 선택 → order.selectedHrTgtWidth set. (★ design-gaps #22 의 자리매핑 패턴)</li>
+    <li><strong>SpecificGravityProvider.get</strong> — grade_cd → 비중 (BigDecimal). 강종별 hardcoded 매핑 추정.</li>
+    <li><strong>ProductivityService.cumulativeProductivity</strong> — Phase A Action 재사용 (action.scm.std.cumulative_productivity).</li>
+  </ul>
+
+  <!-- ====================================================================== -->
+  <h3>③ 추천 ontology row (Q3 정책 — Validator 5 BR + Customer retroactive)</h3>
+
+  <h4>(A) 신규 Action 4개</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>kind</th><th>realizes (PRIMARY)</th><th>핵심 facets</th></tr>
+    <tr style="background:rgba(56,189,248,0.05)">
+      <td><code>action.scm.slab.validate_order</code></td>
+      <td>주문 정합성 점검 (5종 통합)</td>
+      <td>workflow</td>
+      <td><code>SdOrderValidator.validate</code></td>
+      <td>
+        <code>params: order</code> · <code>return: ValidationResult</code> · <code>short_circuit: true</code> ·
+        <code>delegates_to: ["checkStockOrder", "checkOrderSize", "checkPkgWgtRange", "checkDesignPendQty", "checkWorkDue"]</code> ·
+        <code>operational_history: ["김XX 2017-08-30 3종", "정XX 2018-12-04 cross-check", "박XX 2020-06-15 5종 통합 리팩토링"]</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>action.scm.order.classify_product</code></td>
+      <td>제품 분류 (COIL/FS/OTHER)</td>
+      <td>pure_function</td>
+      <td><code>SdProductClassifier.classify</code></td>
+      <td>
+        <code>params: order</code> · <code>return: ProductCategory</code> ·
+        <code>derives_from: order_om.product_type_cd</code> ·
+        <code>enum_values: ["COIL", "FS", "OTHER"]</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>action.scm.order.resolve_hr_tgt_width</code></td>
+      <td>활성 열연 목표폭 선택</td>
+      <td>pure_function</td>
+      <td><code>SelectedHrTgtWidthResolver.resolveAndSet</code></td>
+      <td>
+        <code>params: order</code> · <code>return: void (mutates order.selectedHrTgtWidth)</code> ·
+        <code>indexing: "confirmedPlantCd[1] (HR 위치) → hr_tgt_width_1~5 선택"</code> ·
+        <code>uses_atomic: [confirmed_plant_cd, hr_plant_cd]</code> ·
+        <code>related_design_gaps: #22 (자리매핑 패턴)</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>action.scm.std.find_specific_gravity</code></td>
+      <td>비중 룩업 (강종 → 비중)</td>
+      <td>pure_function</td>
+      <td><code>SpecificGravityProvider.get</code></td>
+      <td>
+        <code>params: grade_cd</code> · <code>return: BigDecimal (specific_gravity)</code> ·
+        <code>has_hardcoded_mapping: true</code> · <code>mapping_source: "SpecificGravityProvider class body"</code> ·
+        <code>related_design_gaps: #25 (hardcoded mapping 같은 패턴)</code>
+      </td>
+    </tr>
+  </table>
+  <p class="small">★ Phase A 의 <code>cumulative_productivity</code> Action 은 SdDesigner Phase 1 에서 호출됨 — 별 Action 등록 X (Phase A 재사용).</p>
+
+  <h4>(B) 신규 BusinessRule 6개 ★ Q3 정책 풀 적용</h4>
+  <table>
+    <tr><th>fqn</th><th>statement</th><th>enforced_by</th><th>operational_history</th></tr>
+    <tr style="background:rgba(167,139,250,0.05)">
+      <td><code>rule.scm.order.no_stock_order</code></td>
+      <td>재고주문 (STOCK_CODE=1) 은 새 슬랩 설계 대상 아님 → DG001 skip</td>
+      <td>SdOrderValidator.checkStockOrder branch <code>Integer.valueOf(1).equals(stockCode)</code></td>
+      <td>P-2018-0098 (2018-11-22 슬랩 중복 생성 → 정XX 패치)</td>
+    </tr>
+    <tr>
+      <td><code>rule.scm.order.order_size_positive</code></td>
+      <td>주문 폭/길이 모두 양수 (NULL/0/음수 X) → DG002</td>
+      <td>SdOrderValidator.checkOrderSize 2 branch (isPositive 2회)</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><code>rule.scm.order.pkg_wgt_range_integrity</code></td>
+      <td>포장단중 하/상한 양수 + 하한 ≤ 상한 → DG003</td>
+      <td>SdOrderValidator.checkPkgWgtRange 2 branch (isPositive + compareTo)</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><code>rule.scm.order.design_pend_qty_cross_check</code></td>
+      <td>설계대기량 양수 + 상한 ≥ 포장단중 하한 → DG004 (cross-table)</td>
+      <td>SdOrderValidator.checkDesignPendQty 4 branch</td>
+      <td>정XX 2018-12-04 cross-check 추가</td>
+    </tr>
+    <tr style="background:rgba(167,139,250,0.05)">
+      <td><code>rule.scm.order.work_due_strict_future</code></td>
+      <td>활성공정 (confirmedPlantCd[i] != ' ') 의 *Due + WORK_DUE 모두 미래 날짜 (오늘 X) → DG005</td>
+      <td>SdOrderValidator.checkWorkDue branches (isAfter strict)</td>
+      <td>P-2020-0411 (2020-05-30 당일 마감 슬랩 생성 → isAfter strict 변경, 박XX 패치)</td>
+    </tr>
+    <tr style="background:rgba(16,185,129,0.05)">
+      <td><code>rule.scm.std.customer_find_first_match_strategy</code> ★ Phase A retroactive</td>
+      <td>Customer 검색 = (cmp, org, product_kind, customer) 매칭 + PRIORITY ASC + first row + null on empty</td>
+      <td>CustomerStdService.findFirstMatch (derived JPA query + isEmpty 분기)</td>
+      <td>—</td>
+    </tr>
+  </table>
+
+  <h4>(C) 신규 atomic 1개 (검토 후보)</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>type</th><th>비고</th></tr>
+    <tr>
+      <td><code>term.scm.shared.specific_gravity</code></td>
+      <td>비중</td>
+      <td>BigDecimal (decimal precision)</td>
+      <td>강종별 비중 — Phase A cumulative_productivity 와 SdInitialSlabWgt 등에서 사용. atomic 승격 검토.</td>
+    </tr>
+  </table>
+  <p class="small">★ Q2 적극 share 정책 — 다중 Action 에서 사용. 단 BigDecimal scalar dimension 이라 thickness/width 와 달리 atomic 승격 가능 (의미 narrow + cross-Action use).</p>
+
+  <h4>(D) TR (Action realizations 외 별 TR 없음)</h4>
+
+  <h4>(E) design-gaps 신규 1개</h4>
+  <ul>
+    <li><strong>#34</strong> — SpecificGravityProvider hardcoded mapping (강종 → 비중). PlantMappingService (#25) 와 같은 패턴. 운영 변경 시 코드 수정 필요.</li>
+  </ul>
+
+  <!-- ====================================================================== -->
+  <h3>④ 누적 row (C.4 종료 시 예상)</h3>
+  <pre>+ 1 atomic        : term.scm.shared.specific_gravity (검토)
++ 0 composite
++ 4 Action       : validate_order / classify_product / resolve_hr_tgt_width / find_specific_gravity
++ 6 BR           : 5 Validator (DG001~005) + 1 Customer retroactive
++ 1 TR           : specific_gravity PRIMARY (SpecificGravityProvider.get return)
++ 1 design-gaps  : #34 SpecificGravityProvider hardcoded
+─────────────────────────────────
+C.4 추가: 12 row (atomic 1 + Action 4 + BR 6 + TR 1)
+Phase A+B+C.1+C.2+C.3+C.4 누적: 139 + 12 = 151 row</pre>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>C.4 답변 — Validator BR + Phase 1 services 합의</h4>
+
+    <div class="field">
+      <label><strong>Q1. 추천 row 12개 OK?</strong> (atomic 1 + Action 4 + BR 6 + TR 1)
+        <span class="recommend">★ 추천: <strong>OK</strong>. Q3 정책 (코드 가드 enforced) 풀 적용.</span>
+      </label>
+      <textarea class="text" name="c4_q1" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. <code>validate_order</code> Action.kind = workflow</strong> — 5종 short-circuit. delegates_to 5 helper checks (별 Action 미등록).
+        <span class="recommend">★ 추천 OK. C.3 의 helper pattern facets 정책 일관 적용.</span>
+      </label>
+      <textarea class="text" name="c4_q2" rows="2" placeholder="예: OK / 5 별 Action ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. 5 Validator BR 등록 (DG001~DG005)</strong> — 각 BR 의 statement + enforced_by + operational_history 명시.
+        <span class="recommend">★ 추천 OK. P-2018-0098 (DG001) + P-2020-0411 (DG005) operational_history 가 BR 가치 입증. Phase B 의 edging_spec_lookup_strategy / hr_wgt_2d_ceiling_lookup 패턴 동일.</span>
+      </label>
+      <textarea class="text" name="c4_q3" rows="2" placeholder="예: OK / 일부만 등록 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. Customer.findFirstMatch BR retroactive (Phase A 후속)</strong> — <code>rule.scm.std.customer_find_first_match_strategy</code>. PRIORITY ASC + first row + null on empty. EdgingGroup BR (B.4) 와 같은 패턴.
+        <span class="recommend">★ 추천 OK. Agent 2 Phase B 검토에서 지적된 누락 항목. Phase A 47 → 49 row (priority TR 추가 후 +1 BR).</span>
+      </label>
+      <textarea class="text" name="c4_q4" rows="2" placeholder="예: OK / Phase E 보류 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. <code>specific_gravity</code> atomic 승격</strong> — BigDecimal scalar 이지만 강종별 의미 + 다중 Action 사용 (cumulative_productivity, SdInitialSlabWgt 등) → atomic 등록.
+        <span class="recommend">★ 추천 OK. thickness/width (HrMin/Max 의 grid coordinate) 와 다른 종류 — 강종 속성 의미. PRIMARY TR = SpecificGravityProvider.get return.</span>
+      </label>
+      <textarea class="text" name="c4_q5" rows="2" placeholder="예: OK / facet 만 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. <code>resolve_hr_tgt_width</code> Action — confirmedPlantCd[1] 자리매핑</strong> — Phase A confirmed_plant_cd encoding (자리 i ↔ proc[i]) 활용. design-gaps #22 와 연결.
+        <span class="recommend">★ 추천 OK. Action.facets <code>uses_atomic: [confirmed_plant_cd, hr_plant_cd]</code> 명시. Phase E 시뮬 시 자리매핑 검증 가능.</span>
+      </label>
+      <textarea class="text" name="c4_q6" rows="2" placeholder="예: OK / 다른 표현 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7. <code>find_specific_gravity</code> hardcoded mapping 마킹</strong> — design-gaps #34 신규. PlantMappingService (#25) 와 같은 패턴.
+        <span class="recommend">★ 추천 OK. <code>has_hardcoded_mapping: true</code> facet + design-gaps 항목. Phase E 결정 (운영팀 협의 후 데이터 분리).</span>
+      </label>
+      <textarea class="text" name="c4_q7" rows="2" placeholder="예: OK / 다른 처리 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q8. 빠뜨림 / 추가</strong>
+        <span class="recommend">★ 추천: 없음. SdOrderValidator 5종 + Phase 1 services 4 + Customer retroactive 모두 매핑.</span>
+      </label>
+      <textarea class="text" name="c4_q8" rows="2" placeholder="예: 없음 / 또는: ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q9. C.5 (21-step Action body cluster) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. SdSecondWgtHighAction (anchor 8+) 등 ~10-12 Action body + AnchorBinding. 가장 큰 단계 — M2 깊이.</span>
+      </label>
+      <textarea class="text" name="c4_q9" rows="2" placeholder="예: OK / 다른 진행 ___"></textarea>
+    </div>
+
+    <div class="ds-actions">
+      <button class="btn primary" id="c4-build">미리보기</button>
+      <button class="btn" id="c4-copy">📋 답변 복사</button>
+      <span class="copy-hint">「📋 답변 복사」 → 채팅 붙여넣기</span>
+    </div>
+    <div class="preview" id="c4-preview"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- C.4 archive -->
+<!-- ====================================================================== -->
+<section class="step" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 C.4 답변 받음 — Validator BR + Phase 1 services 합의 (12 row)</h2>
+  <div class="meta">
+    <span class="badge b-applied">archive</span>
+    <span>모두 추천대로 (Q4 retroactive 도 OK)</span>
+  </div>
+
+  <h3>답변 그대로</h3>
+  <div class="applied">
+    <div class="label">사용자 답변 (2026-05-10)</div>
+    <ul>
+      <li><strong>Q1</strong> 추천 row 12개: 추천대로</li>
+      <li><strong>Q2</strong> validate_order workflow + helper facets: 추천대로</li>
+      <li><strong>Q3</strong> 5 Validator BR (DG001~005) + operational_history: 추천대로</li>
+      <li><strong>Q4</strong> Customer.findFirstMatch BR retroactive: 추천대로 ★</li>
+      <li><strong>Q5</strong> specific_gravity atomic 승격: 추천대로</li>
+      <li><strong>Q6</strong> resolve_hr_tgt_width 자리매핑: 추천대로</li>
+      <li><strong>Q7</strong> find_specific_gravity hardcoded 마킹 (#34): 추천대로</li>
+      <li><strong>Q8</strong> 빠뜨림: 응답 없음 → 없음 추정</li>
+      <li><strong>Q9</strong> C.5 진입: 추천대로</li>
+    </ul>
+  </div>
+
+  <h3>★ C.4 합의 row (12)</h3>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>요약</th></tr>
+    <tr><td>atomic</td><td><code>term.scm.shared.specific_gravity</code></td><td>비중 (BigDecimal, 강종별)</td></tr>
+    <tr><td>Action (workflow)</td><td><code>action.scm.slab.validate_order</code></td><td>realizes SdOrderValidator.validate. 5종 short-circuit. operational_history (김XX/정XX/박XX)</td></tr>
+    <tr><td>Action (pure)</td><td><code>action.scm.order.classify_product</code></td><td>realizes SdProductClassifier.classify. enum: COIL/FS/OTHER</td></tr>
+    <tr><td>Action (pure)</td><td><code>action.scm.order.resolve_hr_tgt_width</code></td><td>realizes SelectedHrTgtWidthResolver. 자리 1 → hr_tgt_width_1~5 indexing</td></tr>
+    <tr><td>Action (pure)</td><td><code>action.scm.std.find_specific_gravity</code></td><td>realizes SpecificGravityProvider.get. has_hardcoded_mapping</td></tr>
+    <tr><td>BR</td><td><code>rule.scm.order.no_stock_order</code></td><td>DG001 — P-2018-0098 슬랩 중복 사고 history</td></tr>
+    <tr><td>BR</td><td><code>rule.scm.order.order_size_positive</code></td><td>DG002 — 폭/길이 양수</td></tr>
+    <tr><td>BR</td><td><code>rule.scm.order.pkg_wgt_range_integrity</code></td><td>DG003 — 포장단중 range integrity</td></tr>
+    <tr><td>BR</td><td><code>rule.scm.order.design_pend_qty_cross_check</code></td><td>DG004 — cross-check (정XX 2018-12-04 추가)</td></tr>
+    <tr><td>BR</td><td><code>rule.scm.order.work_due_strict_future</code></td><td>DG005 — P-2020-0411 당일 마감 history</td></tr>
+    <tr><td>BR ★</td><td><code>rule.scm.std.customer_find_first_match_strategy</code></td><td>Phase A retroactive. Agent 2 누락 지적</td></tr>
+    <tr><td>TR</td><td>specific_gravity PRIMARY (SpecificGravityProvider.get)</td><td>—</td></tr>
+  </table>
+
+  <h3>★ design-gaps 추가 (1)</h3>
+  <ul>
+    <li><strong>#34</strong> — SpecificGravityProvider hardcoded 강종→비중 매핑. PlantMappingService (#25) 와 같은 패턴.</li>
+  </ul>
+
+  <p class="small">★ Phase A+B+C.1+C.2+C.3+C.4 누적: <strong>151 row</strong>. Phase A+B BR 4 + Phase C BR 8 = <strong>BR 12 누적</strong>. 다음 → C.5 21-step Action body cluster.</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<!-- C.5 — 21-step Action body cluster -->
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>C.5 — 21-step Action body cluster (15 Action + 핵심 BR 3 + AnchorBinding 마킹)</h2>
+  <div class="meta">
+    <span class="badge b-discuss">진행 중</span>
+    <span>Phase C 5단계 · M2 깊이 · ★ Phase C 가장 큰 단계</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>① 코드 분석 — 21-step Action 흐름</h3>
+  <div class="archive-quote">
+    <div class="label">SdDesigner imports + 11 Action class 샘플 read</div>
+    <p><strong>15 Action class</strong> = SdDesigner 가 호출하는 21-step body 구현체. 모두 <code>execute(order, slab)</code> 시그니처. AlgorithmException 던짐.</p>
+    <ul>
+      <li><strong>Phase 2 one-shot 1~7</strong>: Thickness / WidthRange / LengthRange / FirstWeight / SecondWgtLow / SecondWgtHigh / MaxSplitCount</li>
+      <li><strong>A-a 루프 8~15</strong>: SplitRange / SlabCount / InitialSlabWgt / SlabWgtRecalc</li>
+      <li><strong>Phase 2 final 16~19</strong>: FinalWidthRange / FinalLengthRange / TargetWidth / TargetLength</li>
+    </ul>
+    <p><strong>★ Action body 의 공통 패턴</strong>:</p>
+    <ul>
+      <li>Phase B Action 호출 (lookup_cast_constraint / lookup_hr_constraint / lookup_hr_min/max_wgt / lookup_edging_spec / find_edging_group)</li>
+      <li>Phase A Action 호출 (cumulative_productivity / lookup_productivity)</li>
+      <li>C.4 Action 호출 (find_specific_gravity / customer_find_first_match)</li>
+      <li>literal magic number / formula (BigDecimal arithmetic)</li>
+      <li>branch guards (NULL check, char==' ' 비활성, range integrity)</li>
+      <li>throw AlgorithmException (DG101~109 등 에러코드)</li>
+    </ul>
+    <p><strong>★ SdSecondWgtHighAction 분석 (anchor 8+ density)</strong>: ABSOLUTE_MAX_KG (literal) + 4-way min cascade + custStd null/nonpositive branch + commented-out legacy fallback (drama DNA) + operational_history (3 author signatures).</p>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>② 추천 — bulk Action 등록 + 핵심 BR + AnchorBinding 마킹 전략</h3>
+  <p class="small">15 Action body 를 모두 deep-dive 하면 ~50+ row + 100+ anchor → 시간 폭증. <strong>전략</strong>: bulk 등록 (Action + delegates_to + 핵심 facets) + 핵심 BR 3 (명백한 가드) + AnchorBinding cluster 는 Phase E 보강 마킹.</p>
+
+  <h4>(A) 신규 Action 15개 (bulk)</h4>
+  <table>
+    <tr><th>step</th><th>fqn</th><th>kind</th><th>realizes</th><th>delegates_to (간략)</th></tr>
+    <tr><td>1</td><td><code>action.scm.slab.calc_thickness</code></td><td>pure_function</td><td>SdThicknessAction.execute</td><td>map_sm_to_cast_machine + lookup_cast_constraint</td></tr>
+    <tr><td>2</td><td><code>action.scm.slab.calc_first_width_range</code></td><td>pure_function</td><td>SdWidthRangeAction.execute</td><td>lookup_hr_constraint + edging 적용</td></tr>
+    <tr><td>3</td><td><code>action.scm.slab.calc_first_length_range</code></td><td>pure_function</td><td>SdLengthRangeAction.execute</td><td>lookup_hr_constraint</td></tr>
+    <tr><td>4</td><td><code>action.scm.slab.calc_first_wgt</code></td><td>pure_function</td><td>SdFirstWeightAction.execute</td><td>find_specific_gravity. forward arithmetic (thickness × width × length × gravity)</td></tr>
+    <tr><td>5</td><td><code>action.scm.slab.calc_second_wgt_low</code></td><td>pure_function</td><td>SdSecondWgtLowAction.execute</td><td>lookup_hr_min_wgt + customer_find_first_match</td></tr>
+    <tr style="background:rgba(56,189,248,0.05)">
+      <td>6 ★</td>
+      <td><code>action.scm.slab.calc_second_wgt_high</code></td>
+      <td>pure_function</td>
+      <td>SdSecondWgtHighAction.execute</td>
+      <td>
+        lookup_hr_max_wgt + customer_find_first_match + cumulative_productivity. 4-way min cascade. ABSOLUTE_MAX_KG safety cap.
+        operational_history: 김XX 2018-04-12 / 박XX 2020-09-07 실수율 / 이XX 2019-11-22 폭 기준 변경 / 박XX 2021-03-08 우선순위 매칭
+      </td>
+    </tr>
+    <tr><td>7</td><td><code>action.scm.slab.calc_max_split_count</code></td><td>pure_function</td><td>SdMaxSplitCountAction.execute</td><td>ceiling division (firstWgt high / secondWgt high)</td></tr>
+    <tr><td>8</td><td><code>action.scm.slab.calc_split_range</code></td><td>pure_function (loop body)</td><td>SdSplitRangeAction.execute</td><td>currentSplitCount → split_wgt_low/high. throw ALG_ITERATION_NEEDED on miss</td></tr>
+    <tr><td>9</td><td><code>action.scm.slab.calc_slab_count</code></td><td>pure_function (loop body)</td><td>SdSlabCountAction.execute</td><td>매수 산정. throw ALG_ITERATION_NEEDED on invalid</td></tr>
+    <tr><td>10</td><td><code>action.scm.slab.calc_initial_slab_wgt</code></td><td>pure_function (loop body)</td><td>SdInitialSlabWgtAction.execute</td><td>step 10 first attempt. find_specific_gravity 활용. success → 루프 종료</td></tr>
+    <tr><td>13</td><td><code>action.scm.slab.recalc_slab_wgt</code></td><td>pure_function (loop body)</td><td>SdSlabWgtRecalcAction.execute</td><td>step 10 fallback. 다른 공식 적용. success → 루프 종료</td></tr>
+    <tr><td>16</td><td><code>action.scm.slab.calc_final_width_range</code></td><td>pure_function</td><td>SdFinalWidthRangeAction.execute</td><td>find_edging_group + lookup_edging_spec + lookup_hr_constraint 조합</td></tr>
+    <tr><td>17</td><td><code>action.scm.slab.calc_final_length_range</code></td><td>pure_function</td><td>SdFinalLengthRangeAction.execute</td><td>lookup_hr_constraint + slab_wgt_in_progress</td></tr>
+    <tr><td>18</td><td><code>action.scm.slab.calc_target_width</code></td><td>pure_function</td><td>SdTargetWidthAction.execute</td><td>final_width_range 중 목표 선택</td></tr>
+    <tr><td>19</td><td><code>action.scm.slab.calc_target_length</code></td><td>pure_function</td><td>SdTargetLengthAction.execute</td><td>final_length_range 중 목표 선택</td></tr>
+  </table>
+  <p class="small">★ <code>scm.slab</code> sub-domain. 모든 Action 의 params 는 (order, slab) 동일. return type 은 void (mutates slab) — 작업용 composite (first_range, second_wgt, split_state, final_range, target) 의 facet 값 set.</p>
+
+  <h4>(B) 핵심 BR 3개 ★ Q3 정책 (명백한 가드)</h4>
+  <table>
+    <tr><th>fqn</th><th>statement</th><th>enforced_by</th><th>operational_history</th></tr>
+    <tr style="background:rgba(167,139,250,0.05)">
+      <td><code>rule.scm.slab.absolute_max_kg_safety_cap</code></td>
+      <td>모든 슬랩 단중 ≤ 999,999.999 kg (ABSOLUTE_MAX_KG). 운영 안전 장치 — 어떤 계산 결과도 이 값 초과 시 강제 cap.</td>
+      <td>SdSecondWgtHighAction.execute 의 분기: <code>if (min.compareTo(ABSOLUTE_MAX_KG) > 0) min = ABSOLUTE_MAX_KG</code></td>
+      <td>2017년 회의 결정 (운영 안전)</td>
+    </tr>
+    <tr>
+      <td><code>rule.scm.slab.sm_plant_active_required</code></td>
+      <td>SdThicknessAction (step 1) 진입 시 confirmedPlantCd[0] (제강 위치) 가 ' ' 비활성 X. ' ' 일 시 DG101 throw.</td>
+      <td>SdThicknessAction.execute 의 분기: <code>if (smChar == ' ') throw fail("제강 공장 비활성")</code></td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><code>rule.scm.slab.confirmed_plant_cd_format</code></td>
+      <td>confirmedPlantCd 는 NULL/empty/length&lt;8 X. 형식 위반 시 DG101 (Thickness) / DG005 (Validator) throw.</td>
+      <td>SdThicknessAction.execute branch + SdOrderValidator.checkWorkDue branch</td>
+      <td>—</td>
+    </tr>
+  </table>
+  <p class="small">★ 다른 BR 후보 (HrSpec/CastSpec/HrMin/Max/EdgingSpec 미존재 가드 등) 는 Phase B 의 lookup BR 들 (Q3) 과 design-gaps #23 (NPE) 로 이미 cover. 추가 BR 등록 X.</p>
+
+  <h4>(C) AnchorBinding cluster — Phase E 보강 마킹</h4>
+  <p class="small">15 Action body 의 anchor 분포 추정 (Phase E 보강):</p>
+  <table>
+    <tr><th>Action</th><th>anchor 추정</th><th>유형</th></tr>
+    <tr><td>SdSecondWgtHighAction ★</td><td>~10</td><td>literal (ABSOLUTE_MAX_KG, MathContext.DECIMAL64) + 4-way min cascade (local) + custStd null/nonpositive branch + commented-out legacy (drama DNA)</td></tr>
+    <tr><td>SdThicknessAction</td><td>~5</td><td>charAt(0) literal + 비활성 가드 branch + NULL guards</td></tr>
+    <tr><td>SdWidthRangeAction</td><td>~5</td><td>charAt(1) literal + edging 적용 branch + width range branch</td></tr>
+    <tr><td>SdInitialSlabWgtAction / SlabWgtRecalcAction</td><td>~6 each</td><td>loop body + ALG_ITERATION_NEEDED throw + 공식 literal</td></tr>
+    <tr><td>나머지 (Final/Target/MaxSplit/SplitRange/SlabCount/FirstWgt/SecondWgtLow/Length)</td><td>~3-5 each</td><td>대부분 forward calc + 1-2 guard</td></tr>
+    <tr><td><strong>총 추정</strong></td><td><strong>~70-100 anchor</strong></td><td>Phase E 보강 (design-gaps #17 invalidation 폭발 위험)</td></tr>
+  </table>
+
+  <h4>(D) design-gaps 신규 1개</h4>
+  <ul>
+    <li><strong>#35</strong> — SdSecondWgtHighAction.java:53-55 의 commented-out legacy fallback (<code>// 2018-06-12 김XX 긴급패치: 두께 NULL 인 강종 별도 처리 → 추후 정합성 점검에서 차단되어 제거</code>). drama DNA — author 시그니처 + 날짜 + 제거 사유. ontology 가 commented 코드 패턴 표현 한계.</li>
+  </ul>
+
+  <h4>(E) atomic / composite / TR 0개</h4>
+  <p class="small">21-step Action 은 기존 atomic / composite 활용. 신규 atomic 없음 (Q3 B.5 정책 — scalar dimension 은 facet).</p>
+
+  <!-- ====================================================================== -->
+  <h3>③ 누적 row (C.5 종료 시 예상)</h3>
+  <pre>+ 0 atomic / composite
++ 15 Action      : 21-step body 15 (step 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 16, 17, 18, 19)
++ 3 BR           : ABSOLUTE_MAX_KG safety + sm_plant_active + confirmed_plant_cd_format
++ 0 TR
++ 1 design-gaps  : #35 commented-out legacy fallback (drama DNA)
++ AnchorBinding ~70-100 (마킹만 — Phase E 보강)
+─────────────────────────────────
+C.5 추가: 19 row (Action 15 + BR 3 + design-gaps 1)
+Phase A+B+C.1+C.2+C.3+C.4+C.5 누적: 151 + 19 = 170 row</pre>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>C.5 답변 — 21-step Action body cluster 합의</h4>
+
+    <div class="field">
+      <label><strong>Q1. 추천 row 19개 OK?</strong> (Action 15 + BR 3 + design-gaps 1)
+        <span class="recommend">★ 추천: <strong>OK</strong>. bulk Action 등록 + 핵심 BR + AnchorBinding 마킹 전략.</span>
+      </label>
+      <textarea class="text" name="c5_q1" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. bulk Action 15 등록 vs deep-dive</strong> — 모든 Action 1:1 매핑 (delegates_to + 간략 facets). deep-dive 는 SdSecondWgtHighAction 의 anchor 분포만 표현.
+        <span class="recommend">★ 추천 OK. 풀 deep-dive 시 row ~50+ + anchor 100+ 폭증. 시간 trade-off 으로 bulk + 핵심 BR 만.</span>
+      </label>
+      <textarea class="text" name="c5_q2" rows="2" placeholder="예: OK / deep-dive 일부 추가 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. AnchorBinding cluster Phase E 보강 마킹</strong> — 15 Action body 의 ~70-100 anchor 후보를 Phase E 에서 일괄 처리.
+        <span class="recommend">★ 추천 OK. design-gaps #17 (invalidation 폭발) 와 같은 운영 risk. C.5 에서 마킹만, Phase E 에서 결정 + bulk 등록.</span>
+      </label>
+      <textarea class="text" name="c5_q3" rows="2" placeholder="예: OK / 일부 지금 등록 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. 핵심 BR 3 등록 (ABSOLUTE_MAX_KG / sm_plant_active / confirmed_plant_cd_format)</strong>
+        <span class="recommend">★ 추천 OK. 다른 BR 후보 (HrSpec/CastSpec/Min/Max 미존재 가드) 는 Phase B lookup BR + design-gaps #23 으로 이미 cover.</span>
+      </label>
+      <textarea class="text" name="c5_q4" rows="2" placeholder="예: OK / BR 더 추가 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. <code>rule.scm.slab.absolute_max_kg_safety_cap</code> ABSOLUTE_MAX_KG (999,999.999 kg)</strong> — 2017년 운영 회의 결정 history.
+        <span class="recommend">★ 추천 OK. 운영 안전 장치 BR 표현. ChangeSpec "ABSOLUTE_MAX 변경" 시뮬 시 핵심.</span>
+      </label>
+      <textarea class="text" name="c5_q5" rows="2" placeholder="예: OK / 다른 표현 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. design-gaps #35 (commented-out legacy fallback) 등록</strong>
+        <span class="recommend">★ 추천 OK. CLAUDE.md drama DNA 핵심 항목. ontology 가 commented 코드 패턴 표현 한계 (현재 모델 한계).</span>
+      </label>
+      <textarea class="text" name="c5_q6" rows="2" placeholder="예: OK / 등록 X ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7. SdConstraintCheckAction / SdSlabSizeCalcAction / SdObjectiveAction / SdOrderExtractor</strong> 4 helper class 처리 — bulk 에 포함 안 함. SdDesigner.design 에서 직접 호출 안 됨 (helper 추정).
+        <span class="recommend">★ 추천: 등록 X (SdDesigner 호출 그래프에서 안 보임). 필요 시 Phase E 에서 추가 매핑.</span>
+      </label>
+      <textarea class="text" name="c5_q7" rows="2" placeholder="예: OK 등록 X / 일부 등록 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q8. 빠뜨림 / 추가</strong>
+        <span class="recommend">★ 추천: 없음. SdDesigner 가 호출하는 15 Action 모두 매핑.</span>
+      </label>
+      <textarea class="text" name="c5_q8" rows="2" placeholder="예: 없음 / 또는: ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q9. C.6 (SdSlabSaveAction + 원본=조정 BR + REQUIRES_NEW BR) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. C.2 의 partial BR <code>original_equals_adjusted</code> 를 enforced_by SdSlabSaveAction setter call 로 보강 + REQUIRES_NEW BR (P-2019-0445).</span>
+      </label>
+      <textarea class="text" name="c5_q9" rows="2" placeholder="예: OK / 다른 진행 ___"></textarea>
+    </div>
+
+    <div class="ds-actions">
+      <button class="btn primary" id="c5-build">미리보기</button>
+      <button class="btn" id="c5-copy">📋 답변 복사</button>
+      <span class="copy-hint">「📋 답변 복사」 → 채팅 붙여넣기</span>
+    </div>
+    <div class="preview" id="c5-preview"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- C.5 archive -->
+<!-- ====================================================================== -->
+<section class="step" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 C.5 답변 받음 — 21-step Action body cluster 합의 (19 row)</h2>
+  <div class="meta">
+    <span class="badge b-applied">archive</span>
+    <span>모두 추천대로</span>
+  </div>
+
+  <h3>답변 그대로</h3>
+  <div class="applied">
+    <div class="label">사용자 답변 (2026-05-10)</div>
+    <ul>
+      <li><strong>Q1</strong> 추천 row 19개: 추천대로</li>
+      <li><strong>Q2</strong> bulk Action 15 + deep-dive 전략: 추천대로</li>
+      <li><strong>Q3</strong> AnchorBinding Phase E 보강 마킹: 추천대로</li>
+      <li><strong>Q4</strong> 핵심 BR 3 등록: 추천대로</li>
+      <li><strong>Q5</strong> ABSOLUTE_MAX_KG safety BR: 추천대로</li>
+      <li><strong>Q6</strong> design-gaps #35 (commented-out legacy): 추천대로</li>
+      <li><strong>Q7</strong> helper class 4 등록 X: 추천대로</li>
+      <li><strong>Q8</strong> 빠뜨림: 응답 없음 → 없음 추정</li>
+      <li><strong>Q9</strong> C.6 진입: 추천대로</li>
+    </ul>
+  </div>
+
+  <h3>★ C.5 합의 row (19)</h3>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>요약</th></tr>
+    <tr><td>Action × 15</td><td><code>action.scm.slab.calc_*</code></td><td>21-step body 1, 2, 3, 4, 5, 6 ★, 7, 8, 9, 10, 13, 16, 17, 18, 19. bulk 등록</td></tr>
+    <tr><td>BR ★</td><td><code>rule.scm.slab.absolute_max_kg_safety_cap</code></td><td>999,999.999 kg cap. 2017 회의 history</td></tr>
+    <tr><td>BR</td><td><code>rule.scm.slab.sm_plant_active_required</code></td><td>DG101 charAt(0)==' ' 비활성 가드</td></tr>
+    <tr><td>BR</td><td><code>rule.scm.slab.confirmed_plant_cd_format</code></td><td>NULL/length<8 형식 가드</td></tr>
+  </table>
+
+  <h3>★ design-gaps 추가 (1)</h3>
+  <ul>
+    <li><strong>#35</strong> — SdSecondWgtHighAction commented-out legacy fallback (drama DNA). ontology 표현 한계.</li>
+  </ul>
+
+  <h3>★ AnchorBinding cluster 마킹 (Phase E 보강)</h3>
+  <p class="small">15 Action body 의 ~70-100 anchor 후보 — Phase E 일괄 처리. design-gaps #17 (invalidation 폭발) 와 같은 운영 risk 영역.</p>
+
+  <p class="small">★ Phase A+B+C.1~C.5 누적: <strong>170 row</strong>. 다음 → C.6 SaveAction + 원본=조정 BR 보강.</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<!-- C.6 — SdSlabSaveAction + 원본=조정 BR + REQUIRES_NEW history -->
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<section class="step">
+  <h2>C.6 — SdSlabSaveAction + 원본=조정 BR enforced_by + history Action</h2>
+  <div class="meta">
+    <span class="badge b-discuss">진행 중</span>
+    <span>Phase C 6단계 · Q5 결정 (BR 복합) 완성 + history Action</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>① 코드 분석 — SdSlabSaveAction 흐름</h3>
+  <div class="archive-quote">
+    <div class="label">SdSlabSaveAction.java + SDSlabLogic.toJpo + SdHistoryAction.java</div>
+    <ul>
+      <li><strong>execute</strong>: <code>@Transactional</code> default propagation. <code>applyAlgorithmResultsToFinalFields</code> 호출 → 매수 (slabCountInProgress) row 만큼 SLAB_RESULT 저장.</li>
+      <li><strong>매수 row 복제 패턴</strong>: 1번째 row = SDSlab.slabNo (Designer 가 createInitialSlab 시 pre-generate). 2~N번째 = <code>SlabNoSequence.next()</code> 추가 발급. 모든 row 동일 도메인값 + 다른 SLAB_NO.</li>
+      <li><strong>★ applyAlgorithmResultsToFinalFields</strong>: 9 invariant pair × 2 setter = 18 setter call (원본 + 조정 동시 set, 동일 값) + splitCount 1 setter = <strong>총 19 setter call</strong>. <em>(이전 C.2 의 "28 setter" 표현은 정정 — 실제 19. SlabResult 비-PK 24 컬럼 중 18 이 invariant pair 적용, 6 은 일반 setter)</em></li>
+      <li><strong>SDSlabLogic.toJpo</strong>: in-memory SDSlabEntity → SlabResultJpo 변환. SDOrderLogic.toEntity reflection 패턴과 유사 (drama DNA).</li>
+      <li><strong>SdHistoryAction</strong>: 3 메서드 (recordValidationFailure / recordStep / recordAlgorithmFailure). 각각 <code>@Transactional</code> (default propagation).</li>
+      <li><strong>★ 운영 이슈 P-2019-0445</strong> (2019-06-08): history 적재 실패 → main tx rollback → 슬랩 미생성. 해결 = history 자체 @Transactional 분리 (이XX 패치). <strong>그러나 javadoc 은 REQUIRES_NEW 라 명시되어 있지만 실제 코드는 default REQUIRED — drama DNA, design-gaps 후보</strong>.</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>② 추천 ontology row (Q5 결정 완성 + history Action)</h3>
+
+  <h4>(A) 신규 Action 6개</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>kind</th><th>realizes</th><th>핵심 facets</th></tr>
+    <tr style="background:rgba(56,189,248,0.05)">
+      <td><code>action.scm.slab.save_slab_result</code></td>
+      <td>SLAB_RESULT 저장 (매수 row 복제)</td>
+      <td>workflow</td>
+      <td><code>SdSlabSaveAction.execute</code></td>
+      <td>
+        <code>params: order, slab</code> · <code>return: List&lt;String&gt; savedSlabNos (count 개)</code> ·
+        <code>side_effects: ["repository.save × count", "SlabNoSequence.next × (count-1)"]</code> ·
+        <code>iteration_pattern: "for i = 0 to count-1"</code> ·
+        <code>row_replication: "1st=slab.slabNo, 2nd~nth=SlabNoSequence.next()"</code> ·
+        <code>delegates_to: [apply_algorithm_results_to_final_fields, slab_to_jpo, repository.save, slabNoSequence.next]</code> ·
+        <code>transaction: "@Transactional default REQUIRED"</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>action.scm.slab.apply_algorithm_results_to_final_fields</code></td>
+      <td>알고리즘 결과 → SLAB_RESULT 컬럼 매핑</td>
+      <td>pure_function</td>
+      <td><code>SdSlabSaveAction.applyAlgorithmResultsToFinalFields (private)</code></td>
+      <td>
+        <code>params: slab</code> · <code>return: void (mutates slab)</code> ·
+        <code>setter_calls: 19</code> · <code>invariant_pair_calls: 9 pairs × 2 = 18</code> ·
+        <code>maps: target → result (target_slab_width → slabWidth + slabWidth1, ...)</code> ·
+        <code>★ enforces: rule.scm.slab.original_equals_adjusted</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>action.scm.slab.slab_to_jpo</code></td>
+      <td>SDSlabEntity → SlabResultJpo 변환</td>
+      <td>workflow</td>
+      <td><code>SDSlabLogic.toJpo</code></td>
+      <td>
+        <code>conversion: "in-memory entity → JPA Jpo"</code> ·
+        <code>related_pattern: "SDOrderLogic.toEntity (reflection)"</code> · <code>uses_reflection: "TBD (likely yes per drama DNA)"</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>action.scm.history.record_validation_failure</code></td>
+      <td>정합성 점검 실패 이력</td>
+      <td>workflow</td>
+      <td><code>SdHistoryAction.recordValidationFailure</code></td>
+      <td>
+        <code>params: order, validationResult</code> · <code>side_effects: ["SLAB_DESIGN_HIST 적재"]</code> ·
+        <code>step_no: 0</code> · <code>slab_no: null</code> · <code>transaction: "@Transactional default REQUIRED"</code>
+      </td>
+    </tr>
+    <tr>
+      <td><code>action.scm.history.record_step</code></td>
+      <td>알고리즘 단계 실행 이력</td>
+      <td>workflow</td>
+      <td><code>SdHistoryAction.recordStep</code></td>
+      <td><code>params: order, slabNo, stepNo, stepName, snapshotJson</code> · <code>side_effects: ["SLAB_DESIGN_HIST 적재"]</code></td>
+    </tr>
+    <tr>
+      <td><code>action.scm.history.record_algorithm_failure</code></td>
+      <td>알고리즘 실패 이력</td>
+      <td>workflow</td>
+      <td><code>SdHistoryAction.recordAlgorithmFailure</code></td>
+      <td><code>params: order, stepNo, stepName, errorCode, snapshot</code> · <code>side_effects: ["SLAB_DESIGN_HIST 적재"]</code></td>
+    </tr>
+  </table>
+
+  <h4>(B) BusinessRule 보강 + 신규 (3)</h4>
+  <table>
+    <tr><th>fqn</th><th>유형</th><th>statement</th><th>enforced_by</th></tr>
+    <tr style="background:rgba(245,158,11,0.05)">
+      <td><code>rule.scm.slab.original_equals_adjusted</code> ★</td>
+      <td>C.2 partial → <strong>FULL 보강</strong></td>
+      <td>SLAB_RESULT 9 invariant pair (slabWidth↔slabWidth1, slabWidthHigh↔slabWidthHigh1, ..., slabWgtLow↔slabWgtLow1) 은 SdSlabSaveAction 시 동일 값 set. 사이즈 조정 시에만 _1 변경.</td>
+      <td>
+        <code>SdSlabSaveAction.applyAlgorithmResultsToFinalFields</code> 의 9 setter pair anchor:<br>
+        <code>setSlabWidth + setSlabWidth1</code> (target) · <code>setSlabWidthHigh + 1</code> · <code>setSlabWidthLow + 1</code> ·<br>
+        <code>setSlabLength + 1</code> · <code>setSlabLengthHigh + 1</code> · <code>setSlabLengthLow + 1</code> ·<br>
+        <code>setSlabWgt + 1</code> · <code>setSlabWgtHigh + 1</code> · <code>setSlabWgtLow + 1</code>
+      </td>
+    </tr>
+    <tr style="background:rgba(167,139,250,0.05)">
+      <td><code>rule.scm.slab.history_isolated_transaction</code></td>
+      <td>BR 신규</td>
+      <td>history 적재 (SLAB_DESIGN_HIST) 는 main 알고리즘 transaction 과 독립. 적재 실패 시 main rollback X — slab 생성 보존.</td>
+      <td>
+        <code>SdHistoryAction.{recordValidationFailure, recordStep, recordAlgorithmFailure}</code> 모두 <code>@Transactional</code> 메서드 (별 클래스 분리). operational_history: P-2019-0445 (2019-06-08, 이XX).
+      </td>
+    </tr>
+    <tr>
+      <td><code>rule.scm.slab.slab_no_sequence_per_count</code></td>
+      <td>BR 신규</td>
+      <td>매수 row 복제 시 1번째 row = slab.slabNo (createInitialSlab pre-generate), 2~N번째 = SlabNoSequence.next() 추가 발급. 모든 row 동일 도메인값 + 다른 SLAB_NO.</td>
+      <td>
+        <code>SdSlabSaveAction.execute</code> 의 loop body: <code>String slabNo = (i == 0) ? slab.getSlabNo() : slabNoSequence.next();</code>
+      </td>
+    </tr>
+  </table>
+
+  <h4>(C) Q5 결정 완성 — composite facets <code>invariant_pairs</code> ↔ BR enforced_by 연결</h4>
+  <p class="small">C.2 의 <code>slab_result.facets.invariant_pairs</code> (9 쌍 list) 가 이제 BR <code>original_equals_adjusted.enforced_by</code> 의 9 anchor 와 1:1 대응. composite ↔ BR ↔ Action ↔ AnchorBinding 4-way 연결 완성.</p>
+
+  <h4>(D) design-gaps 신규 1개</h4>
+  <ul>
+    <li><strong>#36</strong> — SdDesigner.javadoc 의 <code>REQUIRES_NEW</code> 언급 vs 실제 SdHistoryAction 의 <code>@Transactional default REQUIRED</code> 갭. drama DNA — javadoc 가 fix 의도 over-statement, 실제 patch 은 별 클래스 분리만. ChangeSpec "REQUIRES_NEW 도입 시뮬" 대상.</li>
+  </ul>
+
+  <h4>(E) atomic / composite / TR 0개</h4>
+
+  <!-- ====================================================================== -->
+  <h3>③ 누적 row (C.6 종료 시 예상)</h3>
+  <pre>+ 0 atomic / composite
++ 6 Action       : save_slab_result + apply_algorithm_results + slab_to_jpo + 3 history Action
++ 2 BR new       : history_isolated_transaction (P-2019-0445) + slab_no_sequence_per_count
++ 1 BR full      : rule.scm.slab.original_equals_adjusted (C.2 partial → FULL, status change only — row count 변동 X)
++ 0 TR
++ 1 design-gaps  : #36 javadoc REQUIRES_NEW vs 실제 default REQUIRED 갭
+─────────────────────────────────
+C.6 추가: 9 row (Action 6 + BR 2 신규 + BR 1 status change + design-gaps 1)
+실제 추가 row 수 = 8 (Action 6 + BR 2 + design-gaps 1, BR full 은 row 변동 X)
+Phase A+B+C.1~C.6 누적: 170 + 8 = 178 row</pre>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>C.6 답변 — SdSlabSaveAction + 원본=조정 BR 합의</h4>
+
+    <div class="field">
+      <label><strong>Q1. 추천 row 8개 OK?</strong> (Action 6 + BR 신규 2 + design-gaps 1, BR original_equals_adjusted 는 status change FULL)
+        <span class="recommend">★ 추천: <strong>OK</strong>. C.2 partial BR → FULL 보강. composite ↔ BR ↔ Action ↔ AnchorBinding 4-way 완성.</span>
+      </label>
+      <textarea class="text" name="c6_q1" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. <code>save_slab_result</code> Action.kind = workflow</strong> — 매수 row 복제 + DB save loop. side_effects + iteration_pattern facets.
+        <span class="recommend">★ 추천 OK. Q4 결정 (workflow Action.kind) 일관 적용.</span>
+      </label>
+      <textarea class="text" name="c6_q2" rows="2" placeholder="예: OK / pure_function ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. <code>apply_algorithm_results_to_final_fields</code> private 메서드 별 Action 등록</strong> — 19 setter call 의 핵심. ★ enforces facet 으로 BR original_equals_adjusted 연결.
+        <span class="recommend">★ 추천 OK. private 메서드이지만 ontology 의 가치 (BR enforce 위치 명시) 가 큼. 별 Action 으로.</span>
+      </label>
+      <textarea class="text" name="c6_q3" rows="2" placeholder="예: OK / facet 만 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. <code>slab_to_jpo</code> Action 등록</strong> — SDSlabLogic.toJpo. SDOrderLogic.toEntity (C.1 flatten Action) 와 같은 패턴.
+        <span class="recommend">★ 추천 OK. C.1 일관성. uses_reflection facet 은 코드 read 후 확정 (likely yes).</span>
+      </label>
+      <textarea class="text" name="c6_q4" rows="2" placeholder="예: OK / 등록 X ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. history Action 3 등록</strong> — record_validation_failure / record_step / record_algorithm_failure. 모두 workflow + SLAB_DESIGN_HIST 적재 side_effect.
+        <span class="recommend">★ 추천 OK. SdDesigner orchestration 의 21 step + Phase 1 fail 모두 history 매핑.</span>
+      </label>
+      <textarea class="text" name="c6_q5" rows="2" placeholder="예: OK / 통합 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. BR <code>original_equals_adjusted</code> FULL 보강</strong> — C.2 partial → FULL. enforced_by 9 anchor (9 setter pair). composite facets ↔ BR enforced_by ↔ AnchorBinding 4-way 연결.
+        <span class="recommend">★ 추천 OK. Q5 결정 (BR + composite facets 복합) 완성.</span>
+      </label>
+      <textarea class="text" name="c6_q6" rows="2" placeholder="예: OK / 다른 표현 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7. BR <code>history_isolated_transaction</code> 등록</strong> — P-2019-0445 history. javadoc REQUIRES_NEW vs 실제 default REQUIRED 갭은 design-gaps #36 으로.
+        <span class="recommend">★ 추천 OK. operational_history (이XX 2019-06-08) + design-gaps 갭 둘 다 표현.</span>
+      </label>
+      <textarea class="text" name="c6_q7" rows="2" placeholder="예: OK / 단순화 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q8. BR <code>slab_no_sequence_per_count</code> 등록</strong> — 매수 row 복제 패턴. 1st = pre-generate, 2~Nth = SlabNoSequence.next.
+        <span class="recommend">★ 추천 OK. side_effects + iteration pattern 의 핵심 BR.</span>
+      </label>
+      <textarea class="text" name="c6_q8" rows="2" placeholder="예: OK / facet 만 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q9. design-gaps #36 (javadoc REQUIRES_NEW vs 실제 default REQUIRED)</strong>
+        <span class="recommend">★ 추천 OK. drama DNA — javadoc over-statement. ChangeSpec "REQUIRES_NEW 도입" 시뮬 대상.</span>
+      </label>
+      <textarea class="text" name="c6_q9" rows="2" placeholder="예: OK / 등록 X ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q10. SlabResult facet 컬럼 카운트 정정 인지</strong> — C.2 의 "SlabResult 28 컬럼" 표현 → 실제 27 (PK 3 + non-PK 24). invariant pair 9 × 2 = 18 setter + 1 splitCount = 19 setter call. 카운트 정정 OK?
+        <span class="recommend">★ 추천 OK. C.2 archive 의 표현은 그대로 두되 (이미 합의됨), 정확 수치는 C.6 archive 에서 명시.</span>
+      </label>
+      <textarea class="text" name="c6_q10" rows="2" placeholder="예: OK / C.2 archive 도 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q11. 빠뜨림 / 추가</strong>
+        <span class="recommend">★ 추천: 없음. SaveAction 매수 복제 + apply 19 setter + 3 history + Logic toJpo 모두 매핑.</span>
+      </label>
+      <textarea class="text" name="c6_q11" rows="2" placeholder="예: 없음 / 또는: ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q12. C.7 (Phase C 종결 archive + 2 서브에이전트 검토 + Phase D 진입 준비) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. Phase C 누적 row 정리 + 2 fresh-context 서브에이전트 검토 (Phase A+B+C 통합 일관성 + Phase D API 설계 진입 준비) + HANDOFF 갱신.</span>
+      </label>
+      <textarea class="text" name="c6_q12" rows="2" placeholder="예: OK / 다른 진행 ___"></textarea>
+    </div>
+
+    <div class="ds-actions">
+      <button class="btn primary" id="c6-build">미리보기</button>
+      <button class="btn" id="c6-copy">📋 답변 복사</button>
+      <span class="copy-hint">「📋 답변 복사」 → 채팅 붙여넣기</span>
+    </div>
+    <div class="preview" id="c6-preview"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- C.6 archive -->
+<!-- ====================================================================== -->
+<section class="step" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 C.6 답변 받음 — SaveAction + 원본=조정 BR 합의 (8 row)</h2>
+  <div class="meta">
+    <span class="badge b-applied">archive</span>
+    <span>모두 추천대로 (Q10 카운트 정정 포함)</span>
+  </div>
+
+  <h3>답변 그대로</h3>
+  <div class="applied">
+    <div class="label">사용자 답변 (2026-05-10)</div>
+    <ul>
+      <li><strong>Q1</strong> 추천 row 8개: 추천대로</li>
+      <li><strong>Q2</strong> save_slab_result workflow: 추천대로</li>
+      <li><strong>Q3</strong> apply_algorithm_results private 별 Action 등록: 추천대로</li>
+      <li><strong>Q4</strong> slab_to_jpo Action: 추천대로</li>
+      <li><strong>Q5</strong> history Action 3 등록: 추천대로</li>
+      <li><strong>Q6</strong> BR original_equals_adjusted FULL 보강 (C.2 partial → FULL): 추천대로 ★</li>
+      <li><strong>Q7</strong> BR history_isolated_transaction (P-2019-0445): 추천대로</li>
+      <li><strong>Q8</strong> BR slab_no_sequence_per_count: 추천대로</li>
+      <li><strong>Q9</strong> design-gaps #36 (javadoc REQUIRES_NEW vs 실제 default REQUIRED): 추천대로</li>
+      <li><strong>Q10</strong> SlabResult facet 카운트 정정 (28→27, setter 19): 추천대로 ★</li>
+      <li><strong>Q11</strong> 빠뜨림: 응답 없음 → 없음 추정</li>
+      <li><strong>Q12</strong> C.7 (Phase C 종결) 진입: 추천대로</li>
+    </ul>
+  </div>
+
+  <h3>★ C.6 합의 row (8) + BR partial→FULL status change</h3>
+  <table>
+    <tr><th>kind</th><th>fqn</th><th>요약</th></tr>
+    <tr><td>Action (workflow)</td><td><code>action.scm.slab.save_slab_result</code></td><td>realizes SdSlabSaveAction.execute. 매수 row 복제. side_effects: repository.save × count + SlabNoSequence.next × (count-1)</td></tr>
+    <tr><td>Action (pure)</td><td><code>action.scm.slab.apply_algorithm_results_to_final_fields</code></td><td>realizes private 메서드. 19 setter call. ★ enforces original_equals_adjusted</td></tr>
+    <tr><td>Action (workflow)</td><td><code>action.scm.slab.slab_to_jpo</code></td><td>realizes SDSlabLogic.toJpo. SDOrderLogic 패턴 일관</td></tr>
+    <tr><td>Action × 3 (workflow)</td><td><code>action.scm.history.{record_validation_failure / record_step / record_algorithm_failure}</code></td><td>realizes SdHistoryAction 3 메서드. 모두 SLAB_DESIGN_HIST 적재</td></tr>
+    <tr><td>BR ★ FULL</td><td><code>rule.scm.slab.original_equals_adjusted</code></td><td>C.2 partial → FULL. enforced_by 9 setter pair anchor in apply_algorithm_results</td></tr>
+    <tr><td>BR 신규</td><td><code>rule.scm.slab.history_isolated_transaction</code></td><td>P-2019-0445 history. enforced_by SdHistoryAction 별 @Transactional 메서드</td></tr>
+    <tr><td>BR 신규</td><td><code>rule.scm.slab.slab_no_sequence_per_count</code></td><td>매수 row 복제: 1st=pre-generate / 2~Nth=Sequence.next</td></tr>
+  </table>
+
+  <h3>★ design-gaps 추가 (1)</h3>
+  <ul>
+    <li><strong>#36</strong> — SdDesigner.javadoc <code>REQUIRES_NEW</code> 언급 vs 실제 SdHistoryAction <code>@Transactional default REQUIRED</code> 갭. drama DNA over-statement.</li>
+  </ul>
+
+  <h3>★ 카운트 정정 (Q10)</h3>
+  <ul>
+    <li>SlabResult facet 컬럼: 24 (PK 3 + non-PK 24 = 27 total). C.2 archive 의 "28 컬럼" 표현 잘못 — 정확 27.</li>
+    <li>setter call: invariant pair × 2 = 18 + splitCount 1 = <strong>19 setter</strong> (C.5 의 "28 setter" 잘못 — 정확 19).</li>
+  </ul>
+
+  <p class="small">★ Phase C 누적: <strong>80 row</strong> (C.1 23 + C.2 14 + C.3 4 + C.4 12 + C.5 19 + C.6 8). Phase A+B+C 합계: 98 + 80 = <strong>178 row</strong>.</p>
+</section>
+
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<!-- C.7 — Phase C 종결 archive -->
+<!-- ====================================================================== -->
+<!-- ====================================================================== -->
+<section class="step" style="background:rgba(56,189,248,0.04);border-color:rgba(56,189,248,0.4)">
+  <h2>🏁 C.7 — Phase C 종결 archive</h2>
+  <div class="meta">
+    <span class="badge b-applied">완료</span>
+    <span>Phase A 48 + Phase B 50 + Phase C 80 = 178 row ground truth</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>① Phase C 누적 ground truth (C.1~C.6 합계)</h3>
+  <table>
+    <tr><th>구간</th><th>atomic</th><th>composite</th><th>Action</th><th>BR</th><th>TR</th><th>design-gaps</th><th>합계</th></tr>
+    <tr><td>C.1 Order 4-sub</td><td>1 (order_no)</td><td>5 (order + 4 sub)</td><td>1 (flatten)</td><td>0</td><td>16</td><td>2 (#28, #29)</td><td>23</td></tr>
+    <tr><td>C.2 Slab + SlabResult</td><td>1 (slab_no)</td><td>7 (root + DB + 5 work)</td><td>0</td><td>1 (partial)</td><td>5</td><td>3 (#30, #31, #32)</td><td>14</td></tr>
+    <tr><td>C.3 SdDesigner orchestration</td><td>0</td><td>0</td><td>3 (design_slab + run_aa_loop + create_initial)</td><td>1 (aa_loop_max_iter_cap)</td><td>0</td><td>1 (#33)</td><td>4</td></tr>
+    <tr><td>C.4 Validator + Phase 1</td><td>1 (specific_gravity)</td><td>0</td><td>4</td><td>6 (5 Validator + Customer retroactive)</td><td>1</td><td>1 (#34)</td><td>12</td></tr>
+    <tr><td>C.5 21-step Action body</td><td>0</td><td>0</td><td>15</td><td>3 (ABSOLUTE_MAX_KG + sm_active + plant_format)</td><td>0</td><td>1 (#35)</td><td>19</td></tr>
+    <tr><td>C.6 SaveAction + history</td><td>0</td><td>0</td><td>6</td><td>2 신규 + 1 FULL (status only)</td><td>0</td><td>1 (#36)</td><td>8</td></tr>
+    <tr style="background:rgba(56,189,248,0.05)"><td><strong>Phase C 합계</strong></td><td><strong>3</strong></td><td><strong>12</strong></td><td><strong>29</strong></td><td><strong>13</strong></td><td><strong>22</strong></td><td><strong>9 (#28~#36)</strong></td><td><strong>80</strong></td></tr>
+  </table>
+
+  <h3>② Phase A+B+C 합계 (전체 ground truth)</h3>
+  <table>
+    <tr><th>구간</th><th>row 수</th><th>비고</th></tr>
+    <tr><td>Phase A (Round 6)</td><td>48</td><td>Customer/Productivity. 47 + 1 retroactive (Customer.priority TR)</td></tr>
+    <tr><td>Phase B (Round 5 archive)</td><td>50</td><td>HrSpec/CastSpec/EdgingSpec/EdgingGroup/HrMin+MaxWgt</td></tr>
+    <tr><td>Phase C (Order/Slab/21-step)</td><td>80</td><td>Order 4-sub + Slab 7 composite + 21-step orchestration + 15 Action body + Save + history</td></tr>
+    <tr style="background:rgba(56,189,248,0.05)"><td><strong>합계</strong></td><td><strong>178 row</strong></td><td>+ AnchorBinding 9 (Phase A) + ~70-100 (Phase B+C 마킹, Phase E 보강)</td></tr>
+  </table>
+
+  <h3>③ atomic 16개 사용 빈도 (Phase A+B+C 통합)</h3>
+  <pre>scm.shared atomic                Phase A   Phase B   Phase C   합계
+─────────────────────────────────────────────────────────────────
+cmp                                 2         5         5         12 ★ 모든 entity
+org                                 2         5         5         12 ★ 모든 entity
+proc                                1         0         0         1
+grade                               1         1         1         3
+product_kind (8 alias)              1         5         2         8 ★ alias chaos
+customer                            2         1         1         4
+confirmed_plant_cd                  1         0         2         3 (Phase A def + C.1 PRIMARY + C.2 SlabResult)
+priority                            1*        1         0         2 (* = retroactive)
+─────────────────────────────────────────────────────────────────
+hr_plant_cd (B.1)                   -         3         0         3 (HrSpec/HrMin/HrMaxWgt)
+sm_cd (B.2)                         -         1         0         1
+cast_cd (B.2)                       -         1         0         1
+machine_cd (B.2)                    -         1         0         1
+edging_group_cd (B.3)               -         2         0         2 (EdgingSpec/EdgingGroup)
+─────────────────────────────────────────────────────────────────
+order_no (C.1)                      -         -         5         5 (4 Order Jpo + SlabResult)
+slab_no (C.2)                       -         -         1         1 (SlabResult.PK)
+specific_gravity (C.4)              -         -         1         1 (SpecificGravityProvider.get)
+─────────────────────────────────────────────────────────────────
+총 atomic 16개 (Phase A 7 + Phase B 6 + Phase C 3) / TR 위치 합 60+
+</pre>
+  <p class="small">★ Q2 적극 share 정책의 효과 — cmp/org 12 위치 / product_kind 8 alias / order_no 5 위치 / hr_plant_cd 3 위치 등 cross-entity 일관성 보장.</p>
+
+  <h3>④ BusinessRule 17개 통합 (Phase A 1 + Phase B 3 + Phase C 13)</h3>
+  <table>
+    <tr><th>category</th><th>BR</th><th>operational_history</th></tr>
+    <tr><td>Phase A (1)</td><td>productivity_safe_range</td><td>—</td></tr>
+    <tr><td>Phase B (3)</td><td>edging_spec_lookup_strategy / edging_group_match_strategy / hr_wgt_2d_ceiling_lookup (shared)</td><td>P-2018-0237 (EdgingSpec)</td></tr>
+    <tr><td>Phase C - Validator (5)</td><td>no_stock_order / order_size_positive / pkg_wgt_range_integrity / design_pend_qty_cross_check / work_due_strict_future</td><td>P-2018-0098 (DG001) / 정XX 2018-12-04 (DG004) / P-2020-0411 (DG005)</td></tr>
+    <tr><td>Phase C - Customer retroactive (1)</td><td>customer_find_first_match_strategy</td><td>—</td></tr>
+    <tr><td>Phase C - SdDesigner (1)</td><td>aa_loop_max_iter_cap</td><td>P-2018-0721 (분할수 폭주)</td></tr>
+    <tr><td>Phase C - 21-step body (3)</td><td>absolute_max_kg_safety_cap / sm_plant_active_required / confirmed_plant_cd_format</td><td>2017 회의 (ABSOLUTE_MAX)</td></tr>
+    <tr><td>Phase C - Save+history (3)</td><td>original_equals_adjusted / history_isolated_transaction / slab_no_sequence_per_count</td><td>P-2019-0445 (history)</td></tr>
+    <tr style="background:rgba(56,189,248,0.05)"><td><strong>합계 17 BR</strong></td><td>—</td><td>운영 이슈 history 7건 (P-2018-0098/0237/0721 + P-2019-0445 + P-2020-0411 + 2017 회의 + 정XX 패치)</td></tr>
+  </table>
+
+  <h3>⑤ design-gaps 36 항목 (Phase A 22 + Phase B 5 + Phase C 9)</h3>
+  <ul>
+    <li>Phase A 22 (#1~#22): SIM_VERIFIED / Anchor invalidation / composite inheritance / 시뮬 fixture / Java dispatch / Gap Inspector / TR invariant / scope 정합성 / 8 표준 domain / Authoring 비용 / ground truth 충돌 / dispatch UX / 방어로직 갭 / anchor 권한 / 동시성 / 신뢰도 부패 / invalidation 폭발 / user_queue 오답 / god-method / enforced 판정 / 성능 / Spring Data JPA</li>
+    <li>Phase B 5 (#23~#27): NPE→HIST / wildcard 미구현 / hardcoded plant mapping / PRIORITY in PK / 2D sheet 폭증</li>
+    <li>Phase C 9 (#28~#36): chemistry 풀모델 / SDOrderLogic reflection / in-memory TR 한계 / SLAB_DESIGN_HIST 미모델링 / SlabNoSequence side effect / step 14 미구현 / SpecificGravityProvider hardcoded / commented-out legacy / javadoc REQUIRES_NEW 갭</li>
+  </ul>
+
+  <h3>⑥ Phase D 입력 자료 (API 설계 + 인계)</h3>
+  <ul>
+    <li>178 row ground truth (atomic 16 / composite 22 / Action 41 / BR 17 / TR ~60+ / AnchorBinding 9 + ~110-140 마킹)</li>
+    <li>운영 이슈 history 7건 (BR.operational_history)</li>
+    <li>design-gaps 36 항목 (Phase E 일괄 결정)</li>
+    <li>4 sub-domain (scm.std / scm.spec / scm.order / scm.slab) + scm.shared atomic 풀</li>
+    <li>다음 개발자 인계 가이드 (API 명세, 시뮬 흐름, ChangeSpec 시나리오 등)</li>
+  </ul>
+
+  <h3>⑦ AnchorBinding 마킹 — Phase E 보강 대상</h3>
+  <ul>
+    <li>Phase A 9 anchor (cumulativeProductivity 7 + findFirstMatch 2) — 등록 완료</li>
+    <li>Phase B 5 entity body anchor — 추정 ~30 anchor (Phase E 보강)</li>
+    <li>Phase C 21-step body anchor — 추정 ~70-100 anchor (Phase E 보강)</li>
+    <li>Phase C 의 9 setter pair anchor (original_equals_adjusted enforced_by) — schema-level 등록 완료, fragment-level Phase E</li>
+    <li>총 추정 ~110~140 anchor 미등록 — design-gaps #17 invalidation 폭발 risk 대비 필요</li>
+  </ul>
+
+  <p class="small">★ <strong>Phase D 진입 준비 완료</strong> — 다음 단계: API 설계 + 시뮬 흐름 명세 + 다음 개발자 인계 문서. 2 fresh-context 서브에이전트 검토 진행 중 (Phase A+B+C 통합 일관성 + Phase D 진입 준비도).</p>
+</section>
+
+<script>
+function buildC1Text() {
+  const get = name => (document.querySelector(`[name="${name}"]`)?.value || '').trim();
+  const rows = [
+    ['c1_q1', 'Q1. 추천 row 23개'],
+    ['c1_q2', 'Q2. scm.order sub-domain'],
+    ['c1_q3', 'Q3. order_no atomic 등록'],
+    ['c1_q4', 'Q4. PRIMARY + 4 sub composition'],
+    ['c1_q5', 'Q5. order_chemical unused 마킹'],
+    ['c1_q6', 'Q6. flatten_jpo_to_entity workflow Action'],
+    ['c1_q7', 'Q7. confirmed_plant_cd PRIMARY TR 위치'],
+    ['c1_q8', 'Q8. 빠뜨림/추가'],
+    ['c1_q9', 'Q9. C.2 (Slab+SlabResult) 진입']
+  ];
+  const parts = ["[Phase C.1 — Order 4-sub schema 답변]"];
+  for (const [n, label] of rows) {
+    const v = get(n);
+    if (v) parts.push(`\n${label}\n${v}`);
+  }
+  return parts.length > 1 ? parts.join('\n') : '[Phase C.1 — Order 4-sub schema 답변]\n(아직 답변 없음)';
+}
+
+document.getElementById('c1-build').addEventListener('click', () => {
+  const txt = buildC1Text();
+  const pv = document.getElementById('c1-preview');
+  pv.classList.add('visible');
+  pv.textContent = txt;
+});
+document.getElementById('c1-copy').addEventListener('click', async (e) => {
+  const txt = buildC1Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    e.target.classList.add('copied');
+    e.target.textContent = '✓ 복사됨';
+    setTimeout(() => {
+      e.target.classList.remove('copied');
+      e.target.textContent = '📋 답변 복사';
+    }, 1500);
+  } catch (err) {
+    const pv = document.getElementById('c1-preview');
+    pv.classList.add('visible');
+    pv.textContent = txt + '\n\n[복사 실패 — 위 텍스트 수동 복사]';
+  }
+});
+
+// =====================================================================
+// C.2 — Slab + SlabResult
+// =====================================================================
+function buildC2Text() {
+  const get = name => (document.querySelector(`[name="${name}"]`)?.value || '').trim();
+  const rows = [
+    ['c2_q1', 'Q1. 추천 row 14개'],
+    ['c2_q2', 'Q2. scm.slab sub-domain'],
+    ['c2_q3', 'Q3. slab_no atomic 등록'],
+    ['c2_q4', 'Q4. 7 composite 구조 (root + DB sub + 5 work)'],
+    ['c2_q5', 'Q5. invariant_pairs 9쌍'],
+    ['c2_q6', 'Q6. original_equals_adjusted BR partial 등록'],
+    ['c2_q7', 'Q7. design_status enum facet'],
+    ['c2_q8', 'Q8. design-gaps #30/#31/#32 등록'],
+    ['c2_q9', 'Q9. 빠뜨림/추가'],
+    ['c2_q10', 'Q10. C.3 진입']
+  ];
+  const parts = ["[Phase C.2 — Slab + SlabResult 답변]"];
+  for (const [n, label] of rows) {
+    const v = get(n);
+    if (v) parts.push(`\n${label}\n${v}`);
+  }
+  return parts.length > 1 ? parts.join('\n') : '[Phase C.2 — Slab + SlabResult 답변]\n(아직 답변 없음)';
+}
+
+document.getElementById('c2-build').addEventListener('click', () => {
+  const txt = buildC2Text();
+  const pv = document.getElementById('c2-preview');
+  pv.classList.add('visible');
+  pv.textContent = txt;
+});
+document.getElementById('c2-copy').addEventListener('click', async (e) => {
+  const txt = buildC2Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    e.target.classList.add('copied');
+    e.target.textContent = '✓ 복사됨';
+    setTimeout(() => {
+      e.target.classList.remove('copied');
+      e.target.textContent = '📋 답변 복사';
+    }, 1500);
+  } catch (err) {
+    const pv = document.getElementById('c2-preview');
+    pv.classList.add('visible');
+    pv.textContent = txt + '\n\n[복사 실패 — 위 텍스트 수동 복사]';
+  }
+});
+
+// =====================================================================
+// C.3 — SdDesigner orchestration
+// =====================================================================
+function buildC3Text() {
+  const get = name => (document.querySelector(`[name="${name}"]`)?.value || '').trim();
+  const rows = [
+    ['c3_q1', 'Q1. 추천 row 4개'],
+    ['c3_q2', 'Q2. design_slab Action.kind = workflow'],
+    ['c3_q3', 'Q3. run_aa_loop workflow + Q4 결정 첫 등장'],
+    ['c3_q4', 'Q4. helper pattern facets (별 Action 미등록)'],
+    ['c3_q5', 'Q5. BR aa_loop_max_iter_cap 등록 (P-2018-0721)'],
+    ['c3_q6', 'Q6. create_initial_slab side_effects 표현'],
+    ['c3_q7', 'Q7. design-gaps #33 (step 14 미구현 TODO)'],
+    ['c3_q8', 'Q8. 빠뜨림/추가'],
+    ['c3_q9', 'Q9. C.4 진입']
+  ];
+  const parts = ["[Phase C.3 — SdDesigner orchestration 답변]"];
+  for (const [n, label] of rows) {
+    const v = get(n);
+    if (v) parts.push(`\n${label}\n${v}`);
+  }
+  return parts.length > 1 ? parts.join('\n') : '[Phase C.3 — SdDesigner orchestration 답변]\n(아직 답변 없음)';
+}
+
+document.getElementById('c3-build').addEventListener('click', () => {
+  const txt = buildC3Text();
+  const pv = document.getElementById('c3-preview');
+  pv.classList.add('visible');
+  pv.textContent = txt;
+});
+document.getElementById('c3-copy').addEventListener('click', async (e) => {
+  const txt = buildC3Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    e.target.classList.add('copied');
+    e.target.textContent = '✓ 복사됨';
+    setTimeout(() => {
+      e.target.classList.remove('copied');
+      e.target.textContent = '📋 답변 복사';
+    }, 1500);
+  } catch (err) {
+    const pv = document.getElementById('c3-preview');
+    pv.classList.add('visible');
+    pv.textContent = txt + '\n\n[복사 실패 — 위 텍스트 수동 복사]';
+  }
+});
+
+// =====================================================================
+// C.4 — Validator BR + Phase 1 services
+// =====================================================================
+function buildC4Text() {
+  const get = name => (document.querySelector(`[name="${name}"]`)?.value || '').trim();
+  const rows = [
+    ['c4_q1', 'Q1. 추천 row 12개'],
+    ['c4_q2', 'Q2. validate_order workflow + helper facets'],
+    ['c4_q3', 'Q3. 5 Validator BR (DG001~005) + operational_history'],
+    ['c4_q4', 'Q4. Customer.findFirstMatch BR retroactive'],
+    ['c4_q5', 'Q5. specific_gravity atomic 승격'],
+    ['c4_q6', 'Q6. resolve_hr_tgt_width 자리매핑'],
+    ['c4_q7', 'Q7. find_specific_gravity hardcoded 마킹 (#34)'],
+    ['c4_q8', 'Q8. 빠뜨림/추가'],
+    ['c4_q9', 'Q9. C.5 진입']
+  ];
+  const parts = ["[Phase C.4 — Validator BR + Phase 1 services 답변]"];
+  for (const [n, label] of rows) {
+    const v = get(n);
+    if (v) parts.push(`\n${label}\n${v}`);
+  }
+  return parts.length > 1 ? parts.join('\n') : '[Phase C.4 — Validator BR + Phase 1 services 답변]\n(아직 답변 없음)';
+}
+
+document.getElementById('c4-build').addEventListener('click', () => {
+  const txt = buildC4Text();
+  const pv = document.getElementById('c4-preview');
+  pv.classList.add('visible');
+  pv.textContent = txt;
+});
+document.getElementById('c4-copy').addEventListener('click', async (e) => {
+  const txt = buildC4Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    e.target.classList.add('copied');
+    e.target.textContent = '✓ 복사됨';
+    setTimeout(() => {
+      e.target.classList.remove('copied');
+      e.target.textContent = '📋 답변 복사';
+    }, 1500);
+  } catch (err) {
+    const pv = document.getElementById('c4-preview');
+    pv.classList.add('visible');
+    pv.textContent = txt + '\n\n[복사 실패 — 위 텍스트 수동 복사]';
+  }
+});
+
+// =====================================================================
+// C.5 — 21-step Action body cluster
+// =====================================================================
+function buildC5Text() {
+  const get = name => (document.querySelector(`[name="${name}"]`)?.value || '').trim();
+  const rows = [
+    ['c5_q1', 'Q1. 추천 row 19개'],
+    ['c5_q2', 'Q2. bulk Action 15 vs deep-dive'],
+    ['c5_q3', 'Q3. AnchorBinding Phase E 보강 마킹'],
+    ['c5_q4', 'Q4. 핵심 BR 3 등록'],
+    ['c5_q5', 'Q5. ABSOLUTE_MAX_KG safety BR'],
+    ['c5_q6', 'Q6. design-gaps #35 (commented-out legacy)'],
+    ['c5_q7', 'Q7. helper class 4 (Constraint/SizeCalc/Objective/Extractor) 처리'],
+    ['c5_q8', 'Q8. 빠뜨림/추가'],
+    ['c5_q9', 'Q9. C.6 진입']
+  ];
+  const parts = ["[Phase C.5 — 21-step Action body cluster 답변]"];
+  for (const [n, label] of rows) {
+    const v = get(n);
+    if (v) parts.push(`\n${label}\n${v}`);
+  }
+  return parts.length > 1 ? parts.join('\n') : '[Phase C.5 — 21-step Action body cluster 답변]\n(아직 답변 없음)';
+}
+
+document.getElementById('c5-build').addEventListener('click', () => {
+  const txt = buildC5Text();
+  const pv = document.getElementById('c5-preview');
+  pv.classList.add('visible');
+  pv.textContent = txt;
+});
+document.getElementById('c5-copy').addEventListener('click', async (e) => {
+  const txt = buildC5Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    e.target.classList.add('copied');
+    e.target.textContent = '✓ 복사됨';
+    setTimeout(() => {
+      e.target.classList.remove('copied');
+      e.target.textContent = '📋 답변 복사';
+    }, 1500);
+  } catch (err) {
+    const pv = document.getElementById('c5-preview');
+    pv.classList.add('visible');
+    pv.textContent = txt + '\n\n[복사 실패 — 위 텍스트 수동 복사]';
+  }
+});
+
+// =====================================================================
+// C.6 — SdSlabSaveAction + 원본=조정 BR
+// =====================================================================
+function buildC6Text() {
+  const get = name => (document.querySelector(`[name="${name}"]`)?.value || '').trim();
+  const rows = [
+    ['c6_q1', 'Q1. 추천 row 8개'],
+    ['c6_q2', 'Q2. save_slab_result workflow'],
+    ['c6_q3', 'Q3. apply_algorithm_results private 별 Action 등록'],
+    ['c6_q4', 'Q4. slab_to_jpo Action'],
+    ['c6_q5', 'Q5. history Action 3 등록'],
+    ['c6_q6', 'Q6. BR original_equals_adjusted FULL 보강 (C.2 partial → FULL)'],
+    ['c6_q7', 'Q7. BR history_isolated_transaction (P-2019-0445)'],
+    ['c6_q8', 'Q8. BR slab_no_sequence_per_count'],
+    ['c6_q9', 'Q9. design-gaps #36 (javadoc REQUIRES_NEW vs 실제)'],
+    ['c6_q10', 'Q10. SlabResult facet 카운트 정정 (28→27, setter 19)'],
+    ['c6_q11', 'Q11. 빠뜨림/추가'],
+    ['c6_q12', 'Q12. C.7 (Phase C 종결) 진입']
+  ];
+  const parts = ["[Phase C.6 — SdSlabSaveAction + 원본=조정 BR 답변]"];
+  for (const [n, label] of rows) {
+    const v = get(n);
+    if (v) parts.push(`\n${label}\n${v}`);
+  }
+  return parts.length > 1 ? parts.join('\n') : '[Phase C.6 — SdSlabSaveAction + 원본=조정 BR 답변]\n(아직 답변 없음)';
+}
+
+document.getElementById('c6-build').addEventListener('click', () => {
+  const txt = buildC6Text();
+  const pv = document.getElementById('c6-preview');
+  pv.classList.add('visible');
+  pv.textContent = txt;
+});
+document.getElementById('c6-copy').addEventListener('click', async (e) => {
+  const txt = buildC6Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    e.target.classList.add('copied');
+    e.target.textContent = '✓ 복사됨';
+    setTimeout(() => {
+      e.target.classList.remove('copied');
+      e.target.textContent = '📋 답변 복사';
+    }, 1500);
+  } catch (err) {
+    const pv = document.getElementById('c6-preview');
+    pv.classList.add('visible');
+    pv.textContent = txt + '\n\n[복사 실패 — 위 텍스트 수동 복사]';
+  }
+});
+</script>
+
+</div>
+</body>
+</html>

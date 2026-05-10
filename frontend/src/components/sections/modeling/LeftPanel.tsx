@@ -14,18 +14,21 @@ import {
 } from "@/lib/api/ontology";
 import { Check, X as XIcon, Loader2 } from "lucide-react";
 import { ModuleTree } from "./ModuleTree";
+import { OntologyTab } from "./OntologyTab";
 
-// V7 IA (D plan) — 5 mock tab → 2 real tab.
-// Map/Code/Domain/Action 은 모두 ModuleTree (패키지 계층) 안에서 표현.
+// 좌측 탭 — 코드 (패키지 트리) / 온톨로지 (Term/Action/BR/Anchor 모음) / 큐 (자동 추천 confirm).
 const TABS: { id: LeftTab; label: string; icon: string }[] = [
-  { id: "code", label: "코드", icon: "🗂" },     // ← ModuleTree (재해석)
+  { id: "code", label: "코드", icon: "🗂" },
+  { id: "ontology", label: "온톨로지", icon: "🧬" },
   { id: "queue", label: "큐", icon: "📥" },
 ];
 
 export function LeftPanel() {
   const { leftTab, setLeftTab } = useWorkbench();
-  // V7 마이그레이션 — 옛 leftTab (map/domain/action) 들어와 있으면 code 로 매핑
-  const effectiveTab = (leftTab === "code" || leftTab === "queue") ? leftTab : "code";
+  // V7 마이그레이션 — 옛 leftTab 들어와 있으면 code 로 매핑
+  const effectiveTab = (leftTab === "code" || leftTab === "ontology" || leftTab === "queue")
+    ? leftTab
+    : "code";
 
   return (
     <aside
@@ -51,6 +54,7 @@ export function LeftPanel() {
       </div>
       <div className="flex-1 overflow-hidden flex flex-col">
         {effectiveTab === "code" && <ModuleTree />}
+        {effectiveTab === "ontology" && <OntologyTab />}
         {effectiveTab === "queue" && <QueueTab />}
       </div>
     </aside>

@@ -87,6 +87,13 @@ export function OntologyGraph({ repoId }: { repoId: string }) {
   // 데이터 로드
   useEffect(() => {
     let cancelled = false;
+    // path mode 는 focus + target 둘 다 있어야 backend 가 정상 응답 (400 방지)
+    if (mode === "path" && (!focus || !target)) {
+      setData(null);
+      setErr(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setErr(null);
     const opts: Parameters<typeof ontologyApi.getOntologyGraph>[1] = { mode, n_max: nMax };

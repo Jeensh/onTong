@@ -180,6 +180,16 @@ export interface AnchorBindingDTO {
   repo_id: string;
 }
 
+export interface BusinessRuleDTO {
+  fqn: string;
+  statement: string;
+  severity: string;             // "hard" / "soft"
+  terms_ref: string[];
+  source: string;
+  confirmed: boolean;
+  repo_id: string;
+}
+
 export interface CallSiteDTO {
   id: string;
   caller_method_fqn: string;
@@ -430,6 +440,14 @@ export const ontologyApi = {
     fetchJson<ModuleInventoryItemDTO[]>(
       `/api/ontology/repos/${encodeURIComponent(repo_id)}/modules/inventory${qs(opts)}`,
     ),
+  getModuleInventoryActions: (repo_id: string, opts: { package: string; recursive?: boolean }) =>
+    fetchJson<ModuleActionInventoryItemDTO[]>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/modules/inventory/actions${qs(opts)}`,
+    ),
+  listBusinessRules: (opts?: { repo_id?: string }) =>
+    fetchJson<BusinessRuleDTO[]>(`/api/ontology/business-rules${qs(opts ?? {})}`),
+  listAnchorBindings: (opts?: { repo_id?: string }) =>
+    fetchJson<AnchorBindingDTO[]>(`/api/ontology/anchor-bindings${qs(opts ?? {})}`),
 
   // P3-6 Mapping Queue actions
   getMappingQueue: (repo_id: string, limit = 200) =>
@@ -578,6 +596,17 @@ export interface ModuleInventoryItemDTO {
   has_term: boolean;
   term_fqn: string | null;
   method_count: number;
+}
+
+export interface ModuleActionInventoryItemDTO {
+  fqn: string;
+  name: string;
+  kind: string;                    // pure_function / effectful / workflow
+  declared_on_term: string | null;
+  verification_level: string;
+  realization_count: number;
+  primary_method_fqn: string | null;
+  confirmed: boolean;
 }
 
 // R4-T2.2 Perspective DTOs (+ R4-T3.4: compound, 5-kind defaults)

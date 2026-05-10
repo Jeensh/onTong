@@ -121,13 +121,13 @@
   <div class="progress">
     <span class="phase done">A.8.0 — 시작 + 합의 ✓</span>
     <span class="phase done">A.8.1 — 공유 atomic 6종 ✓</span>
-    <span class="phase active">A.8.2 — 고객표준 composite (지금)</span>
-    <span class="phase">A.8.3 — 실수율표준 composite</span>
-    <span class="phase">A.8.4 — TypeRealization 검증</span>
-    <span class="phase">A.8.5 — Customer Action</span>
-    <span class="phase">A.8.6 — Productivity Action</span>
-    <span class="phase">A.8.7 — AnchorBinding</span>
-    <span class="phase">A.8.8 — DB confirm + archive</span>
+    <span class="phase done">A.8.2 — 고객사설계제한 composite ✓</span>
+    <span class="phase done">A.8.3 — 실수율 기준 composite ✓</span>
+    <span class="phase done">A.8.4 — TypeRealization 검증 ✓</span>
+    <span class="phase done">A.8.5 — Customer Action ✓</span>
+    <span class="phase done">A.8.6 — Productivity Action ✓</span>
+    <span class="phase done">A.8.7 — AnchorBinding ✓</span>
+    <span class="phase done">A.8.8 — Round 6 종료 + Phase B 준비 ✓</span>
   </div>
 </header>
 
@@ -344,7 +344,7 @@
     <tr><td>A.8.4</td><td>TypeRealization 검증/추가</td><td>+ 기존 PRIMARY 2건 검증, +Jpo/PK/Logic/Service/Repository TR (PARTIAL or PRIMARY 결정)</td></tr>
     <tr><td>A.8.5</td><td>Customer Action</td><td>+findFirstMatch action + 사용처 SdSecondWgtLowAction/HighAction realization</td></tr>
     <tr><td>A.8.6</td><td>Productivity Action</td><td>+lookup / lookupOrDefault / 보강된 cumulativeProductivity</td></tr>
-    <tr><td>A.8.7</td><td>AnchorBinding</td><td>+cumulativeProductivity body 의 PROC_CODES / DEFAULT / 8자리 loop fragment ↔ atomic 매핑</td></tr>
+    <tr><td>A.8.7</td><td>AnchorBinding</td><td>+cumulativeProductivity body 의 PROC_CODES / DEFAULT / 8자리 loop fragment ↔ atomic 매핑 <strong>+ atomic 7번째 추가 (<code>confirmed_plant_cd</code>)</strong></td></tr>
     <tr><td>A.8.8</td><td>DB confirm + archive</td><td>모든 row confirm (curl) + round6-archive HTML 마무리</td></tr>
   </table>
 
@@ -724,6 +724,17 @@ term.scm.something.else  ← (PARTIAL TR 1 row, 가상)
     <tr><td>6</td><td>고객사</td><td><code>term.scm.shared.customer</code></td><td>string(10)</td><td>Customer/Productivity/Order 공유</td></tr>
   </table>
 
+  <div class="my-guess" style="border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.04)">
+    <div class="label" style="color:var(--amber)">⚠ Phase A 사후 정정 (2026-05-09 Round 6 종료 시점)</div>
+    <p>Step 7 (AnchorBinding) 진행 중 <strong>cumulativeProductivity</strong> 의 confirmedPlantCd 처리를 위해 7번째 atomic 추가:</p>
+    <table style="margin-top:8px">
+      <tr><th>#</th><th>한국어</th><th>fqn</th><th>type</th><th>enum / 비고</th></tr>
+      <tr><td>7</td><td>확정통과공장코드</td><td><code>term.scm.shared.confirmed_plant_cd</code></td><td>string(8)</td><td>facets: encoding="자리 i ↔ proc[i]" / activation="' '=비활성"</td></tr>
+    </table>
+    <p style="margin-top:8px"><strong>왜 retroactive?</strong> Step 1 시점에는 Customer/Productivity 공유 atomic 만 식별. Step 7 anchor 분석에서 Productivity 의 cumulativeProductivity Action 이 SdProductivityStdEntity.confirmedPlantCd 컬럼을 8자리 디코딩해서 사용함을 발견 — atomic 으로 승격.</p>
+    <p style="margin-top:4px"><strong>최종 합의:</strong> atomic 7종 (위 6 + confirmed_plant_cd). Round 6 종료 47 row ground truth 의 atomic 카운트 = 7.</p>
+  </div>
+
   <h4>2. 4가지 결정 사항</h4>
   <ol>
     <li><strong>domain</strong> = <code>scm.shared</code> 신규 sub-domain. atomic 임을 명시 + 어디든 공유.</li>
@@ -869,61 +880,113 @@ PRIORITY ASC 정렬 후 첫 row 채택. 매칭 실패 시 null = 제한 없음.
   </ul>
 
   <!-- ====================================================================== -->
+  <!-- Q1+Q2 partial archive -->
+  <div class="applied" style="margin-top:18px">
+    <div class="label">Step 2 — Q1·Q2 받음</div>
+    <ul style="margin:6px 0 0 22px;padding:0">
+      <li><strong>Q1 label</strong> = <code>고객사설계제한</code> (오타 "재한" → "제한" 수정. javadoc 의 "특정 고객사 설계 제한 JPO" 와 일치)
+        <ul style="margin-top:4px"><li>운영 사례 (사용자 인용): <em>"특정 고객사가 더 빡빡한 기준이 있을 때, 설비상 가능하더라도 거기에 맞춰야 함 (주문에 따라서)"</em></li></ul>
+      </li>
+      <li><strong>Q2 description</strong> = OK (추천 4문장 그대로)</li>
+      <li><strong>진행 방식</strong> = A+C 복합 합의 — 매 step 에 「도메인 깊이」 카드 추가 + Step 3 부터 form 자체에 깊이 Q 포함</li>
+    </ul>
+  </div>
+
+  <h3 style="margin-top:30px">Step 2 — 남은 답변 (Q3~Q9, 가독성 개편 + 도메인 깊이 카드)</h3>
+  <p class="small" style="margin:0 0 14px">
+    각 Q 카드 = 짧은 추천 ★ + 대안 + textarea (한 단어 OK 가능). Q8 = 도메인 깊이 (운영 사례 / priority 의미 / null fallback).
+  </p>
+
   <div class="form-section">
-    <h4>Step 2 답변 — 고객표준 composite 보강</h4>
-
     <div class="field">
-      <label>Q1. <strong>label / fqn</strong> — 추천대로 (고객표준 / <code>term.scm.customer_std</code>) OK?
-        <span class="recommend">내 추천: <strong>OK</strong>. 자동 추천 label 그대로 사용. fqn 은 domain 결정 따라 변경 가능 (Q5).</span>
+      <label><strong>Q3. fqn — label 변경됐으니 fqn 도 변경?</strong>
+        <span class="recommend">★ 추천: <code>term.scm.std.customer_design_limit</code> (S-2 + label 의미 반영)<br>
+        대안: <code>term.scm.std.customer_std</code> (자동 추천 짧게 유지)<br>
+        대안: <code>term.scm.customer_std</code> (그대로 — Q6 에서 S-1 시)</span>
       </label>
-      <textarea class="text" name="q1_label_fqn" placeholder="예: OK / 또는: 한국어를 '고객사 단중 표준' 으로 명확히..."></textarea>
+      <textarea class="text" name="q3_fqn" rows="2" placeholder="예: 추천 / 짧게 / 그대로 / 또는 직접 입력"></textarea>
     </div>
 
     <div class="field">
-      <label>Q2. <strong>description</strong> — 위 추천 4문장 OK? 정정/보강?
-        <span class="recommend">내 추천: 위 그대로 (PK + 룩업 키 + null fallback + 알고리즘 step 활용). 한국어 요약.</span>
+      <label><strong>Q4. parts (atomic 4종) OK?</strong>
+        <span class="recommend">★ 추천 그대로:
+          <code>cmpCd → shared.cmp</code> ·
+          <code>orgCd → shared.org</code> ·
+          <code>productNameCd → shared.product_kind</code> (alias) ·
+          <code>customerCd → shared.customer</code></span>
       </label>
-      <textarea class="text" name="q2_description" placeholder="예: OK / 또는: 더 짧게 / 또는: ___ 추가..." rows="4"></textarea>
+      <textarea class="text" name="q4_parts" rows="2" placeholder="예: OK / 정정 ___"></textarea>
     </div>
 
     <div class="field">
-      <label>Q3. <strong>parts (atomic 4종)</strong> — 위 표 OK? 추가/제거 atomic 있나요?
-        <span class="recommend">내 추천: <strong>OK</strong> 그대로 4 atomic.</span>
+      <label><strong>Q5. facets 3종 OK?</strong>
+        <span class="recommend">★ 추천 그대로:
+          <code>priority</code> (int — tiebreaker) ·
+          <code>pkg_wgt_high</code> (BigDecimal 10,3) ·
+          <code>pkg_wgt_low</code> (BigDecimal 10,3)</span>
       </label>
-      <textarea class="text" name="q3_parts" placeholder="예: OK / 또는: priority 도 atomic 으로 (D-1 결정과 다르게)..."></textarea>
+      <textarea class="text" name="q5_facets" rows="2" placeholder="예: OK / 정정 ___"></textarea>
     </div>
 
     <div class="field">
-      <label>Q4. <strong>facets 3종 (priority / pkg_wgt_high / pkg_wgt_low)</strong> — 위 표 OK? 정정?
-        <span class="recommend">내 추천: <strong>OK</strong>. type 도 코드와 동일 (BigDecimal(10,3) / Integer).</span>
+      <label><strong>Q6. domain — 8 표준 일관성</strong>
+        <span class="recommend">★ 추천 <strong>S-2</strong>: <code>scm.std</code> 신규 sub-domain 통일. 다른 6 표준은 다음 phase 정정.<br>
+        대안 <strong>S-1</strong>: <code>scm</code> 평면 그대로 (현재 자동 추천 유지).</span>
       </label>
-      <textarea class="text" name="q4_facets" placeholder="예: OK / 또는: pkg_wgt_high/low 를 하나의 range facet 으로 묶기..."></textarea>
+      <textarea class="text" name="q6_domain" rows="2" placeholder="예: S-2 / S-1"></textarea>
     </div>
 
     <div class="field">
-      <label>Q5. <strong>domain 일관성 (8 표준)</strong> — S-1 (그대로) / S-2 (scm.std 통일) / S-3 (이번만 std) / S-4 (scm.spec 통합) ?
-        <span class="recommend">내 추천: <strong>S-2</strong> — <code>scm.std</code> 로 통일. CustomerStd 의 fqn 도 <code>term.scm.std.customer_std</code> 로 변경. 다른 6 표준은 다음 세션 정정 (이번 세션 스코프 외).</span>
+      <label><strong>Q7. 매칭 로직 (4-key + PRIORITY ASC + null) 어디에?</strong>
+        <span class="recommend">★ 추천: <strong>description 에만</strong> (composite 자체 부담 X. 매칭 로직은 사용처 Action 에 박음 — Step 5/6).<br>
+        대안: 별도 facet (<code>lookup_pattern</code>) 박기 — 구조화 metadata.</span>
       </label>
-      <textarea class="text" name="q5_domain_consistency" placeholder="예: S-2 / 또는: S-1 (이번 세션은 변경 X)..."></textarea>
+      <textarea class="text" name="q7_lookup" rows="2" placeholder="예: description 만 / facet 도"></textarea>
+    </div>
+  </div>
+
+  <div class="panel diff" style="margin-top:18px">
+    <div class="label">Q8. 도메인 깊이 카드 (A+C 복합 적용)</div>
+    <p style="margin:6px 0 10px;font-size:12.5px">
+      받은 운영 사례 (Q1): <em>"특정 고객사가 더 빡빡한 기준 → 설비 가능 단중보다 좁은 범위 적용 (min 의 한 입력, 주문에 따라서)"</em>.
+      추가 운영 사실 / priority 의미 / null fallback 세 가지 받기.
+    </p>
+  </div>
+
+  <div class="form-section">
+    <div class="field">
+      <label><strong>Q8a. 추가 운영 사례 / 빈도 / 트리거</strong>
+        <span class="recommend">예: 어느 고객사가 자주 등장? / 단중 변경 빈도? / 신규 고객사 등록 흐름?</span>
+      </label>
+      <textarea class="text" name="q8a_cases" rows="3" placeholder="예: 자동차 OEM 5개사가 빡빡함 / 분기 별 변경 / 영업 → 표준 등록 시스템 ..."></textarea>
     </div>
 
     <div class="field">
-      <label>Q6. <strong>매칭 로직 (4-key + PRIORITY ASC + null fallback)</strong> — composite 에 별도 facet (예: <code>lookup_pattern</code>) 박을까, description 에만 박을까?
-        <span class="recommend">내 추천: <strong>description 에만</strong>. 매칭 로직은 사용처 (Action — Step 5/6) 의 metadata 에 박는 게 더 자연. composite 자체에는 부담 X.</span>
+      <label><strong>Q8b. priority 의 의미</strong>
+        같은 (cmp, org) 에 여러 row 등장하는 실제 케이스 — 어떤 조합 / priority 가 무엇 결정?
+        <span class="recommend">예: 같은 고객사가 품종 별로 다른 단중 / priority 1=강제, 99=fallback / 다른 의미?</span>
       </label>
-      <textarea class="text" name="q6_lookup" placeholder="예: description 만 / 또는: facet 도 박아 (구조화 metadata)..."></textarea>
+      <textarea class="text" name="q8b_priority" rows="3" placeholder="예: 한 고객사 X 가 일반 품종 (P=99) + 특수 품종 (P=1, 더 빡빡) / 또는 ..."></textarea>
     </div>
 
     <div class="field">
-      <label>Q7. <strong>Step 3 (실수율표준 composite) 진입 OK?</strong>
-        <span class="recommend">내 추천: <strong>OK</strong>. Customer 결정 패턴 그대로 Productivity 에 재사용. 6-axis 추가 + facet 1개 (productivity) 만 차이.</span>
+      <label><strong>Q8c. null fallback (제한 없음) 의 운영 의미</strong>
+        매칭 안 되면 ("이 고객사 표준 없음") 알고리즘 어떻게?
+        <span class="recommend">예: 다른 표준 (HrSpec/HrMinWgt 등) 만 적용 / 일반 단중 사용 / 운영자 알림?</span>
       </label>
-      <textarea class="text" name="q7_step3_go" placeholder="예: OK / 또는: 잠깐, ___ 더..."></textarea>
+      <textarea class="text" name="q8c_null" rows="3" placeholder="예: 다른 표준 만 / 운영자 알림 X (그냥 통과)"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q9. Step 3 (실수율표준 composite) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. Customer 결정 패턴 + 도메인 깊이 카드 그대로 Productivity 에 재사용.</span>
+      </label>
+      <textarea class="text" name="q9_step3_go" rows="2" placeholder="예: OK / 잠깐 ___"></textarea>
     </div>
 
     <div class="field">
       <label>추가 의견</label>
-      <textarea class="text" name="freeform2" placeholder="optional"></textarea>
+      <textarea class="text" name="freeform2" rows="2" placeholder="optional"></textarea>
     </div>
   </div>
 
@@ -935,6 +998,2146 @@ PRIORITY ASC 정렬 후 첫 row 채택. 매칭 실패 시 null = 제한 없음.
   <div class="preview" id="preview-step2">
     <div class="preview-label">복사될 내용</div>
     <div class="preview-body"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step" id="archive-step-2" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 Step 2 답변 받음 — 고객사설계제한 composite 합의</h2>
+  <div class="meta">
+    <span class="badge b-applied">아카이브</span>
+    <span>모두 추천대로 + Q4 alias 의문 + Q8c "기준" 용어 변경</span>
+  </div>
+
+  <h3>답변 그대로 (Q3~Q9)</h3>
+  <div class="applied">
+    <div class="label">사용자 답변</div>
+    <ul>
+      <li><strong>Q3 fqn</strong>: 추천대로 → <code>term.scm.std.customer_design_limit</code></li>
+      <li><strong>Q4 parts</strong>: 추천대로 + ★ <em>"여러 대상이 동일한 alias를 사용하는 경우 어떻게 돼? 이런 경우 많은 것 같은데"</em> (아래 답)</li>
+      <li><strong>Q5 facets</strong>: 추천대로 → priority / pkg_wgt_high / pkg_wgt_low</li>
+      <li><strong>Q6 domain</strong>: 추천대로 → <strong>S-2</strong> (<code>scm.std</code>)</li>
+      <li><strong>Q7 매칭 로직</strong>: 추천대로 → description 에만</li>
+      <li><strong>Q8a 운영 사례</strong>: 자동차 회사 자주, 나머지는 발생 시</li>
+      <li><strong>Q8b priority 의미</strong>: 같은 고객사가 품종별로 다른 단중</li>
+      <li><strong>Q8c null fallback</strong>: 다른 <strong>기준</strong> 적용. ★ <em>"표준 대신 기준이라는 말을 써"</em></li>
+      <li><strong>Q9 Step 3 진입</strong>: OK</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>★ Q4 의문 답 — 같은 alias 가 여러 entity 에 등장하면?</h3>
+  <p>Step 1 archive 의 답 (3-tuple unique) 을 Customer/Productivity 맥락으로 구체 시각화.</p>
+
+  <h4>한 atomic 입장에서 (한 atomic 이 여러 entity 에 등장)</h4>
+  <pre>term.scm.shared.product_kind        ← (PARTIAL TR 여러 row, 같은 도메인 의미)
+  ├─ CustomerStd.productNameCd         (alias #1: PRODUCT_NAME_CD)
+  ├─ ProductivityStd.prodKindCd        (alias #2: PROD_KIND_CD)
+  ├─ HrSpec.productTypeCd              (alias #3: PRODUCT_TYPE_CD)
+  └─ ... (다른 entity 등장 시 row 추가)
+
+term.scm.shared.cmp                  ← (PARTIAL TR 거의 모든 entity row)
+  ├─ CustomerStd.cmpCd
+  ├─ ProductivityStd.cmpCd
+  ├─ HrSpec.cmpCd
+  ├─ CastSpec.cmpCd
+  ├─ EdgingGroup.cmpCd
+  └─ ... (모든 std + Order/Slab 도)</pre>
+
+  <h4>한 entity 입장에서 (Customer 의 7 컬럼 → 4 atomic + 3 facet)</h4>
+  <pre>CustomerStdJpo
+  ├─ cmpCd          → atomic.shared.cmp           (PARTIAL TR row 1)
+  ├─ orgCd          → atomic.shared.org           (PARTIAL TR row 2)
+  ├─ priority       → <em>composite facet (entity 고유)</em>
+  ├─ productNameCd  → atomic.shared.product_kind  (PARTIAL TR row 3) ← alias chaos
+  ├─ customerCd     → atomic.shared.customer      (PARTIAL TR row 4)
+  ├─ pkgWgtHigh     → <em>composite facet</em>
+  └─ pkgWgtLow      → <em>composite facet</em></pre>
+
+  <div class="my-guess" style="border-color:rgba(16,185,129,0.5);background:rgba(16,185,129,0.04)">
+    <div class="label" style="color:var(--emerald)">★ 핵심</div>
+    <p>매핑 row 의 <strong>unique key = (atomic, codeType, codeField) 3-tuple</strong>. 같은 alias (컬럼명) 도 <strong>entity 별 독립 row</strong>. 충돌 X.</p>
+  </div>
+
+  <h4>드라마 DNA — 같은 컬럼명, 다른 의미</h4>
+  <table>
+    <tr><th>코드 위치</th><th>컬럼명</th><th>매핑 atomic</th><th>의미</th></tr>
+    <tr><td><code>CustomerStd.productNameCd</code></td><td>PRODUCT_NAME_CD</td><td>product_kind</td><td>품종 (제품 카테고리)</td></tr>
+    <tr><td><code>OtherEntity.productNameCd</code> (가상)</td><td>PRODUCT_NAME_CD</td><td>somethingelse</td><td>다른 의미 가능 — 충돌 없이 처리</td></tr>
+  </table>
+  <p class="small">즉 alias 가 같아도 (codeType, codeField) 가 다르면 row 가 다름. 코드 맥락 그대로 살림. 자동 매핑 도구 (recommend) 가 alias 만 보고 자동 배치 가능 → 사용자 confirm 으로 정정 가능.</p>
+
+  <!-- ====================================================================== -->
+  <h3>Q8c — "표준" → "기준" 용어 변경 처리</h3>
+  <div class="panel">
+    <div class="label">결정 (이번 archive 에서 적용)</div>
+    <ul>
+      <li>label <code>고객사설계제한</code> 그대로 (이미 "제한" 사용, 영향 없음)</li>
+      <li>description / 본 HTML 의 "표준" 단어 → "기준" 으로 변경 (Step 3 부터 적용)</li>
+      <li>fqn 의 영문 <code>_std</code> 는 그대로 keep (영문 prefix, 변경 비용 큼. <a href="design-gaps-and-questions.md">design-gaps #9</a> — 다른 6 entity 정정 시 함께 결정)</li>
+      <li>앞으로 "8 표준" → "<strong>8 기준</strong>" 표현 통일</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>★ Step 1 + Step 2 누적 결과 (Step 8 confirm 시점에 큐 반영)</h3>
+  <table>
+    <tr><th>type</th><th>fqn</th><th>변경 vs 자동 추천</th></tr>
+    <tr><td>atomic</td><td><code>term.scm.shared.cmp</code></td><td>+ 신규</td></tr>
+    <tr><td>atomic</td><td><code>term.scm.shared.org</code></td><td>+ 신규</td></tr>
+    <tr><td>atomic</td><td><code>term.scm.shared.proc</code> (enum 8)</td><td>+ 신규</td></tr>
+    <tr><td>atomic</td><td><code>term.scm.shared.grade</code></td><td>+ 신규</td></tr>
+    <tr><td>atomic</td><td><code>term.scm.shared.product_kind</code></td><td>+ 신규</td></tr>
+    <tr><td>atomic</td><td><code>term.scm.shared.customer</code></td><td>+ 신규</td></tr>
+    <tr><td>composite</td><td><code>term.scm.std.customer_design_limit</code></td><td>기존 <code>customer_std</code> → fqn + label + parts (4) + facets (3) + description 보강 + 운영 사례 metadata</td></tr>
+  </table>
+  <p class="small">Step 4 (TR) 에서 Customer 의 PARTIAL TR 4 row 등록. Step 5 에서 findFirstMatch Action + 사용처 realization.</p>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step" id="step-3">
+  <h2>Step 3 — 실수율 기준 (ProductivityStd) composite 보강</h2>
+  <div class="meta">
+    <span class="badge b-discuss">토론</span>
+    <span>큐 row: <code>term.scm.product.productivity_std</code> (자동 추천)</span>
+    <span>패턴: Customer (4 atomic + 3 facet) 와 비교 — 6 atomic + 1 facet (atomic 1단 깊음)</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>현재 큐 row (자동 추천)</h3>
+  <table>
+    <tr><th>field</th><th>현재 값</th></tr>
+    <tr><td>fqn</td><td><code>term.scm.product.productivity_std</code> ★ (다른 7 entity 와 다른 sub-domain)</td></tr>
+    <tr><td>label</td><td>실수율표준</td></tr>
+    <tr><td>kind</td><td>composite</td></tr>
+    <tr><td>domain</td><td><code>scm.product</code> (Q6 에서 S-2 적용 시 <code>scm.std</code> 로)</td></tr>
+    <tr><td>description / parts / facets</td><td>(비어있음)</td></tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>코드 인벤토리 — Productivity 영역 핵심 (Step 0 인벤토리 재확인)</h3>
+
+  <h4>1) ProductivityService 의 3 메서드</h4>
+  <table>
+    <tr><th>메서드</th><th>의미</th><th>비고</th></tr>
+    <tr><td><code>lookup(6 args)</code></td><td>6-축 정확매칭 → null 가능</td><td>repository.findById</td></tr>
+    <tr><td><code>lookupOrDefault(6 args)</code></td><td>null 시 <strong>0.95 fallback</strong></td><td><code>DEFAULT_PRODUCTIVITY = 0.95</code></td></tr>
+    <tr><td><code>cumulativeProductivity(cmp, org, confirmedPlantCd, grade, prodKind, customer)</code></td><td>8 공정 활성 자리 lookup × 곱</td><td>★ 핵심 비즈니스 로직</td></tr>
+  </table>
+
+  <h4>2) DEFAULT_PRODUCTIVITY 변천 (코드 javadoc)</h4>
+  <pre>2017 최초 0.90 → 2019 0.92 → <b>2021 0.95</b> (현재)
+이유: 운영 평균 반영
+TODO(2022-05-17): std 미비 시 운영자 슬랙 알림 (티켓 OPS-2199 — 미진행)</pre>
+
+  <h4>3) 8 공정 (PROC_CODES)</h4>
+  <pre>{ "SM", "HR", "HRF", "CR", "ANL1", "ANL2", "GAL", "CRF" }
+공정 i (0~7) ↔ confirmedPlantCd 의 char i. ' ' = 비활성</pre>
+
+  <h4>4) 운영이슈 보류 2건 (코드 주석에 보존)</h4>
+  <ul>
+    <li><strong>P-2018-0721</strong> — "실수율 과다 → 분할수 폭주" (Round 5 Q9 의미 정정 보류 — 과대인지 과소인지 도메인 확인 필요)</li>
+    <li><strong>P-2020-0834</strong> — std 1.05 등록 → 누적 비정상 상승. 임시 std 화면 검증 추가, 본 메서드 방어로직 보류 (주석으로 남음)</li>
+  </ul>
+
+  <!-- ====================================================================== -->
+  <h3>내 추천 — Productivity 7 컬럼 분해</h3>
+
+  <h4>parts (atomic 6종) — Step 1 결과 그대로 재사용</h4>
+  <table>
+    <tr><th>코드 컬럼</th><th>type</th><th>atomic</th><th>Customer 와 공유?</th></tr>
+    <tr><td><code>cmpCd</code></td><td>string(2)</td><td><code>shared.cmp</code></td><td>★ 공유</td></tr>
+    <tr><td><code>orgCd</code></td><td>string(1)</td><td><code>shared.org</code></td><td>★ 공유</td></tr>
+    <tr><td><code>procCd</code></td><td>string(4) enum 8</td><td><code>shared.proc</code></td><td>(Customer 에 없음)</td></tr>
+    <tr><td><code>gradeCd</code></td><td>string(10)</td><td><code>shared.grade</code></td><td>(Customer 에 없음)</td></tr>
+    <tr><td><code>prodKindCd</code> ★</td><td>string(4)</td><td><code>shared.product_kind</code></td><td>★ 공유 (Customer 의 productNameCd 와 같은 atomic — alias chaos)</td></tr>
+    <tr><td><code>customerCd</code></td><td>string(10)</td><td><code>shared.customer</code></td><td>★ 공유</td></tr>
+  </table>
+
+  <h4>facets (Productivity 고유 1종)</h4>
+  <table>
+    <tr><th>이름</th><th>type</th><th>의미</th></tr>
+    <tr><td><code>productivity</code></td><td>BigDecimal(7,4)</td><td>실수율 0.0~1.0. 안전 가드 0.50 ≤ x ≤ 1.0 (1.0 초과는 std 입력오류로 간주, 운영이슈 P-2020-0834)</td></tr>
+  </table>
+
+  <h4>description 추천 (5문장)</h4>
+  <pre>공정별 실수율 기준 (yield).
+PK = (회사, 소, 공정, 강종, 품종, 고객사) 6-축 <strong>정확매칭 only</strong> (PRIORITY tiebreaker 없음 — Customer 와 차이).
+매칭 실패 시 <strong>default 0.95 fallback</strong> (DEFAULT_PRODUCTIVITY. 2017 0.90 → 2019 0.92 → 2021 0.95 변천. 운영 평균 반영).
+알고리즘 step 6 / 9 / 13 의 <code>cumulativeProductivity</code> 입력 — 8 공정 활성 자리 lookup × 곱.
+운영이슈 보류 2건: P-2018-0721 (실수율 과다 → 분할수 폭주, 의미 정정 보류), P-2020-0834 (std 1.05 등록 누적 비정상, 방어로직 보류).</pre>
+
+  <!-- ====================================================================== -->
+  <h3>Customer 와의 매칭 패턴 차이 (★ 도메인 깊이)</h3>
+  <table>
+    <tr><th>축</th><th>Customer (Step 2 합의)</th><th>Productivity (이번 Step 3)</th></tr>
+    <tr><td>PK</td><td>3-tuple (cmp, org, priority)</td><td>6-tuple (cmp, org, proc, grade, prodKind, customer)</td></tr>
+    <tr><td>매칭 키</td><td>4-key (cmp, org, productName, customer)</td><td>6-key 정확매칭</td></tr>
+    <tr><td>tiebreaker</td><td>PRIORITY ASC</td><td>없음</td></tr>
+    <tr><td>매칭 실패 시</td><td>null = 다른 기준 적용</td><td>0.95 default fallback</td></tr>
+    <tr><td>Q8b 의미</td><td>같은 고객사 품종별 다른 단중 (priority 활용)</td><td>(이번에 결정 — Q7e)</td></tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>Step 3 답변 — 실수율 기준 composite</h4>
+
+    <div class="field">
+      <label><strong>Q1. label / fqn</strong>
+        <span class="recommend">★ 추천 label: <code>실수율 기준</code> (자동 추천 "실수율표준" → Q8c 적용 "기준" 으로) / fqn: <code>term.scm.std.productivity_std</code> (S-2 + 영문 std 그대로)<br>
+        대안 label: <code>공정별 실수율 기준</code> (의미 풍부) / <code>실수율표준</code> 자동 추천 그대로</span>
+      </label>
+      <textarea class="text" name="q1_label_fqn" rows="2" placeholder="예: 추천 / 공정별 실수율 기준 / 자동 추천 그대로"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. description</strong> — 위 5문장 추천 OK?
+        <span class="recommend">★ 추천: 그대로 (PK + 매칭 + default 0.95 변천 + cumulativeProductivity + 운영이슈 2건). "기준" 용어 적용.</span>
+      </label>
+      <textarea class="text" name="q2_description" rows="4" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. parts (atomic 6) OK?</strong>
+        <span class="recommend">★ 추천: 그대로 6 atomic. Step 1 결정 재사용 + cmp/org/customer/product_kind 는 Customer 와 공유.</span>
+      </label>
+      <textarea class="text" name="q3_parts" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. facets 1종 (productivity) OK?</strong>
+        <span class="recommend">★ 추천: 그대로. type BigDecimal(7,4). 안전 가드 0.50~1.0 도 facet metadata 에 기록.</span>
+      </label>
+      <textarea class="text" name="q4_facets" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. domain — Customer 와 같은 S-2 (<code>scm.std</code>)?</strong>
+        <span class="recommend">★ 추천: <strong>S-2 동일</strong> — Customer 와 묶기. 자동 추천의 <code>scm.product</code> 는 폐기.</span>
+      </label>
+      <textarea class="text" name="q5_domain" rows="2" placeholder="예: S-2 / 또는 S-1 (변경 X)"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. 매칭 로직 — Customer 와 다름. 어디 박을까?</strong>
+        <span class="recommend">★ 추천: description 에만 (Customer 와 동일 패턴. 매칭 로직은 사용처 Action 에 박음 — Step 6 의 lookup/lookupOrDefault/cumulativeProductivity).</span>
+      </label>
+      <textarea class="text" name="q6_lookup" rows="2" placeholder="예: description 만 / facet 도"></textarea>
+    </div>
+  </div>
+
+  <!-- Q7 도메인 깊이 카드 -->
+  <div class="panel diff" style="margin-top:18px">
+    <div class="label">Q7. 도메인 깊이 카드 (Customer 보다 풍부 — 운영이슈 / default / 8 공정)</div>
+    <p style="margin:6px 0 10px;font-size:12.5px">5 sub-question. 모르는 부분은 비워둬도 OK.</p>
+  </div>
+
+  <div class="form-section">
+    <div class="field">
+      <label><strong>Q7a. default 0.95 의 운영 의미 + 변천</strong>
+        2017 0.90 → 2019 0.92 → 2021 0.95. <em>"운영 평균 반영"</em> javadoc.
+        <span class="recommend">예: 변천 트리거 (해마다 평균 재계산?) / 0.95 가 너무 낙관적 / std 미비 알림 (OPS-2199) 진행 의미 / 다른?</span>
+      </label>
+      <textarea class="text" name="q7a_default" rows="3" placeholder="예: 평균 매년 재계산 / 0.95 그대로 OK / std 미비 알림 다음 phase ..."></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7b. 8 공정 (PROC_CODES) 의미</strong>
+        SM/HR/HRF/CR/ANL1/ANL2/GAL/CRF — confirmedPlantCd 의 8 자리 매핑.
+        <span class="recommend">예: 각 공정 약어의 풀 네임 / 활성 ' ' 의 도메인 의미 (이 공정 거치지 않음) / 8 자리 순서가 변경 가능?</span>
+      </label>
+      <textarea class="text" name="q7b_proc" rows="3" placeholder="예: SM=제강 / HR=열연 / ' '=이 공정 안 거침 / 순서 고정 ..."></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7c. 운영이슈 P-2018-0721 — "실수율 과다 → 분할수 폭주"</strong>
+        Round 5 Q9 에서 의미 정정 보류. 정확한 도메인 의미?
+        <span class="recommend">예: "실수율 과대 → 분할수 부족" 인지 "실수율 과소 → 분할수 폭주" 인지 / 둘 다 가능?</span>
+      </label>
+      <textarea class="text" name="q7c_issue_2018" rows="3" placeholder="예: 과소 → 폭주 가 정확 / 또는 ___ / 보류 그대로"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7d. 운영이슈 P-2020-0834 — std 1.05 등록 → 누적 비정상</strong>
+        임시 std 화면 검증 추가, 본 메서드 방어로직 보류.
+        <span class="recommend">예: 방어로직 (cap MAX 1.0 / floor MIN 0.5) 도입 결정? / 운영자에게 알림? / 그대로 std 측에서만 막기?</span>
+      </label>
+      <textarea class="text" name="q7d_issue_2020" rows="3" placeholder="예: 도입 / 알림만 / 그대로 보류 ..."></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7e. null vs default 패턴 차이</strong>
+        Customer (null = 다른 기준 적용) vs Productivity (null = default 0.95 fallback). 왜 다름?
+        <span class="recommend">예: Customer 는 fallback 표준 다수 → 그쪽 위임 / Productivity 는 8 공정 곱 = 모든 자리 값 필요 → default 강제 / 다른 이유?</span>
+      </label>
+      <textarea class="text" name="q7e_null_default" rows="3" placeholder="예: 위임 vs 강제 / 또는 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q8. Step 4 (TypeRealization 검증/추가) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. Customer 4 + Productivity 6 PARTIAL TR + 기존 PRIMARY 2 검증 + 다른 layer (Jpo/Logic/Service/Repository) TR 추가 여부.</span>
+      </label>
+      <textarea class="text" name="q8_step4_go" rows="2" placeholder="예: OK / 잠깐 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label>추가 의견</label>
+      <textarea class="text" name="freeform3" rows="2" placeholder="optional"></textarea>
+    </div>
+  </div>
+
+  <div class="ds-actions">
+    <button class="btn primary" data-action="copy-step3">📋 답변 복사 (Step 3)</button>
+    <button class="btn" data-action="preview-step3">미리보기</button>
+    <span class="copy-hint">Q1·Q5·Q8 만 답해도 진행 가능. Q7a~e 는 도메인 깊이 (선택).</span>
+  </div>
+  <div class="preview" id="preview-step3">
+    <div class="preview-label">복사될 내용</div>
+    <div class="preview-body"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step" id="archive-step-3" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 Step 3 답변 받음 — 실수율 기준 composite + 4 의문 풀이</h2>
+  <div class="meta">
+    <span class="badge b-applied">아카이브</span>
+    <span>Q1·Q3~Q6·Q7b·Q8 추천대로 + Q2/Q7a/Q7c/Q7d/Q7e 토론</span>
+  </div>
+
+  <h3>답변 그대로</h3>
+  <div class="applied">
+    <div class="label">사용자 답변</div>
+    <ul>
+      <li><strong>Q1</strong> label/fqn: 추천대로 → label <code>실수율 기준</code> / fqn <code>term.scm.std.productivity_std</code></li>
+      <li><strong>Q2</strong> description: <em>"운영이슈 꼭 들어가야 하는건가? 들어갈거면 명확해야 하는거 아닐까?"</em> ★ 정정 (아래)</li>
+      <li><strong>Q3</strong> parts (atomic 6): 추천대로</li>
+      <li><strong>Q4</strong> facets (1 productivity): 추천대로</li>
+      <li><strong>Q5</strong> domain S-2: 추천대로</li>
+      <li><strong>Q6</strong> 매칭 로직: 추천대로 → description 만</li>
+      <li><strong>Q7a</strong> default 0.95: <em>"매달 실적 계산, 데모는 default 로? 어떻게 되어있지?"</em> ★ 풀이 (아래)</li>
+      <li><strong>Q7b</strong> 8 공정: <em>"순서 변경 불가능"</em> → atomic.proc 의 enum_values 순서 고정 facet</li>
+      <li><strong>Q7c</strong> P-2018-0721: <em>"이해 못하면 폐기"</em> ★ 풀이 + 폐기 결정 (아래)</li>
+      <li><strong>Q7d</strong> P-2020-0834: <em>"방어로직 도입 필요. ontology 제약사항 + 코드 위반 시 모델러에게 알림 UI"</em> ★ 큰 토론 (아래)</li>
+      <li><strong>Q7e</strong> null vs default: <em>"고객사제한은 optional, 실수율은 mandatory"</em> ★ 도메인 통찰 (아래)</li>
+      <li><strong>Q8</strong> Step 4 진입: 추천대로</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>★ Q2 정정 — description 에서 운영이슈 빼기</h3>
+  <div class="panel">
+    <div class="label">사용자 통찰 (정확)</div>
+    <p>운영이슈는 (1) composite 의 도메인 의미가 아니고, (2) 표현 명확하지 않으면 더 혼란.
+    composite description = 도메인 의미만. 운영이슈는 사용처 (Action) 의 metadata.known_issues 에 박는 게 자연.</p>
+  </div>
+
+  <p><strong>Step 3 description (정정 — 4문장, 운영이슈 제외):</strong></p>
+  <pre>공정별 실수율 기준 (yield).
+PK = (회사, 소, 공정, 강종, 품종, 고객사) 6-축 정확매칭 only (PRIORITY tiebreaker 없음 — 고객사설계제한 과 차이).
+매칭 실패 시 default 0.95 fallback (DEFAULT_PRODUCTIVITY).
+알고리즘 step 6 / 9 / 13 의 cumulativeProductivity 입력 — 8 공정 활성 자리 lookup × 곱.</pre>
+  <p class="small">→ 운영이슈 (P-2018-0721 / P-2020-0834) 는 <strong>Step 6 — Productivity Action 의 metadata.known_issues</strong> 에 박음. composite term 자체는 깔끔.</p>
+
+  <!-- ====================================================================== -->
+  <h3>★ Q7a 풀이 — default 0.95 의 운영 vs 데모</h3>
+
+  <h4>운영 환경</h4>
+  <ul>
+    <li><strong>매달 실적 데이터</strong> 로 (회사/소/공정/강종/품종/고객사) 6-축 별 실수율 계산</li>
+    <li>운영자 (또는 std 등록 시스템) 가 ProductivityStd 테이블에 row 등록 / 갱신</li>
+    <li>매월 새 row → 정확매칭 가능 → <code>lookup()</code> 이 정확한 값 반환</li>
+  </ul>
+
+  <h4>코드 default 0.95 (DEFAULT_PRODUCTIVITY)</h4>
+  <ul>
+    <li>운영 평균 (대량 row 들의 평균) 을 hardcoded</li>
+    <li>변천: 2017 0.90 → 2019 0.92 → <strong>2021 0.95</strong> (3~5년에 1회 코드 patch 로 갱신)</li>
+    <li>역할: std 미등록 row 일 때 fallback (운영자 입력 누락 / 새 강종-품종-고객사 조합 / ...)</li>
+    <li>TODO OPS-2199: std 미비 시 운영자 슬랙 알림 — 미진행 (운영 사각지대)</li>
+  </ul>
+
+  <h4>데모 (slab-design-real repo)</h4>
+  <ul>
+    <li><strong>ProductivityStd 테이블 비어있음</strong> (실제 DB 없음 — 정적 코드만)</li>
+    <li>모든 <code>lookup()</code> 호출 → null → <code>lookupOrDefault</code> 가 0.95 반환</li>
+    <li>그러므로 데모의 <code>cumulativeProductivity</code> = <strong>0.95 ^ N</strong> (N = 활성 공정 수)</li>
+    <li>예: 8 공정 모두 활성 → 0.95^8 = 0.66 / 4 공정만 활성 → 0.95^4 = 0.81</li>
+  </ul>
+
+  <h4>의미 (Step 6 Action.metadata 에 박을 것)</h4>
+  <p>운영 환경에서는 std 정확매칭이 우선, 0.95 는 안전망. 데모에서는 0.95 가 사실상 모든 자리에 적용. 시뮬 시 std fixture 추가하면 정확매칭 가능 (<a href="design-gaps-and-questions.md">design-gaps #4</a>).</p>
+
+  <!-- ====================================================================== -->
+  <h3>★ Q7c 풀이 — P-2018-0721 "실수율 과다 → 분할수 폭주"</h3>
+
+  <h4>관련 코드 (SdMaxSplitCountAction Step 7)</h4>
+  <pre>// ceil(secondWgtHigh / orderWgtHigh / productivity)
+BigDecimal raw = slab.getSecondWgtHigh()
+    .divide(order.getOrderWgtHigh(), ...)
+    .divide(order.getProductivity(), ...);
+int maxSplit = raw.setScale(0, RoundingMode.CEILING).intValueExact();
+if (maxSplit &lt; 1) throw new AlgorithmException(...);  // 분할 불가</pre>
+
+  <h4>productivity 변화에 따른 maxSplit 변화</h4>
+  <table>
+    <tr><th>productivity</th><th>분모 (orderWgtHigh × productivity)</th><th>maxSplit</th><th>결과</th></tr>
+    <tr><td>1.0 (이상치, 안전상한)</td><td>가장 큼</td><td>가장 작음</td><td>분할수 부족 (1 slab 가 적은 product)</td></tr>
+    <tr><td>0.95 (default)</td><td>정상</td><td>정상</td><td>—</td></tr>
+    <tr><td>0.50 (안전하한)</td><td>가장 작음</td><td>가장 큼</td><td>분할수 폭주 (1 slab 가 많은 product)</td></tr>
+  </table>
+
+  <p class="small">→ <strong>"실수율 과소 → 분할수 폭주"</strong> 가 자연 의미. 이슈 제목 <em>"실수율 과다 → 분할수 폭주"</em> 는 <strong>반대로 표현됨</strong>.</p>
+
+  <h4>가능 해석</h4>
+  <ul>
+    <li>(a) 이슈 제목이 잘못 (운영자가 실수)</li>
+    <li>(b) "과다" 가 다른 의미 — 예: 운영자가 실수율을 <em>과다하게 추정</em> (과대 입력) → DB 에 1.05 등록 → P-2020-0834 와 같은 이슈?</li>
+    <li>(c) 다른 도메인 맥락</li>
+  </ul>
+
+  <h4>★ 결정 — 폐기</h4>
+  <div class="panel gap">
+    <div class="label">사용자 결정</div>
+    <p><em>"이해 못하면 폐기"</em> → ontology 에 박지 말기. Action.metadata 에 노트만 남김:</p>
+    <pre>known_issues:
+  - issue_id: P-2018-0721
+    summary: "실수율 과다 → 분할수 폭주" (제목 자연 의미와 반대 — 보류)
+    status: <strong>deferred — 의미 정정 필요</strong>
+    next: 다음 운영자 인터뷰에 재확인</pre>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>★★ Q7d 큰 토론 — 방어로직 + ontology 제약사항 + UI/UX</h3>
+
+  <div class="quote">
+    <div class="label">사용자 인용 (정확)</div>
+    "방어로직을 도입해야하는데, 아직 레거시 코드는 방어로직이 없는 거잖아? 온톨로지 레벨에서는 제약사항으로 걸어놔야 하는 것 같고,
+    소스는 그걸 따르고 있지 않다면 제약사항을 어길 수 있다고 모델링 하는 사람에게 알려줄 수 있도록 UI/UX가 되어야 할 것 같은데,
+    어떻게 해야할지 너와의 고찰이 필요하다"
+  </div>
+
+  <h4>① 사용자 통찰의 본질</h4>
+  <ul>
+    <li><strong>도메인 ground truth</strong> (ontology): productivity 의 안전 가드 0.50 ≤ x ≤ 1.0</li>
+    <li><strong>코드 ground truth</strong>: 가드 검증 안 함 (P-2020-0834 방어로직 보류)</li>
+    <li>두 ground truth 가 어긋남 → <strong>모델링 하는 사람이 갭 알 수 있어야 함</strong></li>
+    <li>이건 정확히 <a href="design-gaps-and-questions.md">design-gaps #6 Gap Inspector</a> + <a href="design-gaps-and-questions.md">#11 ground truth 충돌</a> 영역</li>
+  </ul>
+
+  <h4>② ontology 모델링 옵션</h4>
+
+  <h5>옵션 (a) facet 의 constraint sub-field</h5>
+  <pre>composite term.scm.std.productivity_std:
+  facets:
+    productivity:
+      type: BigDecimal(7,4)
+      <strong>constraint:</strong>
+        min: 0.50
+        max: 1.00
+        severity: HIGH
+        note: "1.0 초과는 std 입력오류로 간주 (P-2020-0834)"</pre>
+
+  <h5>옵션 (b) 별도 BusinessRule entity (Round 5 archive 의 모델)</h5>
+  <pre>BusinessRule:
+  fqn: rule.scm.std.productivity_safe_range
+  applies_to_term: term.scm.std.productivity_std
+  applies_to_facet: productivity
+  expression: "0.50 &lt;= productivity &lt;= 1.0"
+  severity: HIGH
+  evidence: P-2020-0834 (2020-04 운영이슈)
+  enforced_by: []     <strong># TODO — 검증 코드 없음 (방어로직 보류)</strong>
+  violated_at_call: ProductivityService.cumulativeProductivity (가드 분기 부재)</pre>
+
+  <p class="small"><strong>★ 내 추천: 옵션 (b)</strong> — BusinessRule 별도 entity. 갭 시각화 + 영향 추적 가능. ontology 의 정형 표현. Round 5 archive 에 이미 합의된 패턴.</p>
+
+  <h4>③ 자동 갭 검출 (Gap Inspector)</h4>
+  <ul>
+    <li>코드 분석: <code>cumulativeProductivity</code> body 의 AST 에서 <code>if (p &gt; MAX) ...</code> 또는 <code>if (p &lt; MIN) ...</code> 가드 분기 검사</li>
+    <li>가드 없음 → BusinessRule 위반 → 갭 entity 자동 생성 (Round 5 archive Gap entity 모델)</li>
+    <li>큐 row → 사용자 분류 (코드 결함 / 의도된 단순화 / 개선 candidate)</li>
+  </ul>
+
+  <h4>④ UI/UX 제안</h4>
+  <ul>
+    <li><strong>composite term 카드</strong>의 「제약사항 (Rules)」 섹션 — facet 별 constraint + 코드 검증 상태 표시</li>
+    <li>각 rule 옆 <strong>상태 배지</strong>:
+      <ul>
+        <li>🟢 <code>ENFORCED</code> — 코드가 가드 분기로 검증함 (자동 검출)</li>
+        <li>🟡 <code>UNENFORCED</code> — 코드가 검증 안 함 (잠재 결함)</li>
+        <li>🔴 <code>VIOLATED</code> — 코드가 명시적으로 위반 (예: 1.05 hardcoded)</li>
+      </ul>
+    </li>
+    <li><strong>amber 알림</strong> — 새 매핑 등록 시 "이 코드는 rule X 검증 안 함, 계속할래요?" toast</li>
+    <li><strong>Workbench 우측 R 패널</strong>에 갭 누적 dashboard (Gap Inspector 의 G-2 inline 워크플로우)</li>
+  </ul>
+
+  <h4>⑤ 이번 세션에서 할 것 vs 미루기</h4>
+  <table>
+    <tr><th>작업</th><th>이번 세션</th></tr>
+    <tr><td>BusinessRule 모델 합의 (옵션 b)</td><td><strong>✓ 적용</strong> — Step 7 (AnchorBinding) 에서 cumulativeProductivity body anchor 등록 시 같이</td></tr>
+    <tr><td>Step 7 후속 — productivity_safe_range rule entity 등록</td><td>✓ Step 7 에서</td></tr>
+    <tr><td>자동 Gap Inspector (코드 가드 분기 자동 검출)</td><td><strong>✗ 보류</strong> — Round 5 Phase A.7.7 영역, 별 phase</td></tr>
+    <tr><td>UI 「제약사항」 섹션 + 상태 배지 (🟢🟡🔴)</td><td><strong>✗ 보류</strong> — frontend 작업, 별 phase</td></tr>
+    <tr><td>design-gaps.md #13 신규 등록</td><td><strong>✓ 적용</strong> — 별도 파일에 추적</td></tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>★ Q7e 도메인 통찰 — null vs default = optional vs mandatory</h3>
+
+  <div class="quote">
+    <div class="label">사용자 인용 (정확)</div>
+    "고객사제한은 특정 고객사의 제한이니까 제한이 없으면 무시하면 되지만, 실수율은 무시할 수 있는게 아니라
+    실제로 공정, 공장별로 존재하는 내용이잖아? 그래서 그런거지"
+  </div>
+
+  <p>이 통찰을 ontology 에 표현:</p>
+  <pre>composite term.scm.std.customer_design_limit:
+  facets:
+    <strong>lookup_strategy: optional</strong>     # 매칭 실패 = 다른 기준만
+    fallback_kind: skip
+
+composite term.scm.std.productivity_std:
+  facets:
+    <strong>lookup_strategy: mandatory</strong>    # 매칭 실패 = default fallback (필수)
+    fallback_kind: default_value
+    fallback_value: 0.95
+    fallback_source: DEFAULT_PRODUCTIVITY (운영 평균 hardcoded)</pre>
+
+  <p class="small">→ Customer 와 Productivity 의 룩업 패턴 차이가 명시적. 다른 기준 (HrSpec / EdgingSpec / ...) 도 같은 facet 으로 분류 가능. <strong>Step 6 (Productivity Action) 의 lookup/lookupOrDefault</strong> 의 동작이 이 facet 에서 자동 도출.</p>
+
+  <!-- ====================================================================== -->
+  <h3>★ Step 1+2+3 누적 결과</h3>
+  <table>
+    <tr><th>type</th><th>fqn</th><th>비고</th></tr>
+    <tr><td>atomic ×6</td><td><code>shared.{cmp, org, proc, grade, product_kind, customer}</code></td><td>+ enum_values facet (proc 8 값)</td></tr>
+    <tr><td>composite</td><td><code>scm.std.customer_design_limit</code></td><td>4 atomic + 3 facet (priority/pkg_wgt_high/pkg_wgt_low). lookup_strategy=optional</td></tr>
+    <tr><td>composite</td><td><code>scm.std.productivity_std</code></td><td>6 atomic + 1 facet (productivity). lookup_strategy=mandatory + default 0.95</td></tr>
+    <tr><td>BusinessRule (NEW)</td><td><code>rule.scm.std.productivity_safe_range</code></td><td>0.50 ≤ x ≤ 1.0. severity=HIGH. enforced_by=[] (방어로직 미구현)</td></tr>
+  </table>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step" id="step-4">
+  <h2>Step 4 — TypeRealization 검증/추가</h2>
+  <div class="meta">
+    <span class="badge b-discuss">토론</span>
+    <span>큐 row: 기존 PRIMARY 2 (Customer+Productivity Entity)</span>
+    <span>+ atomic PARTIAL TR Customer 4 + Productivity 6 + Jpo PRIMARY 2 (drama DNA 두 mirror) 결정</span>
+  </div>
+
+  <h3>현재 큐의 TR 2 row (자동 추천)</h3>
+  <table>
+    <tr><th>term</th><th>codeType</th><th>scope</th><th>비고</th></tr>
+    <tr>
+      <td><code>term.scm.customer_std</code> → 변경: <code>customer_design_limit</code></td>
+      <td><code>CustomerStdEntity</code></td>
+      <td>PRIMARY</td>
+      <td>label / fqn 변경 필요 (Step 2 결정)</td>
+    </tr>
+    <tr>
+      <td><code>term.scm.product.productivity_std</code> → 변경: <code>scm.std.productivity_std</code></td>
+      <td><code>SdProductivityStdEntity</code></td>
+      <td>PRIMARY</td>
+      <td>domain 변경 필요 (Step 3 결정)</td>
+    </tr>
+  </table>
+
+  <h3>내 추천 — Customer 의 추가 PARTIAL TR (4 row)</h3>
+  <table>
+    <tr><th>atomic</th><th>codeField (Entity)</th><th>scope</th></tr>
+    <tr><td><code>shared.cmp</code></td><td>CustomerStdEntity.cmpCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>shared.org</code></td><td>CustomerStdEntity.orgCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>shared.product_kind</code></td><td>CustomerStdEntity.productNameCd ★</td><td>PARTIAL (alias)</td></tr>
+    <tr><td><code>shared.customer</code></td><td>CustomerStdEntity.customerCd</td><td>PARTIAL</td></tr>
+  </table>
+
+  <h3>내 추천 — Productivity 의 추가 PARTIAL TR (6 row)</h3>
+  <table>
+    <tr><th>atomic</th><th>codeField (Entity)</th><th>scope</th></tr>
+    <tr><td><code>shared.cmp</code></td><td>SdProductivityStdEntity.cmpCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>shared.org</code></td><td>SdProductivityStdEntity.orgCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>shared.proc</code></td><td>SdProductivityStdEntity.procCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>shared.grade</code></td><td>SdProductivityStdEntity.gradeCd</td><td>PARTIAL</td></tr>
+    <tr><td><code>shared.product_kind</code></td><td>SdProductivityStdEntity.prodKindCd ★</td><td>PARTIAL (alias)</td></tr>
+    <tr><td><code>shared.customer</code></td><td>SdProductivityStdEntity.customerCd</td><td>PARTIAL</td></tr>
+  </table>
+
+  <h3>다른 layer (Jpo / PK / Logic / Service / Repository) 처리</h3>
+  <table>
+    <tr><th>코드 layer</th><th>역할</th><th>도메인 매핑 추천</th></tr>
+    <tr>
+      <td><code>CustomerStdJpo</code> · <code>SdProductivityStdJpo</code></td>
+      <td>JPA @Entity (DB schema mirror)</td>
+      <td>★ <strong>PRIMARY 추가</strong> — drama DNA. Entity 와 Jpo 가 같은 composite 의 두 mirror. 자동 매핑 도구가 둘 다 발견 가능. + 추가 PARTIAL TR (atomic ↔ Jpo field) — Customer 4 + Productivity 6 추가</td>
+    </tr>
+    <tr>
+      <td><code>CustomerStdPK</code> · <code>SdProductivityStdPK</code></td>
+      <td>@IdClass (composite PK)</td>
+      <td>매핑 X — framework 표현. PK 는 composite 의 일부지만 도메인 의미 별도 표현 (composite 의 PK part facet) 으로 충분</td>
+    </tr>
+    <tr>
+      <td><code>CustomerStdLogic</code> · <code>SdProductivityStdLogic</code></td>
+      <td>Jpo → Entity 변환 (toEntity)</td>
+      <td>매핑 X — Method.role=adapter. Action 도 아님</td>
+    </tr>
+    <tr>
+      <td><code>CustomerStdService</code> · <code>ProductivityService</code></td>
+      <td>비즈니스 로직 (findFirstMatch / lookup / cumulativeProductivity)</td>
+      <td>매핑 X (TR 차원) — Method.role=business. Step 5/6 에서 Action + Realization 으로 처리</td>
+    </tr>
+    <tr>
+      <td><code>CustomerStdRepository</code> · <code>SdProductivityStdRepository</code></td>
+      <td>Spring Data JPA</td>
+      <td>매핑 X — Method.role=adapter</td>
+    </tr>
+  </table>
+
+  <h3>한 atomic 의 PARTIAL TR row 확장 미리 보기 (Q4 의문 시각화)</h3>
+  <pre>term.scm.shared.cmp  ← (PARTIAL TR 4 row 가 이번 Step 4 에서 등록)
+  ├─ CustomerStdEntity.cmpCd
+  ├─ CustomerStdJpo.cmpCd
+  ├─ SdProductivityStdEntity.cmpCd
+  └─ SdProductivityStdJpo.cmpCd
+
+term.scm.shared.product_kind  ← (PARTIAL TR 4 row + alias 표현)
+  ├─ CustomerStdEntity.productNameCd     (alias #1)
+  ├─ CustomerStdJpo.productNameCd        (alias #1)
+  ├─ SdProductivityStdEntity.prodKindCd  (alias #2)
+  └─ SdProductivityStdJpo.prodKindCd     (alias #2)</pre>
+  <p class="small">→ 이게 우리 도구의 차별 가치. Entity ↔ Jpo 의 1:1 mirror 관계 + 컬럼 alias chaos 를 ontology 가 자동 정리.</p>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>Step 4 답변 — TypeRealization 검증/추가</h4>
+
+    <div class="field">
+      <label><strong>Q1. 기존 PRIMARY 2 row 변경 적용 OK?</strong>
+        Customer Entity → <code>scm.std.customer_design_limit</code>, Productivity Entity → domain 변경 (<code>scm.product</code> → <code>scm.std</code>).
+        <span class="recommend">★ 추천 OK. label / fqn / domain 정정 반영.</span>
+      </label>
+      <textarea class="text" name="q1_existing_primary" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. Customer 4 PARTIAL TR (atomic ↔ Entity field) OK?</strong>
+        <span class="recommend">★ 추천 그대로. cmp/org/product_kind/customer ↔ CustomerStdEntity.{cmpCd,orgCd,productNameCd,customerCd}</span>
+      </label>
+      <textarea class="text" name="q2_customer_partial" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. Productivity 6 PARTIAL TR (atomic ↔ Entity field) OK?</strong>
+        <span class="recommend">★ 추천 그대로. cmp/org/proc/grade/product_kind/customer ↔ SdProductivityStdEntity.*</span>
+      </label>
+      <textarea class="text" name="q3_productivity_partial" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. Jpo 추가 PRIMARY (drama DNA 두 mirror) OK?</strong>
+        Entity 와 Jpo 가 같은 composite 의 두 mirror — 둘 다 PRIMARY + Jpo 의 4+6=10 PARTIAL TR 추가.
+        <span class="recommend">★ 추천 OK — 자동 매핑 도구의 가치 시연 (Entity ↔ Jpo 1:1 mirror 자동 발견).<br>
+        대안: Jpo 매핑 X (framework layer 만, Entity 만 도메인 mirror)</span>
+      </label>
+      <textarea class="text" name="q4_jpo_primary" rows="2" placeholder="예: OK / Jpo 매핑 X (Entity 만)"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. PK / Logic / Service / Repository 매핑 X OK?</strong>
+        <span class="recommend">★ 추천 OK. PK = framework 표현. Logic/Repository = adapter (role 무관). Service = Step 5/6 에서 Action+Realization.</span>
+      </label>
+      <textarea class="text" name="q5_other_layer" rows="2" placeholder="예: OK / 또는 PK 도 PARTIAL ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. 도메인 깊이 — atomic 입장에서 1 atomic ↔ N PARTIAL TR row 의미 OK?</strong>
+        예: <code>shared.cmp</code> 가 4 row (Customer Entity + Customer Jpo + Productivity Entity + Productivity Jpo). 다른 표준 (HrSpec 등) 추가 시 row 더 늘어남.
+        <span class="recommend">예: OK 그대로 / 또는 의문 ___</span>
+      </label>
+      <textarea class="text" name="q6_atomic_view" rows="3" placeholder="예: OK / 또는 ___ 의문"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7. Step 5 (Customer Action — findFirstMatch + 사용처) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. Customer 의 ontology 부분 마무리 후 Action layer.</span>
+      </label>
+      <textarea class="text" name="q7_step5_go" rows="2" placeholder="예: OK / 잠깐 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label>추가 의견</label>
+      <textarea class="text" name="freeform4" rows="2" placeholder="optional"></textarea>
+    </div>
+  </div>
+
+  <div class="ds-actions">
+    <button class="btn primary" data-action="copy-step4">📋 답변 복사 (Step 4)</button>
+    <button class="btn" data-action="preview-step4">미리보기</button>
+    <span class="copy-hint">대부분 추천대로면 한 단어 OK</span>
+  </div>
+  <div class="preview" id="preview-step4">
+    <div class="preview-label">복사될 내용</div>
+    <div class="preview-body"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step" id="archive-step-4" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 Step 4 답변 받음 — TR 합의 + Q5 시뮬 흐름 풀이</h2>
+  <div class="meta">
+    <span class="badge b-applied">아카이브</span>
+    <span>Q1~Q4·Q6·Q7 OK + Q5 ★ 시뮬레이션 + 다른 layer 처리 (큰 카드)</span>
+  </div>
+
+  <h3>답변 그대로</h3>
+  <div class="applied">
+    <div class="label">사용자 답변</div>
+    <ul>
+      <li><strong>Q1</strong> 기존 PRIMARY 2 변경 반영: OK (Customer → <code>customer_design_limit</code>, Productivity → <code>scm.std</code>)</li>
+      <li><strong>Q2</strong> Customer 4 PARTIAL: OK</li>
+      <li><strong>Q3</strong> Productivity 6 PARTIAL: OK</li>
+      <li><strong>Q4</strong> Jpo 추가 PRIMARY (drama DNA 두 mirror): OK + Jpo 의 4+6 PARTIAL 추가</li>
+      <li><strong>Q5</strong> 다른 layer 매핑 X: OK + ★ <em>"시뮬레이션 만들때 에이전트가 이부분을 잘 이해할까? 따로 뭘하지 않아도? 대비가 되어있나?"</em> (아래 큰 풀이)</li>
+      <li><strong>Q6</strong> atomic ↔ N row: OK</li>
+      <li><strong>Q7</strong> Step 5 진입: OK</li>
+    </ul>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>★★ Q5 큰 풀이 — 시뮬레이션 + 다른 layer 처리 (사용자 의문에 답)</h3>
+
+  <div class="quote">
+    <div class="label">사용자 인용 (정확)</div>
+    "다른 layer 매핑 X, 그런데 시뮬레이션 만들때 에이전트가 이부분을 잘 이해할까? 따로 뭘하지 않아도?
+    아니면 내가 지금 까먹어서 그렇지 대비가 되어있나?"
+  </div>
+
+  <h4>① 결론 먼저 — 일부 대비됨, 일부 미해결</h4>
+  <ul>
+    <li>✓ <strong>Step 5/6/7 합의 후 핵심 흐름 가능</strong> (Action + Realization + AnchorBinding 으로)</li>
+    <li>✓ 매핑 안 한 layer (Logic/PK/Repository/Service) — <strong>각각 자동 처리 가능</strong> (아래 ④)</li>
+    <li>✗ <strong>미해결 영역 4건</strong> 있음 — design-gaps #1, #4, #5, #13. 발표 전 결정 권장.</li>
+  </ul>
+
+  <h4>② 시뮬레이션 흐름 (cumulativeProductivity 예시 — ChangeSpec "default 0.95 → 0.92")</h4>
+  <pre>[1] 사용자 ChangeSpec 입력
+       └─ "DEFAULT_PRODUCTIVITY 0.95 → 0.92"
+
+[2] PythonGenerator <span class="label"># Step 5/6/7 ontology 활용</span>
+       ├─ Action.cumulative_productivity (Step 6 정의)
+       │    params: 6 atomic, return: BigDecimal facet
+       ├─ Realization (Step 6): CodeMethod cumulativeProductivity
+       ├─ AnchorBinding (Step 7):
+       │    - literal anchor: DEFAULT_PRODUCTIVITY = 0.95 → ChangeSpec 의 변경 적용 위치
+       │    - branch anchor: <code>charAt(i) == ' '</code> → 8 공정 활성 검증
+       │    - literal anchor: PROC_CODES enum (변경 불가, Step 3 Q7b)
+       ├─ lookup_strategy facet (Step 3 결정): mandatory + default fallback
+       └─ BusinessRule.productivity_safe_range (Step 7 — 0.50~1.0)
+
+[3] 한국어 Python 함수 자동 생성
+def <strong>누적_실수율_계산</strong>(회사, 소, 확정통과공장코드, 강종, 품종, 고객사):
+    if 확정통과공장코드 is None or len(확정통과공장코드) &lt; 8:
+        return <strong>0.92</strong>  <span class="label"># ChangeSpec 적용</span>
+    누적 = 1.0
+    for i in range(8):
+        if 확정통과공장코드[i] == ' ':
+            continue
+        실수율 = 실수율_정확매칭_or_default(회사, 소, 공정[i], 강종, 품종, 고객사)
+        누적 *= 실수율
+    return 누적
+
+[4] ScenarioInputAdapter (mock DB)
+       └─ ProductivityStd row fixture (사용자 form 입력 — <a href="design-gaps-and-questions.md">design-gaps #4</a>)
+
+[5] RestrictedPython sandbox 실행
+
+[6] before/after diff
+       before (0.95): 누적 = 0.66 (8 공정 활성 시)
+       after  (0.92): 누적 = 0.51
+
+[7] 통과 시 → Java draft PR (review only)
+       └─ ProductivityService 의 DEFAULT_PRODUCTIVITY = 0.92 변경 commit</pre>
+
+  <h4>③ 매핑 안 한 layer — 어떻게 자동 처리?</h4>
+  <table>
+    <tr><th>코드 layer</th><th>sandbox 처리</th><th>왜 매핑 X 로 OK?</th></tr>
+    <tr>
+      <td><code>CustomerStdLogic.toEntity</code> · <code>SdProductivityStdLogic.toEntity</code></td>
+      <td>자동 trivial transform</td>
+      <td>Jpo 와 Entity 가 같은 dataclass (sandbox 에서 둘 다 dict 또는 dataclass). 변환 자체는 setter 7회의 단순 카피. ontology 매핑 안 해도 자동 generation</td>
+    </tr>
+    <tr>
+      <td><code>CustomerStdPK</code> · <code>SdProductivityStdPK</code></td>
+      <td>dict key (튜플)</td>
+      <td>sandbox 에서 룩업 = <code>fixture[(cmp, org, proc, grade, prodKind, customer)]</code>. PK class 자체는 framework 표현, 도메인 의미 X</td>
+    </tr>
+    <tr>
+      <td><code>CustomerStdRepository</code> · <code>SdProductivityStdRepository</code></td>
+      <td>ScenarioInputAdapter mock 으로 대체</td>
+      <td>실제 DB 호출 X. sandbox 의 lookup = fixture dict 검색. design-gaps #4 의 결정 영역</td>
+    </tr>
+    <tr>
+      <td><code>CustomerStdService.findFirstMatch</code> · <code>ProductivityService.{lookup, lookupOrDefault, cumulativeProductivity}</code></td>
+      <td><strong>Step 5/6 의 Action + Realization 으로 매핑</strong></td>
+      <td>비즈니스 로직 (Method.role=business). Action 매핑 후 sandbox 의 함수 entry point. 이번 Step 5 + Step 6 에서 처리</td>
+    </tr>
+  </table>
+
+  <h4>④ 대비된 영역 vs 미해결 영역</h4>
+  <table>
+    <tr><th>영역</th><th>대비 상태</th><th>위치</th></tr>
+    <tr><td>Action 정의 (signature, kind, params, return)</td><td>✓ 대비</td><td>Step 5/6 (이번 세션)</td></tr>
+    <tr><td>Realization (Action ↔ method)</td><td>✓ 대비</td><td>Step 5/6 (이번 세션)</td></tr>
+    <tr><td>AnchorBinding (body literal/branch)</td><td>✓ 대비</td><td>Step 7 (이번 세션)</td></tr>
+    <tr><td>lookup_strategy (optional/mandatory)</td><td>✓ Step 3 합의</td><td>composite.facets</td></tr>
+    <tr><td>BusinessRule (constraint)</td><td>✓ Step 7 추가 결정</td><td>Step 3 archive 의 Q7d 토론</td></tr>
+    <tr><td>Logic / PK / Repository 자동 처리</td><td>✓ 대비 (sandbox generation 시)</td><td>PythonGenerator</td></tr>
+    <tr><td><strong>SIM_VERIFIED 자동 결정 기준</strong></td><td>✗ 미해결</td><td><a href="design-gaps-and-questions.md">design-gaps #1</a></td></tr>
+    <tr><td><strong>시뮬 input fixture source</strong></td><td>✗ 미해결</td><td><a href="design-gaps-and-questions.md">design-gaps #4</a></td></tr>
+    <tr><td><strong>Java dispatch sandbox 재현</strong> (다형성)</td><td>✗ 미해결</td><td><a href="design-gaps-and-questions.md">design-gaps #5</a></td></tr>
+    <tr><td><strong>BusinessRule 위반 코드의 시뮬 신뢰도</strong></td><td>✗ 미해결</td><td><a href="design-gaps-and-questions.md">design-gaps #13</a></td></tr>
+  </table>
+
+  <h4>⑤ 정리 — 답</h4>
+  <div class="panel diff">
+    <div class="label">사용자 의문에 대한 직접 답</div>
+    <p><strong>"대비가 되어있나?"</strong> — <strong>이번 세션 끝까지 합의하면 매핑 안 한 layer 도 자동 처리 가능</strong>.
+    Logic = trivial, PK = dict key, Repository = mock, Service = Action 매핑.
+    Action / AnchorBinding / facet (lookup_strategy / constraint) 가 시뮬에 필요한 모든 정보를 담음.</p>
+    <p><strong>"따로 뭘 하지 않아도?"</strong> — 매핑 차원에서는 추가 X.
+    단 시뮬 작동 자체는 4 미해결 영역 (input fixture / SIM_VERIFIED / Java dispatch / BusinessRule 위반) 에 의존.
+    이건 design-gaps 에 트래킹 — 발표 전 결정 권장.</p>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>★ Step 1+2+3+4 누적 결과 (Step 8 confirm 시점에 큐 반영)</h3>
+  <table>
+    <tr><th>type</th><th>fqn</th><th>row 수 / 비고</th></tr>
+    <tr><td>atomic</td><td><code>shared.{cmp, org, proc, grade, product_kind, customer}</code></td><td>6 신규</td></tr>
+    <tr><td>composite</td><td><code>scm.std.customer_design_limit</code></td><td>1 보강</td></tr>
+    <tr><td>composite</td><td><code>scm.std.productivity_std</code></td><td>1 보강 (domain 변경)</td></tr>
+    <tr><td>BusinessRule</td><td><code>rule.scm.std.productivity_safe_range</code></td><td>1 신규 (Step 7 상세)</td></tr>
+    <tr><td>TR PRIMARY</td><td>Customer/Productivity Entity + Jpo</td><td>4 (기존 2 갱신 + 신규 2 Jpo)</td></tr>
+    <tr><td>TR PARTIAL</td><td>atomic ↔ Entity field + atomic ↔ Jpo field</td><td>20 (Customer 4×2 + Productivity 6×2)</td></tr>
+  </table>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step" id="step-5">
+  <h2>Step 5 — Customer Action (findFirstMatch + 사용처 references)</h2>
+  <div class="meta">
+    <span class="badge b-discuss">토론</span>
+    <span>큐 row: 0 (Customer 영역 Action 자동 추천 안 됨)</span>
+    <span>대상: <code>CustomerStdService.findFirstMatch</code> + 사용처 SdSecondWgt[Low/High]Action</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>코드 인벤토리 — Customer 영역 Action</h3>
+
+  <h4>핵심 메서드 — <code>CustomerStdService.findFirstMatch</code></h4>
+  <pre>public CustomerStdEntity findFirstMatch(
+    String cmpCd, String orgCd,
+    String productNameCd, String customerCd) {
+
+    List&lt;CustomerStdJpo&gt; matches = repository
+        .findByCmpCdAndOrgCdAndProductNameCdAndCustomerCdOrderByPriorityAsc(
+            cmpCd, orgCd, productNameCd, customerCd);
+    if (matches.isEmpty()) return null;
+    return logic.toEntity(matches.get(0));
+}</pre>
+
+  <h4>사용처 (Step 0 인벤토리)</h4>
+  <table>
+    <tr><th>Action 클래스</th><th>algorithm step</th><th>사용 패턴</th></tr>
+    <tr>
+      <td><code>SdSecondWgtLowAction</code></td>
+      <td>Step 5 — 단중하한 산정</td>
+      <td><strong>max</strong>(EdgingMin, HrMinWgt, <strong>findFirstMatch().pkg_wgt_low</strong>, ...) — 룰엔진 fallback 한 입력</td>
+    </tr>
+    <tr>
+      <td><code>SdSecondWgtHighAction</code></td>
+      <td>Step 6 — 단중상한 산정</td>
+      <td><strong>min</strong>(EdgingMax, HrMaxWgt, <strong>findFirstMatch().pkg_wgt_high</strong>, ...) — 룰엔진 fallback</td>
+    </tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>내 추천 — Customer Action 정의</h3>
+  <pre>Action:
+  fqn:          action.scm.std.find_customer_design_limit
+  label:        고객사설계제한 조회
+  description:  특정 고객사 (cmp, org, productKind, customer) 4-key 매칭 후
+                PRIORITY ASC 첫 row 반환. 매칭 실패 시 null = 다른 기준만 적용 (lookup_strategy=optional).
+  kind:         pure_function    <span class="label"># 입력 → 출력, 부수효과 X</span>
+  params:
+    - cmp_cd          (term.scm.shared.cmp)
+    - org_cd          (term.scm.shared.org)
+    - product_kind    (term.scm.shared.product_kind)  <span class="label"># 컬럼 alias chaos: productNameCd</span>
+    - customer_cd     (term.scm.shared.customer)
+  return_term_fqn:  term.scm.std.customer_design_limit  (composite or null)
+  realizations:
+    - code_method_fqn: ...CustomerStdService.findFirstMatch
+      dispatch_source: <strong>annotation</strong>  <span class="label"># @Service 단일 구현</span>
+  metadata:
+    lookup_strategy:    optional    <span class="label"># Step 3 archive 결정</span>
+    matching_keys:      [cmp, org, product_kind, customer]
+    tiebreaker:         PRIORITY ASC
+    fallback_kind:      skip        <span class="label"># null 시 다른 기준만</span>
+    operating_cases:
+      - "자동차 회사 자주 등장" (Step 2 archive)
+      - "특정 고객사가 더 빡빡한 기준 → 설비 가능 보다 좁은 범위" (Step 2)
+      - "같은 고객사가 품종별로 다른 단중" (Step 2 priority 의미)
+    known_issues: []                <span class="label"># 보류 운영이슈 없음</span></pre>
+
+  <h3>사용처 references (SdSecondWgt[Low/High]Action)</h3>
+  <p>이번 Step 5 에서는 references 만 등록 (실제 Action 정의는 별 phase — algorithm step 5/6 의 max/min 룰엔진 자체가 큰 entity).</p>
+  <pre>action.scm.std.find_customer_design_limit:
+  used_at_call_sites:
+    - SdSecondWgtLowAction.execute  <span class="label"># algorithm step 5: max(...) 의 한 입력</span>
+    - SdSecondWgtHighAction.execute <span class="label"># algorithm step 6: min(...) 의 한 입력</span></pre>
+
+  <!-- ====================================================================== -->
+  <h3>도메인 깊이 — algorithm step 5/6 의 max/min 의 의미</h3>
+  <div class="panel">
+    <div class="label">알고리즘 단중하한 / 단중상한 산정 패턴</div>
+    <p>Step 5 (단중하한) 와 Step 6 (단중상한) 은 룰엔진 패턴 — <strong>여러 표준 의 fallback 결과를 max(min)</strong>:</p>
+    <pre>단중하한 = <strong>max</strong>(
+    EdgingSpec.min,
+    HrMinWgt,
+    <strong>CustomerStd.pkg_wgt_low</strong>   ← findFirstMatch 결과 (optional)
+    ...
+)
+단중상한 = <strong>min</strong>(
+    EdgingSpec.max,
+    HrMaxWgt,
+    <strong>CustomerStd.pkg_wgt_high</strong>  ← findFirstMatch 결과 (optional)
+    ...
+)</pre>
+    <p>의미: 모든 표준의 제한 사항 (<em>"특정 고객사가 더 빡빡한 기준이 있을 때, 설비상 가능하더라도 거기에 맞춰야 함"</em>) 을 합쳐 가장 좁은 범위 (단중하한 max → 더 큰 값, 단중상한 min → 더 작은 값) 를 채택. Customer 가 null 이면 그 입력만 빠짐 (skip = optional).</p>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- ★ 사용자 5 의문 풀이 (Step 5 답변 전 시각화) -->
+  <div class="panel diff" style="margin-top:24px">
+    <div class="label">★ 5 의문 풀이 — Step 5 답변 전 시각화</div>
+    <p style="margin:6px 0 0;font-size:12.5px">사용자가 Q1·Q3·Q5·Q6·Q7 이해 부족이라 답변 보류 — 5 카드로 풀이 후 form 답변.</p>
+  </div>
+
+  <!-- 의문 1 — Q1 label -->
+  <h3 style="margin-top:20px;color:var(--violet)">의문 1 — Q1 label: "조회" 가 단순 테이블 조회처럼 헷갈림</h3>
+  <div class="quote">
+    <div class="label">사용자 인용</div>
+    "고객사 설계제한 조회(단순 테이블 기준 조회)와 주문을 넣어서 해당하는 record를 찾는건 다른 것 같은데"
+  </div>
+
+  <h4>코드 차원의 두 단계 (사용자 통찰 정확)</h4>
+  <table>
+    <tr><th>단계</th><th>코드 위치</th><th>역할 (Method.role)</th><th>ontology 매핑</th></tr>
+    <tr>
+      <td>(a) 단순 테이블 조회</td>
+      <td><code>CustomerStdRepository.findBy...OrderByPriorityAsc</code></td>
+      <td><code>adapter</code> (JPA query)</td>
+      <td>매핑 X (Step 4 결정)</td>
+    </tr>
+    <tr>
+      <td>(b) <strong>주문 컨텍스트 비즈니스 매칭</strong></td>
+      <td><code>CustomerStdService.findFirstMatch</code></td>
+      <td><code>business</code> (4-key + tiebreaker + null fallback)</td>
+      <td>★ Action 매핑 (이번 Step 5)</td>
+    </tr>
+  </table>
+  <p>→ Action 의 의미는 (b) 의 비즈니스 매칭. 주문에 적용할 고객사 제한 row 를 찾는 것. label 도 그 의미로:</p>
+
+  <table>
+    <tr><th>label 후보</th><th>뉘앙스</th></tr>
+    <tr style="background:rgba(167,139,250,0.06)"><td><code>주문별 고객사 제한 매칭</code></td><td>★ 권장 — "매칭" 비즈니스 의미 + 주문 컨텍스트</td></tr>
+    <tr><td><code>고객사 단중 제한 룩업</code></td><td>"룩업" 약간 단순 조회 뉘앙스 + 단중 강조</td></tr>
+    <tr><td><code>주문 컨텍스트의 고객사 제한 결정</code></td><td>가장 정확 / 약간 길음</td></tr>
+    <tr><td><code>고객사설계제한 조회</code></td><td>이전 추천. 사용자 의문대로 단순 조회 뉘앙스</td></tr>
+  </table>
+
+  <!-- 의문 2 — Q3 params + return -->
+  <h3 style="margin-top:20px;color:var(--violet)">의문 2 — Q3 params + return 시각화</h3>
+
+  <h4>입력 (params 4 atomic) — 주문에서 추출</h4>
+  <pre>주문 (SDOrderEntity) → 4 atomic 추출:
+  cmp_cd       = "K"     <span class="label"># atomic.shared.cmp     ← 회사 코드 (모든 entity 공유)</span>
+  org_cd       = "K01"   <span class="label"># atomic.shared.org     ← 소 (회사 내 사업장)</span>
+  product_kind = "PA"    <span class="label"># atomic.shared.product_kind ← 품종 (4 alias 중 하나)</span>
+  customer_cd  = "C001"  <span class="label"># atomic.shared.customer ← 고객사 코드</span></pre>
+
+  <h4>처리 (Action 호출 → realization 메서드)</h4>
+  <pre><strong>Action.find_customer_design_limit</strong> (params 4)
+   ↓ realization 호출
+<strong>CustomerStdService.findFirstMatch(cmp, org, productNameCd, customerCd)</strong>
+   ↓ 4-key 매칭 + PRIORITY ASC + 첫 row
+   ├─ 매칭 row 있음 → CustomerStdEntity (composite)
+   └─ 매칭 row 없음 → null (이 고객사 제한 없음)</pre>
+
+  <h4>출력 (return — composite or null)</h4>
+  <pre>composite term.scm.std.customer_design_limit (또는 null)
+{
+  cmp           : "K"          ← atomic.shared.cmp (PARTIAL part)
+  org           : "K01"        ← atomic.shared.org
+  priority      : 10           ← <strong>composite facet</strong> (entity 고유 — tiebreaker)
+  product_kind  : "PA"         ← atomic.shared.product_kind
+  customer      : "C001"       ← atomic.shared.customer
+  pkg_wgt_high  : 22.000       ← <strong>composite facet</strong> (단중상한 입력 → Step 6 min)
+  pkg_wgt_low   : 8.000        ← <strong>composite facet</strong> (단중하한 입력 → Step 5 max)
+}
+
+또는 null = "이 고객사 제한 없음" → 다른 기준만 적용</pre>
+
+  <h4>왜 atomic vs facet 구분?</h4>
+  <ul>
+    <li><strong>atomic</strong> = 도메인 단위. 다른 entity 도 같은 atomic 사용 (cmp 는 모든 std 가 공유). 재사용 가능.</li>
+    <li><strong>composite facet</strong> = entity 고유. pkg_wgt_high/low 는 CustomerStd 만 가짐. 다른 entity 에 등장 X.</li>
+    <li>이번 Action: <strong>4 atomic 입력 → composite (4 atomic + 3 facet) 반환</strong>. 호출처가 facet 활용 (Step 6 가 <code>.pkg_wgt_high</code> 사용).</li>
+  </ul>
+
+  <!-- 의문 3 — Q5 metadata 사용처 -->
+  <h3 style="margin-top:20px;color:var(--violet)">의문 3 — Q5 metadata 의 실제 사용처</h3>
+  <p>metadata 는 "메모" 가 아니라 시뮬 / 자동 매핑 / UI / PR 의 핵심 입력.</p>
+
+  <table>
+    <tr><th>metadata 항목</th><th>사용 시점</th><th>구체 동작</th></tr>
+    <tr>
+      <td><code>lookup_strategy: optional</code></td>
+      <td><strong>시뮬</strong></td>
+      <td>sandbox 코드: null 반환 시 max/min 입력에서 skip. 자동 처리.</td>
+    </tr>
+    <tr>
+      <td><code>matching_keys</code> (4 키)</td>
+      <td><strong>자동 매핑</strong></td>
+      <td>비슷한 패턴 다른 Action (HrSpec, EdgingGroup 등) 자동 추천. PR 생성 시 SQL <code>WHERE</code> 자동.</td>
+    </tr>
+    <tr>
+      <td><code>tiebreaker: PRIORITY ASC</code></td>
+      <td><strong>UI</strong> + <strong>시뮬</strong></td>
+      <td>Workbench 에 "PRIORITY 1, 2, 3 순으로 우선" 표시. 시뮬 fixture 정렬.</td>
+    </tr>
+    <tr>
+      <td><code>fallback_kind: skip</code></td>
+      <td><strong>시뮬</strong></td>
+      <td>null 반환 시 sandbox 가 max/min 입력에서 빼는 코드 자동 generation.</td>
+    </tr>
+    <tr>
+      <td><code>operating_cases</code></td>
+      <td><strong>UI</strong> + <strong>인터뷰</strong></td>
+      <td>Workbench 우측 R 패널에 표시. 새 운영자가 onTong 처음 봐도 즉시 이해.</td>
+    </tr>
+    <tr>
+      <td><code>known_issues</code></td>
+      <td><strong>UI</strong> + <strong>SIM 신뢰도</strong></td>
+      <td>known_issues 있으면 SIM_VERIFIED 신뢰도 ↓. UI amber 배지.</td>
+    </tr>
+  </table>
+
+  <!-- 의문 4 — Q6 사용처 references -->
+  <h3 style="margin-top:20px;color:var(--violet)">의문 4 — Q6 사용처 references 시각화 (Action 호출 그래프)</h3>
+
+  <h4>Action 끼리의 호출 관계</h4>
+  <pre>[Action] action.scm.std.find_customer_design_limit       ← 이번 Step 5 정의 (★)
+    ▲ 호출 (called by)
+    │
+    ├─ [Action] SdSecondWgtLowAction (algorithm step 5)
+    │     ├─ 입력: 주문 (4 atomic) + slab (composite)
+    │     ├─ 호출: find_customer_design_limit(cmp, org, product_kind, customer)
+    │     ├─ 결과 사용: result?.pkg_wgt_low → max(EdgingMin, HrMinWgt, [pkg_wgt_low or skip], ...)
+    │     └─ 출력: slab.secondWgtLow (단중하한)
+    │
+    └─ [Action] SdSecondWgtHighAction (algorithm step 6)
+          ├─ 입력: 주문 + slab
+          ├─ 호출: find_customer_design_limit(...)
+          ├─ 결과 사용: result?.pkg_wgt_high → min(EdgingMax, HrMaxWgt, [pkg_wgt_high or skip], ...)
+          └─ 출력: slab.secondWgtHigh (단중상한)</pre>
+
+  <h4>왜 이 references 가 중요?</h4>
+  <ul>
+    <li><strong>영향도 분석</strong>: 이 Action 의 metadata / signature 변경 시 호출처 2 곳 자동 추적</li>
+    <li><strong>시뮬</strong>: 호출처 Action 의 시뮬 → 이 Action 도 자동 호출 (sandbox 코드 inline)</li>
+    <li><strong>UI 그래프</strong>: Workbench graph 모드에서 [Action] 노드끼리 화살표 (call edge)</li>
+  </ul>
+  <p>이번 Step 5 에서는 references 만 등록 (이 2 Action 이 사용한다는 fact). SdSecondWgt[Low/High]Action 의 본격 정의 (params / kind / max·min 로직) 는 별 phase (algorithm 21-step entity 정리 시).</p>
+
+  <!-- 의문 5 — Q7 max/min 패턴 -->
+  <h3 style="margin-top:20px;color:var(--violet)">의문 5 — Q7 algorithm step 5/6 max/min 패턴 (단순화)</h3>
+
+  <h4>한 줄로</h4>
+  <div class="biglead" style="font-size:14.5px;color:var(--fg)">
+    슬랩 1개 단중 (kg) 의 <strong>가능 범위</strong> 를 모든 표준의 제한을 합쳐 결정. <strong>가장 좁은 범위 채택</strong>.
+  </div>
+
+  <h4>구체 숫자 예시 — 자동차 OEM 케이스 (사용자 운영 사례)</h4>
+  <table>
+    <tr><th>표준</th><th>단중하한 입력 (kg)</th><th>단중상한 입력 (kg)</th></tr>
+    <tr><td>EdgingSpec</td><td>5,000</td><td>30,000</td></tr>
+    <tr><td>HrMinWgt</td><td>8,000</td><td>—</td></tr>
+    <tr><td>HrMaxWgt</td><td>—</td><td>25,000</td></tr>
+    <tr><td>★ <code>CustomerStd</code> (자동차 OEM "C001")</td><td><em>(null = skip)</em></td><td><strong>22,000</strong> (이 고객사 더 빡빡)</td></tr>
+    <tr><td>...</td><td>...</td><td>...</td></tr>
+    <tr style="background:rgba(167,139,250,0.08)">
+      <td><strong>결과</strong></td>
+      <td><strong>max(5000, 8000, ...) = 8,000</strong></td>
+      <td><strong>min(30000, 25000, 22000, ...) = 22,000</strong></td>
+    </tr>
+  </table>
+  <p><strong>→ 슬랩 단중 허용 범위: 8,000 ~ 22,000 kg</strong>. Customer 가 단중상한 결정 (가장 빡빡한 22,000).</p>
+
+  <h4>비유 (운영자 표현)</h4>
+  <ul>
+    <li>"모든 표준이 각자 '이 무게 이상 / 이하 만 허용' 이라고 함"</li>
+    <li>"<strong>단중하한</strong> = 가장 빡빡한 하한 (가장 큰 min 입력)"</li>
+    <li>"<strong>단중상한</strong> = 가장 빡빡한 상한 (가장 작은 max 입력)"</li>
+    <li>"Customer 가 더 빡빡 → 단중 범위 좁아짐 → 슬랩 만들기 까다로워짐"</li>
+  </ul>
+
+  <h4>이번 Action 의 정확한 역할</h4>
+  <p>위 표의 <strong>"CustomerStd 단중하한 입력 / 단중상한 입력"</strong> 셀을 채우는 함수. 매칭 row 있으면 <code>pkg_wgt_low</code> / <code>pkg_wgt_high</code> 그대로. 없으면 null = skip (그 행 비워둠).</p>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>Step 5 답변 — Customer Action 합의 (5 의문 풀이 후)</h4>
+
+    <div class="field">
+      <label><strong>Q1. Action label / fqn</strong>
+        <span class="recommend">사용자 통찰 반영 — "조회" 가 단순 테이블 조회처럼 들려서 헷갈림. 비즈니스 매칭 의미로:<br>
+        ★ 신규 추천 label: <code>주문별 고객사 제한 매칭</code> / fqn: <code>action.scm.std.match_customer_limit_for_order</code><br>
+        대안: <code>고객사 단중 제한 룩업</code> / <code>주문 컨텍스트의 고객사 제한 결정</code> / <code>고객사설계제한 조회</code> (이전 추천)</span>
+      </label>
+      <textarea class="text" name="q1_label_fqn" rows="2" placeholder="예: 매칭 / 룩업 / 결정 / 조회 / 직접 입력"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. kind = pure_function?</strong>
+        <span class="recommend">★ 추천 <strong>pure_function</strong> — 입력 → 출력, 부수효과 X. realization 다형성 표현 가능.<br>
+        대안 workflow — 부수효과 가짐 (이 경우 안 어울림)</span>
+      </label>
+      <textarea class="text" name="q2_kind" rows="2" placeholder="예: pure_function / 또는 workflow"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. params (4 atomic) + return type OK?</strong>
+        params: cmp / org / product_kind / customer (모두 atomic).
+        return: <code>term.scm.std.customer_design_limit</code> (composite, null 가능).
+        <span class="recommend">★ 추천 그대로. composite 반환 → 호출처가 .pkg_wgt_low / .pkg_wgt_high facet 사용.</span>
+      </label>
+      <textarea class="text" name="q3_params_return" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. realization — CustomerStdService.findFirstMatch (dispatch_source: annotation)</strong>
+        <span class="recommend">★ 추천 그대로. Spring @Service 의 단일 구현. CallSiteAnalyzer Case 3 (ANNOTATION).<br>
+        대안 single_impl (인터페이스 없는 클래스이므로 Case 1)</span>
+      </label>
+      <textarea class="text" name="q4_realization" rows="2" placeholder="예: annotation / single_impl / 또는 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. metadata OK?</strong>
+        lookup_strategy=optional / matching_keys 4 / tiebreaker=PRIORITY ASC / fallback_kind=skip / operating_cases 3건 / known_issues=[]
+        <span class="recommend">★ 추천 그대로 — Step 2/3 archive 의 결정 + 운영 사례 그대로 인용.</span>
+      </label>
+      <textarea class="text" name="q5_metadata" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. 사용처 references 2건 OK?</strong>
+        SdSecondWgtLowAction / SdSecondWgtHighAction. 이번에는 references 만, Action 자체 정의는 별 phase.
+        <span class="recommend">★ 추천 그대로. SdSecondWgt[Low/High]Action 의 본격 정의는 algorithm step 5/6 entity 정리 시.<br>
+        대안: 이번에 사용처 Action 도 같이 정의 (스코프 확장)</span>
+      </label>
+      <textarea class="text" name="q6_callsites" rows="2" placeholder="예: references 만 / 같이 정의"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7. 도메인 깊이 — algorithm step 5/6 의 max/min 패턴이 이번 모델링에 충분히 반영?</strong>
+        <span class="recommend">예: lookup_strategy=optional + fallback_kind=skip 으로 표현됨 / 추가 명시 필요한 부분?</span>
+      </label>
+      <textarea class="text" name="q7_pattern" rows="3" placeholder="예: 충분 / 또는 추가 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q8. Step 6 (Productivity Action — lookup / lookupOrDefault / cumulativeProductivity 3 action) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. Customer (1 action) 보다 풍부 — 3 action + 운영이슈 metadata + 8 공정 dispatch.</span>
+      </label>
+      <textarea class="text" name="q8_step6_go" rows="2" placeholder="예: OK / 잠깐 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label>추가 의견</label>
+      <textarea class="text" name="freeform5" rows="2" placeholder="optional"></textarea>
+    </div>
+  </div>
+
+  <div class="ds-actions">
+    <button class="btn primary" data-action="copy-step5">📋 답변 복사 (Step 5)</button>
+    <button class="btn" data-action="preview-step5">미리보기</button>
+    <span class="copy-hint">대부분 추천대로면 한 단어 OK</span>
+  </div>
+  <div class="preview" id="preview-step5">
+    <div class="preview-label">복사될 내용</div>
+    <div class="preview-body"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step" id="archive-step-5" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 Step 5 답변 받음 — Customer Action 합의</h2>
+  <div class="meta">
+    <span class="badge b-applied">아카이브</span>
+    <span>Q1~Q8 모두 추천대로 (5 의문 풀이 후 명확)</span>
+  </div>
+
+  <h3>Customer Action 확정 (Step 6 의 입력)</h3>
+  <pre>action.scm.std.match_customer_limit_for_order:
+  label:        주문별 고객사 제한 매칭
+  kind:         pure_function
+  params:
+    - cmp_cd          (term.scm.shared.cmp)
+    - org_cd          (term.scm.shared.org)
+    - product_kind    (term.scm.shared.product_kind)   <span class="label"># 컬럼 alias chaos</span>
+    - customer_cd     (term.scm.shared.customer)
+  return_term_fqn:  term.scm.std.customer_design_limit  (composite or null)
+  realizations:
+    - code_method_fqn: ...CustomerStdService.findFirstMatch
+      dispatch_source: annotation
+  metadata:
+    lookup_strategy:    optional
+    matching_keys:      [cmp, org, product_kind, customer]
+    tiebreaker:         PRIORITY ASC
+    fallback_kind:      skip
+    operating_cases:
+      - "자동차 회사 자주 등장"
+      - "특정 고객사가 더 빡빡한 기준 → 설비 가능 보다 좁은 범위"
+      - "같은 고객사가 품종별로 다른 단중"
+    known_issues: []
+
+  used_at_call_sites:
+    - SdSecondWgtLowAction.execute   <span class="label"># algorithm step 5 단중하한 max</span>
+    - SdSecondWgtHighAction.execute  <span class="label"># algorithm step 6 단중상한 min</span></pre>
+
+  <h3>Step 6 진입 — Productivity Action 3 개</h3>
+  <p>Customer 는 1 Action 으로 단순. Productivity 는 3 메서드 → 풍부:
+    <code>lookup</code> (정확매칭, null 가능) + <code>lookupOrDefault</code> (default 0.95 fallback) + ★ <code>cumulativeProductivity</code> (8 공정 누적 곱).
+    Step 3 archive 의 운영이슈 2건 (P-2018-0721 / P-2020-0834) 을 deferred metadata 로.</p>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step" id="step-6">
+  <h2>Step 6 — Productivity Action 3개 (lookup / lookupOrDefault / cumulativeProductivity)</h2>
+  <div class="meta">
+    <span class="badge b-discuss">토론</span>
+    <span>큐 row: 1 (cumulative_productivity 자동 추천, fqn 변경 + description 등 보강 필요)</span>
+    <span>+ 신규 2 (lookup / lookupOrDefault)</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>현재 큐의 1 Action (자동 추천)</h3>
+  <table>
+    <tr><th>fqn</th><th>label</th><th>kind</th><th>비어있는 항목</th></tr>
+    <tr>
+      <td><code>action.scm.product.cumulative_productivity</code></td>
+      <td>cumulative_productivity</td>
+      <td>pure_function</td>
+      <td>description / params / return / realizations / metadata 모두</td>
+    </tr>
+  </table>
+  <p class="small">→ Step 3 결정에 따라 fqn 변경: <code>action.scm.std.cumulative_productivity</code> (S-2 적용).</p>
+
+  <!-- ====================================================================== -->
+  <h3>코드 — ProductivityService 3 메서드 (Step 0/3 인벤토리 재인용)</h3>
+  <pre>// 1) lookup — 6-축 정확매칭 → null 가능
+public BigDecimal lookup(String cmpCd, String orgCd, String procCd,
+                         String gradeCd, String prodKindCd, String customerCd) {
+    SdProductivityStdPK pk = new SdProductivityStdPK(cmpCd, orgCd, procCd, gradeCd, prodKindCd, customerCd);
+    return repository.findById(pk)
+        .map(SdProductivityStdJpo::getProductivity)
+        .orElse(null);
+}
+
+// 2) lookupOrDefault — null 시 0.95 fallback
+public BigDecimal lookupOrDefault(...same 6 args...) {
+    BigDecimal v = lookup(...);
+    return v != null ? v : <strong>DEFAULT_PRODUCTIVITY</strong>;  // 0.95
+}
+
+// 3) cumulativeProductivity — 8 공정 활성 자리 곱 ★
+public BigDecimal cumulativeProductivity(String cmpCd, String orgCd,
+                                         <strong>String confirmedPlantCd</strong>,
+                                         String gradeCd, String prodKindCd, String customerCd) {
+    if (confirmedPlantCd == null || confirmedPlantCd.length() &lt; 8) {
+        return DEFAULT_PRODUCTIVITY;
+    }
+    BigDecimal product = BigDecimal.ONE;
+    for (int i = 0; i &lt; 8; i++) {
+        if (confirmedPlantCd.charAt(i) == ' ') continue;
+        BigDecimal p = lookupOrDefault(
+            cmpCd, orgCd, <strong>PROC_CODES[i]</strong>, gradeCd, prodKindCd, customerCd);
+        product = product.multiply(p);
+    }
+    return product;
+}</pre>
+
+  <!-- ====================================================================== -->
+  <h3>★ 카드 1 — 3 Action 의 호출 관계</h3>
+  <pre>[Action 3] cumulativeProductivity  ★ 핵심 (8 공정 누적 곱)
+    │
+    ↓ delegates_to (loop 8회)
+[Action 2] lookupOrDefault         (default 0.95 fallback)
+    │
+    ↓ delegates_to
+[Action 1] lookup                  (6-축 정확매칭, null 가능)
+    │
+    ↓ realization
+SdProductivityStdRepository.findById  (매핑 X — adapter)</pre>
+  <p>3 Action 이 호출 chain. ontology 가 chain 자체를 표현 → 시뮬 시 sandbox 코드 자동 generation, 영향도 분석 시 중간 변경의 전파 추적.</p>
+
+  <!-- ====================================================================== -->
+  <h3>★ 카드 2 — cumulativeProductivity 흐름 시각화</h3>
+  <pre>입력 (params):
+  cmp_cd               = "K"
+  org_cd               = "K01"
+  confirmed_plant_cd   = "KK HKK  "   <span class="label"># 8자리 string. ' '=비활성</span>
+  grade_cd             = "A1"
+  prod_kind            = "PA"
+  customer_cd          = "C001"
+
+처리:
+  if confirmed_plant_cd is None or len &lt; 8:
+      return 0.95          <span class="label"># DEFAULT_PRODUCTIVITY (방어)</span>
+
+  product = 1.0
+  for i in 0..7:
+      if confirmed_plant_cd[i] == ' ':
+          continue                          <span class="label"># 비활성 공정 skip</span>
+      p = lookupOrDefault(cmp, org,
+                          <strong>PROC_CODES[i]</strong>,    <span class="label"># 8 공정 enum 의 i 번째</span>
+                          grade, prod_kind, customer)
+      product *= p
+
+출력:
+  product (BigDecimal, 0.0 ~ 1.0)
+
+예시 — confirmed_plant_cd = "KK HKK  " (5 자리 활성):
+  i=0 'K' (SM 활성)   → p_0 = lookupOrDefault(..., "SM", ...)
+  i=1 'K' (HR 활성)   → p_1 = lookupOrDefault(..., "HR", ...)
+  i=2 ' ' (HRF 비활성)→ skip
+  i=3 'H' (CR 활성)   → p_3 = lookupOrDefault(..., "CR", ...)
+  i=4 'K' (ANL1 활성) → p_4 = lookupOrDefault(..., "ANL1", ...)
+  i=5 'K' (ANL2 활성) → p_5 = lookupOrDefault(..., "ANL2", ...)
+  i=6 ' ' (GAL 비활성)→ skip
+  i=7 ' ' (CRF 비활성)→ skip
+
+  결과 = p_0 × p_1 × p_3 × p_4 × p_5 = 0.95^5 = 0.774  (데모, std 비어있을 시)</pre>
+
+  <!-- ====================================================================== -->
+  <h3>★ 카드 3 — confirmedPlantCd 의 의미 (신규 atomic 처리)</h3>
+  <p>코드의 <code>confirmedPlantCd</code> = 8자리 string. 자리 i ↔ <code>PROC_CODES[i]</code> 공정.
+    각 자리 char = 공장 코드 (활성) 또는 <code>' '</code> (비활성).</p>
+
+  <h4>옵션 — atomic 처리 방식</h4>
+  <table>
+    <tr><th>옵션</th><th>표현</th><th>장단</th></tr>
+    <tr style="background:rgba(167,139,250,0.06)">
+      <td>★ A — 신규 atomic</td>
+      <td><code>term.scm.shared.confirmed_plant_cd</code> (string 8) + facets {encoding: "8자리, 자리 i ↔ proc[i]", activation: "' '=비활성"}</td>
+      <td>단순. 다른 entity 도 같은 atomic 사용 가능. 7번째 atomic 추가</td>
+    </tr>
+    <tr>
+      <td>B — composite (8 공정 activation map)</td>
+      <td><code>term.scm.order.confirmed_plant</code> (composite) + parts: 8 atomic.proc activation</td>
+      <td>의미 풍부 / 구조 복잡 / order 영역 작업 (이번 세션 스코프 외)</td>
+    </tr>
+    <tr>
+      <td>C — atomic + metadata only</td>
+      <td>string 8 atomic + metadata 에 매핑 설명만</td>
+      <td>가장 단순 / 자동 처리 어려움</td>
+    </tr>
+  </table>
+
+  <p class="small">★ 추천: <strong>A</strong> (신규 atomic, facets 에 encoding/activation 명시). atomic 7번째 — Step 1 의 6 atomic 에 추가.</p>
+
+  <!-- ====================================================================== -->
+  <h3>★ 카드 4 — metadata 운영이슈 처리 (Step 3 archive 결정 적용)</h3>
+
+  <h4>cumulativeProductivity 에 박을 metadata</h4>
+  <pre>action.scm.std.cumulative_productivity:
+  metadata:
+    delegates_to:
+      - action.scm.std.lookup_productivity_or_default  <span class="label"># 8 회 호출 (활성 자리)</span>
+    process_codes:
+      - SM, HR, HRF, CR, ANL1, ANL2, GAL, CRF  <span class="label"># 순서 고정 (Step 3 Q7b)</span>
+    activation_check: "confirmed_plant_cd[i] != ' '"
+    aggregation: "BigDecimal multiply (loop product)"
+    default_on_invalid_input: 0.95   <span class="label"># confirmedPlantCd null 또는 len &lt; 8</span>
+
+    known_issues:
+      - issue_id: <strong>P-2018-0721</strong>
+        summary: "실수율 과다 → 분할수 폭주 (제목 자연 의미와 반대)"
+        status: <strong>deferred</strong>
+        next: 다음 운영자 인터뷰에 의미 정정
+      - issue_id: <strong>P-2020-0834</strong>
+        summary: "std 1.05 (>1.0) 등록 → 누적값 비정상 상승"
+        status: <strong>deferred</strong>
+        related_rule: rule.scm.std.productivity_safe_range  <span class="label"># Step 7 등록</span>
+        violated_at_call: this  <span class="label"># 가드 분기 부재</span></pre>
+
+  <p>이 metadata 가 Workbench UI 에 amber 배지 + 갭 dashboard 노출 (design-gaps #13 phase 2~3). 시뮬 시 SIM_VERIFIED 신뢰도 ↓.</p>
+
+  <!-- ====================================================================== -->
+  <h3>★ 카드 5 — 사용처 references (algorithm step 6/9/13)</h3>
+  <pre>[Action] action.scm.std.cumulative_productivity   ← 이번 정의
+    ▲ called by
+    │
+    ├─ algorithm step 6  (단중상한 산정 시 productivity 입력)
+    ├─ algorithm step 9  (분할수 결정)
+    └─ algorithm step 13 (slab 단중 재계산)
+       <span class="label"># 정확한 caller Action 은 SdInitialSlabWgtAction / SdMaxSplitCountAction / 등 — algorithm 21-step 정리 시 references 본격 정의</span></pre>
+
+  <!-- ====================================================================== -->
+  <h3>내 추천 — 3 Action 정의 표</h3>
+  <table>
+    <tr><th>#</th><th>fqn</th><th>label</th><th>params</th><th>return</th><th>delegates_to</th></tr>
+    <tr>
+      <td>1</td>
+      <td><code>action.scm.std.lookup_productivity</code></td>
+      <td>공정별 실수율 정확매칭 조회</td>
+      <td>6 atomic (cmp, org, proc, grade, product_kind, customer)</td>
+      <td>composite (or null)</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><code>action.scm.std.lookup_productivity_or_default</code></td>
+      <td>공정별 실수율 룩업 (default fallback)</td>
+      <td>6 atomic (동일)</td>
+      <td>composite (non-null, default 0.95)</td>
+      <td>action 1 (lookup)</td>
+    </tr>
+    <tr>
+      <td>3 ★</td>
+      <td><code>action.scm.std.cumulative_productivity</code> (큐 fqn 변경)</td>
+      <td>8 공정 누적 실수율 계산</td>
+      <td>cmp + org + <strong>confirmed_plant_cd</strong> + grade + product_kind + customer</td>
+      <td>BigDecimal facet (또는 composite.productivity)</td>
+      <td>action 2 (lookupOrDefault, 8 회 loop)</td>
+    </tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>Step 6 답변 — Productivity 3 Action 합의</h4>
+
+    <div class="field">
+      <label><strong>Q1. 3 Action 모델링 OK?</strong>
+        <span class="recommend">★ 추천 A: 3 Action 각각 등록 (lookup / lookupOrDefault / cumulativeProductivity).<br>
+        대안 B: 1 Action + 다형성 (호출 chain 표현 약화). 대안 C: cumulative 만 등록 (lookup/lookupOrDefault 매핑 X).</span>
+      </label>
+      <textarea class="text" name="q1_action_count" rows="2" placeholder="예: A / B / C"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. 3 Action 의 label / fqn 추천대로 OK?</strong>
+        위 표의 3 row.
+        <span class="recommend">★ 추천 그대로. 큐의 자동 추천 fqn (<code>scm.product.cumulative_productivity</code>) 은 <code>scm.std</code> 로 변경.</span>
+      </label>
+      <textarea class="text" name="q2_labels" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. params / return 추천대로 OK?</strong>
+        <span class="recommend">★ 추천 그대로. lookup / lookupOrDefault 는 6 atomic 동일. cumulativeProductivity 는 confirmed_plant_cd atomic 추가 (Q5 결정 따라).</span>
+      </label>
+      <textarea class="text" name="q3_params_return" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. confirmedPlantCd 처리 — A/B/C?</strong>
+        <span class="recommend">★ 추천 <strong>A</strong>: 신규 atomic <code>term.scm.shared.confirmed_plant_cd</code> (string 8) + facets (encoding / activation).<br>
+        대안 B: composite (8 공정 activation map, order 영역 작업 — 이번 세션 스코프 외). 대안 C: atomic + metadata only.</span>
+      </label>
+      <textarea class="text" name="q4_confirmed_plant_cd" rows="2" placeholder="예: A / B / C"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. cumulativeProductivity metadata 운영이슈 deferred 처리 OK?</strong>
+        P-2018-0721 (실수율 과다, 의미 정정 보류) + P-2020-0834 (1.05 등록, related_rule + violated_at_call=this).
+        <span class="recommend">★ 추천 그대로. Step 3 archive 결정 적용 + Step 7 의 BusinessRule 과 연결.</span>
+      </label>
+      <textarea class="text" name="q5_known_issues" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. 사용처 references (algorithm step 6/9/13) 정리 OK?</strong>
+        이번엔 references 만 (algorithm 21-step 본격 정의는 별 phase).
+        <span class="recommend">★ 추천 그대로.</span>
+      </label>
+      <textarea class="text" name="q6_callsites" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7. 도메인 깊이 — 3 Action 호출 chain + 누적 곱 흐름 이해 OK?</strong>
+        카드 1·2·3 (호출 관계 + cumulativeProductivity 흐름 + confirmed_plant_cd) 시각화.
+        <span class="recommend">예: 충분 / 또는 추가 의문 ___</span>
+      </label>
+      <textarea class="text" name="q7_understanding" rows="3" placeholder="예: 충분 / 또는 추가 의문 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q8. Step 7 (AnchorBinding — body fragment 매핑) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. Step 7 = cumulativeProductivity body 의 핵심 fragment (8 자리 loop / DEFAULT 0.95 / PROC_CODES) ↔ atomic / Action / BusinessRule 매핑.</span>
+      </label>
+      <textarea class="text" name="q8_step7_go" rows="2" placeholder="예: OK / 잠깐 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label>추가 의견</label>
+      <textarea class="text" name="freeform6" rows="2" placeholder="optional"></textarea>
+    </div>
+  </div>
+
+  <div class="ds-actions">
+    <button class="btn primary" data-action="copy-step6">📋 답변 복사 (Step 6)</button>
+    <button class="btn" data-action="preview-step6">미리보기</button>
+    <span class="copy-hint">대부분 추천대로면 한 단어 OK</span>
+  </div>
+  <div class="preview" id="preview-step6">
+    <div class="preview-label">복사될 내용</div>
+    <div class="preview-body"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step" id="archive-step-6" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 Step 6 답변 받음 — Productivity 3 Action 합의</h2>
+  <div class="meta">
+    <span class="badge b-applied">아카이브</span>
+    <span>Q1~Q8 모두 추천대로</span>
+  </div>
+
+  <h3>3 Action 확정 + atomic 7번째 추가</h3>
+  <ul>
+    <li><strong>action.scm.std.lookup_productivity</strong> — 6 atomic → composite (or null)</li>
+    <li><strong>action.scm.std.lookup_productivity_or_default</strong> — 6 atomic → composite (default 0.95) — delegates_to lookup</li>
+    <li><strong>action.scm.std.cumulative_productivity</strong> ★ — 6 atomic + <code>confirmed_plant_cd</code> → BigDecimal facet — delegates_to lookupOrDefault (8회 loop)</li>
+    <li>+ 신규 atomic <code>term.scm.shared.confirmed_plant_cd</code> (string 8) — 7번째 atomic 추가</li>
+    <li>+ metadata: known_issues 2건 (P-2018-0721 deferred, P-2020-0834 related_rule + violated_at_call=this)</li>
+  </ul>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step" id="step-7">
+  <h2>Step 7 — AnchorBinding (body fragment 매핑) + BusinessRule</h2>
+  <div class="meta">
+    <span class="badge b-discuss">토론</span>
+    <span>핵심: cumulativeProductivity body 의 7 anchor + Customer findFirstMatch 2 anchor + BusinessRule 1</span>
+    <span>v3 Q-C: 혼합 anchor confirm (formula/literal 자동, branch/lookup 사용자 큐)</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>★ AnchorBinding 의 의미 (7 anchor_kind 재설명)</h3>
+  <p><strong>fragment-level 매핑</strong> — method body 내부의 한 표현식 / 분기 / literal 자체를 ontology 에 직접 binding (v4 결정 Q4'=A).
+    메서드 단위 매핑 없이도 anchor 만 등록 가능 (god-method 사각지대 흡수).</p>
+
+  <table>
+    <tr><th>anchor_kind</th><th>의미</th><th>예시</th></tr>
+    <tr><td><code>field</code></td><td>field 정의 자체</td><td>Java field 선언</td></tr>
+    <tr><td><code>field_access</code></td><td>field 읽기/쓰기 접근</td><td><code>order.getProductivity()</code></td></tr>
+    <tr><td><code>param</code></td><td>method 매개변수</td><td><code>cmpCd</code> param</td></tr>
+    <tr><td><code>local</code></td><td>지역 변수</td><td><code>BigDecimal product = ...</code></td></tr>
+    <tr><td><code>return</code></td><td>return 값</td><td><code>return product;</code></td></tr>
+    <tr><td><code>branch</code></td><td>조건 분기</td><td><code>if (charAt(i) == ' ')</code></td></tr>
+    <tr><td><code>literal</code></td><td>상수 / magic number</td><td><code>0.95</code> · <code>"SM"</code> · <code>8</code></td></tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>★ cumulativeProductivity body — 핵심 fragment 7개</h3>
+  <pre>public BigDecimal cumulativeProductivity(...) {
+    <span style="color:var(--rose)">①</span> if (confirmedPlantCd == null || confirmedPlantCd.length() &lt; 8) {
+        <span style="color:var(--amber)">②</span> return <strong>DEFAULT_PRODUCTIVITY</strong>;       <span class="label">// literal 0.95</span>
+    }
+    BigDecimal product = BigDecimal.ONE;
+    <span style="color:var(--violet)">③</span> for (int i = 0; i &lt; <strong>8</strong>; i++) {            <span class="label">// literal 8 (loop bound)</span>
+        <span style="color:var(--rose)">④</span> if (confirmedPlantCd.charAt(i) == <strong>' '</strong>) continue;  <span class="label">// branch — 활성 검증</span>
+        BigDecimal p = lookupOrDefault(
+            cmpCd, orgCd, <span style="color:var(--violet)">⑤</span> <strong>PROC_CODES[i]</strong>, gradeCd, prodKindCd, customerCd);  <span class="label">// literal enum</span>
+        <span style="color:var(--cyan)">⑥</span> product = product.multiply(p);              <span class="label">// local — 누적 곱</span>
+    }
+    <span style="color:var(--cyan)">⑦</span> return product;                              <span class="label">// return — 최종</span>
+}</pre>
+
+  <h4>7 anchor 매핑 추천</h4>
+  <table>
+    <tr><th>#</th><th>kind</th><th>fragment</th><th>binding_target</th><th>confidence</th><th>confirm</th></tr>
+    <tr>
+      <td>①</td><td><code>branch</code></td>
+      <td><code>confirmedPlantCd == null || length &lt; 8</code></td>
+      <td>atomic.confirmed_plant_cd.invalid_check (early-exit guard)</td>
+      <td>0.85</td>
+      <td>user_queue (의미 모호 — 비정상 처리)</td>
+    </tr>
+    <tr>
+      <td>②</td><td><code>literal</code></td>
+      <td><code>DEFAULT_PRODUCTIVITY</code> (0.95)</td>
+      <td>★ Action.cumulative_productivity.metadata.default_on_invalid_input <em>or</em> rule.productivity_safe_range.fallback</td>
+      <td>0.9</td>
+      <td>auto (formula/literal)</td>
+    </tr>
+    <tr>
+      <td>③</td><td><code>literal</code></td>
+      <td><code>8</code> (loop bound)</td>
+      <td>atomic.shared.proc.enum_size</td>
+      <td>0.95</td>
+      <td>auto</td>
+    </tr>
+    <tr>
+      <td>④</td><td><code>branch</code></td>
+      <td><code>charAt(i) == ' '</code></td>
+      <td>atomic.confirmed_plant_cd.activation_check (' ' = 비활성)</td>
+      <td>0.9</td>
+      <td>auto</td>
+    </tr>
+    <tr>
+      <td>⑤</td><td><code>literal</code></td>
+      <td><code>PROC_CODES[i]</code></td>
+      <td>atomic.shared.proc.enum_values[i] (순서 고정)</td>
+      <td>0.95</td>
+      <td>auto</td>
+    </tr>
+    <tr>
+      <td>⑥</td><td><code>local</code></td>
+      <td><code>product = product.multiply(p)</code></td>
+      <td>aggregation.multiply (누적 곱 패턴)</td>
+      <td>0.85</td>
+      <td>user_queue</td>
+    </tr>
+    <tr>
+      <td>⑦</td><td><code>return</code></td>
+      <td><code>return product</code></td>
+      <td>facet productivity (or composite.productivity_std.productivity)</td>
+      <td>0.9</td>
+      <td>auto</td>
+    </tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>★ Customer findFirstMatch body — anchor 2개</h3>
+  <pre>public CustomerStdEntity findFirstMatch(...) {
+    List&lt;CustomerStdJpo&gt; matches = repository
+        .findByCmpCdAndOrgCdAndProductNameCdAndCustomerCdOrderByPriorityAsc(...);
+    <span style="color:var(--rose)">⑧</span> if (matches.<strong>isEmpty()</strong>) return null;       <span class="label">// branch — optional 표현</span>
+    <span style="color:var(--cyan)">⑨</span> return logic.toEntity(matches.<strong>get(0)</strong>);   <span class="label">// local — PRIORITY ASC 첫 row</span>
+}</pre>
+
+  <table>
+    <tr><th>#</th><th>kind</th><th>fragment</th><th>binding_target</th><th>confidence</th><th>confirm</th></tr>
+    <tr>
+      <td>⑧</td><td><code>branch</code></td>
+      <td><code>matches.isEmpty()</code> → null</td>
+      <td>action.match_customer_limit_for_order.metadata.fallback_kind=skip (lookup_strategy=optional)</td>
+      <td>0.85</td>
+      <td>user_queue</td>
+    </tr>
+    <tr>
+      <td>⑨</td><td><code>local</code></td>
+      <td><code>matches.get(0)</code></td>
+      <td>action.metadata.tiebreaker=PRIORITY ASC (첫 row)</td>
+      <td>0.85</td>
+      <td>user_queue</td>
+    </tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <h3>★ BusinessRule 등록 (Step 3 archive Q7d 결정)</h3>
+  <pre>BusinessRule:
+  fqn:                rule.scm.std.productivity_safe_range
+  applies_to_term:    term.scm.std.productivity_std
+  applies_to_facet:   productivity
+  expression:         "0.50 &lt;= productivity &lt;= 1.0"
+  severity:           HIGH
+  evidence:           P-2020-0834 (2020-04 운영이슈 — std 1.05 등록 비정상)
+  enforced_by:        []                                    <span class="label"># 방어로직 미구현</span>
+  violated_at_call:
+    - cumulativeProductivity body (가드 분기 부재)         <span class="label"># 직접 위반</span>
+    - lookupOrDefault body (가드 부재)                     <span class="label"># 간접 위반</span>
+  fallback_value:     0.95                                  <span class="label"># DEFAULT_PRODUCTIVITY</span></pre>
+
+  <p>이 BusinessRule 이 design-gaps #13 (constraint vs 방어로직 갭) 의 entity. 자동 검출 / UI 배지 / Gap Inspector 통합은 별 phase.</p>
+
+  <!-- ====================================================================== -->
+  <h3>도메인 깊이 — 시뮬 시 anchor 활용 흐름</h3>
+  <div class="panel">
+    <div class="label">ChangeSpec 적용 시 anchor 가 어떤 역할?</div>
+    <p>예: ChangeSpec "DEFAULT_PRODUCTIVITY 0.95 → 0.92" 입력.</p>
+    <ol>
+      <li>PythonGenerator 가 anchor ② (literal 0.95) 위치 자동 검출</li>
+      <li>한국어 Python 함수 generation 시 그 자리에 0.92 substitute</li>
+      <li>다른 anchor 들 (③ 8, ④ ' ' check, ⑤ PROC_CODES) 은 그대로 → ontology 의 atomic / facet 의미 유지</li>
+      <li>sandbox 실행 → before/after diff → SIM_VERIFIED 후 Java draft PR (literal 0.95 → 0.92 변경)</li>
+    </ol>
+    <p class="small">→ <strong>anchor 가 ChangeSpec 의 적용 위치</strong>. ontology 의 의미 단위로 변경 + 자동 코드 generation.</p>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>이번 Step 7 의 누적 결과</h3>
+  <table>
+    <tr><th>항목</th><th>이번 Step 7</th></tr>
+    <tr><td>AnchorBinding</td><td>9 (cumulativeProductivity 7 + findFirstMatch 2)</td></tr>
+    <tr><td>BusinessRule</td><td>1 (productivity_safe_range)</td></tr>
+    <tr><td>auto confirmed</td><td>5 (formula/literal 자동)</td></tr>
+    <tr><td>user_queue</td><td>4 (branch/lookup — 사용자 검증 필요)</td></tr>
+  </table>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>Step 7 답변 — AnchorBinding + BusinessRule</h4>
+
+    <div class="field">
+      <label><strong>Q1. cumulativeProductivity 7 anchor 추천대로 OK?</strong>
+        <span class="recommend">★ 추천 그대로. 5 auto + 2 user_queue (branch ① + local ⑥). binding_target 도 추천 그대로.</span>
+      </label>
+      <textarea class="text" name="q1_cumprod_anchors" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. ② DEFAULT_PRODUCTIVITY 0.95 의 binding_target 위치 결정</strong>
+        <span class="recommend">★ 추천: <strong>Action.metadata.default_on_invalid_input</strong> + rule.productivity_safe_range.fallback (둘 다 참조). 의미 명확.<br>
+        대안: Action.metadata 만 / rule 만 / 신규 atomic.default_productivity</span>
+      </label>
+      <textarea class="text" name="q2_default_binding" rows="2" placeholder="예: 추천 (둘 다) / Action 만 / rule 만 / 직접 입력"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. Customer findFirstMatch 2 anchor 추천대로 OK?</strong>
+        <span class="recommend">★ 추천 그대로. 둘 다 user_queue (branch ⑧ + local ⑨, 의미 모호 — 사용자 검증).</span>
+      </label>
+      <textarea class="text" name="q3_customer_anchors" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. BusinessRule productivity_safe_range 등록 OK?</strong>
+        <code>0.50 ≤ productivity ≤ 1.0</code>, severity=HIGH, evidence=P-2020-0834, enforced_by=[] (방어로직 미구현), violated_at_call=cumulative + lookupOrDefault.
+        <span class="recommend">★ 추천 그대로. Step 3 archive Q7d 결정 + design-gaps #13.</span>
+      </label>
+      <textarea class="text" name="q4_business_rule" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. AnchorBinding confidence + confirmed 처리 (혼합 패턴) OK?</strong>
+        v3 Q-C 결정: formula/literal 자동 confirmed, branch/lookup 사용자 큐.
+        <span class="recommend">★ 추천 그대로. 5 auto + 4 user_queue (Customer 2 + cumulative 2).</span>
+      </label>
+      <textarea class="text" name="q5_confidence" rows="2" placeholder="예: OK / 정정 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. 도메인 깊이 — ChangeSpec 시뮬 시 anchor 활용 흐름 이해 OK?</strong>
+        anchor ② (0.95 literal) 가 ChangeSpec 변경의 적용 위치. PythonGenerator 자동 substitute.
+        <span class="recommend">예: 충분 / 또는 추가 의문 ___</span>
+      </label>
+      <textarea class="text" name="q6_understanding" rows="3" placeholder="예: 충분 / 또는 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q7. Step 8 (DB confirm + archive 마무리) 진입 OK?</strong>
+        <span class="recommend">★ 추천 OK. 모든 합의 row 를 ontology API 로 confirm + round6-archive HTML 마무리.</span>
+      </label>
+      <textarea class="text" name="q7_step8_go" rows="2" placeholder="예: OK / 잠깐 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label>추가 의견</label>
+      <textarea class="text" name="freeform7" rows="2" placeholder="optional"></textarea>
+    </div>
+  </div>
+
+  <div class="ds-actions">
+    <button class="btn primary" data-action="copy-step7">📋 답변 복사 (Step 7)</button>
+    <button class="btn" data-action="preview-step7">미리보기</button>
+    <span class="copy-hint">대부분 추천대로면 한 단어 OK</span>
+  </div>
+  <div class="preview" id="preview-step7">
+    <div class="preview-label">복사될 내용</div>
+    <div class="preview-body"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step" id="archive-step-7" style="background:rgba(16,185,129,0.04);border-color:rgba(16,185,129,0.4)">
+  <h2>📚 Step 7 답변 받음 — AnchorBinding 합의 + Q3·Q7 풀이</h2>
+  <div class="meta">
+    <span class="badge b-applied">아카이브</span>
+    <span>Q1·Q2·Q4·Q5·Q6 OK + Q3 Spring Data JPA 한계 인정 + Q7 전체 스코프 결정</span>
+  </div>
+
+  <h3>답변 그대로</h3>
+  <div class="applied">
+    <div class="label">사용자 답변</div>
+    <ul>
+      <li><strong>Q1</strong> cumulativeProductivity 7 anchor: OK</li>
+      <li><strong>Q2</strong> DEFAULT 0.95 binding (default_on_invalid_input + lookup_or_default.default_value): OK</li>
+      <li><strong>Q3</strong> Customer 2 anchor: <em>"매칭 로직이 SQL 처리되는 것 같은데, 이 경우도 잘 연결된 온톨로지가 만들어지나?"</em> ★ 풀이 (아래)</li>
+      <li><strong>Q4</strong> BusinessRule (0.5 ≤ p ≤ 1.0): OK</li>
+      <li><strong>Q5</strong> 혼합 confirm (5 auto + 4 user_queue): OK</li>
+      <li><strong>Q6</strong> 도메인 깊이 — anchor 의 ChangeSpec 활용 흐름: OK</li>
+      <li><strong>Q7</strong> Step 8 진입: <em>"잠깐, 슬랩 설계 레거시 시스템의 모든 내용 다 컨펌? 데모의 ontology 완성될 수 있나?"</em> ★ 큰 결정 (아래)</li>
+    </ul>
+  </div>
+
+  <h3>★ Q3 풀이 — Spring Data JPA / 자동 SQL 의 anchor 한계</h3>
+  <div class="panel">
+    <div class="label">사용자 통찰 정확</div>
+    <p>findFirstMatch body 는 단순 호출 + null/get(0). <strong>진짜 비즈니스 로직 (4-key + PRIORITY ASC) 은 method name 자체에 박힘</strong>:
+      <code>findByCmpCdAndOrgCdAndProductNameCdAndCustomerCdOrderByPriorityAsc</code>.</p>
+    <p>현재 우리 모델: anchor (body) ⑧·⑨ + metadata (matching_keys, tiebreaker) 결합으로 cover. 단 <strong>method name pattern</strong> 자체는 anchor X.</p>
+  </div>
+
+  <h4>한계 + 별 phase 보강</h4>
+  <ul>
+    <li>ChangeSpec "PRIORITY ASC → DESC" 변경의 자동 추적 부족 (method name 변경 추적 부재)</li>
+    <li>@Query annotation (JPQL / native SQL) 의 query string 도 별 anchor 처리 필요</li>
+    <li><strong>design-gaps #22 신규 등록 (🔴 핵심)</strong> — anchor_kind 신규 <code>method_signature</code> 도입 또는 Spring Data JPA derived query parser 통합</li>
+    <li>이번 Round 6 의 metadata 정확성 의존 OK. Phase D (API 설계) 시점에 보강.</li>
+  </ul>
+
+  <h3>★ Q7 결정 — 전체 ontology 완성 + API + 다음 개발자 인계</h3>
+  <div class="quote">
+    <div class="label">사용자 명시 (정확)</div>
+    "온톨로지는 일부가 아니라 지금 레거시 시스템 전체에 대해서 완전한 온톨로지 및 매핑을 만들어야해. 이걸 만들고 에이전트가 쓸 수 있는 Api를 잘 만들어서 다음 개발자에게 넘겨줘서 그 개발자가 시뮬레이션 등 에이전트를 개발해야 하는 상황. 추후 부족한 부분을 계속 업데이트 하더라도 일단 완성본을 하나 만들어야."
+  </div>
+
+  <h4>합의된 새 흐름 — Phase A → B → C → D → E</h4>
+  <table>
+    <tr><th>Phase</th><th>내용</th><th>모드</th><th>위치</th></tr>
+    <tr>
+      <td><strong>A — Round 6 마무리</strong></td>
+      <td>Step 8 — Customer/Productivity 합의 row 47개 정리 + archive + Phase B 준비</td>
+      <td>—</td>
+      <td>이번 세션 (지금)</td>
+    </tr>
+    <tr>
+      <td><strong>B — Round 5 archive 흡수</strong></td>
+      <td>Round 5 의 6 entity (HrSpec / CastSpec / EdgingSpec / EdgingGroup / HrMinWgt / HrMaxWgt) archive 를 ontology 에 confirm. 재인터뷰 X.</td>
+      <td><strong>M1</strong> (빠른 confirm)</td>
+      <td>다음 세션 첫 작업</td>
+    </tr>
+    <tr>
+      <td><strong>C — 핵심 도메인 entity</strong></td>
+      <td>Order (4 sub) + Slab + 21-step Algorithm Action 12~15 개. 깊이 인터뷰.</td>
+      <td><strong>M3</strong> (hybrid: HTML + Authoring AI 보조)</td>
+      <td>Phase B 후</td>
+    </tr>
+    <tr>
+      <td><strong>D — 다음 개발자용 API 설계</strong></td>
+      <td>ontology query / 시뮬 entry point / AnchorBinding access. 32 routes 검토 + 보강 + 인계 가이드 + API 문서.</td>
+      <td>—</td>
+      <td>Phase C 후</td>
+    </tr>
+    <tr>
+      <td><strong>E — 검증 + design-gaps 핵심 결정</strong></td>
+      <td>22 design-gaps 중 🔴 8 결정. ontology 일관성 검증.</td>
+      <td>—</td>
+      <td>Phase D 후</td>
+    </tr>
+  </table>
+</section>
+
+<!-- ====================================================================== -->
+<section class="step" id="step-8">
+  <h2>Step 8 — Round 6 종료 + Phase B 준비</h2>
+  <div class="meta">
+    <span class="badge b-discuss">마무리</span>
+    <span>합의 row 정리 + DB confirm 방식 + archive 마무리 + 다음 phase 준비</span>
+  </div>
+
+  <!-- ====================================================================== -->
+  <h3>★ Round 6 합의 ground truth — 47 row 정리</h3>
+
+  <h4>1) 신규 atomic terms (7 row)</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>type</th><th>비고</th></tr>
+    <tr><td><code>term.scm.shared.cmp</code></td><td>회사</td><td>string(2)</td><td>모든 entity 공유</td></tr>
+    <tr><td><code>term.scm.shared.org</code></td><td>소</td><td>string(1)</td><td>모든 entity 공유</td></tr>
+    <tr><td><code>term.scm.shared.proc</code></td><td>공정</td><td>string(4) enum 8</td><td>enum_values: SM/HR/HRF/CR/ANL1/ANL2/GAL/CRF, order_fixed</td></tr>
+    <tr><td><code>term.scm.shared.grade</code></td><td>강종</td><td>string(10)</td><td>—</td></tr>
+    <tr><td><code>term.scm.shared.product_kind</code></td><td>품종</td><td>string(3~4)</td><td>4 alias chaos (PRODUCT_NAME_CD / PROD_KIND_CD / PRODUCT_TYPE_CD / 기타)</td></tr>
+    <tr><td><code>term.scm.shared.customer</code></td><td>고객사</td><td>string(10)</td><td>—</td></tr>
+    <tr><td><code>term.scm.shared.confirmed_plant_cd</code></td><td>확정통과공장코드</td><td>string(8)</td><td>encoding: 자리 i ↔ proc[i], activation: ' '=비활성</td></tr>
+  </table>
+
+  <h4>2) composite terms 보강 (2 row)</h4>
+  <table>
+    <tr><th>fqn (이전 → 변경)</th><th>한국어</th><th>parts (atomic)</th><th>facets</th></tr>
+    <tr>
+      <td><code>customer_std → scm.std.customer_design_limit</code></td>
+      <td>고객사설계제한</td>
+      <td>cmp / org / product_kind / customer (4)</td>
+      <td>priority / pkg_wgt_high / pkg_wgt_low (3) + lookup_strategy=optional</td>
+    </tr>
+    <tr>
+      <td><code>scm.product.productivity_std → scm.std.productivity_std</code></td>
+      <td>실수율 기준</td>
+      <td>cmp / org / proc / grade / product_kind / customer (6)</td>
+      <td>productivity (1) + lookup_strategy=mandatory + default_value=0.95</td>
+    </tr>
+  </table>
+
+  <h4>3) Action (4 row)</h4>
+  <table>
+    <tr><th>fqn</th><th>label</th><th>kind</th><th>realization</th></tr>
+    <tr><td><code>action.scm.std.match_customer_limit_for_order</code></td><td>주문별 고객사 제한 매칭</td><td>pure_function</td><td>CustomerStdService.findFirstMatch (annotation)</td></tr>
+    <tr><td><code>action.scm.std.lookup_productivity</code></td><td>공정별 실수율 정확매칭 조회</td><td>pure_function</td><td>ProductivityService.lookup (annotation)</td></tr>
+    <tr><td><code>action.scm.std.lookup_productivity_or_default</code></td><td>공정별 실수율 룩업 (default fallback)</td><td>pure_function</td><td>ProductivityService.lookupOrDefault (annotation)</td></tr>
+    <tr><td><code>action.scm.std.cumulative_productivity</code> ★</td><td>8 공정 누적 실수율 계산</td><td>pure_function</td><td>ProductivityService.cumulativeProductivity (annotation)</td></tr>
+  </table>
+
+  <h4>4) BusinessRule 신규 (1 row)</h4>
+  <pre>rule.scm.std.productivity_safe_range:
+  expression:        "0.50 &lt;= productivity &lt;= 1.0"
+  severity:          HIGH
+  evidence:          P-2020-0834
+  enforced_by:       []                                # 방어로직 미구현
+  violated_at_call:  [cumulativeProductivity, lookupOrDefault]</pre>
+
+  <h4>5) TypeRealization (~24 row)</h4>
+  <ul>
+    <li><strong>PRIMARY 4</strong>: CustomerStdEntity / CustomerStdJpo → customer_design_limit. ProductivityStdEntity / ProductivityStdJpo → productivity_std.</li>
+    <li><strong>PARTIAL ~20</strong>: atomic ↔ Entity field (Customer 4 + Productivity 6) + atomic ↔ Jpo field (Customer 4 + Productivity 6).</li>
+  </ul>
+
+  <h4>6) AnchorBinding (9 row)</h4>
+  <ul>
+    <li>cumulativeProductivity body — 7 anchor (1 user_queue + 6 auto). 6번 anchor (multiply local) 만 user.</li>
+    <li>findFirstMatch body — 2 anchor (둘 다 user_queue).</li>
+    <li>★ 정정 — anchor ④ 도 user_queue (Step 3 Q7b 합의 후 confirmed transition).</li>
+  </ul>
+
+  <!-- ====================================================================== -->
+  <h3>★ DB confirm 방식 결정</h3>
+  <div class="panel">
+    <div class="label">현재 backend API 의 한계</div>
+    <p><code>/api/ontology/repos/{repo_id}/{terms|actions|type-realizations}/{fqn}/confirm</code> 은 <strong>기존 row confirm 만 가능</strong>.
+      신규 row 추가 (atomic 7 / Action 4 / TR ~20 / AnchorBinding 9 / BusinessRule 1) 는 별 endpoint 또는 직접 DB insert 필요.</p>
+  </div>
+
+  <h4>옵션</h4>
+  <ul>
+    <li>★ <strong>(α)</strong> 이번 Round 6 = <strong>archive HTML 만 완성</strong> (round6-archive.html 또는 본 HTML 의 Step 8 archive). DB 적재는 Phase B 후 일괄 (Phase B 도 신규 row 다수 — 같은 패턴). </li>
+    <li><strong>(β)</strong> 즉시 backend 보강 (신규 row 추가 endpoint) + 이번 세션에 적재. Phase B 도 같은 endpoint 사용.</li>
+    <li><strong>(γ)</strong> 직접 SQLite insert script 작성 + 이번 세션 적재.</li>
+  </ul>
+
+  <p class="small">★ 추천 <strong>(α)</strong>. archive HTML 자체가 ground truth — DB 는 backend 보강 후 일괄. Phase D 의 API 설계 작업과 통합 가능.</p>
+
+  <!-- ====================================================================== -->
+  <h3>archive HTML 마무리</h3>
+  <ul>
+    <li>★ <strong>본 HTML 의 Step 8 archive</strong> — 본 round6-live-authoring.html 의 마지막 archive section 으로. 일관성 ↑</li>
+    <li>대안: <code>round6-archive.html</code> 별 파일 — Round 5 패턴 차용. 본 HTML 은 인터뷰 process, archive 는 ground truth 분리.</li>
+  </ul>
+
+  <p class="small">★ 추천 <strong>본 HTML 끝에 마무리 archive section</strong>. archive 하나로 통합.</p>
+
+  <!-- ====================================================================== -->
+  <h3>Phase B 준비</h3>
+  <h4>Round 5 archive 6 entity 의 핵심 사실 (ontology confirm 입력)</h4>
+  <ul>
+    <li><strong>HrSpec</strong> — 열연 스펙. PK = (cmp, org, grade, product_kind). 폭/길이/단중 제약</li>
+    <li><strong>CastSpec</strong> — 연주공장 (Cast plant) 스펙. PK = (cmp, org, productType, castCd/machineCd). 연주머신이 특정 품종에 대해 뽑는 두께 (머신당 고정값) · 폭 / 길이 / 단중 범위. <em>(화학 성분 X — 화학은 order_chemical 도메인)</em></li>
+    <li><strong>EdgingSpec</strong> — 슬랩 폭 변환 룰. * wildcard fallback. (Round 5 D-3″ 채택)</li>
+    <li><strong>EdgingGroup</strong> — EDGING 설비 + EdgingConstraint. PRIORITY tiebreaker</li>
+    <li><strong>HrMinWgt / HrMaxWgt</strong> — 단중 표준 (단중하한 / 단중상한 입력)</li>
+  </ul>
+
+  <p>Phase B 작업 = 위 6 entity 각각 빠른 confirm (M1 — 재인터뷰 X, archive 그대로 적용). 평균 30 분/entity = ~3h 예상.</p>
+
+  <!-- ====================================================================== -->
+  <div class="form-section">
+    <h4>Step 8 답변 — Round 6 종료 + Phase B 준비</h4>
+
+    <div class="field">
+      <label><strong>Q1. 합의 row 47개 정리 표 OK?</strong> (atomic 7 + composite 2 + Action 4 + BusinessRule 1 + TR ~24 + AnchorBinding 9)
+        <span class="recommend">★ 추천 OK. 누락 발견 시 정정.</span>
+      </label>
+      <textarea class="text" name="q1_summary" rows="2" placeholder="예: OK / 누락 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q2. DB confirm 방식 — α / β / γ?</strong>
+        <span class="recommend">★ 추천 <strong>α</strong> (archive HTML 만 완성, DB 적재는 Phase D 후 일괄). 이유: 신규 row endpoint 부재 + Phase B 도 동일 패턴.</span>
+      </label>
+      <textarea class="text" name="q2_db_method" rows="2" placeholder="예: α / β (즉시) / γ (직접 SQL)"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q3. archive HTML 마무리 위치 — 본 HTML 끝 vs 별 파일?</strong>
+        <span class="recommend">★ 추천 <strong>본 HTML 끝</strong> 마무리 archive section.</span>
+      </label>
+      <textarea class="text" name="q3_archive_location" rows="2" placeholder="예: 본 HTML 끝 / 별 파일 (round6-archive.html)"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q4. Phase B 진입 — Round 5 archive 6 entity 빠른 confirm OK?</strong>
+        <span class="recommend">★ 추천 OK. 다음 세션 첫 작업.</span>
+      </label>
+      <textarea class="text" name="q4_phase_b_go" rows="2" placeholder="예: OK / 또는 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q5. HANDOFF 갱신 + 메모리 업데이트 OK?</strong>
+        Phase A 완료 + Phase B/C/D/E 흐름 합의 + 다음 세션 첫 작업 = Phase B 진입.
+        <span class="recommend">★ 추천 OK.</span>
+      </label>
+      <textarea class="text" name="q5_handoff" rows="2" placeholder="예: OK"></textarea>
+    </div>
+
+    <div class="field">
+      <label><strong>Q6. Round 6 마무리 평가 / 추가 의견</strong>
+        <span class="recommend">예: 부족한 영역 / 다시 봐야 할 결정 / Phase B 진입 전 정정 / 기타</span>
+      </label>
+      <textarea class="text" name="q6_evaluation" rows="3" placeholder="예: 충분 / 또는 ___"></textarea>
+    </div>
+
+    <div class="field">
+      <label>추가 의견</label>
+      <textarea class="text" name="freeform8" rows="2" placeholder="optional"></textarea>
+    </div>
+  </div>
+
+  <div class="ds-actions">
+    <button class="btn primary" data-action="copy-step8">📋 답변 복사 (Step 8)</button>
+    <button class="btn" data-action="preview-step8">미리보기</button>
+    <span class="copy-hint">대부분 추천대로면 한 단어 OK</span>
+  </div>
+  <div class="preview" id="preview-step8">
+    <div class="preview-label">복사될 내용</div>
+    <div class="preview-body"></div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<!-- ============================ ROUND 6 종료 ============================ -->
+<!-- ====================================================================== -->
+<section class="step" id="round6-final" style="background:rgba(16,185,129,0.06);border:2px solid rgba(16,185,129,0.5)">
+  <h2>🏁 Round 6 종료 — Phase A (Customer / Productivity) 완료</h2>
+  <div class="meta">
+    <span class="badge b-applied">Round 6 Final Archive</span>
+    <span>Q1~Q5 모두 추천대로 OK</span>
+    <span>Q6: "하면서 보강해가자" + 새 운영 패턴 합의 (서브에이전트 2 검토)</span>
+  </div>
+
+  <h3>★ 합의 ground truth 47 row (Phase D DB 적재 입력)</h3>
+
+  <h4>1) 신규 atomic terms (7)</h4>
+  <table>
+    <tr><th>fqn</th><th>한국어</th><th>type</th><th>비고</th></tr>
+    <tr><td><code>term.scm.shared.cmp</code></td><td>회사</td><td>string(2)</td><td>모든 entity 공유</td></tr>
+    <tr><td><code>term.scm.shared.org</code></td><td>소</td><td>string(1)</td><td>모든 entity 공유</td></tr>
+    <tr><td><code>term.scm.shared.proc</code></td><td>공정</td><td>string(4) enum 8</td><td>SM/HR/HRF/CR/ANL1/ANL2/GAL/CRF + order_fixed</td></tr>
+    <tr><td><code>term.scm.shared.grade</code></td><td>강종</td><td>string(10)</td><td>—</td></tr>
+    <tr><td><code>term.scm.shared.product_kind</code></td><td>품종</td><td>string(3~4)</td><td>4 alias chaos</td></tr>
+    <tr><td><code>term.scm.shared.customer</code></td><td>고객사</td><td>string(10)</td><td>—</td></tr>
+    <tr><td><code>term.scm.shared.confirmed_plant_cd</code></td><td>확정통과공장코드</td><td>string(8)</td><td>encoding: 자리 i ↔ proc[i], activation: ' '=비활성</td></tr>
+  </table>
+
+  <div class="my-guess" style="border-color:rgba(16,185,129,0.5);background:rgba(16,185,129,0.04)">
+    <div class="label" style="color:var(--emerald)">✅ Phase B 사후 정정 (2026-05-10 B.4 Q6 합의)</div>
+    <p>Phase B EdgingGroup (B.4) 작업 중 신규 atomic <code>term.scm.shared.priority</code> (Integer, tiebreaker semantic) 등록 — atomic 자체는 <strong>Phase B 소속</strong> (B.4 신규). Phase A Customer 의 priority facet 와 의미 동일하므로 Phase A 에 retroactive TR 추가.</p>
+    <ul>
+      <li><strong>Phase A atomic 7 그대로 유지</strong> (priority atomic 은 Phase B 소속)</li>
+      <li><strong>+1 PARTIAL TR</strong>: <code>term.scm.shared.priority</code> ↔ <code>CustomerStdJpo.priority</code> — Phase A composite <code>scm.std.customer_design_limit</code> 의 priority facet 가 Phase B 의 atomic 을 atomic_ref 로 가리킴</li>
+      <li><strong>최종 합의</strong>: Phase A atomic 7 (변경 없음), Phase A TR +1, ground truth row <strong>47 → 48</strong>.</li>
+      <li>참조: Phase B B.4 archive (priority atomic 등록), Phase B 누적 atomic count = 6 (priority 포함).</li>
+    </ul>
+  </div>
+
+  <h4>2) composite terms 보강 (2)</h4>
+  <table>
+    <tr><th>fqn (이전 → 변경)</th><th>한국어</th><th>parts (atomic)</th><th>facets</th></tr>
+    <tr>
+      <td><code>customer_std → scm.std.customer_design_limit</code></td>
+      <td>고객사설계제한</td>
+      <td>cmp / org / product_kind / customer (4)</td>
+      <td><strong>priority (atomic_ref → scm.shared.priority, B.4 retroactive)</strong> / pkg_wgt_high / pkg_wgt_low (3) + lookup_strategy=optional, fallback_kind=skip</td>
+    </tr>
+    <tr>
+      <td><code>scm.product.productivity_std → scm.std.productivity_std</code></td>
+      <td>실수율 기준</td>
+      <td>cmp / org / proc / grade / product_kind / customer (6)</td>
+      <td>productivity (1) + lookup_strategy=mandatory, default_value=0.95</td>
+    </tr>
+  </table>
+
+  <h4>3) Action (4)</h4>
+  <table>
+    <tr><th>fqn</th><th>label</th><th>kind</th><th>realization</th></tr>
+    <tr><td><code>action.scm.std.match_customer_limit_for_order</code></td><td>주문별 고객사 제한 매칭</td><td>pure_function</td><td>CustomerStdService.findFirstMatch</td></tr>
+    <tr><td><code>action.scm.std.lookup_productivity</code></td><td>공정별 실수율 정확매칭 조회</td><td>pure_function</td><td>ProductivityService.lookup</td></tr>
+    <tr><td><code>action.scm.std.lookup_productivity_or_default</code></td><td>공정별 실수율 룩업 (default fallback)</td><td>pure_function</td><td>ProductivityService.lookupOrDefault (delegates lookup)</td></tr>
+    <tr><td><code>action.scm.std.cumulative_productivity</code> ★</td><td>8 공정 누적 실수율 계산</td><td>pure_function</td><td>ProductivityService.cumulativeProductivity (delegates lookupOrDefault, 8회 loop)</td></tr>
+  </table>
+
+  <h4>4) BusinessRule (1) + AnchorBinding (9) + TR (~24)</h4>
+  <ul>
+    <li><strong>BusinessRule</strong>: <code>rule.scm.std.productivity_safe_range</code> (0.5 ≤ p ≤ 1.0, severity=HIGH, evidence=P-2020-0834, enforced_by=[], violated_at_call=[cumulative, lookupOrDefault])</li>
+    <li><strong>AnchorBinding</strong>: cumulativeProductivity body 7 (literal 0.95 / literal 8 / branch ' ' / literal PROC_CODES / local multiply / return / branch invalid_check) + findFirstMatch body 2 (branch isEmpty / local get(0))</li>
+    <li><strong>TypeRealization</strong>: PRIMARY 4 (Customer Entity+Jpo, Productivity Entity+Jpo) + PARTIAL ~20 (atomic ↔ Entity field + atomic ↔ Jpo field)</li>
+  </ul>
+
+  <h3>★ 합의된 새 흐름 — Phase A → B → C → D → E</h3>
+  <table>
+    <tr><th>Phase</th><th>내용</th><th>모드</th><th>상태</th></tr>
+    <tr><td><strong>A</strong></td><td>Round 6 — Customer/Productivity</td><td>M1 (직접 HTML 인터뷰)</td><td><span class="pill p-emerald">완료 (이번 세션)</span></td></tr>
+    <tr><td><strong>B</strong></td><td>Round 5 archive 6 entity 흡수 (HrSpec / CastSpec / EdgingSpec / EdgingGroup / HrMinWgt / HrMaxWgt) — 빠른 confirm, 재인터뷰 X</td><td>M1 (빠른 confirm)</td><td><span class="pill p-amber">다음 세션 첫 작업</span></td></tr>
+    <tr><td><strong>C</strong></td><td>핵심 도메인 entity — Order (4 sub) + Slab + 21-step Algorithm Action 12~15</td><td>M3 (HTML + Authoring AI 보조)</td><td>Phase B 후</td></tr>
+    <tr><td><strong>D</strong></td><td>다음 개발자용 API 설계 + 인계 가이드 + API 문서</td><td>—</td><td>Phase C 후</td></tr>
+    <tr><td><strong>E</strong></td><td>검증 + design-gaps 22 항목 중 🔴 8 결정 + 빠진 entity 보완</td><td>—</td><td>Phase D 후</td></tr>
+  </table>
+
+  <h3>★ 새 운영 패턴 — fresh-context 서브에이전트 2 검토</h3>
+  <div class="quote">
+    <div class="label">사용자 명시 (Step 8 Q6)</div>
+    "작업할때 맥락이 다른 서브에이전트 2에게 검토를 하는 과정을 거쳐줘"
+  </div>
+  <ul>
+    <li>적용: phase 진입 / 종료 / 핵심 결정 / 큰 산출물 작성</li>
+    <li>방식: `Agent` tool 2 개 병렬 spawn (general-purpose, fresh context)</li>
+    <li>역할 차별화: 기술 정확성 vs 비판적 / 일관성 vs 빠뜨림</li>
+    <li>결과 통합 후 사용자 보고. 사용자 정정/추가 결정.</li>
+    <li>메모리 저장: <code>feedback_subagent_review.md</code></li>
+    <li>검수 기록: <code>reference-materials.md</code> 의 "검수 기록" 섹션</li>
+  </ul>
+
+  <h3>★ 의심 영역 누적 (Phase A 진행 중 — Phase E 에서 결정)</h3>
+  <table>
+    <tr><th>영역</th><th>출처</th><th>등급</th><th>위치</th></tr>
+    <tr><td>composite description 의 운영이슈 포함 여부</td><td>Step 3 Q2</td><td>해결</td><td>이번 세션 — Action.metadata.known_issues 로 분리</td></tr>
+    <tr><td>P-2018-0721 의 정확한 도메인 의미</td><td>Step 3 Q7c</td><td>보류 (폐기)</td><td>다음 운영자 인터뷰</td></tr>
+    <tr><td>P-2020-0834 방어로직 + UI/UX</td><td>Step 3 Q7d</td><td>design-gaps #13</td><td>Phase D / E</td></tr>
+    <tr><td>매핑 안 한 layer (Logic/PK/Service/Repository) 의 시뮬 처리</td><td>Step 4 Q5</td><td>해결</td><td>이번 세션 — archive-step-4 풀이</td></tr>
+    <tr><td>Action label "조회" vs "매칭" 뉘앙스</td><td>Step 5 Q1</td><td>해결</td><td>match_customer_limit_for_order 채택</td></tr>
+    <tr><td>Spring Data JPA / 자동 SQL 의 anchor 한계</td><td>Step 7 Q3</td><td>design-gaps #22</td><td>Phase D — anchor_kind 신규 method_signature 도입</td></tr>
+    <tr><td>전체 ontology + API + 인계</td><td>Step 7 Q7</td><td>해결 (새 흐름 합의)</td><td>Phase B/C/D/E 진행</td></tr>
+  </table>
+
+  <h3>★ 산출물 (Phase A 종료 시점)</h3>
+  <ul>
+    <li><strong>round6-live-authoring.html</strong> — 본 HTML. 8 step 인터뷰 + 8 archive + 1 final archive (이 섹션)</li>
+    <li><strong>reference-materials.md</strong> — 참고자료 인덱스 (최종 가이드 입구)</li>
+    <li><strong>section1-2-3-overview.html</strong> — 다른 관계자 발표용 풀 가이드 (12 섹션)</li>
+    <li><strong>design-gaps-and-questions.md</strong> — 22 항목 디자인 갭 (🔴 8 + 🟡 12 + 🟢 2)</li>
+    <li><strong>anchor-binding-deep-dive.html</strong> — 인터랙티브 심층 가이드 (6 탭)</li>
+    <li><strong>HANDOFF.md</strong> — 다음 세션 첫 작업 = Phase B</li>
+  </ul>
+
+  <h3>다음 세션 첫 작업</h3>
+  <div class="panel ok">
+    <div class="label">Phase B 진입 — Round 5 archive 6 entity 빠른 confirm</div>
+    <p>대상: HrSpec / CastSpec / EdgingSpec / EdgingGroup / HrMinWgt / HrMaxWgt</p>
+    <p>패턴: 본 round6 의 Round 5 archive 만 read → ontology 의 description / parts / facets / Action 정리 → 사용자 빠른 confirm (재인터뷰 X)</p>
+    <p>방식: M1 빠른 confirm. entity 평균 30 분 × 6 ≈ 3h 예상.</p>
+    <p>먼저: phase 진입 직전 fresh-context 서브에이전트 2 으로 Phase B 준비 검수.</p>
   </div>
 </section>
 
@@ -1031,17 +3234,19 @@ document.querySelector('button[data-action="copy-step1"]').addEventListener('cli
 
 function buildStep2Text() {
   const fields = [
-    ["q1_label_fqn",         "Q1. label / fqn"],
-    ["q2_description",       "Q2. description"],
-    ["q3_parts",             "Q3. parts (atomic 4)"],
-    ["q4_facets",            "Q4. facets (3)"],
-    ["q5_domain_consistency","Q5. domain 일관성 (S-1~S-4)"],
-    ["q6_lookup",            "Q6. 매칭 로직 표현"],
-    ["q7_step3_go",          "Q7. Step 3 진입"],
-    ["freeform2",            "추가"],
+    ["q3_fqn",         "Q3. fqn"],
+    ["q4_parts",       "Q4. parts (atomic 4)"],
+    ["q5_facets",      "Q5. facets (3)"],
+    ["q6_domain",      "Q6. domain (S-1/S-2)"],
+    ["q7_lookup",      "Q7. 매칭 로직 표현"],
+    ["q8a_cases",      "Q8a. 운영 사례"],
+    ["q8b_priority",   "Q8b. priority 의미"],
+    ["q8c_null",       "Q8c. null fallback 운영"],
+    ["q9_step3_go",    "Q9. Step 3 진입"],
+    ["freeform2",      "추가"],
   ];
   const slot = document.querySelector('#step-2');
-  const parts = ["[Step 2 — 고객표준 composite 보강]"];
+  const parts = ["[Step 2 — 고객사설계제한 composite 보강 (Q3~Q9)]"];
   for (const [k, label] of fields) {
     const v = (slot.querySelector(`textarea[name="${k}"]`)?.value ?? '').trim();
     if (v) parts.push(`\n## ${label}\n${v}`);
@@ -1066,6 +3271,282 @@ document.querySelector('button[data-action="copy-step2"]').addEventListener('cli
     btn.classList.add('copied');
     setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
     const slot = document.querySelector('#preview-step2');
+    const body = slot.querySelector('.preview-body');
+    body.textContent = txt;
+    slot.classList.add('visible');
+  } catch {
+    alert('복사 실패. 미리보기 영역에서 수동 복사하세요.');
+  }
+});
+
+function buildStep3Text() {
+  const fields = [
+    ["q1_label_fqn",   "Q1. label / fqn"],
+    ["q2_description", "Q2. description"],
+    ["q3_parts",       "Q3. parts (atomic 6)"],
+    ["q4_facets",      "Q4. facets (1)"],
+    ["q5_domain",      "Q5. domain (S-2)"],
+    ["q6_lookup",      "Q6. 매칭 로직 표현"],
+    ["q7a_default",    "Q7a. default 0.95"],
+    ["q7b_proc",       "Q7b. 8 공정 의미"],
+    ["q7c_issue_2018", "Q7c. P-2018-0721 의미"],
+    ["q7d_issue_2020", "Q7d. P-2020-0834 처리"],
+    ["q7e_null_default","Q7e. null vs default 패턴"],
+    ["q8_step4_go",    "Q8. Step 4 진입"],
+    ["freeform3",      "추가"],
+  ];
+  const slot = document.querySelector('#step-3');
+  const parts = ["[Step 3 — 실수율 기준 composite 보강]"];
+  for (const [k, label] of fields) {
+    const v = (slot.querySelector(`textarea[name="${k}"]`)?.value ?? '').trim();
+    if (v) parts.push(`\n## ${label}\n${v}`);
+  }
+  return parts.join("\n");
+}
+
+document.querySelector('button[data-action="preview-step3"]').addEventListener('click', () => {
+  const slot = document.querySelector('#preview-step3');
+  const body = slot.querySelector('.preview-body');
+  body.textContent = buildStep3Text();
+  slot.classList.add('visible');
+});
+
+document.querySelector('button[data-action="copy-step3"]').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  const txt = buildStep3Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    const orig = btn.textContent;
+    btn.textContent = '✓ 복사됨';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+    const slot = document.querySelector('#preview-step3');
+    const body = slot.querySelector('.preview-body');
+    body.textContent = txt;
+    slot.classList.add('visible');
+  } catch {
+    alert('복사 실패. 미리보기 영역에서 수동 복사하세요.');
+  }
+});
+
+function buildStep4Text() {
+  const fields = [
+    ["q1_existing_primary",   "Q1. 기존 PRIMARY 2 변경"],
+    ["q2_customer_partial",   "Q2. Customer 4 PARTIAL"],
+    ["q3_productivity_partial","Q3. Productivity 6 PARTIAL"],
+    ["q4_jpo_primary",        "Q4. Jpo 추가 PRIMARY"],
+    ["q5_other_layer",        "Q5. 다른 layer 매핑 X"],
+    ["q6_atomic_view",        "Q6. atomic ↔ N row"],
+    ["q7_step5_go",           "Q7. Step 5 진입"],
+    ["freeform4",             "추가"],
+  ];
+  const slot = document.querySelector('#step-4');
+  const parts = ["[Step 4 — TypeRealization 검증/추가]"];
+  for (const [k, label] of fields) {
+    const v = (slot.querySelector(`textarea[name="${k}"]`)?.value ?? '').trim();
+    if (v) parts.push(`\n## ${label}\n${v}`);
+  }
+  return parts.join("\n");
+}
+
+document.querySelector('button[data-action="preview-step4"]').addEventListener('click', () => {
+  const slot = document.querySelector('#preview-step4');
+  const body = slot.querySelector('.preview-body');
+  body.textContent = buildStep4Text();
+  slot.classList.add('visible');
+});
+
+document.querySelector('button[data-action="copy-step4"]').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  const txt = buildStep4Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    const orig = btn.textContent;
+    btn.textContent = '✓ 복사됨';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+    const slot = document.querySelector('#preview-step4');
+    const body = slot.querySelector('.preview-body');
+    body.textContent = txt;
+    slot.classList.add('visible');
+  } catch {
+    alert('복사 실패. 미리보기 영역에서 수동 복사하세요.');
+  }
+});
+
+function buildStep5Text() {
+  const fields = [
+    ["q1_label_fqn",      "Q1. Action label / fqn"],
+    ["q2_kind",           "Q2. kind"],
+    ["q3_params_return",  "Q3. params + return"],
+    ["q4_realization",    "Q4. realization"],
+    ["q5_metadata",       "Q5. metadata"],
+    ["q6_callsites",      "Q6. 사용처 references"],
+    ["q7_pattern",        "Q7. algorithm step 5/6 패턴"],
+    ["q8_step6_go",       "Q8. Step 6 진입"],
+    ["freeform5",         "추가"],
+  ];
+  const slot = document.querySelector('#step-5');
+  const parts = ["[Step 5 — Customer Action 합의]"];
+  for (const [k, label] of fields) {
+    const v = (slot.querySelector(`textarea[name="${k}"]`)?.value ?? '').trim();
+    if (v) parts.push(`\n## ${label}\n${v}`);
+  }
+  return parts.join("\n");
+}
+
+document.querySelector('button[data-action="preview-step5"]').addEventListener('click', () => {
+  const slot = document.querySelector('#preview-step5');
+  const body = slot.querySelector('.preview-body');
+  body.textContent = buildStep5Text();
+  slot.classList.add('visible');
+});
+
+document.querySelector('button[data-action="copy-step5"]').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  const txt = buildStep5Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    const orig = btn.textContent;
+    btn.textContent = '✓ 복사됨';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+    const slot = document.querySelector('#preview-step5');
+    const body = slot.querySelector('.preview-body');
+    body.textContent = txt;
+    slot.classList.add('visible');
+  } catch {
+    alert('복사 실패. 미리보기 영역에서 수동 복사하세요.');
+  }
+});
+
+function buildStep6Text() {
+  const fields = [
+    ["q1_action_count",       "Q1. 3 Action 모델링"],
+    ["q2_labels",             "Q2. 3 Action label/fqn"],
+    ["q3_params_return",      "Q3. params / return"],
+    ["q4_confirmed_plant_cd", "Q4. confirmedPlantCd 처리"],
+    ["q5_known_issues",       "Q5. 운영이슈 metadata"],
+    ["q6_callsites",          "Q6. 사용처 references"],
+    ["q7_understanding",      "Q7. 도메인 깊이 이해"],
+    ["q8_step7_go",           "Q8. Step 7 진입"],
+    ["freeform6",             "추가"],
+  ];
+  const slot = document.querySelector('#step-6');
+  const parts = ["[Step 6 — Productivity 3 Action 합의]"];
+  for (const [k, label] of fields) {
+    const v = (slot.querySelector(`textarea[name="${k}"]`)?.value ?? '').trim();
+    if (v) parts.push(`\n## ${label}\n${v}`);
+  }
+  return parts.join("\n");
+}
+
+document.querySelector('button[data-action="preview-step6"]').addEventListener('click', () => {
+  const slot = document.querySelector('#preview-step6');
+  const body = slot.querySelector('.preview-body');
+  body.textContent = buildStep6Text();
+  slot.classList.add('visible');
+});
+
+document.querySelector('button[data-action="copy-step6"]').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  const txt = buildStep6Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    const orig = btn.textContent;
+    btn.textContent = '✓ 복사됨';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+    const slot = document.querySelector('#preview-step6');
+    const body = slot.querySelector('.preview-body');
+    body.textContent = txt;
+    slot.classList.add('visible');
+  } catch {
+    alert('복사 실패. 미리보기 영역에서 수동 복사하세요.');
+  }
+});
+
+function buildStep7Text() {
+  const fields = [
+    ["q1_cumprod_anchors",  "Q1. cumulativeProductivity 7 anchor"],
+    ["q2_default_binding",  "Q2. DEFAULT 0.95 binding"],
+    ["q3_customer_anchors", "Q3. Customer 2 anchor"],
+    ["q4_business_rule",    "Q4. BusinessRule"],
+    ["q5_confidence",       "Q5. confidence + confirmed"],
+    ["q6_understanding",    "Q6. 도메인 깊이"],
+    ["q7_step8_go",         "Q7. Step 8 진입"],
+    ["freeform7",           "추가"],
+  ];
+  const slot = document.querySelector('#step-7');
+  const parts = ["[Step 7 — AnchorBinding + BusinessRule]"];
+  for (const [k, label] of fields) {
+    const v = (slot.querySelector(`textarea[name="${k}"]`)?.value ?? '').trim();
+    if (v) parts.push(`\n## ${label}\n${v}`);
+  }
+  return parts.join("\n");
+}
+
+document.querySelector('button[data-action="preview-step7"]').addEventListener('click', () => {
+  const slot = document.querySelector('#preview-step7');
+  const body = slot.querySelector('.preview-body');
+  body.textContent = buildStep7Text();
+  slot.classList.add('visible');
+});
+
+document.querySelector('button[data-action="copy-step7"]').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  const txt = buildStep7Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    const orig = btn.textContent;
+    btn.textContent = '✓ 복사됨';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+    const slot = document.querySelector('#preview-step7');
+    const body = slot.querySelector('.preview-body');
+    body.textContent = txt;
+    slot.classList.add('visible');
+  } catch {
+    alert('복사 실패. 미리보기 영역에서 수동 복사하세요.');
+  }
+});
+
+function buildStep8Text() {
+  const fields = [
+    ["q1_summary",          "Q1. 47 row 정리"],
+    ["q2_db_method",        "Q2. DB confirm 방식 (α/β/γ)"],
+    ["q3_archive_location", "Q3. archive HTML 위치"],
+    ["q4_phase_b_go",       "Q4. Phase B 진입"],
+    ["q5_handoff",          "Q5. HANDOFF + 메모리"],
+    ["q6_evaluation",       "Q6. Round 6 평가"],
+    ["freeform8",           "추가"],
+  ];
+  const slot = document.querySelector('#step-8');
+  const parts = ["[Step 8 — Round 6 종료 + Phase B 준비]"];
+  for (const [k, label] of fields) {
+    const v = (slot.querySelector(`textarea[name="${k}"]`)?.value ?? '').trim();
+    if (v) parts.push(`\n## ${label}\n${v}`);
+  }
+  return parts.join("\n");
+}
+
+document.querySelector('button[data-action="preview-step8"]').addEventListener('click', () => {
+  const slot = document.querySelector('#preview-step8');
+  const body = slot.querySelector('.preview-body');
+  body.textContent = buildStep8Text();
+  slot.classList.add('visible');
+});
+
+document.querySelector('button[data-action="copy-step8"]').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  const txt = buildStep8Text();
+  try {
+    await navigator.clipboard.writeText(txt);
+    const orig = btn.textContent;
+    btn.textContent = '✓ 복사됨';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+    const slot = document.querySelector('#preview-step8');
     const body = slot.querySelector('.preview-body');
     body.textContent = txt;
     slot.classList.add('visible');

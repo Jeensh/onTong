@@ -213,3 +213,83 @@ def get_inventory(
         ))
     out.sort(key=lambda x: x.simple_name)
     return out
+
+
+# ---------------------------------------------------------------------------
+# 패키지 별 Action list (좌측 트리 expand 시 inline action leaf 표시용)
+# ---------------------------------------------------------------------------
+class ActionInventoryDTO(BaseModel):
+    fqn: str
+    name: str
+    kind: str           # pure_function / effectful / workflow
+    declared_on_term: str | None = None
+    verification_level: str
+    realization_count: int
+    primary_method_fqn: str | None = None  # 첫 realization 의 method_fqn (간략 표시용)
+    confirmed: bool = False                # 진급 단계가 SIGNATURE_LOCKED 이상인가
+
+
+@router.get("/{repo_id}/modules/inventory/actions", response_model=list[ActionInventoryDTO])
+def get_inventory_actions(
+    repo_id: str,
+    package: str = Query(..., description="dotted full path"),
+    recursive: bool = Query(False),
+) -> list[ActionInventoryDTO]:
+    """패키지 별 Action list.
+
+    한 Action 은 그 realization 의 parent code_type 의 package 로 그루핑.
+    같은 action 이 여러 패키지에 걸쳐있으면 각 패키지 inventory 에 모두 노출 (단, primary 1번만).
+    """
+    code_store = CodeLayerStore()
+    mapping_store = MappingLayerStore()
+
+    types = code_store.list_types_summary(repo_id=repo_id)
+    code_pkg: dict[str, str] = {ct["fqn"]: (ct["package"] or "") for ct in types}
+
+    actions = mapping_store.list_actions(repo_id=repo_id)
+
+    out: list[ActionInventoryDTO] = []
+    seen: set[str] = set()
+    for a in actions:
+        if not a.realizations:
+            continue
+        primary_method_fqn: str | None = None
+        action_pkg: str | None = None
+        for r in a.realizations:
+            base = r.code_method_fqn.split("(", 1)[0].split("@line", 1)[0]
+            if "." not in base:
+                continue
+            parent_class = base.rsplit(".", 1)[0]
+            pkg = code_pkg.get(parent_class)
+            if pkg is None:
+                continue
+            if primary_method_fqn is None:
+                primary_method_fqn = r.code_method_fqn
+                action_pkg = pkg
+            # 한 action 은 첫 매칭 패키지에만 (modules_api 의 direct_actions 와 일관)
+            break
+
+        if action_pkg is None:
+            continue
+        match = (action_pkg == package) if not recursive else (
+            action_pkg == package or action_pkg.startswith(package + ".")
+        )
+        if not match:
+            continue
+        if a.fqn in seen:
+            continue
+        seen.add(a.fqn)
+
+        confirmed = a.verification_level.value not in ("unmapped", "draft")
+        out.append(ActionInventoryDTO(
+            fqn=a.fqn,
+            name=a.label,
+            kind=a.kind.value,
+            declared_on_term=a.declared_on_term,
+            verification_level=a.verification_level.value,
+            realization_count=len(a.realizations),
+            primary_method_fqn=primary_method_fqn,
+            confirmed=confirmed,
+        ))
+    out.sort(key=lambda x: x.name)
+    return out
