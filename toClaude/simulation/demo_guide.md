@@ -126,3 +126,99 @@ PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/ -q
 ### tests/simulation/test_agent3.py / test_demo_e2e.py 3 failure
 - 원인: `sample-repos/slab-design/` 부재 (commit `2a346e3` 옵션 A 정렬 영향)
 - 해결: 통합 작업 시 `sample-repos/slab-design-real_v2/` 와 매핑 결정 후 fixture 경로 갱신
+
+---
+
+## 2026-05-10 STEP 3b-1 — Runner contract 모델 11종 + LookupDataSource
+
+### S8. LookupDataSource 인스턴스화 + fixture_only 모드 검증
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python - <<'PY'
+from backend.simulation.runner.lookup_source import LookupDataSource
+
+
+# spec 05 §3.4 _derive_table_specs 가 기대하는 최소 인터페이스
+class FakeField:
+    def __init__(self, slot_name, atomic_fqn=None, is_pk=False, drama_dna_kind=None):
+        self.slot_name, self.atomic_fqn, self.is_pk, self.drama_dna_kind = (
+            slot_name, atomic_fqn, is_pk, drama_dna_kind
+        )
+
+
+class FakeCT:
+    def __init__(self, fqn, fields, role="lookup_table"):
+        self.fqn, self.fields, self.role = fqn, fields, role
+
+
+class FakeOnt:
+    def __init__(self, cts):
+        self._cts = cts
+
+    def list_code_types(self, role=None):
+        return [c for c in self._cts if role is None or c.role == role]
+
+
+customer = FakeCT("scm.std.CustomerStd", [
+    FakeField("customer_no", atomic_fqn="scm.shared.atomic.customer_no", is_pk=True),
+    FakeField("customer_name", atomic_fqn="scm.shared.atomic.customer_name", drama_dna_kind="alias"),
+])
+
+# spec 04 §6.3 P-2018-0098 회귀 fixture
+fixture = {
+    "lookups": {
+        "scm.std.CustomerStd:7": {
+            "pk": 7,
+            "table_spec_fqn": "scm.std.CustomerStd",
+            "columns": {"customer_name": "정XX"},
+        }
+    },
+    "metadata": {"scenario_origin": "P-2018-0098"},
+}
+src = LookupDataSource(ontology_client=FakeOnt([customer]), fixture=fixture)
+
+row = src.get("scm.std.CustomerStd", 7)
+print("get OK:", row.pk, row.columns["customer_name"])
+print("table_specs:", list(src.table_specs().keys()))
+print("validate:", src.validate())  # []
+print("metadata:", src.metadata())  # {'scenario_origin': 'P-2018-0098'}
+PY
+# 기대 출력:
+# get OK: 7 정XX
+# table_specs: ['scm.std.CustomerStd']
+# validate: []
+# metadata: {'scenario_origin': 'P-2018-0098'}
+```
+
+### S9. Runner 모델 + LookupDataSource 24 test 통과 확인
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python -m pytest \
+  tests/simulation/test_runner_models.py \
+  tests/simulation/test_lookup_source.py -v
+# 기대: 24 passed (15 + 9)
+```
+
+### S10. 회귀 — 전체 simulation test suite (3a + 3b-1 누적)
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/ -q
+# 기대: 219 passed (이전 195 → +24), 17 skipped, 3 failed (sample-repos/slab-design 부재 — 무관)
+```
+
+## Troubleshooting (3b-1)
+
+### `_type` 필드 ValidationError / Pydantic v2 underscore-private 경고
+- 원인: Pydantic v2 가 `_type` 으로 시작하는 필드를 private 로 처리
+- 해결: 모델은 `type_: str = Field(alias="_type")` 로 정의 + `populate_by_name=True`. 직렬화 시 `_type` 으로 노출됨
+- 확인: `TypedValue(_type="atomic.foo", value=1).model_dump(by_alias=True)` → `{"_type": "atomic.foo", "value": 1}`
+
+### `RunInputs.fixture` 타입 오류 (`arbitrary_types_allowed`)
+- 원인: fixture 는 LookupDataSource 인스턴스 (Pydantic 외 타입). 직접 import 시 contracts ↔ runner 순환 발생
+- 해결: `RunInputs.fixture: Optional[Any]` + `arbitrary_types_allowed=True`. 실제 타입은 duck-typed (sandbox 가 호출 시점에 .get/.list 사용)
+
+### `_derive_table_specs` 가 빈 dict 반환
+- 원인 1: `list_code_types(role='lookup_table')` 가 빈 리스트 — modeling 측에 lookup_table role 의 CodeType 없음
+- 원인 2: 모든 CodeType 이 is_pk=True + atomic_fqn 매핑된 field 없음 (skip)
+- 확인: warning log 에 "list_code_types(role='lookup_table') 호출 실패" 출력 여부 — 출력되면 ontology_client 가 graceful 실패 (modeling 미가용)
+- 정상 동작: LookupDataSource 자체는 `_index_fixture` 로 row 인덱싱 계속 — get/list 는 작동, validate 만 unknown table_spec_fqn 경고

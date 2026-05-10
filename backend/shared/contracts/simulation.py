@@ -193,6 +193,190 @@ class SimResult(BaseModel):
     """ChangeSpec 의 hash — 재현 시 동일 입력 검증용."""
 
 
+# ─── Runner-side 모델 (spec 05 §1, §2, §3, §4.6, §4.8) ──────────────
+
+
+class TypedValue(BaseModel):
+    """slot 값의 type-tagged 표현 — JSON 직렬화 시 _type 식별자 보존 (spec 05 §5.5).
+
+    `type_` 명명: Pydantic v2 가 `_type` 으로 underscore-prefix 을 private 로 처리하므로
+    public 필드는 `type_` 사용. 직렬화 시 alias `_type` 으로 노출.
+    """
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    type_: str = Field(alias="_type")
+    """CodeType FQN — 예: 'scm.order.Order'."""
+
+    value: Any
+    """primitive / dict / list."""
+
+
+class RunPlan(BaseModel):
+    """시뮬 입력의 plan — orchestrator 가 expected_brs / expected_anchors 계산 (spec 04 §3.3).
+
+    minimal — POST /runs 가 plan 을 즉시 빌드하거나 (spec 03), runner 가 주입 받음.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    delegates_to_tree: list[dict[str, Any]] = Field(default_factory=list)
+    """flatten 된 delegation tree — 각 element 는 {action_fqn, depth, is_in_loop?, optional?, ...}.
+    구체 schema 는 spec 02 의 delegates-to-tree endpoint 응답과 동일."""
+
+    expected_brs: dict[str, list[str]] = Field(default_factory=dict)
+    """spec 04 §3.3 — {"direct": [...], "transitive": [...], "scenario": [...]} 형식."""
+
+    expected_anchors: list[str] = Field(default_factory=list)
+    estimated_steps: int = 0
+    warnings: list[str] = Field(default_factory=list)
+
+
+class RunInputs(BaseModel):
+    """orchestrator → python_generator → java_sandbox 일관 사용되는 입력 (spec 05 §4.6).
+
+    `fixture` 는 LookupDataSource 인스턴스 (Pydantic 외 type) — model_config 로 허용.
+    """
+
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+    slots: dict[str, TypedValue] = Field(default_factory=dict)
+    """Action.inputs 의 slot_name → TypedValue."""
+
+    fixture: Optional[Any] = None
+    """LookupDataSource 인스턴스. orchestrator 가 빌드 후 주입.
+    type 으로 명시 안 하는 이유: LookupDataSource 는 backend.simulation.runner 안에 있어
+    상위 contracts 에서 import 시 순환. duck-typed."""
+
+    overrides: dict[str, Any] = Field(default_factory=dict)
+    """ChangeSpec.atomic_overrides 의 그대로 — atomic_path → 값 (spec 04 §1.2)."""
+
+    primary_input_slot: Optional[str] = None
+    """다형성 dispatch 가 참조할 슬롯 이름 (spec 05 §4.6)."""
+
+
+class GeneratedScript(BaseModel):
+    """PythonGenerator 의 산출 (spec 05 §1.2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source_code: str
+    """실행 가능한 Python 코드 (utf-8)."""
+
+    entrypoint: str = "run"
+    """실행할 함수 이름."""
+
+    imports: list[str] = Field(default_factory=list)
+    """필요 import 문 — sandbox 가 화이트리스트 검증 (spec 05 §1.4)."""
+
+    estimated_steps: int = 0
+    java_dispatch_calls: list[str] = Field(default_factory=list)
+    """본 코드가 호출할 Java method_fqn 목록 — 사전 검증 용."""
+
+    fixture_keys_used: list[str] = Field(default_factory=list)
+
+
+# ─── Java sandbox dispatch (spec 05 §2.2) ──────────────────────────
+
+
+class AnchorHit(BaseModel):
+    """JVM agent 가 instrumentation 으로 capture 한 anchor hit (spec 05 §2.2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    anchor_id: str
+    marker: str
+    line: int
+    captured_value: Optional[Any] = None
+
+
+class BRTrigger(BaseModel):
+    """JVM 도중 호출된 BR enforcer 메서드 trace (spec 05 §2.2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    br_fqn: str
+    enforcer_method_fqn: Optional[str]
+    outcome: Literal["passed", "violated", "skipped"]
+    violation_path: Optional[str] = None
+    expected: Optional[Any] = None
+    actual: Optional[Any] = None
+
+
+class DispatchResult(BaseModel):
+    """JavaSandbox.dispatch() 의 산출 (spec 05 §2.2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    outputs: dict[str, Any] = Field(default_factory=dict)
+    realized_method_fqn: Optional[str] = None
+    dispatch_consistent: bool = True
+    dispatch_mismatch_reason: Optional[str] = None
+    duration_ms: int = 0
+    jvm_log: str = ""
+    captured_anchors: list[AnchorHit] = Field(default_factory=list)
+    captured_brs: list[BRTrigger] = Field(default_factory=list)
+
+
+class SandboxCapabilities(BaseModel):
+    """JavaSandbox 구현체 capabilities (spec 05 §2.4)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    backend: Literal["jvm_subprocess", "graalvm_polyglot", "stub"] = "stub"
+    java_version: Optional[str] = None
+    classpath_roots: list[str] = Field(default_factory=list)
+    instrumentation_jar: Optional[str] = None
+    max_heap_mb: int = 512
+    max_concurrent_dispatches: int = 4
+
+
+# ─── Lookup data source (spec 05 §3.2) ─────────────────────────────
+
+
+class TableSpec(BaseModel):
+    """lookup 가능한 CodeType 의 메타 (spec 05 §3.2).
+
+    LookupDataSource 가 modeling 측 OntologyClient 의 list_code_types 결과로 derive.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    code_type_fqn: str
+    pk_atom_fqn: str
+    columns: dict[str, str] = Field(default_factory=dict)
+    """slot_name → atomic_fqn 매핑."""
+
+    drama_dna_columns: list[str] = Field(default_factory=list)
+
+
+class LookupRow(BaseModel):
+    """scenario_fixture.lookups 의 한 row — atomic 슬롯 dict (spec 05 §3.2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pk: Any
+    table_spec_fqn: str
+    columns: dict[str, Any] = Field(default_factory=dict)
+
+
+# ─── Failure policy (spec 05 §4.8) ─────────────────────────────────
+
+
+class FailurePolicy(BaseModel):
+    """dispatch loop 실패 시 정책 (spec 05 §4.8).
+
+    21-step 회귀 / drama 시연 vs 운영 빠른 ping 의 정책 분리.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    on_dispatch_error: Literal["fail_fast", "continue", "abort_after_n"] = "fail_fast"
+    on_br_violation: Literal["continue", "fail_fast"] = "continue"
+    on_anchor_miss: Literal["continue", "fail_fast"] = "continue"
+    on_dispatch_inconsistent: Literal["continue", "fail_fast"] = "continue"
+
+
 __all__ = [
     "ChangeSpec",
     "RunOptions",
@@ -201,4 +385,16 @@ __all__ = [
     "AnchorEvidence",
     "DelegationTraceFrame",
     "SimResult",
+    # Runner-side (STEP 3b)
+    "TypedValue",
+    "RunPlan",
+    "RunInputs",
+    "GeneratedScript",
+    "AnchorHit",
+    "BRTrigger",
+    "DispatchResult",
+    "SandboxCapabilities",
+    "TableSpec",
+    "LookupRow",
+    "FailurePolicy",
 ]

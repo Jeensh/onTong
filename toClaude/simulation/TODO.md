@@ -11,11 +11,14 @@ Single Source of Truth for task status. Use `[x]` (done) / `[ ]` (pending).
 ### 3.1 신설 파일 7개 (spec 따른 ChangeSpec/SimResult 흐름)
 - [x] `backend/shared/contracts/simulation.py` — ChangeSpec/SimResult 모델 (STEP 3a, 2026-05-10)
 - [x] `tests/simulation/test_changespec_schema.py` — 19 test 통과
-- [ ] `backend/simulation/runner/` 폴더 (mkdir + __init__.py)
-- [ ] `backend/simulation/runner/lookup_source.py` — spec 05 §3 (fixture 모드만)
-- [ ] `backend/simulation/runner/python_generator.py` — spec 05 §1 (echo-stub)
-- [ ] `backend/simulation/runner/java_sandbox.py` — spec 05 §2 (stub_dispatch tier)
-- [ ] `backend/simulation/runner/orchestrator.py` — spec 05 §4.5 (entry)
+- [x] `backend/simulation/runner/` 폴더 (mkdir + __init__.py) (STEP 3b-1, 2026-05-10)
+- [x] `backend/shared/contracts/simulation.py` — Runner 11 모델 추가 (TypedValue/RunPlan/RunInputs/GeneratedScript/AnchorHit/BRTrigger/DispatchResult/SandboxCapabilities/TableSpec/LookupRow/FailurePolicy)
+- [x] `backend/simulation/runner/lookup_source.py` — spec 05 §3 (fixture_only 모드)
+- [x] `tests/simulation/test_runner_models.py` — 15 test 통과
+- [x] `tests/simulation/test_lookup_source.py` — 9 test 통과
+- [ ] `backend/simulation/runner/java_sandbox.py` — spec 05 §2 (StubJavaSandbox tier) — STEP 3b-2
+- [ ] `backend/simulation/runner/python_generator.py` — spec 05 §1 (echo-stub) — STEP 3b-3
+- [ ] `backend/simulation/runner/orchestrator.py` — spec 05 §4.5 (entry) + e2e test — STEP 3b-4
 - [ ] `backend/simulation/api/run_handle.py` — spec 03 (run lifecycle state machine)
 - [ ] `backend/simulation/api/spec_router.py` — spec 03 (POST /runs / GET /runs/{id}/sim-result)
 
@@ -61,4 +64,4 @@ Single Source of Truth for task status. Use `[x]` (done) / `[ ]` (pending).
 
 ## Backlog
 
-- 사용자 지시 대기 (STEP 3b 진입할지, 또는 통합 backlog 우선 처리할지)
+- 사용자 지시 대기 — STEP 3b-2 (java_sandbox.py / StubJavaSandbox) 진입 승인 필요
