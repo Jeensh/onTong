@@ -250,11 +250,48 @@ class RunHandleStore:
              - 정상 + sim_result.status='completed' → store sim_result + transition running → completed
              - 정상 + sim_result.status='failed'    → store sim_result + transition running → failed
              - 예외 raise                          → transition running → failed (sim_result 미저장)
-
-        후속 (운영) — 본 메서드를 async 큐의 worker 에서 호출하면 v2 가 됨.
         """
         handle = self.register(request)
-        run_id = handle.run_id
+        return self._execute(handle.run_id, request, orchestrator, run_plan)
+
+    def submit_background(
+        self,
+        request: CreateRunRequest,
+        orchestrator: _OrchestratorProtocol,
+        run_plan: RunPlan,
+    ) -> RunHandle:
+        """spec 05 §4.3 v1 — async queue (asyncio worker 대신 daemon thread 로 단순화).
+
+        흐름:
+          1. register → pending → 즉시 RunHandle 반환 (status=pending)
+          2. background thread 가 _execute() 호출 → running → completed/failed
+          3. 호출자는 GET /runs/{id} polling 으로 status 확인
+
+        장점:
+        - sync HTTP 응답 시간 짧음 (orchestrator 가 무거워도 client block 없음)
+        - state machine 변경 0 — submit() 와 같은 transitions 사용
+        - 모든 store 메서드가 thread-safe (RLock) 이라 race 없음
+
+        spec 05 §4.3 v2 (Redis-RQ) 도입 시: thread → Redis worker 로 swap.
+        """
+        handle = self.register(request)
+        thread = threading.Thread(
+            target=self._execute,
+            args=(handle.run_id, request, orchestrator, run_plan),
+            daemon=True,
+            name=f"sim-run-{handle.run_id}",
+        )
+        thread.start()
+        return handle  # status=pending — caller 가 polling
+
+    def _execute(
+        self,
+        run_id: str,
+        request: CreateRunRequest,
+        orchestrator: _OrchestratorProtocol,
+        run_plan: RunPlan,
+    ) -> RunHandle:
+        """submit / submit_background 의 공통 실행 path."""
         self.transition(run_id, "running")
         run_options = self._run_options[run_id]
 

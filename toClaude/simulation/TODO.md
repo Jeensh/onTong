@@ -80,6 +80,12 @@ Single Source of Truth for task status. Use `[x]` (done) / `[ ]` (pending).
 
 - ★ **STEP 3.1 종결** (2026-05-10) — 7개 신설 파일 + main.py wiring 모두 완료. spec 03/04/05 1차 통합 완료.
 - ★ **STEP 3c 종결** (2026-05-10) — Section 3 ↔ Section 2 ontology 실데이터 통합 완료. NullOntologyClient default 제거 / `_build_minimal_run_plan` 1-frame echo 제거 / 하드코딩 `primary_input_type` 제거. 실 ontology DB 의 1514 actions 기반으로 dispatch / anchor / BR 동작.
+- ★ **STEP 3e 최종 종결** (2026-05-10) — F + E1 + E2 + E6 일괄 완료:
+  * F — 실 ontology 시나리오 5종 (P-2018-0098 atomic_overrides / change_spec_ref deterministic / 21-step sub_actions / artifact 디스크 / failure_policy continue)
+  * E1 — `JvmSubprocessSandbox` 신설 (spec 05 §2.5 + §5). Protocol + envelope 직렬화 + graceful fallback. spec_router 가 env `ONTONG_SANDBOX_TIER` 로 auto/jvm_subprocess/stub 자동 선택.
+  * E2 — `RunHandleStore.submit_background()` (spec 05 §4.3 v1). daemon thread, Redis-RQ swap-ready.
+  * E6 — `ontology_sources_router` 신설. SQLite + Neo4j dual source 명시적 endpoint (`GET /api/simulation/ontology-sources`).
+  * 회귀 400 passed (이전 374 → +26: F 5 + E1 11 + E2 5 + E6 5).
 - ★ **STEP 3d-E 종결** (2026-05-10) — 운영화 layer 4종 추가:
   - E3 — TimeoutBudget (spec 05 §4.7) + FailurePolicy 4가지 (spec 05 §4.8). RunOptions 6 필드 확장 (timeout_sec / capture_traces / capture_br_evidence / on_dispatch_error / on_br_violation / on_dispatch_inconsistent). Orchestrator dispatch loop 정책 분기.
   - E4 — promote/downgrade hook (spec 04 §3.4). `SimResult.suggested_promotion / suggested_downgrade`. verdict + scenario_kind metadata 로 권장.

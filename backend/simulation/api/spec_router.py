@@ -114,21 +114,64 @@ def _build_default_ontology_client() -> _OntologyClientProtocol:
 
 
 def _build_default_orchestrator() -> Orchestrator:
-    """singleton orchestrator — 실 OntologyQueryClient 기반 stub backend.
+    """singleton orchestrator — 실 OntologyQueryClient 기반 sandbox.
 
-    STEP 3c 이전: NullOntologyClient default → 모든 dispatch 가 inconclusive.
-    STEP 3c 이후: 실 ontology DB 기반 — action.realizations / anchor_bindings /
-    BR (preconditions+postconditions) 모두 ontology 에서 fetch.
+    STEP 3c: NullOntologyClient default 제거 → 실 ontology DB.
+    STEP 3d-E1: sandbox tier 자동 선택 — JvmSubprocessSandbox 시도, Java 미존재 시 stub fallback.
     """
     global _ontology_client
     if _ontology_client is None:
         _ontology_client = _build_default_ontology_client()
     ont = _ontology_client
+
+    # spec 05 §2.5 — jvm_subprocess tier 시도, 미가용 시 stub fallback
+    sandbox = _build_default_sandbox(ont)
     return Orchestrator(
         python_generator=PythonGenerator(),
-        java_sandbox=StubJavaSandbox(SandboxCapabilities(backend="stub"), ont),
+        java_sandbox=sandbox,
         lookup_source_factory=lambda fixture: LookupDataSource(ont, fixture),
     )
+
+
+def _build_default_sandbox(ontology_client):
+    """JvmSubprocessSandbox 시도 → SubprocessNotAvailable 시 StubJavaSandbox fallback.
+
+    환경변수 `ONTONG_SANDBOX_TIER` 로 강제 가능: stub | jvm_subprocess.
+    """
+    import os
+
+    tier = os.getenv("ONTONG_SANDBOX_TIER", "auto").lower()
+
+    if tier in ("stub", "stub_dispatch"):
+        logger.info("spec_router: sandbox tier=stub (env-forced)")
+        return StubJavaSandbox(SandboxCapabilities(backend="stub"), ontology_client)
+
+    if tier in ("jvm_subprocess", "auto"):
+        try:
+            from backend.simulation.runner.jvm_subprocess_sandbox import (
+                JvmSubprocessSandbox,
+                SubprocessNotAvailable,
+            )
+
+            jar = os.getenv("ONTONG_INSTRUMENTATION_JAR")
+            cap = SandboxCapabilities(
+                backend="jvm_subprocess",
+                instrumentation_jar=jar,
+            )
+            sandbox = JvmSubprocessSandbox(cap)
+            logger.info("spec_router: sandbox tier=jvm_subprocess wired")
+            return sandbox
+        except SubprocessNotAvailable as exc:
+            if tier == "jvm_subprocess":
+                # 강제 jvm_subprocess 인데 미가용 — 그래도 stub fallback (router 부팅 보장)
+                logger.error(
+                    "ONTONG_SANDBOX_TIER=jvm_subprocess 강제됐으나 Java 미가용 — stub fallback: %s",
+                    exc,
+                )
+            else:
+                logger.info("spec_router: jvm_subprocess 미가용 — stub fallback (%s)", exc)
+
+    return StubJavaSandbox(SandboxCapabilities(backend="stub"), ontology_client)
 
 
 def _build_default_run_plan_builder() -> RunPlanBuilder:

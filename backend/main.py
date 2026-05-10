@@ -80,6 +80,8 @@ from backend.simulation.api.transpile_router import router as transpile_router
 from backend.simulation.api.auto_pr_router import router as auto_pr_router
 from backend.simulation.api.seed_router import router as seed_router
 from backend.simulation.api.differential_router import router as differential_router
+# Section 3 — dual ontology source 상태 보고 (STEP 3d-E6, 2026-05-10)
+from backend.simulation.api.ontology_sources_router import router as ontology_sources_router
 
 setup_logging(
     level=settings.log_level,
@@ -484,6 +486,8 @@ app.include_router(transpile_router)
 app.include_router(auto_pr_router)
 app.include_router(seed_router)
 app.include_router(differential_router)
+# Section 3 — dual ontology source 상태 (STEP 3d-E6)
+app.include_router(ontology_sources_router)
 
 
 # Global exception handler
