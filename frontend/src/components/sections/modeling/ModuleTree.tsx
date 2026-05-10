@@ -212,7 +212,31 @@ export function ModuleTree() {
     return matchedPaths.has(n.path) || n.children.some(visibleCheck);
   };
 
-  const renderNode = (n: ModuleNodeDTO, depth: number): React.ReactNode => {
+  /**
+   * Single-child chain 압축 — n 이 직접 class/action/term 가 없고 자식이 1개면,
+   * 자식과 합쳐 점선 prefix 로 표시. 사용자가 `com.example.slabdesign.feature.sd.process` 같은
+   * 빈 chain 을 한 줄로 보게 함.
+   *
+   * matchedPaths 가 있을 때 (검색 중) 는 압축 건너뜀 — 검색 결과가 정확히 보이도록.
+   */
+  const compressChain = (start: ModuleNodeDTO): { display: ModuleNodeDTO; prefix: string[] } => {
+    if (matchedPaths !== null) return { display: start, prefix: [] };
+    let cur = start;
+    const prefix: string[] = [];
+    while (
+      cur.children.length === 1 &&
+      cur.direct_classes === 0 &&
+      cur.direct_actions === 0 &&
+      cur.direct_terms === 0
+    ) {
+      prefix.push(cur.name);
+      cur = cur.children[0];
+    }
+    return { display: cur, prefix };
+  };
+
+  const renderNode = (input: ModuleNodeDTO, depth: number): React.ReactNode => {
+    const { display: n, prefix } = compressChain(input);
     const isExpanded = expanded.has(n.path) || (matchedPaths?.has(n.path) ?? false);
     const isSelected = selectedPkg === n.path;
     const hasChildren = n.children.length > 0;
@@ -258,7 +282,12 @@ export function ModuleTree() {
             ? (isExpanded ? <FolderOpen className="w-3 h-3 shrink-0 text-amber-500" />
                           : <Folder className="w-3 h-3 shrink-0 text-amber-500" />)
             : <Box className="w-3 h-3 shrink-0 text-muted-foreground" />}
-          <span className="truncate flex-1">{n.name}</span>
+          <span className="truncate flex-1 min-w-0">
+            {prefix.length > 0 && (
+              <span className="text-muted-foreground/60 text-[11px]">{prefix.join(".")}.</span>
+            )}
+            <span>{n.name}</span>
+          </span>
           {(n.direct_classes > 0 || n.total_classes > 0) && (
             <span className="text-[9.5px] text-muted-foreground/70 font-mono shrink-0">
               {n.direct_classes > 0 && <span>{n.direct_classes}</span>}

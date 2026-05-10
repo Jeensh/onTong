@@ -54,9 +54,15 @@ interface WorkbenchStore {
   selectedActionFqn: string | null;
   selectedCodeTypeFqn: string | null;
   selectedTermFqn: string | null;
+  selectedRuleFqn: string | null;
+  selectedAnchorId: string | null;
   setSelectedAction: (fqn: string | null) => void;
   setSelectedCodeType: (fqn: string | null) => void;
   setSelectedTerm: (fqn: string | null) => void;
+  setSelectedRule: (fqn: string | null) => void;
+  setSelectedAnchor: (id: string | null) => void;
+  /** 단일 entity 만 활성 — 새 selection 시 다른 4개를 null 로. */
+  selectOnly: (kind: "action" | "codeType" | "term" | "rule" | "anchor", id: string | null) => void;
 
   // repo
   activeRepoId: string;
@@ -105,9 +111,35 @@ export const useWorkbench = create<WorkbenchStore>((set) => ({
   selectedActionFqn: null,
   selectedCodeTypeFqn: null,
   selectedTermFqn: null,
-  setSelectedAction: (fqn) => set({ selectedActionFqn: fqn }),
-  setSelectedCodeType: (fqn) => set({ selectedCodeTypeFqn: fqn }),
-  setSelectedTerm: (fqn) => set({ selectedTermFqn: fqn }),
+  selectedRuleFqn: null,
+  selectedAnchorId: null,
+  setSelectedAction: (fqn) => set({
+    selectedActionFqn: fqn,
+    selectedCodeTypeFqn: null, selectedTermFqn: null, selectedRuleFqn: null, selectedAnchorId: null,
+  }),
+  setSelectedCodeType: (fqn) => set({
+    selectedCodeTypeFqn: fqn,
+    selectedActionFqn: null, selectedTermFqn: null, selectedRuleFqn: null, selectedAnchorId: null,
+  }),
+  setSelectedTerm: (fqn) => set({
+    selectedTermFqn: fqn,
+    selectedActionFqn: null, selectedCodeTypeFqn: null, selectedRuleFqn: null, selectedAnchorId: null,
+  }),
+  setSelectedRule: (fqn) => set({
+    selectedRuleFqn: fqn,
+    selectedActionFqn: null, selectedCodeTypeFqn: null, selectedTermFqn: null, selectedAnchorId: null,
+  }),
+  setSelectedAnchor: (id) => set({
+    selectedAnchorId: id,
+    selectedActionFqn: null, selectedCodeTypeFqn: null, selectedTermFqn: null, selectedRuleFqn: null,
+  }),
+  selectOnly: (kind, id) => set({
+    selectedActionFqn:   kind === "action"   ? id : null,
+    selectedCodeTypeFqn: kind === "codeType" ? id : null,
+    selectedTermFqn:     kind === "term"     ? id : null,
+    selectedRuleFqn:     kind === "rule"     ? id : null,
+    selectedAnchorId:    kind === "anchor"   ? id : null,
+  }),
 
   // 기본 repo — Phase 3 데모 정합. Import 모달이 done 시 setRepoId 로 갱신.
   activeRepoId: "slab-design-real",

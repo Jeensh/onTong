@@ -185,3 +185,10 @@ class BusinessRule(BaseModel):
     source: str = ""                            # 출처 (매뉴얼 fragment / 코드 추출)
     confirmed: bool = False
     repo_id: str = ""
+    # 2026-05-10: 코드 ↔ BR mapping. extend_br_schema.py 의 컬럼 surface.
+    enforced_by: list[str] = Field(default_factory=list)
+    """이 BR 을 enforce 하는 method_fqn list (코드 가드 위치)."""
+    violated_at_call: list[dict] = Field(default_factory=list)
+    """위반 가능 call site list (각 dict 는 caller_method_fqn / line 등)."""
+    operational_history: list[dict] = Field(default_factory=list)
+    """운영 사고 history (incident_id / summary / occurred_at 등 dict)."""

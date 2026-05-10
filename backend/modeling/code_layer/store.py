@@ -173,6 +173,11 @@ def _cs_to_row(cs: CallSite) -> CallSiteRow:
 
 def _row_to_cs(row: CallSiteRow) -> CallSite:
     cands_raw = json.loads(row.possible_runtime_types_json or "[]")
+    # 미래 호환 — DB 에 enum 미등록 값이 있으면 STATIC_UNRESOLVED 로 fallback (400 안 내고).
+    try:
+        src = CallAnalysisSource(row.analysis_source)
+    except ValueError:
+        src = CallAnalysisSource.STATIC_UNRESOLVED
     return CallSite(
         id=row.id,
         caller_method_fqn=row.caller_method_fqn,
@@ -181,7 +186,7 @@ def _row_to_cs(row: CallSiteRow) -> CallSite:
         line=row.line,
         possible_runtime_types=[CallCandidate(**c) for c in cands_raw],
         confidence=row.confidence,
-        analysis_source=CallAnalysisSource(row.analysis_source),
+        analysis_source=src,
         needs_user_confirm=row.needs_user_confirm,
         user_confirmed_type=row.user_confirmed_type,
         user_confirmed_at=row.user_confirmed_at,

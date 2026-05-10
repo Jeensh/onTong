@@ -94,6 +94,10 @@ class BusinessRuleRow(Base):
     source:     Mapped[str] = mapped_column(String, nullable=False, default="")
     confirmed:  Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     repo_id:    Mapped[str] = mapped_column(String, nullable=False, default="", index=True)
+    # 2026-05-10: 코드 ↔ BR mapping 강화 — extend_br_schema.py 가 ALTER TABLE 로 추가.
+    enforced_by_json:         Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    violated_at_call_json:    Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    operational_history_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
 
 
 __all__ = (

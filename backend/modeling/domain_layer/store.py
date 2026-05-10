@@ -134,6 +134,9 @@ def _rule_to_row(r: BusinessRule) -> BusinessRuleRow:
         source=r.source,
         confirmed=r.confirmed,
         repo_id=r.repo_id,
+        enforced_by_json=json.dumps(r.enforced_by, ensure_ascii=False),
+        violated_at_call_json=json.dumps(r.violated_at_call, ensure_ascii=False),
+        operational_history_json=json.dumps(r.operational_history, ensure_ascii=False),
     )
 
 
@@ -146,6 +149,9 @@ def _row_to_rule(row: BusinessRuleRow) -> BusinessRule:
         source=row.source,
         confirmed=row.confirmed,
         repo_id=row.repo_id,
+        enforced_by=json.loads(row.enforced_by_json or "[]"),
+        violated_at_call=json.loads(row.violated_at_call_json or "[]"),
+        operational_history=json.loads(row.operational_history_json or "[]"),
     )
 
 

@@ -178,6 +178,15 @@ export interface AnchorBindingDTO {
   confirmed: boolean;
   rationale: string;
   repo_id: string;
+  line: number | null;          // 2026-05-10 추가 — source code line (1-indexed)
+}
+
+export interface IncidentRefDTO {
+  incident_id: string;
+  summary: string;
+  occurred_at: string | null;
+  triggered_by: string | null;
+  fixed_at_commit: string | null;
 }
 
 export interface BusinessRuleDTO {
@@ -188,6 +197,10 @@ export interface BusinessRuleDTO {
   source: string;
   confirmed: boolean;
   repo_id: string;
+  // 2026-05-10 추가 — 코드 ↔ BR mapping
+  enforced_by: string[];                            // method_fqn list
+  violated_at_call: Record<string, unknown>[];      // call site dict list
+  operational_history: IncidentRefDTO[];
 }
 
 export interface CallSiteDTO {
@@ -240,6 +253,8 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
   const res = await fetch(url, {
     ...init,
+    // dev 중에 Next.js / browser fetch cache 가 stale 응답을 재사용하는 경우 방지.
+    cache: init?.cache ?? "no-store",
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
   if (!res.ok) {
@@ -484,7 +499,97 @@ export const ontologyApi = {
       `/api/ontology/repos/${encodeURIComponent(repo_id)}/type-realizations/${tr_id}/reject`,
       { method: "POST" },
     ),
+
+  // ---------------------------------------------------------------------------
+  // 5-ii Stage 1 — confirmed toggle (Term / Action / BR / Anchor)
+  // unconfirm = row 보존 + confirmed=false. reject = row 삭제 (queue 패턴).
+  // ---------------------------------------------------------------------------
+  unconfirmTerm: (repo_id: string, fqn: string) =>
+    fetchJson<QueueActionResultDTO>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/terms/${encodeURIComponent(fqn)}/unconfirm`,
+      { method: "POST" },
+    ),
+  unconfirmAction: (repo_id: string, fqn: string) =>
+    fetchJson<QueueActionResultDTO>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/actions/${encodeURIComponent(fqn)}/unconfirm`,
+      { method: "POST" },
+    ),
+  confirmBusinessRule: (repo_id: string, fqn: string) =>
+    fetchJson<QueueActionResultDTO>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/business-rules/${encodeURIComponent(fqn)}/confirm`,
+      { method: "POST" },
+    ),
+  unconfirmBusinessRule: (repo_id: string, fqn: string) =>
+    fetchJson<QueueActionResultDTO>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/business-rules/${encodeURIComponent(fqn)}/unconfirm`,
+      { method: "POST" },
+    ),
+  confirmAnchorBinding: (repo_id: string, anchor_id: string) =>
+    fetchJson<QueueActionResultDTO>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/anchor-bindings/${encodeURIComponent(anchor_id)}/confirm`,
+      { method: "POST" },
+    ),
+  unconfirmAnchorBinding: (repo_id: string, anchor_id: string) =>
+    fetchJson<QueueActionResultDTO>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/anchor-bindings/${encodeURIComponent(anchor_id)}/unconfirm`,
+      { method: "POST" },
+    ),
+
+  // ---------------------------------------------------------------------------
+  // 5-ii Stage 2 — inline field PATCH (Term / Action / BR / Anchor)
+  // None 으로 보낸 field 는 변경 안 됨. Backend 가 partial update 처리.
+  // ---------------------------------------------------------------------------
+  patchTerm: (repo_id: string, fqn: string, patch: TermPatchDTO) =>
+    fetchJson<QueueActionResultDTO>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/terms/${encodeURIComponent(fqn)}`,
+      { method: "PATCH", body: JSON.stringify(patch) },
+    ),
+  patchAction: (repo_id: string, fqn: string, patch: ActionPatchDTO) =>
+    fetchJson<QueueActionResultDTO>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/actions/${encodeURIComponent(fqn)}`,
+      { method: "PATCH", body: JSON.stringify(patch) },
+    ),
+  patchBusinessRule: (repo_id: string, fqn: string, patch: BRPatchDTO) =>
+    fetchJson<QueueActionResultDTO>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/business-rules/${encodeURIComponent(fqn)}`,
+      { method: "PATCH", body: JSON.stringify(patch) },
+    ),
+  patchAnchorBinding: (repo_id: string, anchor_id: string, patch: AnchorPatchDTO) =>
+    fetchJson<QueueActionResultDTO>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/anchor-bindings/${encodeURIComponent(anchor_id)}`,
+      { method: "PATCH", body: JSON.stringify(patch) },
+    ),
 };
+
+// ---------------------------------------------------------------------------
+// 5-ii Stage 2 — Patch DTOs (1:1 with backend Pydantic models)
+// ---------------------------------------------------------------------------
+export interface TermPatchDTO {
+  label?: string;
+  aliases?: string[];
+  description?: string;
+  domain?: string;
+  value_type?: string;
+  unit?: string;
+  enum_values?: string[];
+}
+
+export interface ActionPatchDTO {
+  label?: string;
+  aliases?: string[];
+  description?: string;
+}
+
+export interface BRPatchDTO {
+  statement?: string;
+  severity?: "hard" | "soft";
+}
+
+export interface AnchorPatchDTO {
+  anchor_locator?: string;
+  target_slot?: string;
+  rationale?: string;
+}
 
 // ---------------------------------------------------------------------------
 // Mapping queue DTOs (P3-6)

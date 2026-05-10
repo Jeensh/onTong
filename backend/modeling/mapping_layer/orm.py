@@ -107,6 +107,8 @@ class AnchorBindingRow(Base):
     confirmed:         Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     rationale:         Mapped[str] = mapped_column(Text, nullable=False, default="")
     repo_id:           Mapped[str] = mapped_column(String, nullable=False, default="", index=True)
+    # 2026-05-10: anchor 의 source code 라인 번호 — fix_action_output_anchor_line.py 가 ALTER TABLE 로 추가.
+    line:              Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         Index("ix_anchor_bindings_action_slot", "target_action_fqn", "target_slot"),
