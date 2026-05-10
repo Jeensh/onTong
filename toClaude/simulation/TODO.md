@@ -20,9 +20,10 @@ Single Source of Truth for task status. Use `[x]` (done) / `[ ]` (pending).
 - [x] `tests/simulation/test_java_sandbox.py` — 13 test 통과 (anchor auto-hit + BR auto-pass + P-2018-0098)
 - [x] `backend/simulation/runner/python_generator.py` — spec 05 §1 (echo-stub) (STEP 3b-3, 2026-05-10)
 - [x] `tests/simulation/test_python_generator.py` — 14 test 통과 (ast.parse + dedup + fixture_keys + end-to-end exec sanity)
-- [ ] `backend/simulation/runner/orchestrator.py` — spec 05 §4.5 (entry) + e2e test — STEP 3b-4
-- [ ] `backend/simulation/api/run_handle.py` — spec 03 (run lifecycle state machine)
-- [ ] `backend/simulation/api/spec_router.py` — spec 03 (POST /runs / GET /runs/{id}/sim-result)
+- [x] `backend/simulation/runner/orchestrator.py` — spec 05 §4.5 (running 단계 entry) (STEP 3b-4, 2026-05-10)
+- [x] `tests/simulation/test_orchestrator.py` — 16 test 통과 (verdict 판정 + e2e Phase C P-2018-0098 sim_verified)
+- [ ] `backend/simulation/api/run_handle.py` — spec 03 (run lifecycle state machine) — STEP 3b-5
+- [ ] `backend/simulation/api/spec_router.py` — spec 03 (POST /runs / GET /runs/{id}/sim-result) — STEP 3b-6
 
 ### 3.2 main.py wiring
 - [x] simulation router 9개 이미 등록됨 (commit `4ddf170`)
@@ -66,4 +67,5 @@ Single Source of Truth for task status. Use `[x]` (done) / `[ ]` (pending).
 
 ## Backlog
 
-- 사용자 지시 대기 — STEP 3b-4 (orchestrator.py / running 단계 entry + e2e test) 진입 승인 필요
+- 사용자 지시 대기 — STEP 3b-5 (api/run_handle.py / RunHandle state machine) 진입 승인 필요
+  ★ STEP 3b-1~3b-4 완료 = Section 3 의 spec 05 runner core 4 컴포넌트 (LookupDataSource / PythonGenerator / JavaSandbox / Orchestrator) 완성. e2e sim_verified 회로 검증 완료.

@@ -458,3 +458,182 @@ PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/ -q
 ### `loop_iterable` / `optional` 분기가 무시됨
 - 의도된 동작 — echo-stub 첫 iter 는 sequential dispatch 만. is_in_loop / optional 플래그는 `delegation frame N` comment 에 depth 정보만 echo
 - 후속: 3b-4 orchestrator 에서 atomic.facets 의 iter_source 마킹 + scenario.metadata 조건 평가 추가
+
+---
+
+## 2026-05-10 STEP 3b-4 — Orchestrator (running 단계 entry)
+
+### S17. Orchestrator e2e — Phase C P-2018-0098 회귀 sim_verified 회로
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python - <<'PY'
+"""Orchestrator + LookupDataSource + PythonGenerator + StubJavaSandbox 묶음 → SimResult."""
+from backend.shared.contracts.simulation import (
+    ChangeSpec, RunOptions, RunPlan, SandboxCapabilities,
+)
+from backend.simulation.runner.java_sandbox import StubJavaSandbox
+from backend.simulation.runner.lookup_source import LookupDataSource
+from backend.simulation.runner.orchestrator import Orchestrator
+from backend.simulation.runner.python_generator import PythonGenerator
+
+
+# Fake DTOs (modeling 미가용 환경)
+class FakeRz:
+    code_method_fqn = "com.scm.SdDesigner.runStep1"
+
+
+class FakeAct:
+    fqn = "scm.workflow.SDSlabEntity_step_1_to_8"
+    preconditions = ["br.scm.slab.DG003.WidthMin"]
+    postconditions = ["br.scm.slab.DG003.WidthMax"]
+
+
+class FakeAB:
+    id = "anchor.scm.proc_kind_hr"
+    anchor_locator = "자리 1 = HR"
+    code_method_fqn = "com.scm.SdDesigner.runStep1"
+    target_action_fqn = "scm.workflow.SDSlabEntity_step_1_to_8"
+    target_slot = "param[0]"
+
+
+class FakeOnt:
+    def get_action(self, fqn):
+        return FakeAct() if fqn == FakeAct.fqn else None
+
+    def get_realizations_for_input_type(self, action_fqn, code_type_fqn):
+        if action_fqn == FakeAct.fqn and code_type_fqn == "scm.order.Order":
+            return [FakeRz()]
+        return []
+
+    def get_anchor_bindings_for_action(self, action_fqn):
+        return [FakeAB()] if action_fqn == FakeAct.fqn else []
+
+    def list_code_types(self, role=None):
+        return []
+
+
+ont = FakeOnt()
+orch = Orchestrator(
+    python_generator=PythonGenerator(),
+    java_sandbox=StubJavaSandbox(SandboxCapabilities(backend="stub"), ont),
+    lookup_source_factory=lambda fixture: LookupDataSource(ont, fixture),
+)
+
+cs = ChangeSpec(
+    action_fqn="scm.workflow.SDSlabEntity_step_1_to_8",
+    atomic_overrides={
+        "scm.workflow.SDSlabEntity_step_1_to_8.inputs[0]<scm.order.Order>.width": 1180,
+    },
+    scenario_fixture={
+        "lookups": {
+            "scm.std.CustomerStd:7": {
+                "pk": 7, "table_spec_fqn": "scm.std.CustomerStd",
+                "columns": {"customer_name": "정XX"},
+            },
+            "scm.spec.HrSpec:HR-23-A": {
+                "pk": "HR-23-A", "table_spec_fqn": "scm.spec.HrSpec",
+                "columns": {"proc": "0HR23456"},
+            },
+        },
+        "metadata": {"scenario_origin": "P-2018-0098"},
+    },
+)
+plan = RunPlan(
+    delegates_to_tree=[
+        {"action_fqn": "scm.workflow.SDSlabEntity_step_1_to_8", "depth": 1, "primary_input_type": "scm.order.Order"},
+    ],
+    estimated_steps=1,
+)
+
+result = orch.run(cs, plan, RunOptions(sandbox_tier="stub_dispatch"))
+print("verdict :", result.verdict)
+print("status  :", result.status)
+print("run_id  :", result.run_id)
+print("duration:", result.duration_ms, "ms")
+print("trace   :", [(f.action_fqn, f.dispatch_consistent) for f in result.delegation_trace])
+print("BR      :", [(b.br_fqn, b.outcome) for b in result.br_evidence])
+print("anchor  :", [(a.anchor_id, a.outcome) for a in result.anchor_evidence])
+print("ref     :", result.change_spec_ref)
+PY
+# 기대 출력 (요약):
+# verdict : sim_verified
+# status  : completed
+# run_id  : run-... (12-hex)
+# duration: ... ms
+# trace   : [('scm.workflow.SDSlabEntity_step_1_to_8', True)]
+# BR      : [('br.scm.slab.DG003.WidthMin', 'passed'), ('br.scm.slab.DG003.WidthMax', 'passed')]
+# anchor  : [('anchor.scm.proc_kind_hr', 'hit')]
+# ref     : sha256:...
+```
+
+### S18. inconclusive 회로 — dispatch 부정합 시
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python - <<'PY'
+"""primary_input_type 매핑 안되는 경우 → dispatch_consistent=False → inconclusive."""
+from backend.shared.contracts.simulation import (
+    ChangeSpec, RunOptions, RunPlan, SandboxCapabilities,
+)
+from backend.simulation.runner.java_sandbox import StubJavaSandbox
+from backend.simulation.runner.lookup_source import LookupDataSource
+from backend.simulation.runner.orchestrator import Orchestrator
+from backend.simulation.runner.python_generator import PythonGenerator
+
+
+class FakeOnt:
+    def get_action(self, fqn): return None
+    def get_realizations_for_input_type(self, *a, **k): return []  # 항상 빈 리스트
+    def get_anchor_bindings_for_action(self, fqn): return []
+    def list_code_types(self, role=None): return []
+
+
+ont = FakeOnt()
+orch = Orchestrator(
+    python_generator=PythonGenerator(),
+    java_sandbox=StubJavaSandbox(SandboxCapabilities(backend="stub"), ont),
+    lookup_source_factory=lambda fixture: LookupDataSource(ont, fixture),
+)
+result = orch.run(
+    ChangeSpec(action_fqn="a1", atomic_overrides={}, scenario_fixture={"lookups": {}}),
+    RunPlan(delegates_to_tree=[{"action_fqn": "a1", "depth": 1, "primary_input_type": "scm.order.Order"}]),
+    RunOptions(sandbox_tier="stub_dispatch"),
+)
+print("verdict:", result.verdict)
+print("frame consistent:", result.delegation_trace[0].dispatch_consistent)
+print("frame reason   :", result.delegation_trace[0].dispatch_mismatch_reason)
+PY
+# 기대 출력:
+# verdict: inconclusive
+# frame consistent: False
+# frame reason   : no realization for input type 'scm.order.Order' on action 'a1'
+```
+
+### S19. Orchestrator 16 test + 회귀 (3a + 3b-1~3b-4 누적)
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/test_orchestrator.py -v
+# 기대: 16 passed
+
+PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/ -q
+# 기대: 262 passed (이전 246 → +16), 17 skipped, 3 failed (sample-repos/slab-design 부재 — 무관)
+```
+
+## Troubleshooting (3b-4)
+
+### `verdict=inconclusive` 인데 BR / anchor 모두 정상
+- 원인 1: 어떤 frame 의 `dispatch_consistent=False` (spec 04 §3.2 (f) 미달)
+- 원인 2: `delegates_to_tree[i].primary_input_type` 누락 → `_build_run_inputs` 가 primary_input_slot=None 으로 설정 → StubJavaSandbox 가 mismatch_reason="primary_input not declared" 반환
+- 해결: edge 에 `"primary_input_type": "scm.order.Order"` 등 명시 (spec 05 §4.6 build_slots 알고리즘은 후속 iter)
+
+### `status=failed` + `failure_reason="sandbox crashed on ..."`
+- 원인: JavaSandbox.dispatch() 가 예외 발생 — fail_fast 정책 (echo-stub 첫 iter)
+- 해결: sandbox 구현체 점검 / ontology_client 호출 graceful failure 확인 (StubJavaSandbox 는 이미 graceful, custom sandbox 는 예외 처리 추가 필요)
+- 후속: spec 05 §4.8 의 `on_dispatch_error="continue"` 정책 도입 시 frame 의 error 필드만 채우고 다음 sub-action 진행
+
+### `change_spec_ref` 가 다른 두 ChangeSpec 인데 같음 / 같은데 다름
+- 의도된 동작 — `sha256:{16_hex}` 형식. canonical JSON (sort_keys=True, ensure_ascii=False) 의 sha256 16자 prefix
+- 충돌 가능성: 16자 prefix 라 약 1/2^64 — 실용 충돌 위험 낮음. 후속에서 64자 full hash 로 확장 가능
+
+### `br_evidence` 의 severity 가 모두 'info'
+- 의도된 동작 — orchestrator 가 outcome=violated→error / 그 외→info 로 매핑 (echo-stub iter)
+- 후속: ontology_client 의 BusinessRule.severity 직접 조회 보강
