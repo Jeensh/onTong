@@ -27,12 +27,14 @@ Single Source of Truth for task status. Use `[x]` (done) / `[ ]` (pending).
 - `backend/simulation/api/run_handle.py` — spec 03 (RunHandle state machine + RunHandleStore) (STEP 3b-5, 2026-05-10)
 - `tests/simulation/test_run_handle.py` — 20 test 통과 (5 상태 전환 + submit lifecycle + e2e)
 - `backend/shared/contracts/simulation.py` — RunHandle 모델 추가 (Literal 5 상태, plan: Optional[RunPlan])
-- `backend/simulation/api/spec_router.py` — spec 03 (POST /runs / GET /runs/{id}/sim-result) — STEP 3b-6
+- `backend/simulation/api/spec_router.py` — spec 03 §1, §2 endpoints (POST /runs / GET /runs/{id} / sim-result / changespec / list) (STEP 3b-6, 2026-05-10)
+- `tests/simulation/test_spec_router.py` — 13 test 통과 (FastAPI TestClient + Depends override)
+- `backend/main.py` — spec_router 등록 (scenarios_router 보다 먼저 = path 충돌 시 spec_router 우선)
 
 ### 3.2 main.py wiring
 
 - simulation router 9개 이미 등록됨 (commit `4ddf170`)
-- spec_router 추가 등록 (3.1 의 spec_router.py 작성 후)
+- spec_router 추가 등록 — scenarios_router 보다 먼저 (path 충돌 시 spec 03 우선) (STEP 3b-6, 2026-05-10)
 
 ## STEP 4 — 첫 ChangeSpec → SimResult 흐름
 
@@ -47,6 +49,10 @@ Single Source of Truth for task status. Use `[x]` (done) / `[ ]` (pending).
 - `sample-repos/slab-design-real_v2/` 와 우리 simulation 의 jvm_bridge HTTP endpoint 매핑 결정 (slab-design 폴더 제거 후 endpoint 재포팅 필요)
 - `tests/simulation/test_agent3.py` / `test_demo_e2e.py` 3 failure 해결 — fixture 경로를 새 sample-repos 위치로
 - frontend `JavaPythonComparePanel.tsx` 의 `SLAB_DESIGN_BASE` URL 매핑
+- 옛 `scenarios_router` 의 `/api/simulation/runs/{run_id}` (simulation-storage tag) → `/api/simulation/scenario-runs/{run_id}` 마이그레이션 (현재는 spec_router 가 가림)
+- `spec_router._build_default_orchestrator()` 의 `_NullOntologyClient` → 실 `OntologyQueryClient` 연결 (modeling 측 facade)
+- `spec_router._build_minimal_run_plan()` → 실 `/api/ontology/actions/{fqn}/delegates-to-tree` HTTP 호출
+- spec 03 미구현 endpoints (후속 step): §2.3 /artifacts, §3.1 /runs/diff, §4.1 /anchor-invalidate, §5.1 /verification/promote, §6.1-2 /health|/capabilities
 
 ## Phase E backlog (modeling 측 미결정 11건)
 
@@ -72,6 +78,6 @@ Single Source of Truth for task status. Use `[x]` (done) / `[ ]` (pending).
 
 ## Backlog
 
-- 사용자 지시 대기 — STEP 3b-6 (api/spec_router.py / FastAPI POST/GET endpoints + main.py wiring) 진입 승인 필요
-★ STEP 3b-1~3b-5 완료 = Section 3 의 spec 05 runner core 4 컴포넌트 + spec 03 RunHandle store. submit() 통한 e2e (ChangeSpec → SimResult.sim_verified) 검증 완료. 마지막 sub-step 3b-6 의 REST endpoint wiring 만 남음.
+- ★ **STEP 3.1 종결** (2026-05-10) — 7개 신설 파일 + main.py wiring 모두 완료. spec 03/04/05 1차 통합 완료.
+- 다음: STEP 4.1+ (첫 시나리오 ChangeSpec → SimResult 흐름) 또는 통합 backlog 진행 — 사용자 결정 대기
 

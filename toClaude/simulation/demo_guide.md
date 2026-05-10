@@ -774,3 +774,105 @@ PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/ -q
 ### multi-thread 환경에서 race condition 의심
 - 본 store 는 `threading.RLock` 보호 — 단일 process 다 thread 안전 (FastAPI worker)
 - multi-process 환경 (gunicorn workers) 는 본 v1 에서 미지원 — 운영 v2 (Redis) 에서 보강
+
+---
+
+## 2026-05-10 STEP 3b-6 — spec 03 Run lifecycle FastAPI router (★ STEP 3.1 종결)
+
+### S23. 서버 기동 + curl smoke (POST → GET 흐름 e2e)
+
+```bash
+# 백엔드 기동 (별 터미널 / background)
+PYTHONPATH=$(pwd) ./venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8765
+
+# POST /api/simulation/runs
+RUN_ID=$(curl -sS -X POST http://127.0.0.1:8765/api/simulation/runs \
+  -H "Content-Type: application/json" \
+  -d '{"change_spec":{"action_fqn":"action.scm.demo","atomic_overrides":{},"scenario_fixture":{"lookups":{}}},"requested_by":"smoke"}' \
+  | python3 -c "import sys, json; print(json.load(sys.stdin)['run_id'])")
+echo "run_id: $RUN_ID"
+
+# GET /api/simulation/runs/{run_id} (RunHandle polling)
+curl -sS http://127.0.0.1:8765/api/simulation/runs/$RUN_ID | python3 -m json.tool
+# 기대: {"run_id":"...","status":"completed","created_at":"...","plan":null}
+
+# GET /api/simulation/runs/{run_id}/sim-result
+curl -sS http://127.0.0.1:8765/api/simulation/runs/$RUN_ID/sim-result | \
+  python3 -c "import sys, json; d=json.load(sys.stdin); print('verdict:', d['verdict'], '/ status:', d['status'])"
+# 기대: verdict: inconclusive / status: completed
+# (NullOntologyClient 환경 — realization 없으니 dispatch_consistent=False → inconclusive. 정상)
+
+# GET /api/simulation/runs/{run_id}/changespec
+curl -sS http://127.0.0.1:8765/api/simulation/runs/$RUN_ID/changespec | \
+  python3 -c "import sys, json; print('action_fqn:', json.load(sys.stdin)['action_fqn'])"
+# 기대: action_fqn: action.scm.demo
+
+# GET /api/simulation/runs (list)
+curl -sS http://127.0.0.1:8765/api/simulation/runs | \
+  python3 -c "import sys, json; d=json.load(sys.stdin); print('list count:', len(d))"
+# 기대: list count: 1+
+
+# GET /api/simulation/runs?status=completed (filter)
+curl -sS "http://127.0.0.1:8765/api/simulation/runs?status=completed" | \
+  python3 -c "import sys, json; print('completed:', len(json.load(sys.stdin)))"
+
+# 404 unknown
+curl -sS -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:8765/api/simulation/runs/run-nonexistent
+# 기대: HTTP 404
+```
+
+### S24. spec_router 13 test + 회귀 (3a + 3b-1~3b-6 누적)
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/test_spec_router.py -v
+# 기대: 13 passed
+
+PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/ -q
+# 기대: 295 passed (이전 282 → +13), 17 skipped, 3 failed (sample-repos 부재 — 무관)
+```
+
+### S25. main.py route 확인 (충돌 검출)
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python -c "
+from backend.main import app
+seen = {}
+for r in app.routes:
+    p = getattr(r, 'path', '')
+    if '/runs' in p:
+        for m in sorted(getattr(r, 'methods', []) or []):
+            key = (m, p)
+            seen.setdefault(key, []).append(r.endpoint.__module__)
+for (m, p), mods in sorted(seen.items()):
+    marker = '⚠️' if len(mods) > 1 else '✓'
+    print(f'{marker} {m:6s} {p}')
+    for mod in mods:
+        print(f'           {mod}')
+"
+# 기대: 모든 route 가 ✓ (단일 owner). spec_router 가 우선이라 GET /runs, GET /runs/{id} 는 spec_router 만.
+```
+
+## Troubleshooting (3b-6)
+
+### POST /runs → 422 Validation Error
+- 원인: `change_spec` 필드 누락 또는 잘못된 형태
+- 해결: `{"change_spec": {"action_fqn": "...", "atomic_overrides": {}, "scenario_fixture": {"lookups": {}}}}` 형태 확인
+- 디버그: response body 의 `detail` 필드 — Pydantic 가 어느 필드 missing 인지 알려줌
+
+### GET /runs/{id} 가 다른 store 의 응답을 반환
+- 원인: scenarios_router 의 옛 `/runs/{id}` 와 path 충돌
+- 해결: main.py 에서 `app.include_router(spec_router)` 가 **`scenarios_router` 보다 먼저** 호출되는지 확인
+- 검증: `app.routes` iteration 으로 path-method 별 owner module 확인 (S25)
+
+### GET /runs/{id}/sim-result 가 404 — completed 인데도
+- 원인: orchestrator 가 예외 발생 → status=failed (sim_result 미저장)
+- 확인: `GET /runs/{id}` 의 `status` 필드 검사 — completed 만 sim_result 보관
+- 디버그: 로그 / orchestrator 실행 직접 호출
+
+### POST /runs 가 예상보다 느림 (sync 실행)
+- 원인: echo-stub iter 는 sync orchestrator — request 가 SimResult 빌드까지 block
+- 후속 보강: STEP 3b-7 (또는 운영 v2) 에서 asyncio.Queue / Redis-RQ 로 비동기화
+
+### NullOntologyClient 라 `verdict=inconclusive` 만 나옴
+- 의도된 동작 — modeling facade 미연결 환경에서 stub backend 가 realization 비어있음 → consistent=False → inconclusive
+- 정합성 검증: 통합 작업 시 `_build_default_orchestrator()` 의 NullOntologyClient 를 실 `OntologyQueryClient` 로 교체

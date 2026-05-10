@@ -67,6 +67,10 @@ from backend.modeling.api import recommend_api
 from backend.modeling.api import repo_import as repo_import_api
 from backend.modeling.persistence.database import bootstrap_database
 # Section 3 — simulation routers (plug-in)
+# spec 03 Run lifecycle (STEP 3b-6) — /api/simulation/runs 의 canonical owner.
+# scenarios_router 의 /runs/{id} (옛 simulation-storage) 와 path 충돌 — spec_router
+# 가 우선이도록 먼저 import + include.
+from backend.simulation.api.spec_router import router as spec_router
 from backend.simulation.api.slab_agent import router as slab_agent_router
 from backend.simulation.api.agents_router import router as agents_router
 from backend.simulation.api.scenarios_router import router as scenarios_router
@@ -468,6 +472,9 @@ app.include_router(queue_actions_api.router)
 # Authoring AI (2026-05-05 — B.5 prototype)
 app.include_router(authoring_api.router)
 # Section 3 — simulation routers (2026-05-10)
+# spec_router 먼저 — /api/simulation/runs 의 spec 03 우선권.
+# scenarios_router 의 옛 /runs/{id} (simulation-storage tag) 와 path 충돌 시 spec_router 가 win.
+app.include_router(spec_router)
 app.include_router(slab_agent_router)
 app.include_router(agents_router)
 app.include_router(scenarios_router)
