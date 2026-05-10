@@ -21,6 +21,36 @@ interface OntologyTrace {
   explanation: string;
 }
 
+/** Java FQN 을 ClassName.method(...) + 패키지 분리. */
+function shortenJavaFqn(fqn: string): { className: string; method: string; pkg: string } {
+  const parenIdx = fqn.indexOf("(");
+  const before = parenIdx >= 0 ? fqn.slice(0, parenIdx) : fqn;
+  const args = parenIdx >= 0 ? fqn.slice(parenIdx) : "";
+  const parts = before.split(".");
+  if (parts.length < 2) return { className: "", method: fqn, pkg: "" };
+  const method = parts[parts.length - 1];
+  const className = parts[parts.length - 2];
+  const pkg = parts.slice(0, -2).join(".");
+  return { className, method: method + args, pkg };
+}
+
+/** action.scm.foo.bar_실행 → bar_실행 + 패키지 prefix. */
+function shortenActionFqn(fqn: string): { name: string; ns: string } {
+  const parts = fqn.split(".");
+  if (parts.length < 2) return { name: fqn, ns: "" };
+  return { name: parts[parts.length - 1], ns: parts.slice(0, -1).join(".") };
+}
+
+/** facade call 의 마지막 method 만 추출 (예: get_action(...).realizations → realizations). */
+function shortenFacadeCall(call: string): { method: string; full: string } {
+  const m = call.match(/\.([a-zA-Z_][a-zA-Z0-9_]*)$/);
+  if (m) return { method: m[1], full: call };
+  // 또는 함수형: OntologyQueryClient.get_action('...')
+  const m2 = call.match(/([a-zA-Z_][a-zA-Z0-9_]*)\(/);
+  if (m2) return { method: m2[1] + "(...)", full: call };
+  return { method: call, full: call };
+}
+
 interface RunOntologyEvidence {
   run_id: string;
   action_fqn: string;
@@ -257,38 +287,7 @@ export function OntologyEvidencePanel({
                     {meta.desc}
                   </div>
                   {traces.map((t, i) => (
-                    <div
-                      key={i}
-                      className="rounded-md border border-foreground/10 bg-white dark:bg-black/30 p-2.5 space-y-1.5 shadow-sm min-w-0 overflow-hidden"
-                    >
-                      <div className="text-[11px] text-foreground font-medium leading-relaxed break-words" style={{ overflowWrap: "anywhere" }}>
-                        {t.explanation}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground space-y-1 pt-1 border-t border-border/40">
-                        <div className="break-all" style={{ overflowWrap: "anywhere" }}>
-                          <b className="text-foreground/70">id:</b>{" "}
-                          <code className="text-[9px] break-all">{t.evidence_id}</code>
-                        </div>
-                        <div className="break-all" style={{ overflowWrap: "anywhere" }}>
-                          <b className="text-foreground/70">source:</b>{" "}
-                          <span className="font-mono text-[9px]">{t.ontology_source}</span>
-                        </div>
-                        <div className="break-all" style={{ overflowWrap: "anywhere" }}>
-                          <b className="text-foreground/70">facade:</b>{" "}
-                          <code className="text-[9px] break-all">{t.ontology_facade_call}</code>
-                        </div>
-                      </div>
-                      {Object.keys(t.ontology_data).length > 0 && (
-                        <details className="text-[10px] pt-1">
-                          <summary className="cursor-pointer text-primary hover:underline font-medium">
-                            ▶ ontology data ({Object.keys(t.ontology_data).length} 필드)
-                          </summary>
-                          <pre className="mt-1 p-2 rounded bg-muted border border-border overflow-x-auto text-[10px] whitespace-pre-wrap break-all" style={{ overflowWrap: "anywhere" }}>
-{JSON.stringify(t.ontology_data, null, 2)}
-                          </pre>
-                        </details>
-                      )}
-                    </div>
+                    <TraceCard key={i} trace={t} />
                   ))}
                 </div>
               )}
@@ -296,6 +295,197 @@ export function OntologyEvidencePanel({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** 작은 칩. */
+function Chip({
+  tone = "neutral",
+  children,
+}: {
+  tone?: "neutral" | "ok" | "warn" | "info" | "muted";
+  children: React.ReactNode;
+}) {
+  const toneClass = {
+    neutral: "bg-foreground/10 text-foreground border-foreground/15",
+    ok: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+    warn: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+    info: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
+    muted: "bg-muted text-muted-foreground border-border",
+  }[tone];
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${toneClass}`}>
+      {children}
+    </span>
+  );
+}
+
+/** 한 trace 의 가독성 좋은 표시 — kind 별로 핵심만 prominent + chip + 풀 정보는 접힘. */
+function TraceCard({ trace }: { trace: OntologyTrace }) {
+  const t = trace;
+  const data = t.ontology_data as Record<string, any>;
+
+  return (
+    <div className="rounded-md border border-foreground/10 bg-white dark:bg-black/30 p-3 space-y-2 shadow-sm min-w-0 overflow-hidden">
+      {/* ── 핵심 식별자 — kind 별 다른 렌더 ─────── */}
+      {t.evidence_kind === "action" && (() => {
+        const { name, ns } = shortenActionFqn(t.evidence_id);
+        const label = data.label as string | undefined;
+        return (
+          <>
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-base">🧩</span>
+              <span className="text-[13px] font-bold text-foreground break-all" style={{ overflowWrap: "anywhere" }}>
+                {name}
+              </span>
+              {label && label !== name && (
+                <span className="text-[11px] text-muted-foreground">"{label}"</span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {data.kind && <Chip tone="info">{String(data.kind)}</Chip>}
+              {typeof data.realizations_count === "number" && (
+                <Chip tone={data.realizations_count > 0 ? "ok" : "muted"}>
+                  realizations × {data.realizations_count}
+                </Chip>
+              )}
+              {typeof data.sub_actions_count === "number" && data.sub_actions_count > 0 && (
+                <Chip tone="info">sub-actions × {data.sub_actions_count}</Chip>
+              )}
+              {data.declared_on_term && (
+                <Chip tone="muted">term: {String(data.declared_on_term).split(".").pop()}</Chip>
+              )}
+            </div>
+            <div className="text-[9px] text-muted-foreground font-mono break-all" style={{ overflowWrap: "anywhere" }}>
+              {ns}
+            </div>
+          </>
+        );
+      })()}
+
+      {t.evidence_kind === "realized_method" && (() => {
+        const { className, method, pkg } = shortenJavaFqn(t.evidence_id);
+        const confirmed = data.confirmed as boolean | undefined;
+        const confidence = data.confidence as number | undefined;
+        const scope = data.scope as string | undefined;
+        return (
+          <>
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-base">⚙️</span>
+              <span className="text-[13px] font-bold font-mono text-foreground break-all" style={{ overflowWrap: "anywhere" }}>
+                {className ? `${className}.${method}` : method}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              <Chip tone={confirmed ? "ok" : "warn"}>
+                {confirmed ? "✓ confirmed" : "✗ unconfirmed"}
+              </Chip>
+              {confidence !== undefined && (
+                <Chip tone={confidence >= 0.9 ? "ok" : confidence >= 0.5 ? "warn" : "muted"}>
+                  conf {confidence.toFixed(2)}
+                </Chip>
+              )}
+              {scope && <Chip tone="info">{scope}</Chip>}
+              {data.applies_to_code_type_fqn && (
+                <Chip tone="muted">
+                  applies to: {String(data.applies_to_code_type_fqn).split(".").pop()}
+                </Chip>
+              )}
+            </div>
+            {pkg && (
+              <div className="text-[9px] text-muted-foreground font-mono break-all" style={{ overflowWrap: "anywhere" }}>
+                📦 {pkg}
+              </div>
+            )}
+          </>
+        );
+      })()}
+
+      {t.evidence_kind === "br" && (() => {
+        const brName = t.evidence_id.split(".").pop() || t.evidence_id;
+        const kind = data.kind as string | undefined;
+        return (
+          <>
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-base">📋</span>
+              <span className="text-[13px] font-bold font-mono text-foreground break-all" style={{ overflowWrap: "anywhere" }}>
+                {brName}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {kind && (
+                <Chip tone={kind.includes("pre") ? "info" : "warn"}>
+                  {kind.includes("unknown") ? "unknown" : kind}
+                </Chip>
+              )}
+            </div>
+          </>
+        );
+      })()}
+
+      {t.evidence_kind === "anchor" && (() => {
+        const anchorId = t.evidence_id.split(".").pop() || t.evidence_id;
+        const locator = data.anchor_locator as string | undefined;
+        const codeMethodFqn = data.code_method_fqn as string | undefined;
+        const targetSlot = data.target_slot as string | undefined;
+        const codeShort = codeMethodFqn ? shortenJavaFqn(codeMethodFqn) : null;
+        return (
+          <>
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-base">⚓</span>
+              <span className="text-[13px] font-bold font-mono text-foreground break-all" style={{ overflowWrap: "anywhere" }}>
+                {anchorId}
+              </span>
+              {locator && <Chip tone="info">{locator}</Chip>}
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {targetSlot && <Chip tone="muted">slot: {targetSlot}</Chip>}
+              {data.confirmed !== undefined && (
+                <Chip tone={data.confirmed ? "ok" : "warn"}>
+                  {data.confirmed ? "✓ confirmed" : "✗ unconfirmed"}
+                </Chip>
+              )}
+            </div>
+            {codeShort && (
+              <div className="text-[10px] text-muted-foreground font-mono break-all" style={{ overflowWrap: "anywhere" }}>
+                ⚙️ {codeShort.className}.{codeShort.method}
+              </div>
+            )}
+          </>
+        );
+      })()}
+
+      {/* ── 풀 정보 — 접힘 (raw 정보 추적용) ─────── */}
+      <details className="text-[10px] pt-1 border-t border-border/40">
+        <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
+          ▶ 원본 (id / source / facade / data 전체)
+        </summary>
+        <div className="mt-2 space-y-1.5 text-[10px] text-muted-foreground bg-muted/40 rounded p-2">
+          <div className="break-all" style={{ overflowWrap: "anywhere" }}>
+            <b className="text-foreground/70">id:</b>{" "}
+            <code className="text-[9px]">{t.evidence_id}</code>
+          </div>
+          <div className="break-all" style={{ overflowWrap: "anywhere" }}>
+            <b className="text-foreground/70">source:</b> {t.ontology_source}
+          </div>
+          <div className="break-all" style={{ overflowWrap: "anywhere" }}>
+            <b className="text-foreground/70">facade:</b>{" "}
+            <code className="text-[9px]">{t.ontology_facade_call}</code>
+          </div>
+          {Object.keys(t.ontology_data).length > 0 && (
+            <div className="pt-1">
+              <b className="text-foreground/70">ontology data:</b>
+              <pre className="mt-1 p-1.5 rounded bg-background border border-border text-[9px] whitespace-pre-wrap break-all" style={{ overflowWrap: "anywhere" }}>
+{JSON.stringify(t.ontology_data, null, 2)}
+              </pre>
+            </div>
+          )}
+          <div className="pt-1 italic text-foreground/60 break-words" style={{ overflowWrap: "anywhere" }}>
+            {t.explanation}
+          </div>
+        </div>
+      </details>
     </div>
   );
 }
