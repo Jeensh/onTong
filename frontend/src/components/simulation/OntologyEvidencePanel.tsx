@@ -45,6 +45,7 @@ const KIND_META: Record<
   OntologyTrace["evidence_kind"],
   {
     label: string;
+    shortLabel: string;     // 좁은 영역 chip 용
     chipTone: string;       // 작은 chip
     cardTone: string;       // 펼친 카드 배경 (강한 색)
     icon: React.ReactNode;
@@ -54,6 +55,7 @@ const KIND_META: Record<
 > = {
   action: {
     label: "Action 노드",
+    shortLabel: "Action",
     chipTone: "border-blue-600 bg-blue-100 text-blue-800 dark:border-blue-400 dark:bg-blue-900/40 dark:text-blue-200",
     cardTone: "border-l-4 border-blue-600 bg-blue-50 dark:bg-blue-900/20",
     icon: <Network size={16} />,
@@ -61,7 +63,8 @@ const KIND_META: Record<
     emoji: "🧩",
   },
   realized_method: {
-    label: "Realization → Java method",
+    label: "Realization → Java",
+    shortLabel: "Realization",
     chipTone: "border-emerald-600 bg-emerald-100 text-emerald-800 dark:border-emerald-400 dark:bg-emerald-900/40 dark:text-emerald-200",
     cardTone: "border-l-4 border-emerald-600 bg-emerald-50 dark:bg-emerald-900/20",
     icon: <Cpu size={16} />,
@@ -70,6 +73,7 @@ const KIND_META: Record<
   },
   br: {
     label: "BusinessRule",
+    shortLabel: "BR",
     chipTone: "border-amber-600 bg-amber-100 text-amber-800 dark:border-amber-400 dark:bg-amber-900/40 dark:text-amber-200",
     cardTone: "border-l-4 border-amber-600 bg-amber-50 dark:bg-amber-900/20",
     icon: <ShieldCheck size={16} />,
@@ -78,6 +82,7 @@ const KIND_META: Record<
   },
   anchor: {
     label: "AnchorBinding",
+    shortLabel: "Anchor",
     chipTone: "border-purple-600 bg-purple-100 text-purple-800 dark:border-purple-400 dark:bg-purple-900/40 dark:text-purple-200",
     cardTone: "border-l-4 border-purple-600 bg-purple-50 dark:bg-purple-900/20",
     icon: <AnchorIcon size={16} />,
@@ -133,8 +138,8 @@ export function OntologyEvidencePanel({
 
   const wrapperClass =
     variant === "card"
-      ? "rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card p-5 space-y-4 shadow-sm"
-      : "rounded-lg border-2 border-primary/40 bg-gradient-to-br from-primary/8 to-primary/3 p-4 space-y-3 shadow-sm";
+      ? "rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card p-5 space-y-4 shadow-sm overflow-hidden"
+      : "rounded-lg border-2 border-primary/40 bg-gradient-to-br from-primary/8 to-primary/3 p-3 space-y-3 shadow-sm overflow-hidden";
 
   if (loading) {
     return (
@@ -167,34 +172,33 @@ export function OntologyEvidencePanel({
   return (
     <div className={wrapperClass}>
       {/* ── Header — strongly emphasized ─────────────────────── */}
-      <div className="flex items-start gap-3 pb-3 border-b border-primary/20">
-        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-sm">
-          <BookOpen size={20} />
+      <div className="flex items-start gap-2.5 pb-3 border-b border-primary/20 min-w-0">
+        <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-sm">
+          <BookOpen size={18} />
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-base font-bold text-foreground flex items-center gap-2 flex-wrap">
-            📚 온톨로지 근거
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30">
-              Section 2 ontology trace
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <div className="text-sm font-bold text-foreground flex items-center gap-2 flex-wrap">
+            <span>📚 온톨로지 근거</span>
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30 whitespace-nowrap">
+              Section 2 trace
             </span>
           </div>
-          <div className="text-[12px] text-foreground/80 mt-1 font-mono break-all">
+          <div className="text-[11px] text-foreground/80 mt-1 font-mono break-all" style={{ wordBreak: "break-all", overflowWrap: "anywhere" }}>
             <span className="text-muted-foreground">action:</span>{" "}
             <span className="font-semibold">{data.action_fqn}</span>
           </div>
-          <div className="text-[10px] text-muted-foreground mt-0.5">
+          <div className="text-[10px] text-muted-foreground mt-0.5 break-all" style={{ overflowWrap: "anywhere" }}>
             <span className="font-medium text-foreground/70">{data.ontology_transport}</span>
-            {" · facade: "}<code className="text-[9px]">{data.ontology_facade}</code>
           </div>
         </div>
       </div>
 
       {/* ── Summary chips — bigger and more colorful ─────── */}
-      <div>
+      <div className="min-w-0">
         <div className="text-[11px] font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
           📊 4 evidence kind 카운트
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-1.5">
           {(["action", "realized_method", "br", "anchor"] as const).map((kind) => {
             const count = data.summary[kind] ?? 0;
             const meta = KIND_META[kind];
@@ -204,20 +208,20 @@ export function OntologyEvidencePanel({
                 key={kind}
                 onClick={() => count > 0 && setExpandedKind(kind)}
                 disabled={count === 0}
-                className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2 text-left transition-all ${meta.chipTone} ${
-                  dimmed ? "opacity-40 cursor-not-allowed" : "hover:scale-[1.02] cursor-pointer"
+                className={`flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-left transition-all min-w-0 ${meta.chipTone} ${
+                  dimmed ? "opacity-40 cursor-not-allowed" : "cursor-pointer hover:shadow-sm"
                 } ${expandedKind === kind && !dimmed ? "ring-2 ring-offset-1 ring-primary/40" : ""}`}
               >
-                <span className="text-xl">{meta.emoji}</span>
+                <span className="text-base flex-shrink-0">{meta.emoji}</span>
                 <div className="flex-1 min-w-0">
-                  <div className="text-[11px] font-bold leading-tight">
-                    {meta.label}
+                  <div className="text-[10px] font-bold leading-tight truncate">
+                    {meta.shortLabel}
                   </div>
-                  <div className="text-[10px] opacity-80 mt-0.5">
+                  <div className="text-[9px] opacity-80">
                     {count > 0 ? `${count} 건` : "—"}
                   </div>
                 </div>
-                <span className="text-lg font-bold">{count}</span>
+                <span className="text-base font-bold flex-shrink-0">{count}</span>
               </button>
             );
           })}
@@ -225,7 +229,7 @@ export function OntologyEvidencePanel({
       </div>
 
       {/* ── per-kind grouped trace — colorful expandable cards ── */}
-      <div className="space-y-2">
+      <div className="space-y-2 min-w-0">
         <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
           🔍 trace 상세 (클릭해 펼치기)
         </div>
@@ -235,43 +239,43 @@ export function OntologyEvidencePanel({
           const meta = KIND_META[kind];
           const isOpen = expandedKind === kind;
           return (
-            <div key={kind} className={`rounded-lg overflow-hidden ${meta.cardTone}`}>
+            <div key={kind} className={`rounded-lg overflow-hidden min-w-0 ${meta.cardTone}`}>
               <button
                 onClick={() => setExpandedKind(isOpen ? null : kind)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 text-left"
+                className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-black/5 dark:hover:bg-white/5 text-left min-w-0"
               >
-                <span className="text-xl">{meta.emoji}</span>
-                {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                <span className="font-semibold text-sm">{meta.label}</span>
-                <span className="ml-auto inline-flex items-center justify-center min-w-[28px] h-6 px-2 rounded-full bg-white/70 dark:bg-black/30 text-xs font-bold">
+                <span className="text-lg flex-shrink-0">{meta.emoji}</span>
+                {isOpen ? <ChevronDown size={14} className="flex-shrink-0" /> : <ChevronRight size={14} className="flex-shrink-0" />}
+                <span className="font-semibold text-[13px] flex-1 min-w-0 truncate">{meta.label}</span>
+                <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[24px] h-5 px-1.5 rounded-full bg-white/70 dark:bg-black/30 text-[11px] font-bold">
                   {traces.length}
                 </span>
               </button>
               {isOpen && (
-                <div className="px-4 pb-4 space-y-2 bg-white/40 dark:bg-black/20">
-                  <div className="text-[11px] text-foreground/70 italic pt-2">
+                <div className="px-3 pb-3 space-y-2 bg-white/40 dark:bg-black/20 min-w-0">
+                  <div className="text-[10px] text-foreground/70 italic pt-2 break-words" style={{ overflowWrap: "anywhere" }}>
                     {meta.desc}
                   </div>
                   {traces.map((t, i) => (
                     <div
                       key={i}
-                      className="rounded-md border border-foreground/10 bg-white dark:bg-black/30 p-3 space-y-1.5 shadow-sm"
+                      className="rounded-md border border-foreground/10 bg-white dark:bg-black/30 p-2.5 space-y-1.5 shadow-sm min-w-0 overflow-hidden"
                     >
-                      <div className="text-[12px] text-foreground font-medium leading-relaxed">
+                      <div className="text-[11px] text-foreground font-medium leading-relaxed break-words" style={{ overflowWrap: "anywhere" }}>
                         {t.explanation}
                       </div>
-                      <div className="text-[10px] text-muted-foreground space-y-0.5 pt-1 border-t border-border/40">
-                        <div>
+                      <div className="text-[10px] text-muted-foreground space-y-1 pt-1 border-t border-border/40">
+                        <div className="break-all" style={{ overflowWrap: "anywhere" }}>
                           <b className="text-foreground/70">id:</b>{" "}
-                          <code className="text-[10px] break-all">{t.evidence_id}</code>
+                          <code className="text-[9px] break-all">{t.evidence_id}</code>
                         </div>
-                        <div>
+                        <div className="break-all" style={{ overflowWrap: "anywhere" }}>
                           <b className="text-foreground/70">source:</b>{" "}
-                          <span className="font-mono text-[10px]">{t.ontology_source}</span>
+                          <span className="font-mono text-[9px]">{t.ontology_source}</span>
                         </div>
-                        <div>
-                          <b className="text-foreground/70">facade call:</b>{" "}
-                          <code className="text-[10px] break-all">{t.ontology_facade_call}</code>
+                        <div className="break-all" style={{ overflowWrap: "anywhere" }}>
+                          <b className="text-foreground/70">facade:</b>{" "}
+                          <code className="text-[9px] break-all">{t.ontology_facade_call}</code>
                         </div>
                       </div>
                       {Object.keys(t.ontology_data).length > 0 && (
@@ -279,7 +283,7 @@ export function OntologyEvidencePanel({
                           <summary className="cursor-pointer text-primary hover:underline font-medium">
                             ▶ ontology data ({Object.keys(t.ontology_data).length} 필드)
                           </summary>
-                          <pre className="mt-1 p-2 rounded bg-muted border border-border overflow-x-auto text-[10px]">
+                          <pre className="mt-1 p-2 rounded bg-muted border border-border overflow-x-auto text-[10px] whitespace-pre-wrap break-all" style={{ overflowWrap: "anywhere" }}>
 {JSON.stringify(t.ontology_data, null, 2)}
                           </pre>
                         </details>
@@ -311,14 +315,18 @@ export function OntologyEvidenceToggle({
     <div className="space-y-3">
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`w-full sm:w-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border-2 transition-all ${
+        className={`w-full inline-flex items-start gap-2 px-3 py-2 rounded-lg text-[13px] font-semibold border-2 transition-all text-left ${
           open
             ? "border-primary bg-primary text-primary-foreground shadow-md"
             : "border-primary/40 bg-primary/10 hover:bg-primary/20 hover:border-primary text-primary hover:shadow-sm"
         }`}
       >
-        {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-        {label}
+        <span className="flex-shrink-0 mt-0.5">
+          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </span>
+        <span className="flex-1 min-w-0 break-words leading-snug" style={{ overflowWrap: "anywhere" }}>
+          {label}
+        </span>
       </button>
       {open && (
         <OntologyEvidencePanel
