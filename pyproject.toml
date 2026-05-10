@@ -81,6 +81,9 @@ pyyaml = "^6.0"
 python-dateutil = "^2.8"
 python-ulid = "^2.0"
 
+# Section 3 — PostgreSQL (slab-design 마스터 데이터 + 주문)
+psycopg = {version = "^3.2", extras = ["binary"]}
+
 # Image Analysis (OCR)
 easyocr = "^1.7"
 ollama = ">=0.4"
@@ -104,6 +107,7 @@ httpx = "^0.25.0"
 fakeredis = "^2.20"
 pytest-postgresql = "^6.0"
 locust = "^2.20"
+hypothesis = "^6.152"  # Section 3 — testgen property-based test 생성
 
 [tool.black]
 line-length = 100
