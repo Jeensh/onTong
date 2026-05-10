@@ -18,6 +18,7 @@ import {
 import { getStepLabel } from "@/lib/simulation/stepLabels";
 import { HelpPopover } from "./HelpPopover";
 import { OntologyEvidenceToggle } from "./OntologyEvidencePanel";
+import { resolveActionFqn } from "@/lib/simulation/stepActionMap";
 
 export function RegressionPanel() {
   const [runs, setRuns] = useState<RunRecord[]>([]);
@@ -149,8 +150,8 @@ export function RegressionPanel() {
           </div>
 
           <OntologyEvidenceToggle
-            actionFqn="action.scm.슬랩설계_실행"
-            label={`📚 비교 대상 단계의 온톨로지 근거 (${diff.baseline.step_id} ↔ ${diff.candidate?.step_id ?? "?"})`}
+            actionFqn={resolveActionFqn(diff.baseline.step_id)}
+            label={`📚 비교 대상 단계의 온톨로지 근거 (${diff.baseline.step_id} → ${resolveActionFqn(diff.baseline.step_id)})`}
           />
 
           {diff.summary.field_diffs.length > 0 && (

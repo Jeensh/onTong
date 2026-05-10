@@ -8,14 +8,94 @@ import { HelpPopover } from "./HelpPopover";
 /** 자주 쓰는 action_fqn preset — 사용자가 빠르게 선택. */
 const PRESET_ACTIONS = [
   {
-    fqn: "action.scm.std.match_customer_limit_for_order",
-    label: "고객 한도 매칭 (match_customer_limit_for_order)",
-    desc: "주문에 대한 고객 신용한도 체크 — verdict=sim_verified 시나리오의 root action",
+    fqn: "action.scm.슬랩설계_실행",
+    label: "🔝 슬랩 설계 실행 (workflow root)",
+    desc: "21-step workflow 의 root — 모든 sub-action 을 BFS",
   },
   {
-    fqn: "action.scm.슬랩설계_실행",
-    label: "슬랩 설계 실행 (21-step workflow)",
-    desc: "주문 → 슬랩 사이즈 도출 21단계 — Section 3 의 핵심 시뮬 대상",
+    fqn: "action.scm.std.match_customer_limit_for_order",
+    label: "고객 한도 매칭 (match_customer_limit_for_order)",
+    desc: "주문 ↔ 고객 신용한도 체크. verdict=sim_verified 핵심 시나리오",
+  },
+  {
+    fqn: "action.scm.order.정합성_검증",
+    label: "주문 정합성 검증 (validator)",
+    desc: "DG001~005 — 재고/사이즈/포장단중/설계대기량/작업기한일",
+  },
+  {
+    fqn: "action.scm.product.cumulative_productivity",
+    label: "누적 실수율 (productivity)",
+    desc: "활성 공정 실수율 곱 — anchor 풍부",
+  },
+  {
+    fqn: "action.scm.thickness_실행",
+    label: "Step 1 — 1차 두께 결정 (thickness)",
+    desc: "CAST_SPEC 룩업 → Slab 두께",
+  },
+  {
+    fqn: "action.scm.width_range_실행",
+    label: "Step 2 — 1차 폭 범위 (width_range)",
+    desc: "CAST ∩ HR_SPEC ∩ EDGING",
+  },
+  {
+    fqn: "action.scm.length_range_실행",
+    label: "Step 3 — 1차 길이 범위 (length_range)",
+    desc: "CAST ∩ HR_SPEC",
+  },
+  {
+    fqn: "action.scm.first_weight_실행",
+    label: "Step 4 — 1차 단중",
+    desc: "1차 단중 하/상한 결정",
+  },
+  {
+    fqn: "action.scm.second_wgt_low_실행",
+    label: "Step 5 — 2차 단중 하한",
+    desc: "HR_MIN_WGT 2D 격자 룩업",
+  },
+  {
+    fqn: "action.scm.second_wgt_high_실행",
+    label: "Step 6 — 2차 단중 상한",
+    desc: "HR_MAX_WGT 2D 격자 룩업",
+  },
+  {
+    fqn: "action.scm.max_split_count_실행",
+    label: "Step 7 — 최대 분할수",
+    desc: "A-a 루프 시작점",
+  },
+  {
+    fqn: "action.scm.split_range_실행",
+    label: "Step 8 — 분할 범위",
+    desc: "분할수 고려 단중 범위",
+  },
+  {
+    fqn: "action.scm.slab.slab_count_실행",
+    label: "★ Step 9 — Slab 매수",
+    desc: "floor(설계대기량 ÷ 실수율 ÷ 단중)",
+  },
+  {
+    fqn: "action.scm.slab.initial_slab_wgt_실행",
+    label: "Step 10 — Slab 단중",
+    desc: "설계대기량 만족 점검",
+  },
+  {
+    fqn: "action.scm.final_width_range_실행",
+    label: "Step 16 — 최종 폭 범위",
+    desc: "최종 폭 하/상한",
+  },
+  {
+    fqn: "action.scm.final_length_range_실행",
+    label: "Step 17 — 최종 길이 범위",
+    desc: "최종 길이 하/상한",
+  },
+  {
+    fqn: "action.scm.target_width_실행",
+    label: "Step 18 — 목표 폭",
+    desc: "최종 목표 폭",
+  },
+  {
+    fqn: "action.scm.target_length_실행",
+    label: "Step 19 — 목표 길이",
+    desc: "최종 목표 길이",
   },
 ];
 
@@ -103,9 +183,10 @@ export function OntologyEvidenceView() {
       {/* preset action chips */}
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
         <div className="text-xs font-medium text-muted-foreground">
-          🎯 자주 쓰는 action — 클릭해 즉시 evidence 보기
+          🎯 자주 쓰는 action ({PRESET_ACTIONS.length}종) — 클릭해 즉시 evidence 보기.
+          슬랩 설계 21-step workflow 의 각 sub-action 별로 다른 ontology trace 가 나옵니다.
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
           {PRESET_ACTIONS.map((p) => (
             <button
               key={p.fqn}
@@ -113,16 +194,16 @@ export function OntologyEvidenceView() {
                 setInputFqn(p.fqn);
                 setActionFqn(p.fqn);
               }}
-              title={p.desc}
-              className={`text-left rounded-lg border px-3 py-2 transition-colors ${
+              title={`${p.fqn}\n${p.desc}`}
+              className={`text-left rounded-md border px-2.5 py-2 transition-colors ${
                 actionFqn === p.fqn
                   ? "border-primary bg-primary/10"
                   : "border-border hover:border-primary/40 hover:bg-muted/50"
               }`}
             >
-              <div className="text-[12px] font-medium text-foreground">{p.label}</div>
-              <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">{p.fqn}</div>
-              <div className="text-[10px] text-muted-foreground mt-1">{p.desc}</div>
+              <div className="text-[11px] font-medium text-foreground leading-tight">{p.label}</div>
+              <div className="text-[9px] text-muted-foreground mt-0.5 font-mono truncate">{p.fqn.replace("action.scm.", "")}</div>
+              <div className="text-[10px] text-muted-foreground mt-1 leading-tight">{p.desc}</div>
             </button>
           ))}
         </div>
