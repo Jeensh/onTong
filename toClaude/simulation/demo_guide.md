@@ -348,3 +348,113 @@ PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/ -q
 - 원인 1: `get_action(fqn) → None` (modeling 미수록)
 - 원인 2: Action.preconditions + postconditions 둘 다 비어있음
 - 원인 3: ontology_client 호출 Exception (warning log 출력)
+
+---
+
+## 2026-05-10 STEP 3b-3 — PythonGenerator (echo-stub)
+
+### S14. PythonGenerator 합성 + GeneratedScript 검증
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python - <<'PY'
+from backend.shared.contracts.simulation import ChangeSpec, RunPlan
+from backend.simulation.runner.python_generator import PythonGenerator
+
+cs = ChangeSpec(
+    action_fqn="scm.workflow.SDSlabEntity_step_1_to_8",
+    atomic_overrides={"order.width": 1180},
+    scenario_fixture={"lookups": {"scm.std.CustomerStd:7": {"pk": 7, "table_spec_fqn": "scm.std.CustomerStd", "columns": {}}}},
+)
+plan = RunPlan(
+    delegates_to_tree=[
+        {"action_fqn": "scm.workflow.SDSlabEntity_step_1_to_8", "depth": 1},
+        {"action_fqn": "action.scm.std.match", "depth": 2},
+    ],
+    estimated_steps=2,
+)
+script = PythonGenerator().generate(cs, plan)
+print("entrypoint:", script.entrypoint)
+print("imports:", script.imports)
+print("dispatch_calls:", script.java_dispatch_calls)
+print("fixture_keys:", script.fixture_keys_used)
+print("estimated_steps:", script.estimated_steps)
+print("--- source_code (앞 600 chars) ---")
+print(script.source_code[:600])
+PY
+# 기대 출력 (요약):
+# entrypoint: run
+# imports: ['from backend.shared.contracts.simulation import DelegationTraceFrame']
+# dispatch_calls: ['scm.workflow.SDSlabEntity_step_1_to_8', 'action.scm.std.match']
+# fixture_keys: ['scm.std.CustomerStd:7']
+# estimated_steps: 2
+```
+
+### S15. PythonGenerator + StubJavaSandbox end-to-end exec
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python - <<'PY'
+"""echo-stub 의 source_code 가 exec 후 run() 호출 가능한지 sanity."""
+from backend.shared.contracts.simulation import (
+    ChangeSpec, RunInputs, RunOptions, RunPlan, SandboxCapabilities, TypedValue,
+)
+from backend.simulation.runner.java_sandbox import StubJavaSandbox
+from backend.simulation.runner.python_generator import PythonGenerator
+
+
+class FakeOnt:
+    def get_action(self, fqn): return None
+    def get_realizations_for_input_type(self, *a, **k): return []
+    def get_anchor_bindings_for_action(self, fqn): return []
+
+
+cs = ChangeSpec(action_fqn="action.x", atomic_overrides={}, scenario_fixture={"lookups": {}})
+plan = RunPlan(delegates_to_tree=[
+    {"action_fqn": "a1", "depth": 1},
+    {"action_fqn": "a2", "depth": 2},
+])
+script = PythonGenerator().generate(cs, plan)
+ns = {}
+exec(script.source_code, ns)
+result = ns["run"](
+    inputs=RunInputs(slots={"o": TypedValue(_type="scm.X", value={})}, primary_input_slot="o"),
+    java_sandbox=StubJavaSandbox(SandboxCapabilities(backend="stub"), FakeOnt()),
+    lookup_source=None,
+    run_options=RunOptions(sandbox_tier="stub_dispatch"),
+)
+print("trace 길이:", len(result["trace"]))
+for f in result["trace"]:
+    print(" -", f.action_fqn, f"depth={f.depth}", f"consistent={f.dispatch_consistent}")
+PY
+# 기대 출력:
+# trace 길이: 2
+#  - a1 depth=1 consistent=False  (FakeOnt 가 realization 없음)
+#  - a2 depth=2 consistent=False
+```
+
+### S16. PythonGenerator 14 test + 회귀 (3a + 3b-1 + 3b-2 + 3b-3 누적)
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/test_python_generator.py -v
+# 기대: 14 passed
+
+PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/ -q
+# 기대: 246 passed (이전 232 → +14), 17 skipped, 3 failed (sample-repos/slab-design 부재 — 무관)
+```
+
+## Troubleshooting (3b-3)
+
+### 생성된 source_code 가 ast.parse 시 SyntaxError
+- 원인: action_fqn 에 따옴표/줄바꿈 등 비정상 문자 포함 (정상이라면 일어나지 않음)
+- 해결: `PythonGenerator._build_run_body` 가 `repr()` 사용하므로 일반 fqn 은 안전. 비정상 문자 발견 시 RunPlan 단계에서 sanitize
+
+### `java_dispatch_calls` 에서 같은 fqn 중복 제거됨
+- 의도된 동작 — spec 05 §1.2 에서 java_dispatch_calls 는 사전 검증용 fqn 합집합. dedup 시 첫 등장 순 유지
+- 실제 dispatch 횟수는 `delegation_trace` 의 frame 수로 확인
+
+### `atomic_overrides` 적용 안 됨
+- 의도된 동작 — echo-stub 첫 iter 는 헤더 docstring 으로 echo 만. 실제 patching 은 orchestrator (3b-4) 가 spec 04 §1.2 4-rule algorithm 으로
+- 검증: 생성된 source_code 에 override path 가 docstring 으로 등장하는지
+
+### `loop_iterable` / `optional` 분기가 무시됨
+- 의도된 동작 — echo-stub 첫 iter 는 sequential dispatch 만. is_in_loop / optional 플래그는 `delegation frame N` comment 에 depth 정보만 echo
+- 후속: 3b-4 orchestrator 에서 atomic.facets 의 iter_source 마킹 + scenario.metadata 조건 평가 추가
