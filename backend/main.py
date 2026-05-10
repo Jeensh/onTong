@@ -53,9 +53,10 @@ from backend.application.skill.skill_loader import UserSkillLoader
 from backend.application.skill.skill_matcher import SkillMatcher
 from backend.infrastructure.events.event_bus import event_bus
 # 2026-05-01 clean slate: backend.modeling (Section 2) 만 본 process 가 책임.
-# Section 3 (simulation) 은 plug-in 방식 — 다음 개발자가 별 PR 로 추가.
+# Section 3 (simulation) 은 plug-in 방식 — 별 PR 로 추가.
 # 인계 명세는 toClaude/modeling/handoff-spec/ 6 파일 (00 README + 01~05) 참조.
 # C2~C5 완료 (2026-05-02): Code/Domain/Mapping Layer + Query API.
+# Section 3 통합 (2026-05-10): simulation router 8종 등록 (sandbox/jobs/runs/bridge/transpile/auto_pr/differential).
 from backend.api import authoring as authoring_api
 from backend.modeling.api import ontology_router as ontology_query_api
 from backend.modeling.api import graph_api as ontology_graph_api
@@ -65,6 +66,16 @@ from backend.modeling.api import queue_actions_api
 from backend.modeling.api import recommend_api
 from backend.modeling.api import repo_import as repo_import_api
 from backend.modeling.persistence.database import bootstrap_database
+# Section 3 — simulation routers (plug-in)
+from backend.simulation.api.slab_agent import router as slab_agent_router
+from backend.simulation.api.agents_router import router as agents_router
+from backend.simulation.api.scenarios_router import router as scenarios_router
+from backend.simulation.api.jobs_router import router as jobs_router
+from backend.simulation.api.bridge_router import router as bridge_router
+from backend.simulation.api.transpile_router import router as transpile_router
+from backend.simulation.api.auto_pr_router import router as auto_pr_router
+from backend.simulation.api.seed_router import router as seed_router
+from backend.simulation.api.differential_router import router as differential_router
 
 setup_logging(
     level=settings.log_level,
@@ -282,6 +293,8 @@ async def lifespan(app: FastAPI):
     authoring_api.init(business_term_store=DomainLayerStore())
     logger.info("Authoring AI wired: 8 capabilities + session + cost log")
 
+    # Section 3 (Simulation) — Agent 3종 (agents_router) + SlabViewer3D 보존 라우터.
+    # 별도 init() 불필요 — OntologyClient는 in-process 모드로 Section 2를 직접 호출.
 
     # Register skills (before agents — agents may use them)
     register_all_skills()
@@ -454,6 +467,16 @@ app.include_router(perspective_api.router)
 app.include_router(queue_actions_api.router)
 # Authoring AI (2026-05-05 — B.5 prototype)
 app.include_router(authoring_api.router)
+# Section 3 — simulation routers (2026-05-10)
+app.include_router(slab_agent_router)
+app.include_router(agents_router)
+app.include_router(scenarios_router)
+app.include_router(jobs_router)
+app.include_router(bridge_router)
+app.include_router(transpile_router)
+app.include_router(auto_pr_router)
+app.include_router(seed_router)
+app.include_router(differential_router)
 
 
 # Global exception handler

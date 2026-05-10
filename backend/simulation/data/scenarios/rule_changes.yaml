@@ -1,0 +1,84 @@
+# 시나리오 시드 — 룰 1줄 변경 카탈로그.
+# 운영자가 실제로 검증할 일이 있는 변경들을 라이브러리로 등록.
+
+- id: scn-hr-prod-095-to-092
+  name: "HR 실수율 0.95 → 0.92"
+  description: "열연 실수율 룰 1줄 변경. Slab 매수/단중 fan-out 측정."
+  step_id: pipeline_full
+  tags: [productivity, rule-change, hr]
+  inputs:
+    rules:
+      hr: "0.92"
+
+- id: scn-hrf-prod-093-to-088
+  name: "HRF 실수율 0.93 → 0.88"
+  description: "열연정정 공정 실수율 변경. 누적 실수율 fan-out."
+  step_id: pipeline_full
+  tags: [productivity, rule-change, hrf]
+  inputs:
+    rules:
+      hrf: "0.88"
+
+- id: scn-edging-wildcard-removed
+  name: "EDGING_SPEC '*' fallback row 삭제"
+  description: "정합성 회귀 — 와일드카드 누락 시 어느 그룹에서 EdgingSpecMissingError?"
+  step_id: pipeline_full
+  tags: [data-integrity, edging, regression]
+  inputs:
+    rules:
+      edging_wildcard: false
+
+- id: scn-edging-wide-1700
+  name: "넓은 Slab (selectedHrTgtWidth=1700)"
+  description: "EDGING_GROUP 매칭 미달 → DG103 — 신규 그룹 추가 시 영향 검증."
+  step_id: pipeline_full
+  tags: [edging, group-miss]
+  inputs:
+    order:
+      selectedHrTgtWidth: "1700"
+
+- id: scn-plant-mapping-K-to-CC2
+  name: "PlantMapping K → CC2/M2 마이그"
+  description: "레거시 하드코딩 → DB 테이블 마이그 시뮬. CastSpec lookup 결과 변동 측정."
+  step_id: plant_mapping_migrate
+  tags: [migration, plant-mapping]
+  inputs:
+    smCd: K
+    productTypeCd: A001
+    mapping_overrides:
+      K:
+        castCd: CC2
+        machineCd: M2
+
+- id: scn-pkgwgt-narrow
+  name: "포장단중 범위 좁힘 (10~20)"
+  description: "고객 단중 제약 강화 시 DG003 검증 fan-out."
+  step_id: validator
+  tags: [validator, pkg-wgt, constraint]
+  inputs:
+    order:
+      pkgWgtLow: "10"
+      pkgWgtHigh: "20"
+
+- id: scn-thickness-A001
+  name: "Step 1 — A001 품종 Slab 두께 (220mm)"
+  description: "기준 동작 — CAST_SPEC 룩업 정상."
+  step_id: thickness
+  tags: [baseline, thickness]
+  inputs: {}
+
+- id: scn-second-wgt-thin-narrow
+  name: "Step 5/6 — 얇고 좁은 Slab 단중 한계"
+  description: "HR_MIN/MAX_WGT 2D sheet 격자 외 입력 시 DG106/DG107."
+  step_id: second_wgt
+  tags: [hr-min-wgt, hr-max-wgt, boundary]
+  inputs:
+    order:
+      confirmedPlantCd: "KKKK    "
+      productivity: "0.85"
+    slab:
+      slabThickness: "180"
+      firstWidthLow: "1100"
+      firstWidthHigh: "1100"
+      firstWgtLow: "8"
+      firstWgtHigh: "25"
