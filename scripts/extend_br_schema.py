@@ -39,7 +39,8 @@ BR_METADATA = {
     },
     "rule.scm.spec.edging_group_match_strategy": {
         "enforced_by": [
-            "com.example.slabdesign.feature.sd.process.std.service.EdgingGroupService.findGroup(String,String,String,String,String)",
+            # 2026-05-10: 정정 — EdgingGroupService 가 아니라 EdgingService.findGroup, 인자 6개 (BigDecimal 포함).
+            "com.example.slabdesign.feature.sd.process.std.service.EdgingService.findGroup(String,String,String,String,String,BigDecimal)",
         ],
         "operational_history": [],
     },
@@ -134,7 +135,8 @@ BR_METADATA = {
     },
     "rule.scm.slab.history_isolated_transaction": {
         "enforced_by": [
-            "com.example.slabdesign.feature.sd.process.working.action.SdHistoryAction.recordStep(SDOrderEntity,String,int,String,String)",
+            # 2026-05-10: 정정 — 패키지 경로 process.history.action (process.working.action 아님).
+            "com.example.slabdesign.feature.sd.process.history.action.SdHistoryAction.recordStep(SDOrderEntity,String,int,String,String)",
         ],
         "operational_history": [
             {"incident_id": "P-2019-0445", "summary": "history rollback 사고 — REQUIRES_NEW vs REQUIRED 갭",

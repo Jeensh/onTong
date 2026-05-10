@@ -1088,4 +1088,27 @@ Phase C C.6. SdDesigner.java:68 javadoc `해결: history 자체 @Transactional �
 
 ---
 
-(이전 47 → 48 항목으로 증가. Phase A 22 + B 5 + C 9 + D.3 5 + D.4 6 + 인계 검증 1 = 48.)
+## 인계 깊이 검증 — 신규 등록 1 항목 (Phase E backlog)
+
+> 2026-05-10. 사용자 의심 ("코드 따로, 온톨로지 따로 매핑 아니냐") 으로 풀 매핑 검증 실시. 4-way (Action↔Method, Anchor↔Method, BR↔Method, Term↔CodeType) 중 3개는 100% 살아있고, atomic TR 부재 16건이 갭으로 발견.
+
+### #49 16 atomic term ↔ code_type TR 부재 🟡
+**영역**: Domain ↔ Code 매핑
+**의문**: 16 atomic term (cmp / org / proc / grade / customer / order_no / slab_no / cast_cd / hr_plant_cd / machine_cd / sm_cd / edging_group_cd / confirmed_plant_cd / priority / product_kind / specific_gravity) 이 BusinessTerm 정의만 있고 어느 Java field/type 과 1:1 매핑되는지 TR 부재. 29 composite TR + 5 partial TR 만 등록됨.
+
+**원인 분석**: 이 atomic 들은 Java 에서 dedicated type 이 아니라 `String cmp`, `String org` 같은 method 인자 String 으로 흩어져 있음. 따라서 "어느 type 의 어느 슬롯" 이 아니라 "어느 method 의 어느 인자 인덱스" 로 link 되어야 함. 현 mapping_layer 의 TypeRealization schema 는 type-level (CodeType) 만 취급 — atomic↔method-arg 의 표현 자리가 없음.
+
+**영향**: 
+- spec 04 `atomic_overrides={"cmp": "01"}` 의 path resolution 알고리즘 (§1.2) 이 동작하려면 atomic 이 어느 method 인자 위치에 등장하는지 알아야 함. 현 상태에서는 broadcast 로 fallback (모든 String 인자 후보 순회) 또는 사용자 explicit 지정.
+- AnchorBinding.target_slot 이 일부 보충 (예: `action.metadata.fallback_kind`) 하지만 atomic 인자 위치 표시 전용 anchor 는 없음.
+
+**가능 해결 방향**:
+- (a) **AtomicArgBinding 신규 entity** — `{atomic_fqn, code_method_fqn, arg_index}`. 16 atomic × 평균 2~3 method 위치 = ~40 row. 자동 추출 가능 (Java parser 가 method signature 의 String 인자명 매칭).
+- (b) **method_signature 보강** — `code_methods.params_atoms_json = [{"index": 0, "atomic_fqn": "term.scm.shared.cmp"}, ...]`. 같은 정보를 code_methods 안에 inline.
+- (c) **현행 유지 + spec 04 path resolution 보강** — atomic_overrides 가 broadcast + 사용자 disambiguation 큐 지원. 새 entity 안 만듦.
+
+**현 인계 영향**: 첫 시뮬 시나리오 `action.scm.std.match_customer_limit_for_order` 는 method 인자 4개 (cmp, org, proc, grade) — 이름 매칭이 1:1 이라 broadcast 작동 OK. 하지만 atomic 이 method 안에서 다른 변수명으로 흩어진 경우 (예: `String foo = order.getCmp();` 후 사용) 추적 부실. Phase E 에서 (a)/(b)/(c) 결정 권장.
+
+---
+
+(이전 48 → 49 항목으로 증가. Phase A 22 + B 5 + C 9 + D.3 5 + D.4 6 + 인계 검증 1 + 깊이 검증 1 = 49.)

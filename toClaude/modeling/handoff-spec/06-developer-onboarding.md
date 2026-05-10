@@ -475,6 +475,7 @@ PYTHONPATH=$(pwd) python3 scripts/promote_actions.py
 | #39 anchor T4/T5 (Maven / IDE) | STEP 4.6 | manual + PR merge 만 first iteration |
 | #40 재바인딩 알림 큐 | STEP 4.6 | 일단 stale 만 마킹, 알림 큐는 나중 |
 | #41 lookups schema 형식 | STEP 4.2 ChangeSpec 작성 | `{"TableName": [row, ...]}` 로 첫 시나리오 잡고 굳히기 |
+| #49 atomic ↔ method-arg 매핑 부재 | STEP 4.2 atomic_overrides 적용 | first match 시나리오 (cmp/org/proc/grade) 는 인자명 1:1 → broadcast 작동. 다른 시나리오 부딪히면 결정 |
 | #42 BRException 구분 | STEP 4 verdict | 첫 iteration: BR.enforced_by method 의 throw 만 BRViolation. 일반 RuntimeException 은 inconclusive |
 | #43 type_assignable | STEP 3.5 JavaSandbox | Java reflection `Class.isAssignableFrom` 만. generic 은 phase E |
 | #44 LookupDataSource 3 mode | STEP 3.5 lookup_source | `fixture` 모드만 first iteration. fallback / snapshot 은 나중 |
