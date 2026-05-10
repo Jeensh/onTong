@@ -79,6 +79,8 @@ class RunHandleStore:
         self._change_specs: dict[str, ChangeSpec] = {}
         self._sim_results: dict[str, SimResult] = {}
         self._run_options: dict[str, RunOptions] = {}
+        # spec 03 §2.3 — generated python source / jvm log artifacts
+        self._artifacts: dict[str, dict[str, str]] = {}  # run_id → {kind → content}
 
     # ─── Public — register / get / list ───────────────────────
 
@@ -123,6 +125,20 @@ class RunHandleStore:
         """
         with self._lock:
             return self._sim_results.get(run_id)
+
+    def store_artifact(self, run_id: str, kind: str, content: str) -> None:
+        """spec 03 §2.3 — orchestrator 가 generated_python / jvm_log / trace 저장."""
+        with self._lock:
+            self._artifacts.setdefault(run_id, {})[kind] = content
+
+    def get_artifact(self, run_id: str, kind: str) -> Optional[str]:
+        """spec 03 §2.3 — artifact content 조회."""
+        with self._lock:
+            return self._artifacts.get(run_id, {}).get(kind)
+
+    def list_artifact_kinds(self, run_id: str) -> list[str]:
+        with self._lock:
+            return list(self._artifacts.get(run_id, {}).keys())
 
     # ─── Public — state transitions ───────────────────────────
 
@@ -196,6 +212,28 @@ class RunHandleStore:
         sim_result = sim_result.model_copy(update={"run_id": run_id})
         with self._lock:
             self._sim_results[run_id] = sim_result
+
+        # spec 03 §2.3 — orchestrator 가 보관한 GeneratedScript 를 artifact 로 저장
+        gen_script = getattr(orchestrator, "last_generated_script", None)
+        if gen_script is not None:
+            self.store_artifact(run_id, "generated_python", gen_script.source_code)
+            # trace artifact (JSON Lines)
+            import json
+            trace_lines = [
+                json.dumps(f.model_dump(), ensure_ascii=False, default=str)
+                for f in sim_result.delegation_trace
+            ]
+            self.store_artifact(run_id, "trace", "\n".join(trace_lines))
+            # input_fixture
+            self.store_artifact(
+                run_id, "input_fixture",
+                json.dumps(request.change_spec.scenario_fixture, ensure_ascii=False, default=str),
+            )
+            # output_dump
+            self.store_artifact(
+                run_id, "output_dump",
+                json.dumps(sim_result.output_values, ensure_ascii=False, default=str),
+            )
 
         terminal = "completed" if sim_result.status == "completed" else "failed"
         self.transition(run_id, terminal)

@@ -386,6 +386,82 @@ def test_orchestrator_e2e_p_2018_0098_regression_sim_verified():
 # ─── 7. failed status — sandbox 가 예외 발생 시 ────────────────
 
 
+def test_orchestrator_atomic_overrides_patched_into_slots():
+    """spec 04 §1.2 4-rule patcher 가 RunInputs.slots 에 실제 patch (Rule 1)."""
+    from backend.shared.contracts.simulation import ChangeSpec, RunPlan
+    from backend.simulation.runner.orchestrator import Orchestrator
+
+    captured: dict = {}
+
+    class _CapturingSandbox:
+        def dispatch(self, action_fqn, inputs, run_options):
+            from backend.shared.contracts.simulation import DispatchResult
+            captured["primary_value"] = inputs.slots.get("primary").value if inputs.slots.get("primary") else None
+            return DispatchResult(
+                outputs={}, realized_method_fqn="com.X.method",
+                dispatch_consistent=True, dispatch_mismatch_reason=None,
+                duration_ms=0, jvm_log="", captured_anchors=[], captured_brs=[],
+            )
+
+    class _StubLookup:
+        def get(self, *a, **k): return None
+        def list(self, *a, **k): return []
+        def validate(self): return []
+
+    orch = Orchestrator(
+        python_generator=__import__("backend.simulation.runner.python_generator",
+                                    fromlist=["PythonGenerator"]).PythonGenerator(),
+        java_sandbox=_CapturingSandbox(),
+        lookup_source_factory=lambda fx: _StubLookup(),
+    )
+    cs = ChangeSpec(
+        action_fqn="scm.workflow.X",
+        atomic_overrides={
+            "scm.workflow.X.inputs[0]<scm.order.Order>.width": 1180,
+            "scm.workflow.X.inputs[0]<scm.order.Order>.thickness": 220,
+        },
+        scenario_fixture={"lookups": {}},
+    )
+    plan = RunPlan(delegates_to_tree=[
+        {"action_fqn": "scm.workflow.X", "depth": 1, "primary_input_type": "scm.order.Order"},
+    ])
+    orch.run(cs, plan, _run_options())
+
+    # patcher 가 atomic_overrides 를 inputs.slots["primary"].value 에 patch 했어야 함
+    assert captured["primary_value"] == {"width": 1180, "thickness": 220}
+
+
+def test_orchestrator_invalid_atomic_override_marks_failed():
+    """ValueError raise → status=failed + verdict=inconclusive."""
+    from backend.shared.contracts.simulation import ChangeSpec, RunPlan
+    from backend.simulation.runner.orchestrator import Orchestrator
+
+    class _SandboxNotCalled:
+        def dispatch(self, *a, **k):
+            raise AssertionError("dispatch 호출되면 안 됨 — patcher 실패 시 dispatch skip")
+
+    class _StubLookup:
+        def get(self, *a, **k): return None
+        def list(self, *a, **k): return []
+        def validate(self): return []
+
+    orch = Orchestrator(
+        python_generator=__import__("backend.simulation.runner.python_generator",
+                                    fromlist=["PythonGenerator"]).PythonGenerator(),
+        java_sandbox=_SandboxNotCalled(),
+        lookup_source_factory=lambda fx: _StubLookup(),
+    )
+    cs = ChangeSpec(
+        action_fqn="x",
+        atomic_overrides={"": 123},  # invalid path → ValueError
+        scenario_fixture={"lookups": {}},
+    )
+    result = orch.run(cs, RunPlan(delegates_to_tree=[{"action_fqn": "x", "depth": 1}]), _run_options())
+    assert result.status == "failed"
+    assert result.verdict == "inconclusive"
+    assert "atomic_overrides invalid" in (result.failure_reason or "")
+
+
 def test_orchestrator_status_failed_when_sandbox_raises():
     """JavaSandbox.dispatch 가 예외 → status=failed + failure_reason 채움."""
     from backend.shared.contracts.simulation import SandboxCapabilities

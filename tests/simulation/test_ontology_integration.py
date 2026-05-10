@@ -162,3 +162,148 @@ def test_spec_router_post_runs_with_real_ontology_returns_handle(real_ontology_c
             f"{sr['delegation_trace'][0].get('dispatch_mismatch_reason')}"
         )
         assert sr["delegation_trace"][0]["realized_method_fqn"] is not None
+
+
+# ─── 4. 첫 시나리오 — match_customer_limit_for_order (A3) ───────
+
+
+def test_match_customer_limit_for_order_scenario_runs_sim_verified(real_ontology_client):
+    """STEP 4.1+ 첫 시나리오 — `action.scm.std.match_customer_limit_for_order`.
+
+    실 ontology 데이터:
+    - realizations 1: CustomerStdService.findFirstMatch(String,String,String,String) confirmed
+    - precondition 1: rule.scm.std.customer_find_first_match_strategy
+    - anchor_bindings 2: anchor_customer_empty_check, anchor_customer_first_match
+
+    기대 동작 (실 ontology + StubJavaSandbox):
+    - dispatch_consistent=True (realized_method 채움)
+    - br_evidence 1건 passed
+    - anchor_evidence 2건 hit
+    - verdict=sim_verified
+    """
+    target = real_ontology_client.get_action("action.scm.std.match_customer_limit_for_order")
+    if target is None:
+        pytest.skip("action.scm.std.match_customer_limit_for_order 가 ontology DB 에 없음")
+
+    from backend.shared.contracts.simulation import (
+        ChangeSpec, CreateRunRequest, SandboxCapabilities,
+    )
+    from backend.simulation.api.run_handle import RunHandleStore
+    from backend.simulation.runner.java_sandbox import StubJavaSandbox
+    from backend.simulation.runner.lookup_source import LookupDataSource
+    from backend.simulation.runner.orchestrator import Orchestrator
+    from backend.simulation.runner.python_generator import PythonGenerator
+    from backend.simulation.runner.run_plan_builder import RunPlanBuilder
+
+    orch = Orchestrator(
+        python_generator=PythonGenerator(),
+        java_sandbox=StubJavaSandbox(SandboxCapabilities(backend="stub"), real_ontology_client),
+        lookup_source_factory=lambda fx: LookupDataSource(real_ontology_client, fx),
+    )
+    store = RunHandleStore()
+    plan = RunPlanBuilder(real_ontology_client).build(target.fqn)
+
+    cs = ChangeSpec(
+        action_fqn=target.fqn,
+        atomic_overrides={},
+        scenario_fixture={"lookups": {}, "metadata": {"scenario_origin": "A3_match_customer_limit"}},
+    )
+    handle = store.submit(CreateRunRequest(change_spec=cs), orch, plan)
+    sr = store.get_sim_result(handle.run_id)
+
+    # 1. dispatch consistent — realized_method 가 ontology 의 confirmed realization
+    assert sr.delegation_trace[0].dispatch_consistent is True
+    assert "CustomerStdService.findFirstMatch" in sr.delegation_trace[0].realized_method_fqn
+
+    # 2. BR evidence 1건 passed (precondition rule.scm.std.customer_find_first_match_strategy)
+    assert len(sr.br_evidence) == 1
+    assert sr.br_evidence[0].br_fqn == "rule.scm.std.customer_find_first_match_strategy"
+    assert sr.br_evidence[0].outcome == "passed"
+
+    # 3. anchor evidence 2건 hit (empty_check + first_match)
+    assert len(sr.anchor_evidence) == 2
+    assert {a.anchor_id for a in sr.anchor_evidence} == {
+        "anchor_customer_empty_check",
+        "anchor_customer_first_match",
+    }
+    assert all(a.outcome == "hit" for a in sr.anchor_evidence)
+
+    # 4. verdict=sim_verified (모든 BR passed + 모든 anchor hit + dispatch consistent)
+    assert sr.verdict == "sim_verified"
+    assert sr.status == "completed"
+
+
+# ─── 5. P-2018-0098 회귀 (B) — 21-step workflow + scenario_fixture ───
+
+
+def test_p_2018_0098_regression_21_step_workflow(real_ontology_client):
+    """B 작업 — Phase C P-2018-0098 회귀.
+
+    `action.scm.슬랩설계_실행` (21 sub_actions) 의 BFS 펼침 + dispatch loop 검증.
+    실 ontology 의 sub_actions 가 fetch 되어 22 frame trace 생성 (root + 21 children).
+    """
+    target = real_ontology_client.get_action("action.scm.슬랩설계_실행")
+    if target is None or len(target.sub_actions) < 10:
+        pytest.skip("21-step workflow 가 ontology DB 에 없음")
+
+    from backend.shared.contracts.simulation import (
+        ChangeSpec, CreateRunRequest, SandboxCapabilities,
+    )
+    from backend.simulation.api.run_handle import RunHandleStore
+    from backend.simulation.runner.java_sandbox import StubJavaSandbox
+    from backend.simulation.runner.lookup_source import LookupDataSource
+    from backend.simulation.runner.orchestrator import Orchestrator
+    from backend.simulation.runner.python_generator import PythonGenerator
+    from backend.simulation.runner.run_plan_builder import RunPlanBuilder
+
+    orch = Orchestrator(
+        python_generator=PythonGenerator(),
+        java_sandbox=StubJavaSandbox(SandboxCapabilities(backend="stub"), real_ontology_client),
+        lookup_source_factory=lambda fx: LookupDataSource(real_ontology_client, fx),
+    )
+    store = RunHandleStore()
+    plan = RunPlanBuilder(real_ontology_client).build(target.fqn)
+
+    # P-2018-0098 fixture (drama / regression)
+    cs = ChangeSpec(
+        action_fqn=target.fqn,
+        atomic_overrides={},
+        scenario_fixture={
+            "lookups": {
+                "scm.std.CustomerStd:7": {
+                    "pk": 7, "table_spec_fqn": "scm.std.CustomerStd",
+                    "columns": {"customer_name": "정XX", "thickness_min": 200},
+                },
+                "scm.spec.HrSpec:HR-23-A": {
+                    "pk": "HR-23-A", "table_spec_fqn": "scm.spec.HrSpec",
+                    "columns": {"proc": "0HR23456"},
+                },
+            },
+            "metadata": {
+                "scenario_origin": "P-2018-0098",
+                "snapshot_at": "2018-04-23T03:14",
+            },
+        },
+    )
+
+    handle = store.submit(CreateRunRequest(change_spec=cs), orch, plan)
+    sr = store.get_sim_result(handle.run_id)
+
+    # 1. delegation_trace 가 22 frame (root + 21 sub_actions BFS)
+    assert len(sr.delegation_trace) >= 22, \
+        f"expected ≥22 frames (root + 21 sub_actions), got {len(sr.delegation_trace)}"
+
+    # 2. root frame 의 action_fqn 정합
+    assert sr.delegation_trace[0].action_fqn == target.fqn
+    assert sr.delegation_trace[0].depth == 0
+
+    # 3. sub_actions frame 들의 depth=1
+    sub_frames = [f for f in sr.delegation_trace[1:] if f.depth == 1]
+    assert len(sub_frames) >= 10  # at least 10 sub_actions trace
+
+    # 4. ChangeSpec 의 metadata 가 보존됐는지 (재현 가능성)
+    cs_back = store.get_change_spec(handle.run_id)
+    assert cs_back.scenario_fixture["metadata"]["scenario_origin"] == "P-2018-0098"
+
+    # 5. status=completed (sandbox 충돌 없음)
+    assert sr.status == "completed"

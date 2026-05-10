@@ -44,6 +44,7 @@ from backend.shared.contracts.simulation import (
     SimResult,
     TypedValue,
 )
+from backend.simulation.runner.atomic_override_patcher import AtomicOverridePatcher
 
 logger = logging.getLogger(__name__)
 
@@ -84,10 +85,14 @@ class Orchestrator:
         python_generator: _PythonGeneratorProtocol,
         java_sandbox: _JavaSandboxProtocol,
         lookup_source_factory: Callable[[dict[str, Any]], _LookupDataSourceProtocol],
+        atomic_override_patcher: Optional[AtomicOverridePatcher] = None,
     ):
         self._gen = python_generator
         self._sandbox = java_sandbox
         self._lookup_factory = lookup_source_factory
+        self._patcher = atomic_override_patcher or AtomicOverridePatcher()
+        self.last_generated_script: Optional[GeneratedScript] = None
+        """가장 최근 run() 의 GeneratedScript — RunHandleStore 가 artifact 저장에 사용."""
 
     # ─── Public — run() entry ───────────────────────────────────
 
@@ -109,48 +114,66 @@ class Orchestrator:
         lookup_source = self._lookup_factory(change_spec.scenario_fixture)
 
         # 2. generated script (artifact 용 — 직접 실행은 안 함)
+        # 본 인스턴스의 last_generated_script 에 저장 — RunHandleStore 가 fetch 가능
         try:
-            self._gen.generate(change_spec, run_plan)
+            self.last_generated_script = self._gen.generate(change_spec, run_plan)
         except Exception as exc:
             logger.warning("PythonGenerator.generate() 실패 — %s", exc)
+            self.last_generated_script = None
 
-        # 3. RunInputs 빌드 — echo-stub: empty slots, fixture 만 주입
+        # 3. RunInputs 빌드 — empty slots + fixture 주입
         inputs = self._build_run_inputs(change_spec, run_plan, lookup_source)
 
-        # 4. dispatch loop
+        # dispatch loop 변수 (sandbox_error 는 patcher 단계에서도 set 가능)
         trace: list[DelegationTraceFrame] = []
-        all_anchors: list[tuple[str, AnchorHit]] = []  # (action_fqn, hit)
+        all_anchors: list[tuple[str, AnchorHit]] = []
         all_brs: list[BRTrigger] = []
         sandbox_error: Optional[str] = None
 
-        for i, edge in enumerate(run_plan.delegates_to_tree, start=1):
-            action_fqn = edge.get("action_fqn") if isinstance(edge, dict) else None
-            depth = edge.get("depth", 0) if isinstance(edge, dict) else 0
-            if action_fqn is None:
-                logger.debug("delegation edge without action_fqn — skip")
-                continue
-            try:
-                dr = self._sandbox.dispatch(action_fqn, inputs, run_options)
-            except Exception as exc:
-                logger.warning(
-                    "JavaSandbox.dispatch(%s) raised — failure policy fail_fast",
-                    action_fqn,
-                )
-                sandbox_error = f"sandbox crashed on {action_fqn}: {exc}"
-                break
+        # 3b. atomic_overrides 적용 (spec 04 §1.2 4-rule patcher) — slots 채움
+        try:
+            inputs, patcher_warnings = self._patcher.apply(
+                inputs,
+                change_spec.atomic_overrides,
+                change_spec.action_fqn,
+            )
+            for w in patcher_warnings:
+                logger.debug("AtomicOverridePatcher: %s", w)
+        except ValueError as exc:
+            logger.warning("AtomicOverridePatcher 거부 — invalid path: %s", exc)
+            sandbox_error = f"atomic_overrides invalid: {exc}"
+            # patcher 실패 → dispatch loop skip, status=failed 처리
 
-            trace.append(DelegationTraceFrame(
-                seq=i,
-                depth=depth,
-                action_fqn=action_fqn,
-                realized_method_fqn=dr.realized_method_fqn,
-                dispatch_consistent=dr.dispatch_consistent,
-                dispatch_mismatch_reason=dr.dispatch_mismatch_reason,
-                duration_ms=dr.duration_ms,
-            ))
-            all_anchors.extend((action_fqn, h, dr.realized_method_fqn) for h in dr.captured_anchors)
-            all_brs.extend(dr.captured_brs)
-            # echo-stub: outputs={} 이므로 merge 의미 없음 — 후속 iter 보강
+        # 4. dispatch loop (patcher 실패 시 skip)
+        if sandbox_error is None:
+            for i, edge in enumerate(run_plan.delegates_to_tree, start=1):
+                action_fqn = edge.get("action_fqn") if isinstance(edge, dict) else None
+                depth = edge.get("depth", 0) if isinstance(edge, dict) else 0
+                if action_fqn is None:
+                    logger.debug("delegation edge without action_fqn — skip")
+                    continue
+                try:
+                    dr = self._sandbox.dispatch(action_fqn, inputs, run_options)
+                except Exception as exc:
+                    logger.warning(
+                        "JavaSandbox.dispatch(%s) raised — failure policy fail_fast",
+                        action_fqn,
+                    )
+                    sandbox_error = f"sandbox crashed on {action_fqn}: {exc}"
+                    break
+
+                trace.append(DelegationTraceFrame(
+                    seq=i,
+                    depth=depth,
+                    action_fqn=action_fqn,
+                    realized_method_fqn=dr.realized_method_fqn,
+                    dispatch_consistent=dr.dispatch_consistent,
+                    dispatch_mismatch_reason=dr.dispatch_mismatch_reason,
+                    duration_ms=dr.duration_ms,
+                ))
+                all_anchors.extend((action_fqn, h, dr.realized_method_fqn) for h in dr.captured_anchors)
+                all_brs.extend(dr.captured_brs)
+                # echo-stub: outputs={} 이므로 merge 의미 없음 — 후속 iter 보강
 
         # 5. evidence 매핑
         br_evidence = [self._br_trigger_to_evidence(t) for t in all_brs]

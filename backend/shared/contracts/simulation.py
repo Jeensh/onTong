@@ -377,6 +377,150 @@ class FailurePolicy(BaseModel):
     on_dispatch_inconsistent: Literal["continue", "fail_fast"] = "continue"
 
 
+# ─── Spec 03 §2.3 Artifacts ────────────────────────────────────────
+
+
+class Artifact(BaseModel):
+    """spec 03 §2.3 — generated_python / jvm_log / trace / input_fixture / output_dump."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["generated_python", "jvm_log", "trace", "input_fixture", "output_dump"]
+    name: str
+    content_type: str
+    size_bytes: int
+    download_url: str
+    summary: str = ""
+
+
+class ArtifactBundle(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    artifacts: list[Artifact] = Field(default_factory=list)
+
+
+# ─── Spec 03 §3.1 Diff ────────────────────────────────────────────
+
+
+class FieldDiff(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str
+    base_value: Optional[Any] = None
+    head_value: Optional[Any] = None
+    change: Literal["added", "removed", "changed", "unchanged"]
+
+
+class BRDiff(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    br_fqn: str
+    base_outcome: Optional[str] = None
+    head_outcome: Optional[str] = None
+    change: Literal["added", "removed", "changed", "unchanged"]
+
+
+class AnchorDiff(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    anchor_id: str
+    base_outcome: Optional[str] = None
+    head_outcome: Optional[str] = None
+    change: Literal["added", "removed", "changed", "unchanged"]
+
+
+class DiffRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    base_run_id: str
+    head_run_id: str
+    aspects: list[Literal["outputs", "br_evidence", "anchor_evidence", "delegation_trace", "duration"]] = \
+        Field(default_factory=lambda: ["outputs", "br_evidence", "anchor_evidence"])
+
+
+class DiffResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    base_run_id: str
+    head_run_id: str
+    output_diffs: list[FieldDiff] = Field(default_factory=list)
+    br_diffs: list[BRDiff] = Field(default_factory=list)
+    anchor_diffs: list[AnchorDiff] = Field(default_factory=list)
+    duration_diff_ms: Optional[int] = None
+    summary: str = ""
+
+
+# ─── Spec 03 §4.1 Anchor invalidate ────────────────────────────────
+
+
+class AnchorInvalidateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    repo_id: str
+    method_fqn: Optional[str] = None
+    commit_sha_before: Optional[str] = None
+    commit_sha_after: Optional[str] = None
+    reason: Literal["code_change", "manual_edit", "auto_detect"] = "code_change"
+
+
+class AnchorInvalidateResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    invalidated_anchor_ids: list[str] = Field(default_factory=list)
+    affected_actions: list[str] = Field(default_factory=list)
+    downgrade_count: int = 0
+    suggested_resimulate_runs: list[str] = Field(default_factory=list)
+
+
+# ─── Spec 03 §5.1 Verification promote ─────────────────────────────
+
+
+class PromoteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action_fqn: str
+    target_level: str  # VerificationLevel value (DRAFT/SIGNATURE_LOCKED/BODY_ANCHORED/SIM_VERIFIED/PR_PROVEN)
+    evidence_run_ids: list[str] = Field(default_factory=list)
+    approver: str
+    note: Optional[str] = None
+
+
+class PromoteResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action_fqn: str
+    previous_level: Optional[str] = None
+    new_level: str
+    promoted_at: str
+    blocked_reason: Optional[str] = None
+
+
+# ─── Spec 03 §6 Health / Capabilities ──────────────────────────────
+
+
+class HealthStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["ok", "degraded", "down"] = "ok"
+    sandbox_available: bool = True
+    jvm_available: bool = False
+    queue_depth: int = 0
+    last_run_at: Optional[str] = None
+
+
+class Capabilities(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    supported_action_kinds: list[str] = Field(default_factory=list)
+    supported_scenario_kinds: list[str] = Field(default_factory=list)
+    supported_verdicts: list[str] = Field(default_factory=list)
+    runner_version: str = "echo-stub-3c"
+    java_sandbox_version: Optional[str] = None
+    max_timeout_sec: int = 30
+    max_atomic_overrides: int = 100
+
+
 # ─── Run lifecycle (spec 03 §1.1) ─────────────────────────────────
 
 
@@ -419,4 +563,18 @@ __all__ = [
     "FailurePolicy",
     # Run lifecycle (STEP 3b-5)
     "RunHandle",
+    # Spec 03 §2-§6 (STEP 3c-C)
+    "Artifact",
+    "ArtifactBundle",
+    "FieldDiff",
+    "BRDiff",
+    "AnchorDiff",
+    "DiffRequest",
+    "DiffResult",
+    "AnchorInvalidateRequest",
+    "AnchorInvalidateResult",
+    "PromoteRequest",
+    "PromoteResult",
+    "HealthStatus",
+    "Capabilities",
 ]
