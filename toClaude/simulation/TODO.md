@@ -16,7 +16,8 @@ Single Source of Truth for task status. Use `[x]` (done) / `[ ]` (pending).
 - [x] `backend/simulation/runner/lookup_source.py` — spec 05 §3 (fixture_only 모드)
 - [x] `tests/simulation/test_runner_models.py` — 15 test 통과
 - [x] `tests/simulation/test_lookup_source.py` — 9 test 통과
-- [ ] `backend/simulation/runner/java_sandbox.py` — spec 05 §2 (StubJavaSandbox tier) — STEP 3b-2
+- [x] `backend/simulation/runner/java_sandbox.py` — spec 05 §2 (JavaSandbox Protocol + StubJavaSandbox) (STEP 3b-2, 2026-05-10)
+- [x] `tests/simulation/test_java_sandbox.py` — 13 test 통과 (anchor auto-hit + BR auto-pass + P-2018-0098)
 - [ ] `backend/simulation/runner/python_generator.py` — spec 05 §1 (echo-stub) — STEP 3b-3
 - [ ] `backend/simulation/runner/orchestrator.py` — spec 05 §4.5 (entry) + e2e test — STEP 3b-4
 - [ ] `backend/simulation/api/run_handle.py` — spec 03 (run lifecycle state machine)
@@ -64,4 +65,4 @@ Single Source of Truth for task status. Use `[x]` (done) / `[ ]` (pending).
 
 ## Backlog
 
-- 사용자 지시 대기 — STEP 3b-2 (java_sandbox.py / StubJavaSandbox) 진입 승인 필요
+- 사용자 지시 대기 — STEP 3b-3 (python_generator.py / echo-stub) 진입 승인 필요

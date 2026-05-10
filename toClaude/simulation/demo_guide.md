@@ -222,3 +222,129 @@ PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/ -q
 - 원인 2: 모든 CodeType 이 is_pk=True + atomic_fqn 매핑된 field 없음 (skip)
 - 확인: warning log 에 "list_code_types(role='lookup_table') 호출 실패" 출력 여부 — 출력되면 ontology_client 가 graceful 실패 (modeling 미가용)
 - 정상 동작: LookupDataSource 자체는 `_index_fixture` 로 row 인덱싱 계속 — get/list 는 작동, validate 만 unknown table_spec_fqn 경고
+
+---
+
+## 2026-05-10 STEP 3b-2 — JavaSandbox Protocol + StubJavaSandbox
+
+### S11. StubJavaSandbox 합성 dispatch — sim_verified 가능한 경로
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python - <<'PY'
+from backend.shared.contracts.simulation import (
+    RunInputs, RunOptions, SandboxCapabilities, TypedValue,
+)
+from backend.simulation.runner.java_sandbox import StubJavaSandbox
+
+
+# 가짜 ontology client (modeling 미가용 환경)
+class FakeBinding:
+    def __init__(self, id_, locator):
+        self.id = id_
+        self.anchor_locator = locator
+        self.code_method_fqn = "com.scm.SdDesigner.runStep1"
+        self.target_action_fqn = "scm.workflow.SDSlabEntity_step_1_to_8"
+        self.target_slot = "param[0]"
+
+
+class FakeAction:
+    fqn = "scm.workflow.SDSlabEntity_step_1_to_8"
+    preconditions = ["br.scm.slab.DG003.WidthMin"]
+    postconditions = ["br.scm.slab.DG003.WidthMax"]
+
+
+class FakeRealization:
+    code_method_fqn = "com.scm.SdDesigner.runStep1"
+
+
+class FakeOnt:
+    def get_action(self, fqn):
+        return FakeAction() if fqn == FakeAction.fqn else None
+
+    def get_realizations_for_input_type(self, action_fqn, code_type_fqn):
+        return [FakeRealization()] if code_type_fqn == "scm.order.Order" else []
+
+    def get_anchor_bindings_for_action(self, action_fqn):
+        return [FakeBinding("anchor.scm.proc_kind_hr", "자리 1 = HR")]
+
+
+sandbox = StubJavaSandbox(
+    capabilities=SandboxCapabilities(backend="stub"),
+    ontology_client=FakeOnt(),
+)
+inputs = RunInputs(
+    slots={"order": TypedValue(_type="scm.order.Order", value={"width": 1180})},
+    overrides={},
+    primary_input_slot="order",
+)
+result = sandbox.dispatch(
+    action_fqn="scm.workflow.SDSlabEntity_step_1_to_8",
+    inputs=inputs,
+    run_options=RunOptions(sandbox_tier="stub_dispatch"),
+)
+print("realized:", result.realized_method_fqn)
+print("consistent:", result.dispatch_consistent)
+print("anchors:", [(a.anchor_id, a.marker) for a in result.captured_anchors])
+print("brs:", [(b.br_fqn, b.outcome) for b in result.captured_brs])
+print("jvm_log:", repr(result.jvm_log))
+PY
+# 기대 출력:
+# realized: com.scm.SdDesigner.runStep1
+# consistent: True
+# anchors: [('anchor.scm.proc_kind_hr', '자리 1 = HR')]
+# brs: [('br.scm.slab.DG003.WidthMin', 'passed'), ('br.scm.slab.DG003.WidthMax', 'passed')]
+# jvm_log: '[stub mode]\n'
+```
+
+### S12. `backend != 'stub'` 거부 확인
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python - <<'PY'
+from backend.shared.contracts.simulation import SandboxCapabilities
+from backend.simulation.runner.java_sandbox import StubJavaSandbox
+
+
+class FakeOnt:
+    def get_action(self, fqn): return None
+    def get_realizations_for_input_type(self, *a, **k): return []
+    def get_anchor_bindings_for_action(self, fqn): return []
+
+
+try:
+    StubJavaSandbox(capabilities=SandboxCapabilities(backend="jvm_subprocess"), ontology_client=FakeOnt())
+except ValueError as e:
+    print("OK rejected:", e)
+PY
+# 기대 출력:
+# OK rejected: StubJavaSandbox 는 SandboxCapabilities.backend='stub' 만 받음 — got 'jvm_subprocess'. ...
+```
+
+### S13. JavaSandbox 13 test + 회귀 (3a + 3b-1 + 3b-2 누적)
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/test_java_sandbox.py -v
+# 기대: 13 passed
+
+PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/ -q
+# 기대: 232 passed (이전 219 → +13), 17 skipped, 3 failed (sample-repos/slab-design 부재 — 무관)
+```
+
+## Troubleshooting (3b-2)
+
+### `ValueError: StubJavaSandbox 는 SandboxCapabilities.backend='stub' 만 받음`
+- 원인: capabilities 의 backend 가 `jvm_subprocess` / `graalvm_polyglot` 으로 설정됨
+- 해결: stub tier 사용 시 `SandboxCapabilities(backend="stub")` 명시. 운영 promote 결정에는 jvm_subprocess / graalvm tier 필요 (별도 클래스, 후속 step)
+
+### `dispatch_consistent=False` + `mismatch_reason="primary_input slot not declared"`
+- 원인: `RunInputs.primary_input_slot=None` 로 dispatch 호출 — pure constant Action 경로
+- 해결: stub 의 첫 iter 는 conservative — primary 없으면 consistent=False. 진짜 pure constant 인 경우는 후속 iteration 에서 sandbox 가 type 검증 skip 정책으로 보강
+
+### `captured_anchors` 가 빈 리스트
+- 원인 1: `get_anchor_bindings_for_action(fqn)` 가 빈 리스트 — modeling 측에 해당 action 의 binding 없음
+- 원인 2: ontology_client 호출 시 Exception → warning log 후 graceful 빈 결과
+- 확인: `import logging; logging.basicConfig(level=logging.WARNING)` 후 dispatch 실행해 warning log 검사
+
+### `captured_brs` 가 빈 리스트
+- 원인 1: `get_action(fqn) → None` (modeling 미수록)
+- 원인 2: Action.preconditions + postconditions 둘 다 비어있음
+- 원인 3: ontology_client 호출 Exception (warning log 출력)
