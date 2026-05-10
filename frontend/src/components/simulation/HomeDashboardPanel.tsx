@@ -142,11 +142,14 @@ export function HomeDashboardPanel({ onJump }: Props = {}) {
 
   useEffect(() => {
     const load = async () => {
-      const [scns, runs, jobs] = await Promise.all([
+      const [scnsRaw, runsRaw, jobsRaw] = await Promise.all([
         listScenarios().catch(() => []),
         listRuns({ limit: 200 }).catch(() => []),
         listJobs(200).catch(() => []),
       ]);
+      const scns = Array.isArray(scnsRaw) ? scnsRaw : [];
+      const runs = Array.isArray(runsRaw) ? runsRaw : [];
+      const jobs = Array.isArray(jobsRaw) ? jobsRaw : [];
       const baseline = runs.filter((r) => r.is_baseline).length;
       const jobsDone = jobs.filter((j) => j.status === "done").length;
       const regressionsWithDiff = jobs.filter(

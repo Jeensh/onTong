@@ -94,14 +94,22 @@ export interface JobInfo {
 
 // ─── Scenarios ──────────────────────────────────────────────────────
 
+/** {items: [...]} 또는 [...] 양쪽 응답 형식 안전 처리. */
+function asArray<T>(j: unknown): T[] {
+  if (Array.isArray(j)) return j as T[];
+  if (j && typeof j === "object" && Array.isArray((j as { items?: unknown }).items)) {
+    return (j as { items: T[] }).items;
+  }
+  return [];
+}
+
 export async function listScenarios(opts: { stepId?: string; tag?: string } = {}): Promise<Scenario[]> {
   const params = new URLSearchParams();
   if (opts.stepId) params.set("step_id", opts.stepId);
   if (opts.tag) params.set("tag", opts.tag);
   const r = await fetch(`${BASE}/scenarios?${params}`);
   if (!r.ok) throw new Error(`listScenarios: ${r.status}`);
-  const j = await r.json();
-  return j.items;
+  return asArray<Scenario>(await r.json());
 }
 
 export async function getScenario(id: string): Promise<Scenario> {
@@ -160,8 +168,7 @@ export async function listRuns(opts: {
   if (opts.limit) params.set("limit", String(opts.limit));
   const r = await fetch(`${BASE}/runs?${params}`);
   if (!r.ok) throw new Error(`listRuns: ${r.status}`);
-  const j = await r.json();
-  return j.items;
+  return asArray<RunRecord>(await r.json());
 }
 
 export async function getRun(id: string): Promise<RunRecord> {
@@ -263,8 +270,7 @@ export async function bridgeListTerms(): Promise<{
 export async function listJobs(limit = 50): Promise<JobInfo[]> {
   const r = await fetch(`${BASE}/jobs?limit=${limit}`);
   if (!r.ok) throw new Error(`listJobs: ${r.status}`);
-  const j = await r.json();
-  return j.items;
+  return asArray<JobInfo>(await r.json());
 }
 
 export async function submitScenarioJob(scenarioId: string, parentRunId?: string): Promise<JobInfo> {
