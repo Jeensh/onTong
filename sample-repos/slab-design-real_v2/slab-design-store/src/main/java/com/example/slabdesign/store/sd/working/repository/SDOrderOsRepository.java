@@ -2,6 +2,7 @@ package com.example.slabdesign.store.sd.working.repository;
 
 import com.example.slabdesign.store.sd.working.jpo.SDOrderOsJpo;
 import com.example.slabdesign.store.sd.working.jpo.SDOrderPK;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -30,4 +31,7 @@ public interface SDOrderOsRepository extends JpaRepository<SDOrderOsJpo, SDOrder
         """)
     List<SDOrderOsJpo> findDesignable(@Param("cmpCd") String cmpCd,
                                       @Param("orgCd") String orgCd);
+
+    /** 회사·소 단위 페이지 단위 주문 목록 (REST 브라우징용). */
+    List<SDOrderOsJpo> findByCmpCdAndOrgCd(String cmpCd, String orgCd, Pageable pageable);
 }
