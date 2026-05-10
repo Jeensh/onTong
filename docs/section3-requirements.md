@@ -39,7 +39,7 @@
 3. 각 주문별로 `simulate_width_impact(order, new_edging_limit)` Tool 호출
 4. 영향받는 주문 목록, 폭 범위 변화량, 설계 가부 집계
 5. Ripple Effect 보고서(JSON) 생성
-6. 채팅 패널 하단에 영향받은 슬랩 Slab 설계 3D 확인 버튼 표시
+6. 채팅 패널 하단에 영향받은 Slab Slab 설계 3D 확인 버튼 표시
 
 ---
 
