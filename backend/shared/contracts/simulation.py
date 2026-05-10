@@ -46,10 +46,7 @@ class ChangeSpec(BaseModel):
 
 
 class RunOptions(BaseModel):
-    """시뮬 실행 옵션 (spec 03/04 — 03 의 RunOptions 확정 후 보강 예정).
-
-    현재는 minimal — sandbox tier / dry_run 만. spec 03 endpoint 정의 시 확장.
-    """
+    """시뮬 실행 옵션 (spec 03 §1.1 + spec 05 §4.7 + §4.8 통합)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -58,6 +55,37 @@ class RunOptions(BaseModel):
 
     dry_run: bool = False
     """True 면 RunPlan 생성까지만 (실제 sandbox 실행 skip)."""
+
+    # ─── spec 05 §4.7 TimeoutBudget ───────────────────────────────
+    timeout_sec: int = Field(default=30, ge=1, le=600)
+    """전체 run 의 timeout. orchestrator 가 dispatch loop 분배 (spec 05 §4.7)."""
+
+    capture_traces: bool = True
+    """anchor binding marker hit 추적 (spec 03 §1.1)."""
+
+    capture_br_evidence: bool = True
+    """BR 위반 증거 수집 (spec 03 §1.1)."""
+
+    # ─── spec 05 §4.8 FailurePolicy ───────────────────────────────
+    on_dispatch_error: Literal["fail_fast", "continue", "abort_after_n"] = "fail_fast"
+    """dispatch 예외 시 정책 (spec 05 §4.8):
+    - fail_fast    : 첫 에러에 dispatch loop 중단 (현재 default)
+    - continue     : frame 의 error 만 채우고 다음 sub-action 진행
+    - abort_after_n: max_dispatch_errors 누적 시 abort"""
+
+    on_br_violation: Literal["continue", "fail_fast"] = "continue"
+    """BR violation 처리 (spec 05 §4.8):
+    - continue     : violation 도 capture, dispatch loop 계속 (verdict=sim_violation 종료)
+    - fail_fast    : 즉시 dispatch 중단 (debug / drama 시연용)"""
+
+    on_anchor_miss: Literal["continue", "fail_fast"] = "continue"
+    """anchor miss 시 정책 — 보통 continue (verdict=inconclusive 결정은 verdict 단계)."""
+
+    on_dispatch_inconsistent: Literal["continue", "fail_fast"] = "continue"
+    """dispatch_consistent=False 시 정책 — 보통 continue (trace 끝까지 수집)."""
+
+    max_dispatch_errors: int = Field(default=3, ge=1, le=20)
+    """on_dispatch_error='abort_after_n' 시 누적 임계값."""
 
 
 class CreateRunRequest(BaseModel):
@@ -182,6 +210,15 @@ class SimResult(BaseModel):
     # ── 컨텍스트 ─────────────────────────────────────────
     affected_design_gaps: list[int] = Field(default_factory=list)
     failure_reason: Optional[str] = None
+
+    # ── promote/downgrade hook (spec 04 §3.4) ──────────────────
+    suggested_promotion: Optional[str] = None
+    """verdict=sim_verified + scenario.kind ∈ {regression, boundary, integration} 시
+    'BODY_ANCHORED → SIM_VERIFIED' 같은 자동 진급 권장. 실 storage update 는
+    POST /api/simulation/verification/promote 호출 책임 (사람 또는 agent)."""
+
+    suggested_downgrade: Optional[str] = None
+    """verdict=sim_violation 시 'SIM_VERIFIED → BODY_ANCHORED' 다운그레이드 권장."""
 
     # ── 시간 ─────────────────────────────────────────────
     started_at: str

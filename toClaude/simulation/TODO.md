@@ -80,11 +80,16 @@ Single Source of Truth for task status. Use `[x]` (done) / `[ ]` (pending).
 
 - ★ **STEP 3.1 종결** (2026-05-10) — 7개 신설 파일 + main.py wiring 모두 완료. spec 03/04/05 1차 통합 완료.
 - ★ **STEP 3c 종결** (2026-05-10) — Section 3 ↔ Section 2 ontology 실데이터 통합 완료. NullOntologyClient default 제거 / `_build_minimal_run_plan` 1-frame echo 제거 / 하드코딩 `primary_input_type` 제거. 실 ontology DB 의 1514 actions 기반으로 dispatch / anchor / BR 동작.
+- ★ **STEP 3d-E 종결** (2026-05-10) — 운영화 layer 4종 추가:
+  - E3 — TimeoutBudget (spec 05 §4.7) + FailurePolicy 4가지 (spec 05 §4.8). RunOptions 6 필드 확장 (timeout_sec / capture_traces / capture_br_evidence / on_dispatch_error / on_br_violation / on_dispatch_inconsistent). Orchestrator dispatch loop 정책 분기.
+  - E4 — promote/downgrade hook (spec 04 §3.4). `SimResult.suggested_promotion / suggested_downgrade`. verdict + scenario_kind metadata 로 권장.
+  - E5 — artifact 디스크 저장 (spec 05 §6.2). `RunHandleStore` 의 in-memory + 디스크 dual (`ONTONG_ARTIFACT_ROOT` env / default `data/simulation/artifacts/`). graceful fallback.
+  - 회귀 374 passed (이전 345 → +29: TimeoutBudget 10 + Disk Storage 12 + PromoteHook 7).
 - ★ **STEP 3c-A+B+C+D 종결** (2026-05-10) — 운영화 layer 일괄 처리:
-  * A — atomic_overrides 4-rule patcher (`AtomicOverridePatcher`) 신설. spec 04 §1.2 의 Rule 1/2/4 구현. ChangeSpec.atomic_overrides 가 `RunInputs.slots` 까지 실 patch 됨.
-  * B — 실 ontology 의 `action.scm.std.match_customer_limit_for_order` 시나리오 → verdict=sim_verified ★ + `action.scm.슬랩설계_실행` 21-step workflow 22-frame 회귀.
-  * C — spec 03 미구현 5종 endpoint (artifacts / runs/diff / anchor-invalidate / verification/promote / health / capabilities) 모두 구현.
-  * D — broken slab_agent (HTTP 500 ImportError) 를 ontology 기반으로 재작성. atomic facets 추출 + spec 03 redirect 안내. 다른 8 routers 는 정상 동작 확인 (mock JSON 의존성 0건).
+  - A — atomic_overrides 4-rule patcher (`AtomicOverridePatcher`) 신설. spec 04 §1.2 의 Rule 1/2/4 구현. ChangeSpec.atomic_overrides 가 `RunInputs.slots` 까지 실 patch 됨.
+  - B — 실 ontology 의 `action.scm.std.match_customer_limit_for_order` 시나리오 → verdict=sim_verified ★ + `action.scm.슬랩설계_실행` 21-step workflow 22-frame 회귀.
+  - C — spec 03 미구현 5종 endpoint (artifacts / runs/diff / anchor-invalidate / verification/promote / health / capabilities) 모두 구현.
+  - D — broken slab_agent (HTTP 500 ImportError) 를 ontology 기반으로 재작성. atomic facets 추출 + spec 03 redirect 안내. 다른 8 routers 는 정상 동작 확인 (mock JSON 의존성 0건).
 - 다음: 실 Java 실행 tier (jvm_subprocess) / async queue / TimeoutBudget / FailurePolicy / Neo4j ↔ SQLite ontology 통합 — 사용자 결정 대기
 
 ### STEP 3c 신설 파일 (Section 3 ↔ Section 2 ontology wire)

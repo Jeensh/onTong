@@ -22,9 +22,11 @@ echo-stub iter 합의 (3b-5):
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional, Protocol
 
 from backend.shared.contracts.simulation import (
@@ -51,6 +53,16 @@ _VALID_TRANSITIONS: dict[str, set[str]] = {
 }
 
 
+# spec 03 §2.3 — artifact kind → 파일 확장자 매핑 (디스크 저장 시 file 이름)
+_ARTIFACT_EXT: dict[str, str] = {
+    "generated_python": "py",
+    "jvm_log": "log",
+    "trace": "jsonl",
+    "input_fixture": "json",
+    "output_dump": "json",
+}
+
+
 # ─── Orchestrator Protocol (duck-typed) ────────────────────────────
 
 
@@ -73,14 +85,19 @@ class RunHandleStore:
     multi-process 는 v2 (Redis) 에서 보강.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, artifact_root: Optional[Path] = None) -> None:
         self._lock = threading.RLock()
         self._handles: dict[str, RunHandle] = {}
         self._change_specs: dict[str, ChangeSpec] = {}
         self._sim_results: dict[str, SimResult] = {}
         self._run_options: dict[str, RunOptions] = {}
-        # spec 03 §2.3 — generated python source / jvm log artifacts
-        self._artifacts: dict[str, dict[str, str]] = {}  # run_id → {kind → content}
+        # spec 03 §2.3 + spec 05 §6.2 — artifact storage
+        # in-memory cache + 디스크 (default: $ONTONG_ARTIFACT_ROOT or data/simulation/artifacts/)
+        self._artifacts: dict[str, dict[str, str]] = {}
+        if artifact_root is None:
+            env = os.getenv("ONTONG_ARTIFACT_ROOT")
+            artifact_root = Path(env) if env else Path("data") / "simulation" / "artifacts"
+        self._artifact_root: Path = artifact_root
 
     # ─── Public — register / get / list ───────────────────────
 
@@ -127,18 +144,62 @@ class RunHandleStore:
             return self._sim_results.get(run_id)
 
     def store_artifact(self, run_id: str, kind: str, content: str) -> None:
-        """spec 03 §2.3 — orchestrator 가 generated_python / jvm_log / trace 저장."""
+        """spec 03 §2.3 + spec 05 §6.2 — orchestrator artifact 저장.
+
+        in-memory cache + 디스크 (`{artifact_root}/{run_id}/{name}`).
+        디스크 write 실패 시 in-memory 만 유지 (graceful — read 는 in-memory 우선).
+        """
         with self._lock:
             self._artifacts.setdefault(run_id, {})[kind] = content
+        try:
+            run_dir = self._artifact_root / run_id
+            run_dir.mkdir(parents=True, exist_ok=True)
+            ext = _ARTIFACT_EXT.get(kind, "txt")
+            path = run_dir / f"{kind}.{ext}"
+            path.write_text(content, encoding="utf-8")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "artifact 디스크 write 실패 (run=%s, kind=%s) — in-memory 만 유지: %s",
+                run_id, kind, exc,
+            )
 
     def get_artifact(self, run_id: str, kind: str) -> Optional[str]:
-        """spec 03 §2.3 — artifact content 조회."""
+        """spec 03 §2.3 — artifact content 조회 (in-memory 우선, 미존재 시 디스크 fallback)."""
         with self._lock:
-            return self._artifacts.get(run_id, {}).get(kind)
+            cached = self._artifacts.get(run_id, {}).get(kind)
+        if cached is not None:
+            return cached
+        # 디스크 fallback (재시작 후 또는 process 간)
+        try:
+            ext = _ARTIFACT_EXT.get(kind, "txt")
+            path = self._artifact_root / run_id / f"{kind}.{ext}"
+            if path.exists():
+                return path.read_text(encoding="utf-8")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("artifact 디스크 read 실패 (run=%s, kind=%s): %s", run_id, kind, exc)
+        return None
 
     def list_artifact_kinds(self, run_id: str) -> list[str]:
         with self._lock:
-            return list(self._artifacts.get(run_id, {}).keys())
+            kinds = set(self._artifacts.get(run_id, {}).keys())
+        # 디스크의 추가 artifact 도 포함 (in-memory 손실 시)
+        try:
+            run_dir = self._artifact_root / run_id
+            if run_dir.exists():
+                for f in run_dir.iterdir():
+                    kind = f.stem
+                    if kind in _ARTIFACT_EXT:
+                        kinds.add(kind)
+        except Exception:
+            pass
+        return sorted(kinds)
+
+    def artifact_path(self, run_id: str, kind: str) -> Optional[Path]:
+        """디스크 path 반환 (있을 때만). 다운로드 endpoint 가 file 응답에 사용."""
+        ext = _ARTIFACT_EXT.get(kind, "txt")
+        path = self._artifact_root / run_id / f"{kind}.{ext}"
+        return path if path.exists() else None
+
 
     # ─── Public — state transitions ───────────────────────────
 

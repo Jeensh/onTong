@@ -45,6 +45,7 @@ from backend.shared.contracts.simulation import (
     TypedValue,
 )
 from backend.simulation.runner.atomic_override_patcher import AtomicOverridePatcher
+from backend.simulation.runner.timeout_budget import TimeoutBudget
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +145,10 @@ class Orchestrator:
             sandbox_error = f"atomic_overrides invalid: {exc}"
             # patcher 실패 → dispatch loop skip, status=failed 처리
 
-        # 4. dispatch loop (patcher 실패 시 skip)
+        # 4. dispatch loop (patcher 실패 시 skip) — TimeoutBudget + FailurePolicy 적용
+        budget = TimeoutBudget(total_sec=run_options.timeout_sec, plan=run_plan)
+        dispatch_error_count = 0
+
         if sandbox_error is None:
             for i, edge in enumerate(run_plan.delegates_to_tree, start=1):
                 action_fqn = edge.get("action_fqn") if isinstance(edge, dict) else None
@@ -152,15 +156,43 @@ class Orchestrator:
                 if action_fqn is None:
                     logger.debug("delegation edge without action_fqn — skip")
                     continue
+
+                # spec 05 §4.7 — budget exhausted 체크 (dispatch 시작 전)
+                if budget.is_exhausted():
+                    sandbox_error = (
+                        f"timeout: total run budget {run_options.timeout_sec}s 소진 — "
+                        f"frame {i} ({action_fqn}) 부터 dispatch skip"
+                    )
+                    break
+
+                # spec 05 §4.8 — dispatch 예외 정책
                 try:
                     dr = self._sandbox.dispatch(action_fqn, inputs, run_options)
                 except Exception as exc:
+                    dispatch_error_count += 1
+                    error_msg = f"sandbox crashed on {action_fqn}: {exc}"
+                    policy = run_options.on_dispatch_error
                     logger.warning(
-                        "JavaSandbox.dispatch(%s) raised — failure policy fail_fast",
-                        action_fqn,
+                        "JavaSandbox.dispatch(%s) raised — policy=%s (count=%d): %s",
+                        action_fqn, policy, dispatch_error_count, exc,
                     )
-                    sandbox_error = f"sandbox crashed on {action_fqn}: {exc}"
-                    break
+                    if policy == "fail_fast":
+                        sandbox_error = error_msg
+                        break
+                    if policy == "abort_after_n" and dispatch_error_count >= run_options.max_dispatch_errors:
+                        sandbox_error = (
+                            f"abort_after_n triggered (max={run_options.max_dispatch_errors}): {error_msg}"
+                        )
+                        break
+                    # continue 정책 또는 abort_after_n 미충족 — frame 의 error 만 채우고 다음
+                    trace.append(DelegationTraceFrame(
+                        seq=i, depth=depth, action_fqn=action_fqn,
+                        realized_method_fqn=None,
+                        dispatch_consistent=False,
+                        dispatch_mismatch_reason=None,
+                        duration_ms=0, error=error_msg,
+                    ))
+                    continue
 
                 trace.append(DelegationTraceFrame(
                     seq=i,
@@ -173,7 +205,23 @@ class Orchestrator:
                 ))
                 all_anchors.extend((action_fqn, h, dr.realized_method_fqn) for h in dr.captured_anchors)
                 all_brs.extend(dr.captured_brs)
-                # echo-stub: outputs={} 이므로 merge 의미 없음 — 후속 iter 보강
+
+                # spec 05 §4.8 — BR violation 정책
+                if run_options.on_br_violation == "fail_fast":
+                    if any(t.outcome == "violated" for t in dr.captured_brs):
+                        violated_fqns = [t.br_fqn for t in dr.captured_brs if t.outcome == "violated"]
+                        sandbox_error = (
+                            f"on_br_violation=fail_fast — BR violated on {action_fqn}: {violated_fqns}"
+                        )
+                        break
+
+                # spec 05 §4.8 — dispatch_inconsistent 정책
+                if not dr.dispatch_consistent and run_options.on_dispatch_inconsistent == "fail_fast":
+                    sandbox_error = (
+                        f"on_dispatch_inconsistent=fail_fast — frame {i} {action_fqn}: "
+                        f"{dr.dispatch_mismatch_reason}"
+                    )
+                    break
 
         # 5. evidence 매핑
         br_evidence = [self._br_trigger_to_evidence(t) for t in all_brs]
@@ -192,6 +240,11 @@ class Orchestrator:
             verdict = self._decide_verdict(trace, br_evidence, anchor_evidence)
             failure_reason = None
 
+        # 7. promote/downgrade hook (spec 04 §3.4)
+        suggested_promotion, suggested_downgrade = self._derive_promotion_hook(
+            verdict, change_spec,
+        )
+
         completed_at = datetime.now(timezone.utc).isoformat()
         duration_ms = int((time.monotonic() - t_start) * 1000)
 
@@ -205,6 +258,8 @@ class Orchestrator:
             delegation_trace=trace,
             affected_design_gaps=[],
             failure_reason=failure_reason,
+            suggested_promotion=suggested_promotion,
+            suggested_downgrade=suggested_downgrade,
             started_at=started_at,
             completed_at=completed_at,
             duration_ms=duration_ms,
@@ -274,6 +329,35 @@ class Orchestrator:
             actual=trigger.actual,
             operational_history_refs=[],
         )
+
+    @staticmethod
+    def _derive_promotion_hook(
+        verdict: str,
+        change_spec: ChangeSpec,
+    ) -> tuple[Optional[str], Optional[str]]:
+        """spec 04 §3.4 promote/downgrade 자동 권장.
+
+        Returns: (suggested_promotion, suggested_downgrade)
+
+        정책:
+          - verdict=sim_verified + scenario.kind ∈ {regression, boundary, integration}
+            → suggested_promotion = "BODY_ANCHORED → SIM_VERIFIED"
+          - verdict=sim_violation
+            → suggested_downgrade = "SIM_VERIFIED → BODY_ANCHORED"
+          - 그 외: 둘 다 None
+
+        scenario.kind 는 change_spec.scenario_fixture.metadata.scenario_kind 에서 추출.
+        없으면 promotion 권장 안 함 (보수적).
+        """
+        if verdict == "sim_verified":
+            metadata = change_spec.scenario_fixture.get("metadata", {}) or {}
+            scenario_kind = metadata.get("scenario_kind")
+            if scenario_kind in ("regression", "boundary", "integration"):
+                return ("BODY_ANCHORED → SIM_VERIFIED", None)
+            return (None, None)
+        if verdict == "sim_violation":
+            return (None, "SIM_VERIFIED → BODY_ANCHORED")
+        return (None, None)
 
     @staticmethod
     def _anchor_hit_to_evidence(
