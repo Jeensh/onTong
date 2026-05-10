@@ -980,3 +980,122 @@ PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/ -q
 - 원인: `RunPlanBuilder.build(max_depth=10)` 의 max_depth 초과
 - 해결: 현재 default 10. 더 깊은 tree 면 `RunPlanBuilder.build(action_fqn, max_depth=30)` 로 호출 시 깊이 확장
 - 확인: plan.warnings 에 "max_depth=N 초과" 메시지 있는지
+
+---
+
+# STEP 3f — Differential 5 카테고리 + Ontology Evidence + 랜딩 페이지 (2026-05-10)
+
+## 시나리오 1: Differential 5 카테고리 분류 (요구사항 1)
+
+**의도**: Java↔Python 응답이 비교 어렵고 null 많은 문제 해결.
+
+```bash
+# differential 응답 안에 새 필드들이 들어있는지 확인
+curl -X POST http://localhost:8000/api/simulation/runs \
+  -H "Content-Type: application/json" \
+  -d '{"change_spec": {"action_fqn": "action.scm.std.match_customer_limit_for_order", "atomic_overrides": {}, "scenario_fixture": {"lookups": {}}}}' \
+  | jq -r '.run_id' | tee /tmp/run_id.txt
+
+curl -s http://localhost:8000/api/simulation/runs/$(cat /tmp/run_id.txt)/differential \
+  | jq '{summary, matched_count, mismatched_count, java_only_count, python_only_count, both_null_count}'
+# 기대: "38 matched / 2 mismatched / ..." 형식 summary + 각 count 정수
+```
+
+**결과 해석**:
+| 카테고리 | 의미 |
+|---|---|
+| matched | 두 값 같음 (numeric tolerance 포함) |
+| mismatched | 양쪽 값 있는데 다름 |
+| java_only | python 응답에서 None / 누락 |
+| python_only | java 응답에서 None / 누락 |
+| both_null | 양쪽 None — diff list 에서 자동 제외 (count 만) |
+
+**normalize 응답 필드**: `java_payload_normalized` / `python_payload_normalized` — null/빈값 재귀 제거. UI 가 원본 vs 정리본 둘 다 노출 가능.
+
+## 시나리오 2: Ontology Evidence — 4 evidence kind (요구사항 2)
+
+**의도**: SimResult 가 ontology 기반임을 사용자가 명시적으로 느낄 수 있게.
+
+```bash
+# run 생성 후 ontology-evidence endpoint 조회
+RUN_ID=$(cat /tmp/run_id.txt)
+curl -s http://localhost:8000/api/simulation/runs/$RUN_ID/ontology-evidence | jq '{
+  action_fqn,
+  ontology_facade,
+  ontology_transport,
+  trace_count: (.traces | length),
+  summary
+}'
+```
+
+**기대 응답**:
+```json
+{
+  "action_fqn": "action.scm.std.match_customer_limit_for_order",
+  "ontology_facade": "backend.modeling.api.ontology_query.OntologyQueryClientImpl",
+  "ontology_transport": "in-process facade (HTTP 우회)",
+  "trace_count": 4,
+  "summary": {"action": 1, "realized_method": 1, "br": 1, "anchor": 2}
+}
+```
+
+**4 evidence kind**:
+| kind | source | facade call |
+|---|---|---|
+| action | `Action (mapping_layer.schema.Action)` | `get_action(fqn)` |
+| realized_method | `Realization` | `get_action(fqn).realizations` |
+| br | `Action.preconditions / postconditions` | `get_action(fqn).preconditions/postconditions` |
+| anchor | `AnchorBinding (mapping_layer.schema.AnchorBinding)` | `get_anchor_bindings_for_action(fqn)` |
+
+각 trace 항목엔 `evidence_kind / evidence_id / ontology_source / ontology_facade_call / ontology_data / explanation` 6 필드.
+
+## 시나리오 3: 랜딩 페이지 — Apple/Claude 스타일 (요구사항 3)
+
+**의도**: 호기심 유발 + 스토리라인 + 가독성.
+
+```bash
+# 새 랜딩 페이지
+open http://localhost:8000/section3.html
+# 폰트: Apple SD Gothic Neo + SF Pro Text
+# 컬러: Claude warm cream (#faf9f5) + accent orange (#d97757)
+# 레이아웃: 상단 sticky nav + 6 chapter scroll
+# 인터랙션: 8 reveal 블록 (호기심 유발 클릭)
+```
+
+**6 chapter 스토리라인**:
+1. **CHAPTER 01 · 왜** — 정적 도구 한계 3가지
+2. **CHAPTER 02 · 무엇을** — ChangeSpec → SimResult verdict
+3. **CHAPTER 03 · 어떻게** — 5 컴포넌트 + ontology in-process facade
+4. **CHAPTER 04 · 근거** — `/ontology-evidence` 사용법
+5. **CHAPTER 05 · Java↔Python** — 5 카테고리 + null 해결
+6. **CHAPTER 06 · 운영화** — 4 stats + 13 endpoints + FailurePolicy
+
+**이전 버전 보존**: `frontend/public/section3.legacy.html` — 사용자 지시 "지우진말고".
+
+## 회귀 테스트 (3f)
+
+```bash
+PYTHONPATH=$(pwd) ./venv/bin/python -m pytest \
+  tests/simulation/test_differential_classification.py \
+  tests/simulation/test_ontology_evidence.py -v
+# 기대: 23 passed (16 + 7)
+
+PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/ -q
+# 기대: 423 passed (이전 400 → +23), 17 skipped, 3 failed (sample-repos — 무관)
+```
+
+## Troubleshooting (3f)
+
+### `/ontology-evidence` 가 404 반환
+- 원인 1: 미완료 run (sim_result 없음) → register 만 하고 submit 안 함
+- 원인 2: run_id 자체가 없음
+- 확인: `GET /api/simulation/runs/{run_id}` 로 state 확인. `completed` 가 아니면 evidence 조회 불가
+
+### evidence trace 가 비어있음 / `realized_method` 가 0건
+- 원인: ontology DB 의 해당 action 에 `realizations` 가 0건 (orphan action)
+- 확인: `OntologyQueryClientImpl().get_action(fqn).realizations` 직접 호출
+- 해결: realization 이 있는 다른 action 으로 시도 (`action.scm.std.match_customer_limit_for_order` 권장)
+
+### differential 응답에서 `summary` 필드가 없음
+- 원인: 옛 cached differential 결과 — 3f 이전 데이터
+- 해결: 새 run 으로 differential 재호출. 또는 `RunHandleStore` 재시작

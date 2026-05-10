@@ -78,6 +78,13 @@ Single Source of Truth for task status. Use `[x]` (done) / `[ ]` (pending).
 
 ## Backlog
 
+- ★ **STEP 3f 종결** (2026-05-10) — 사용자 3 요구사항 + 통신 구조 검증 일괄 처리:
+  - 0 — Section 2 ↔ Section 3 통신 방식 검증. Onboarding Q4 (line 501-506) 가 HTTP / Python facade 둘 다 명시적으로 허용 → 현재 in-process facade 유지 (사용자 "규약대로 진행" 결정).
+  - 1 — Java↔Python differential 5 카테고리 분류 (matched/mismatched/java_only/python_only/both_null). `_normalize_payload()` null/빈값 재귀 제거. `summary` 한 줄 + per-category counts. 16 test 통과.
+  - 2 — `GET /api/simulation/runs/{run_id}/ontology-evidence` 신설. 4 evidence kind (action / realized_method / br / anchor) trace, 각 SimResult 항목의 ontology source 명시 (mapping_layer.schema.* 클래스 + facade call). 7 test 통과.
+  - 3-A — `frontend/public/section3.html` 전면 재작성. Apple SD Gothic Neo + Claude warm cream(#faf9f5) + accent orange(#d97757). 6 chapter 스토리라인 (왜/무엇을/어떻게/근거/Java↔Python/운영화) + 8 reveal 블록 (호기심 유발 클릭).
+  - 3-B — 좌측 toc → 상단 sticky nav + chapter scroll + scroll spy. 이전 `section3.legacy.html` 보존 (사용자 지시 "지우진말고").
+  - 회귀 423 passed (이전 400 → +23: differential 16 + ontology evidence 7).
 - ★ **STEP 3.1 종결** (2026-05-10) — 7개 신설 파일 + main.py wiring 모두 완료. spec 03/04/05 1차 통합 완료.
 - ★ **STEP 3c 종결** (2026-05-10) — Section 3 ↔ Section 2 ontology 실데이터 통합 완료. NullOntologyClient default 제거 / `_build_minimal_run_plan` 1-frame echo 제거 / 하드코딩 `primary_input_type` 제거. 실 ontology DB 의 1514 actions 기반으로 dispatch / anchor / BR 동작.
 - ★ **STEP 3e 최종 종결** (2026-05-10) — F + E1 + E2 + E6 일괄 완료:

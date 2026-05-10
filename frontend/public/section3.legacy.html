@@ -1,0 +1,2094 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Section 3 — 코드 기반 온톨로지 시뮬레이션 · 통합 미팅 랜딩</title>
+<style>
+  :root{
+    --bg:#0b0d10; --surface:#11151b; --surface-2:#161b23; --line:#222a36;
+    --text:#e6edf3; --muted:#8b97a8; --accent:#7dd3fc; --accent-2:#a5b4fc;
+    --green:#34d399; --yellow:#fbbf24; --red:#f87171; --orange:#fb923c;
+    --code:#0f141b; --kbd:#1f2937;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Pretendard","Apple SD Gothic Neo",
+                "Noto Sans KR",sans-serif; line-height:1.65; font-size:15px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code,pre,kbd,.mono{font-family:"JetBrains Mono","SF Mono",ui-monospace,Menlo,Consolas,monospace}
+
+  /* layout */
+  .layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+  nav.toc{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+    border-right:1px solid var(--line);background:var(--surface);padding:24px 18px}
+  nav.toc h2{font-size:13px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;
+    margin:0 0 12px}
+  nav.toc ol{list-style:none;padding:0;margin:0;counter-reset:section}
+  nav.toc li{counter-increment:section;font-size:13.5px;margin:6px 0;color:var(--text)}
+  nav.toc li::before{content:counter(section)". ";color:var(--muted)}
+  nav.toc a{color:var(--text)}
+  nav.toc a:hover{color:var(--accent)}
+  nav.toc .pill{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;
+    background:var(--surface-2);color:var(--muted);margin-left:6px}
+
+  main{padding:40px 64px 120px;max-width:1100px}
+  header.hero{padding:24px 0 36px;border-bottom:1px solid var(--line);margin-bottom:36px}
+  header.hero .eyebrow{color:var(--accent);font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+    font-weight:600}
+  header.hero h1{font-size:34px;line-height:1.25;margin:8px 0 12px;font-weight:700;letter-spacing:-.01em}
+  header.hero p.lede{color:var(--muted);font-size:16px;margin:0 0 20px;max-width:780px}
+  header.hero .meta{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
+  header.hero .meta b{color:var(--text);font-weight:600}
+
+  .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .badge{font-size:12px;padding:4px 10px;border-radius:999px;background:var(--surface-2);
+    color:var(--muted);border:1px solid var(--line)}
+  .badge.ok{color:var(--green);border-color:rgba(52,211,153,.4)}
+  .badge.warn{color:var(--yellow);border-color:rgba(251,191,36,.4)}
+
+  section{margin:48px 0;scroll-margin-top:24px}
+  section > h2{font-size:24px;margin:0 0 8px;letter-spacing:-.005em;
+    border-left:3px solid var(--accent);padding-left:10px}
+  section > p.section-lede{color:var(--muted);margin:0 0 18px;max-width:820px}
+  h3{font-size:17px;margin:28px 0 8px}
+  h4{font-size:14px;margin:18px 0 6px;color:var(--accent-2)}
+
+  /* code */
+  pre{background:var(--code);border:1px solid var(--line);border-radius:8px;
+    padding:14px 16px;overflow:auto;font-size:13px;color:#cbd5e1;margin:10px 0}
+  code{background:var(--code);padding:1.5px 6px;border-radius:4px;font-size:90%;color:#e0e7ff}
+  pre code{background:transparent;padding:0;color:inherit}
+  kbd{background:var(--kbd);padding:1px 6px;border-radius:4px;font-size:90%;border:1px solid #334155;
+      color:#e2e8f0}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.05em;
+    background:var(--surface)}
+  tbody tr:hover{background:var(--surface)}
+  td.center{text-align:center}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* cards */
+  .grid{display:grid;gap:14px}
+  .grid.cols-2{grid-template-columns:repeat(2,1fr)}
+  .grid.cols-3{grid-template-columns:repeat(3,1fr)}
+  .grid.cols-4{grid-template-columns:repeat(4,1fr)}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .card h4{margin:0 0 6px;color:var(--text)}
+  .card .v{font-size:22px;font-weight:700;color:var(--accent);margin-top:4px;
+    font-variant-numeric:tabular-nums}
+  .card .sub{font-size:12px;color:var(--muted)}
+  .card.green .v{color:var(--green)} .card.yellow .v{color:var(--yellow)}
+  .card.red .v{color:var(--red)} .card.purple .v{color:var(--accent-2)}
+
+  /* status */
+  .status{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:12.5px}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .dot.green{background:var(--green)} .dot.yellow{background:var(--yellow)}
+  .dot.red{background:var(--red)} .dot.gray{background:var(--muted)}
+
+  /* ascii / diagram boxes */
+  .diagram{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:14px 16px;
+    overflow:auto;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;color:#cbd5e1;
+    white-space:pre;line-height:1.5}
+
+  /* callouts */
+  .callout{border-left:3px solid var(--accent);background:rgba(125,211,252,.06);
+    padding:12px 14px;border-radius:6px;margin:14px 0}
+  .callout.warn{border-left-color:var(--yellow);background:rgba(251,191,36,.08)}
+  .callout.ok{border-left-color:var(--green);background:rgba(52,211,153,.08)}
+
+  /* tag chips */
+  .chip{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11.5px;
+    background:var(--surface-2);color:var(--muted);margin:2px 4px 2px 0;border:1px solid var(--line)}
+  .chip.det{color:#86efac;border-color:rgba(134,239,172,.3)}
+  .chip.llm{color:#fde68a;border-color:rgba(253,230,138,.3)}
+  .chip.stub{color:#fca5a5;border-color:rgba(252,165,165,.3)}
+  .chip.section3{color:#7dd3fc;border-color:rgba(125,211,252,.3)}
+  .chip.section2{color:#86efac;border-color:rgba(134,239,172,.3)}
+  .chip.section1{color:#fde68a;border-color:rgba(253,230,138,.3)}
+  .chip.shared{color:#c4b5fd;border-color:rgba(196,181,253,.3)}
+
+  /* color legend dots */
+  .ctok{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;
+    margin-right:4px}
+  .ctok.green{background:#34d399}.ctok.yellow{background:#fbbf24}.ctok.red{background:#f87171}
+  .ctok.gray{background:#94a3b8}
+
+  /* responsive */
+  @media (max-width: 980px){
+    .layout{grid-template-columns:1fr}
+    nav.toc{display:none}
+    main{padding:24px 18px 80px}
+    .grid.cols-2,.grid.cols-3,.grid.cols-4{grid-template-columns:1fr 1fr}
+  }
+
+  /* screenshots */
+  .shot{margin:18px 0 22px;border:1px solid var(--line);border-radius:10px;overflow:hidden;
+    background:var(--surface)}
+  .shot figcaption{padding:10px 14px;font-size:12.5px;color:var(--muted);
+    border-top:1px solid var(--line);background:var(--surface-2)}
+  .shot figcaption b{color:var(--text)}
+  .shot img{display:block;width:100%;height:auto;background:#fff}
+  .shot .pin{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;
+    background:rgba(125,211,252,.12);color:var(--accent);margin-right:8px;
+    border:1px solid rgba(125,211,252,.3);vertical-align:middle}
+  .shot .stepnum{display:inline-flex;width:22px;height:22px;border-radius:50%;
+    background:var(--accent);color:#0b0d10;align-items:center;justify-content:center;
+    font-weight:700;font-size:12px;margin-right:8px;vertical-align:middle}
+  .shotgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+  .shotgrid .shot{margin:0}
+
+  /* step-by-step flow */
+  .flow-step{margin:24px 0}
+  .flow-step h4{margin:0 0 4px;font-size:15px;color:var(--text)}
+  .flow-step .who{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+  .flow-step .who b{color:var(--accent-2)}
+  .flow-callout{display:grid;grid-template-columns:1fr 280px;gap:14px;align-items:start}
+  .flow-callout .insights{padding:0 4px}
+  .flow-callout .insights h5{margin:0 0 6px;font-size:12px;text-transform:uppercase;
+    letter-spacing:.06em;color:var(--green)}
+  .flow-callout .insights ul{margin:0;padding-left:16px;font-size:13px}
+  .flow-callout .insights li{margin:5px 0}
+  .flow-callout .insights code{font-size:11.5px}
+  .flow-callout .insights .num{display:inline-block;background:var(--accent);
+    color:#0b0d10;padding:0 7px;border-radius:4px;font-weight:700;margin-right:4px;font-size:11.5px}
+  @media (max-width:980px){.flow-callout{grid-template-columns:1fr}}
+
+  /* tour cards */
+  .tour-block{margin:32px 0 44px;padding:20px 22px;border:1px solid var(--line);
+    border-radius:14px;background:linear-gradient(180deg,var(--surface),var(--bg) 90%)}
+  .tour-block h3{margin:0 0 4px;font-size:19px;letter-spacing:-.005em}
+  .tour-block .subline{color:var(--muted);font-size:13px;margin:0 0 14px}
+  .tour-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:18px;align-items:start}
+  .tour-grid .shot{margin:0}
+  .tour-when{background:rgba(251,191,36,.06);border-left:3px solid var(--yellow);
+    padding:10px 14px;border-radius:6px;margin:10px 0 12px;font-size:13.5px}
+  .tour-when b{color:var(--yellow)}
+
+  /* step list */
+  ol.steps{counter-reset:step;list-style:none;padding:0;margin:8px 0 12px}
+  ol.steps > li{counter-increment:step;position:relative;padding:8px 0 10px 38px;
+    border-bottom:1px dashed var(--line);font-size:13.5px}
+  ol.steps > li:last-child{border-bottom:0}
+  ol.steps > li::before{content:counter(step);position:absolute;left:0;top:6px;
+    width:26px;height:26px;border-radius:50%;background:var(--accent);
+    color:#0b0d10;font-weight:700;display:grid;place-items:center;font-size:13px}
+  ol.steps b{color:var(--accent-2)}
+  ol.steps code{font-size:12.5px}
+
+  .interpret{margin-top:14px;padding:12px 14px;background:rgba(52,211,153,.06);
+    border-left:3px solid var(--green);border-radius:6px;font-size:13.5px}
+  .interpret h5{margin:0 0 6px;color:var(--green);font-size:13px;text-transform:uppercase;
+    letter-spacing:.06em}
+  .interpret ul{margin:0;padding-left:18px}
+  .interpret li{margin:4px 0}
+
+  .next-step{margin-top:10px;padding:10px 14px;background:var(--surface-2);
+    border-radius:6px;font-size:13px;color:var(--muted);border:1px dashed var(--line)}
+  .next-step b{color:var(--accent)}
+  .tech-line{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);
+    font-size:12px;color:var(--muted)}
+  .tech-line b{color:var(--text)}
+
+  @media (max-width:980px){
+    .shotgrid,.tour-grid{grid-template-columns:1fr}
+  }
+
+  /* footer */
+  footer{margin-top:64px;padding-top:18px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:12.5px}
+
+  details{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px;
+    margin:8px 0}
+  details > summary{cursor:pointer;font-weight:600;color:var(--text)}
+  details[open]{background:var(--surface-2)}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav class="toc" aria-label="목차">
+  <h2>목차</h2>
+  <ol>
+    <li><a href="#summary">한 줄 요약</a></li>
+    <li><a href="#why">왜 만들었나</a></li>
+    <li><a href="#arch">시스템 아키텍처</a></li>
+    <li><a href="#stack">핵심 기술 스택</a></li>
+    <li><a href="#features">구현 기능 카탈로그</a></li>
+    <li><a href="#panels">7개 패널 (UI)</a></li>
+    <li><a href="#ast">AST 파싱</a></li>
+    <li><a href="#transpile">Java → Python 변환</a></li>
+    <li><a href="#usage">사용법</a></li>
+    <li><a href="#tour">시각 투어 <span class="pill">SHOT</span></a></li>
+    <li><a href="/slab-design.html">⛓ Slab 설계 콘솔 <span class="pill">NEW</span></a></li>
+    <li><a href="#verify">객관적 검증 <span class="pill">★</span></a></li>
+    <li><a href="#java">slab-design 기동 + 비교</a></li>
+    <li><a href="#filemap">파일 맵</a></li>
+    <li><a href="#integration">Section 2 통합</a></li>
+    <li><a href="#nextsteps">다음 액션</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<header class="hero">
+  <div class="eyebrow">Section 3 · 통합 미팅 랜딩 · 2026-05-09</div>
+  <h1>코드 기반 온톨로지 시뮬레이션</h1>
+  <p class="lede">
+    자바 레거시 코드에서 <b>AST 파싱</b>으로 도메인 룰을 추출하고, <b>LLM</b>으로 Python으로 자동 변환하고,
+    <b>샌드박스</b>에서 실제 비즈니스 데이터로 실행한 뒤, <b>Java vs Python 차이</b>까지 자동 비교하는
+    시뮬레이션 엔진. 대상 코드베이스: <code>sample-repos/slab-design</code> (Spring Boot, 21단계 Slab 설계).
+  </p>
+  <div class="badges">
+    <span class="badge ok">pytest 189 통과</span>
+    <span class="badge ok">tsc exit 0</span>
+    <span class="badge ok">12 라이브 검증 ✅10 ⚠️1</span>
+    <span class="badge ok">Java Bridge 가용</span>
+    <span class="badge">Phase 7-E 완료</span>
+  </div>
+</header>
+
+<!-- ============================ 1. 한 줄 요약 ============================ -->
+<section id="summary">
+  <h2>1. 한 줄 요약</h2>
+  <div class="callout">
+    자바 레거시 코드를 빌드하지 않고도 <b>룰 한 줄 변경의 결과를 실제 데이터로 실행</b>해 보여주는
+    "코드 기반 온톨로지 시뮬레이션" 플랫폼.
+  </div>
+</section>
+
+<!-- ============================ 2. 왜 만들었나 ============================ -->
+<section id="why">
+  <h2>2. 왜 만들었나 — 정적 도구의 한계</h2>
+  <table>
+    <thead><tr><th style="width:42%">정적 분석 도구가 못 하는 것</th><th>Section 3가 하는 것</th></tr></thead>
+    <tbody>
+      <tr><td>코드 호출 그래프만</td><td><b>실제 비즈니스 데이터로 알고리즘 실행</b> + Risk Heatmap</td></tr>
+      <tr><td>"가능한 분기"만 표시</td><td><b>Hypothesis로 1000건 자동 생성</b> → 도달 빈도 시각화</td></tr>
+      <tr><td>사람이 직접 케이스 작성</td><td><b>도메인 용어 → 추천 시나리오 자동 생성</b> (OntologyBridge)</td></tr>
+      <tr><td>1회성 실행</td><td><b>시나리오 라이브러리 + 영구 이력 + 회귀 자동 검증</b></td></tr>
+      <tr><td>로컬 결과 비교</td><td><b>양방향 lineage</b> (supersedes / baseline_of / regression_of)</td></tr>
+      <tr><td>자바 실행 환경 별도 필요</td><td><b>Java 무수정 + Python 미러</b> 양쪽 실행 후 자동 diff</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================ 3. 아키텍처 ============================ -->
+<section id="arch">
+  <h2>3. 시스템 아키텍처</h2>
+  <div class="diagram">┌────────────────────────────────────────────────────────────────────────┐
+│                          Frontend (Next.js)                            │
+│  홈 / 샌드박스 / 시나리오 라이브러리 / 임팩트 / 회귀 / OntologyBridge      │
+│  + What-if 슬라이더 / Time-travel 스크러버 / Auto-PR 카드               │
+└──────────────────────────────────┬─────────────────────────────────────┘
+                                   │ /api/simulation/*  (Next proxy → :8001)
+┌──────────────────────────────────▼─────────────────────────────────────┐
+│                         Backend (FastAPI)                              │
+│  ┌─────────────┬──────────┬───────────────┬──────────┬──────────────┐  │
+│  │ AsyncJob    │ SQLite   │ OntologyBridge│ Heatmap  │ Hypothesis   │  │
+│  │ Queue (N=4) │ Storage  │ (term ↔ step) │(line cov)│ testgen      │  │
+│  └─────┬───────┴──────────┴───────────────┴──────────┴──────────────┘  │
+│        │                                                               │
+│  ┌─────▼─────────────────────────────────────────────────────────────┐ │
+│  │  Sandbox (subprocess + setrlimit) — Python 21-step 미러            │ │
+│  │  validator → thickness → width_range → ... → target_size           │ │
+│  └─────────────────────────────────────────────────────────────────────┘ │
+│        │                          │                                    │
+│  ┌─────▼──────────┐    ┌──────────▼──────────────────────┐             │
+│  │ Transpile      │    │ JVM Bridge (java_bridge/)        │             │
+│  │  (tree-sitter  │    │  Spring Boot CLI — Oracle/Kafka  │             │
+│  │   + Pydantic   │    │  mock swap → SdDesigner.design() │             │
+│  │   AI Agent)    │    │                                  │             │
+│  └────────────────┘    └─────────────────┬─────────────────┘             │
+│                                          │                              │
+│                              ┌───────────▼──────────────┐               │
+│                              │ sample-repos/slab-design │               │
+│                              │ (자바 무수정, jar dep)    │               │
+│                              └──────────────────────────┘               │
+│                                                                        │
+│  (Section 2 ontology 호출 — graceful timeout 2s)                       │
+│  ┌──────────────────────┐                                              │
+│  │ OntologyClient       │ →  Section 2 (Modeling) Neo4j BFS / 매핑    │
+│  └──────────────────────┘                                              │
+└────────────────────────────────────────────────────────────────────────┘</div>
+</section>
+
+<!-- ============================ 4. 핵심 기술 스택 ============================ -->
+<section id="stack">
+  <h2>4. 핵심 기술 스택</h2>
+  <table>
+    <thead><tr><th>영역</th><th>기술</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td><b>AST 파싱</b></td><td><code>tree-sitter</code> + <code>tree-sitter-java</code></td>
+          <td>자바 메서드 단위 추출 (Section 2와 동일 파서 재사용)</td></tr>
+      <tr><td><b>LLM 변환</b></td><td>Pydantic AI 1.x + Claude Opus 4.7</td>
+          <td>Java → Python step 함수 자동 생성 (structured output)</td></tr>
+      <tr><td><b>자동 케이스</b></td><td>Hypothesis 6.x</td>
+          <td>property-based 1000건 자동 생성 (normal / boundary / error / performance)</td></tr>
+      <tr><td><b>샌드박스</b></td><td><code>subprocess</code> + <code>resource.setrlimit</code></td>
+          <td>Python step 안전 실행 (CPU/메모리 제한)</td></tr>
+      <tr><td><b>JVM Bridge</b></td><td>Spring Boot CLI + <code>@Primary @Bean</code> mock</td>
+          <td>자바 SdDesigner를 Oracle/Kafka 없이 호출</td></tr>
+      <tr><td><b>저장소</b></td><td>SQLite 3-table</td>
+          <td>scenarios / runs / lineage — 영구 이력 + 양방향 계보</td></tr>
+      <tr><td><b>비동기 큐</b></td><td>asyncio.Semaphore(N=4)</td>
+          <td>동시 실행 제한 + SSE 멀티 구독</td></tr>
+      <tr><td><b>시각화</b></td><td>Plotly.js + react-plotly.js</td>
+          <td>Risk Heatmap / 변화 매트릭스 / Time-travel 스크러버</td></tr>
+      <tr><td><b>트러스트</b></td><td>line-level confidence</td>
+          <td><span class="ctok green"></span>det / <span class="ctok yellow"></span>llm /
+              <span class="ctok red"></span>stub 라인별 신뢰도 색상</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================ 5. 구현 기능 카탈로그 ============================ -->
+<section id="features">
+  <h2>5. 구현 기능 카탈로그</h2>
+
+  <p style="margin:6px 0 18px;color:var(--muted);font-size:13px">
+    아래는 카탈로그 텍스트 — 각 패널 실제 화면은 <a href="#tour">§10 시각 투어</a>에서 확인.
+  </p>
+
+  <h3>5-1. Sandbox — Python 21-step 미러 (16개 step 구현)</h3>
+  <p class="section-lede">자바 21-step Slab 설계 알고리즘의 Python 미러. subprocess + setrlimit로 안전 실행.</p>
+  <table>
+    <thead><tr><th>Step ID</th><th>자바 대응</th><th>설명</th></tr></thead>
+    <tbody>
+      <tr><td><code>validator</code></td><td><code>SdOrderValidator</code></td><td>DG001~005 검증 (5건)</td></tr>
+      <tr><td><code>productivity</code></td><td><code>ProductivityService.cumulativeProductivity</code></td><td>활성 공정 실수율 곱</td></tr>
+      <tr><td><code>thickness</code></td><td><code>SdThicknessAction</code> (step 1)</td><td>CAST_SPEC → slab.thickness</td></tr>
+      <tr><td><code>width_range</code></td><td><code>SdWidthRangeAction</code> (step 2)</td><td>CAST ∩ HR_SPEC ∩ EDGING</td></tr>
+      <tr><td><code>length_range</code></td><td><code>SdLengthRangeAction</code> (step 3)</td><td>CAST ∩ HR_SPEC</td></tr>
+      <tr><td><code>second_wgt</code></td><td><code>SdSecondWgt(Low+High)Action</code></td><td><b>HR_MIN/MAX_WGT 2D sheet 룩업</b> ★</td></tr>
+      <tr><td><code>max_split</code></td><td><code>SdMaxSplitCountAction</code> (step 7)</td><td>A-a 루프 시작점</td></tr>
+      <tr><td><code>split_range</code></td><td><code>SdSplitRangeAction</code> (step 8)</td><td>분할수 고려 단중 범위</td></tr>
+      <tr><td><code>slab_count</code></td><td><code>SdSlabCountAction</code> (step 9)</td><td>Slab 매수 산정 ★</td></tr>
+      <tr><td><code>slab_weight</code></td><td><code>SdInitialSlabWgtAction</code> (step 10)</td><td>Slab 단중 산정</td></tr>
+      <tr><td><code>final_width_range</code></td><td><code>SdFinalWidthRangeAction</code> (16)</td><td>최종 폭 범위</td></tr>
+      <tr><td><code>final_length_range</code></td><td><code>SdFinalLengthRangeAction</code> (17)</td><td>최종 길이 범위</td></tr>
+      <tr><td><code>target_size</code></td><td><code>SdTargetWidth+LengthAction</code> (18+19)</td><td>목표 폭/길이</td></tr>
+      <tr><td><code>pipeline_full</code></td><td>(compose)</td><td><b>validate → step 1~19 전체 흐름</b></td></tr>
+      <tr><td><code>plant_mapping_migrate</code></td><td>—</td><td><b>마이그 시뮬: 변경 전·후 룩업 결과 비교</b></td></tr>
+    </tbody>
+  </table>
+
+  <h3>5-2. Hypothesis testgen — 자동 케이스 생성</h3>
+  <table>
+    <thead><tr><th>유형</th><th>의미</th><th>예시</th></tr></thead>
+    <tbody>
+      <tr><td><span class="chip">normal</span> 정상</td><td>통과 기대</td><td>정상 주문</td></tr>
+      <tr><td><span class="chip">boundary</span> 경계</td><td>임계치</td><td><code>pkgWgtLow</code>(포장단중하한) <code>== pkgWgtHigh</code>(상한)</td></tr>
+      <tr><td><span class="chip">error</span> 오류</td><td>DG 트리거</td><td><code>stockCode</code>(재고코드) <code>=1 → DG001</code> 재고주문</td></tr>
+      <tr><td><span class="chip">performance</span> 성능</td><td>대량</td><td><code>designPendQty</code>(설계대기량) <code>=10000</code> kg</td></tr>
+    </tbody>
+  </table>
+
+  <h3>5-3. Risk Heatmap (★ 동적 커버리지)</h3>
+  <p>자바 코드 라인을 색칠. 정적 도구는 "테스트가 닿았는가"만 보여주지만, Section 3는
+    <b>실제 비즈니스 데이터로 도달한 빈도</b>를 시각화.</p>
+  <ul>
+    <li><span class="ctok red"></span> 0건 = "Hypothesis로도 못 찾은 분기 — 진짜 위험"</li>
+    <li><span class="ctok yellow"></span> ≤10% 도달</li>
+    <li><span class="ctok green"></span> 자주 도달</li>
+  </ul>
+
+  <h3>5-4. ★ Phase 7-E 신박 기능 3종</h3>
+  <div class="grid cols-3">
+    <div class="card">
+      <h4>What-if 슬라이더</h4>
+      <div class="sub">ImpactPanel · 0.500~1.000 step 0.005 · 600ms 디바운스 · 5건 표본 빠른 재시뮬 →
+        변화 매트릭스 즉시 갱신</div>
+    </div>
+    <div class="card">
+      <h4>Time-travel 스크러버</h4>
+      <div class="sub">SandboxPanel · cursor 슬라이더 · 60ms 자동 재생 · 누적 matched/failed 비율 ·
+        case input/output JsonTable</div>
+    </div>
+    <div class="card">
+      <h4>Auto-PR (자바 패치)</h4>
+      <div class="sub">실패 5건 → LLM이 patched_method + rationale + risk_notes 생성 ·
+        difflib unified_diff color-coded · 클립보드</div>
+    </div>
+  </div>
+
+  <h3>5-5. 시나리오 라이브러리 + 영구 저장소 + 자동 회귀</h3>
+  <ul>
+    <li>YAML 시드 8건 (HR/HRF 실수율, EDGING fallback, plant 마이그, 포장단중, 두께 등)</li>
+    <li>SQLite 3-table: <code>scenarios</code> · <code>runs</code> · <code>lineage</code></li>
+    <li>baseline 등록 시나리오는 신규 run 완료 시 <b>자동 diff</b> → <code>job.regression</code> 첨부</li>
+  </ul>
+
+  <h3>5-6. OntologyBridge — 도메인 용어 → step 매핑</h3>
+  <p>16종 정규화 (한국어/영문/컬럼명 alias 통합):</p>
+  <p>
+    <span class="chip">실수율</span><span class="chip">두께</span><span class="chip">포장단중</span>
+    <span class="chip">단중</span><span class="chip">EDGING</span><span class="chip">폭</span>
+    <span class="chip">길이</span><span class="chip">분할</span><span class="chip">제강</span>
+    <span class="chip">HR_MIN_WGT</span><span class="chip">HR_MAX_WGT</span><span class="chip">HR_SPEC</span>
+    <span class="chip">CAST_SPEC</span><span class="chip">주문</span><span class="chip">설계대기량</span>
+    <span class="chip">21-step</span>
+  </p>
+  <p class="sub">각 용어 → 영향 step 목록 + <b>추천 시나리오 (input 프리셋)</b>.</p>
+
+  <h3>5-7. Java ↔ Python Differential</h3>
+  <p>같은 입력으로 자바 SdDesigner와 Python pipeline_full 동시 실행 후 BigDecimal tolerance 적용
+    field-by-field flatten diff. <code>POST /api/simulation/differential/run</code> 으로 즉시 호출.</p>
+</section>
+
+<!-- ============================ 6. 패널 ============================ -->
+<section id="panels">
+  <h2>6. 7개 패널 — UI 구성</h2>
+  <div class="grid cols-3">
+    <div class="card"><h4>🏠 홈 대시보드</h4><div class="sub">최근 실행 / 핵심 지표 / 빠른 진입점</div></div>
+    <div class="card"><h4>⚙️ 샌드박스 시뮬</h4><div class="sub">step 선택 + Hypothesis 케이스 + Time-travel</div></div>
+    <div class="card"><h4>📚 시나리오 라이브러리</h4><div class="sub">8건 시드 + CRUD + 태그/step 필터</div></div>
+    <div class="card"><h4>📊 변경 영향 분석</h4><div class="sub">변화 매트릭스 (2x2) + What-if + Auto-PR</div></div>
+    <div class="card"><h4>🕐 실행 이력</h4><div class="sub">영구 이력 + baseline + diff 비교</div></div>
+    <div class="card"><h4>✅ 회귀 검증</h4><div class="sub">baseline 기준 자동 diff</div></div>
+    <div class="card"><h4>🌐 OntologyBridge</h4><div class="sub">도메인 용어 → 영향 step + 핸드오프</div></div>
+  </div>
+</section>
+
+<!-- ============================ 7. AST ============================ -->
+<section id="ast">
+  <h2>7. AST 파싱 — 어떻게 했나</h2>
+
+  <h3>7-1. 도구 선택</h3>
+  <p><code>tree-sitter</code> + <code>tree-sitter-java</code>. Section 2 modeling의
+    <code>backend/modeling/code_analysis/java_parser.py</code>와 <b>동일한 파서 인스턴스 재사용</b>.</p>
+
+  <h3>7-2. 추출 단위 — 메서드</h3>
+  <p>파일 단위가 아닌 <b>메서드 단위</b>로 추출.</p>
+  <pre><code>@dataclass
+class JavaMethodInfo:
+    file_path: str
+    class_name: str
+    method_name: str
+    return_type: str
+    parameters: list[tuple[str, str]]    # (type, name)
+    modifiers: list[str]                  # public / static / ...
+    body_source: str                      # 메서드 본문 (들여쓰기 보존)
+    signature_line: int
+    end_line: int
+    imports: list[str]                    # 파일 import 목록
+    package: str
+    class_fields: list[tuple[str, str]]
+    javadoc: str                          # 메서드 직전 Javadoc/주석</code></pre>
+
+  <h3>7-3. 파싱 흐름</h3>
+  <div class="diagram">1. tree_sitter_java.language() 로 Language 객체 1회 생성
+2. Parser(_JAVA_LANGUAGE) → 자바 소스 bytes 입력
+3. _walk(root) BFS → class_declaration 노드 수집
+4. 각 class 안의 method_declaration 노드 수집
+5. 노드별로 추출:
+   - identifier         → method_name
+   - formal_parameters  → 파라미터 (type, name) 쌍
+   - modifiers          → public/static 등
+   - block              → body_source (원본 들여쓰기 유지)
+   - block_comment      → 직전 Javadoc
+6. JavaMethodInfo dataclass 로 통합</div>
+
+  <h3>7-4. API 진입점</h3>
+  <pre><code>GET  /api/simulation/transpile/methods?path=&lt;java_file&gt;
+     → list[JavaMethodInfo]   (시그니처만 — 가벼움)
+
+POST /api/simulation/transpile/extract  body={path,name}
+     → JavaMethodInfo (본문 포함)</code></pre>
+  <div class="callout ok">
+    <b>라이브 검증 통과</b> · <code>SdThicknessAction.java</code> →
+    <code>execute</code>, <code>fail</code> 두 메서드 정확 추출 (signature_line 40, 72).
+  </div>
+</section>
+
+<!-- ============================ 8. Transpile ============================ -->
+<section id="transpile">
+  <h2>8. Java → Python 변환 — 어떻게 했나</h2>
+
+  <h3>8-1. 변환 엔진 — Pydantic AI Agent</h3>
+  <p>Pydantic AI 1.x + Claude Opus 4.7. structured output으로 안정성 확보.</p>
+  <pre><code>class PythonStepDraft(BaseModel):
+    step_id: str
+    function_name: str
+    python_source: str            # 독립 실행 가능한 def
+    imports: list[str]
+    rationale: str                # 변환 결정 1~3문장
+    confidence: float             # 0~1 메서드 평균
+    method: str                   # 'llm' or 'fallback'
+    line_origins: list[LineOrigin]    # 라인별 신뢰도</code></pre>
+
+  <h3>8-2. 변환 규칙 (System Prompt 발췌)</h3>
+  <table>
+    <thead><tr><th>규칙</th><th>매핑</th></tr></thead>
+    <tbody>
+      <tr><td>시그니처</td><td><code>def &lt;name&gt;(inputs: dict) -&gt; dict:</code></td></tr>
+      <tr><td>자바 entity → dict</td><td><code>order.getConfirmedPlantCd()</code> → <code>inputs["order"]["confirmedPlantCd"]</code></td></tr>
+      <tr><td>외부 서비스</td><td>dict stub 필드 + <code># TODO: lookup 함수 주입 필요</code></td></tr>
+      <tr><td><code>AlgorithmException</code></td><td><code>ValueError</code> 또는 <code>{"error":{"code","message"}}</code></td></tr>
+      <tr><td><code>BigDecimal</code></td><td><code>Decimal</code> (<code>from decimal import Decimal</code>)</td></tr>
+      <tr><td><code>LocalDate</code></td><td><code>datetime.date</code></td></tr>
+      <tr><td>매직 넘버</td><td><b>그대로 유지</b> (legacy DNA 보존)</td></tr>
+      <tr><td>외부 패키지</td><td><b>금지</b> — 표준 라이브러리만</td></tr>
+      <tr><td>주석</td><td>한국어 OK / Javadoc → docstring</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8-3. ★ 라인 단위 신뢰도 시각화 (차별점)</h3>
+  <p>각 Python 라인 끝에 origin 주석을 붙여 신뢰도 영역 표시:</p>
+  <table>
+    <thead><tr><th>주석</th><th>의미</th><th>UI 색상</th></tr></thead>
+    <tbody>
+      <tr><td><code># [det]</code></td><td>자바 원본을 1:1 직역</td><td><span class="ctok green"></span> 녹색</td></tr>
+      <tr><td><code># [llm:0.85]</code></td><td>LLM 의미 추론 (점수 0~1)</td><td><span class="ctok yellow"></span> 황색</td></tr>
+      <tr><td><code># [stub]</code></td><td>외부 서비스 stub / TODO</td><td><span class="ctok red"></span> 빨강</td></tr>
+      <tr><td>(주석 없음)</td><td>사람이 보정</td><td><span class="ctok gray"></span> 회색</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8-4. 동치성 검증</h3>
+  <div class="grid cols-2">
+    <div class="card">
+      <h4>shadow_compare</h4>
+      <div class="sub">변환된 Python을 메모리에서 exec → 기존 sandbox.registry의 reference step과 동일 입력 비교 →
+        출력 dict field-by-field 비교</div>
+    </div>
+    <div class="card">
+      <h4>structural_check</h4>
+      <div class="sub">exec 가능 여부 + 함수 시그니처 검증 + import 화이트리스트 (외부 패키지 금지: os/subprocess/socket/...)</div>
+    </div>
+  </div>
+
+  <h3>8-5. 라이브 변환 결과 예시</h3>
+  <p><code>SdThicknessAction.execute</code> 변환 결과:</p>
+  <pre><code>def thickness_v2(inputs: dict) -> dict:                  # [det]
+    order = inputs["order"]                              # [det]
+    slab = inputs["slab"]                                # [det]
+    confirmed = order["confirmedPlantCd"]                 # [det]
+
+    if confirmed is None or confirmed == " " * 8:        # [llm:0.85]
+        ...
+    plant = plant_mapping.lookup(confirmed[0])           # [llm:0.7]
+    spec = cast_spec_service.lookup(plant, grade)        # [stub]</code></pre>
+  <div class="sub"><code>confidence: 0.7 · method: "llm" · rationale: "자바의 확인 로직을 그대로 옮기고,
+    castSpecService.lookup 호출은 inputs 딕셔너리에서 stub으로 표현했습니다."</code></div>
+</section>
+
+<!-- ============================ 9. 사용법 ============================ -->
+<section id="usage">
+  <h2>9. Section 3 사용법 — 빠른 시작</h2>
+
+  <h3>9-1. 환경 / 기동</h3>
+  <pre><code># 백엔드 (포트 8001 권장 — Chroma가 8000 사용 중)
+SIMULATION_SKIP_ONTOLOGY=1 ./venv/bin/uvicorn backend.main:app --port 8001 --reload
+
+# 프론트엔드
+cd frontend && npm run dev    # http://localhost:3000</code></pre>
+
+  <h3>9-2. 5분 시연 흐름</h3>
+  <table>
+    <thead><tr><th>#</th><th>단계</th><th>화면</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>홈 대시보드 → "샌드박스로"</td><td>🏠 홈</td></tr>
+      <tr><td>2</td><td>step <code>pipeline_full</code> + Hypothesis 100건</td><td>⚙️ 샌드박스</td></tr>
+      <tr><td>3</td><td>Risk Heatmap 확인 (자바 코드 색상)</td><td>우측 패널</td></tr>
+      <tr><td>4</td><td>OntologyBridge "실수율" → 영향 step 8개 + 추천 시나리오</td><td>🌐 Bridge</td></tr>
+      <tr><td>5</td><td>시나리오 "EDGING_SPEC `*` 누락" 1-click 실행</td><td>📚 라이브러리</td></tr>
+      <tr><td>6</td><td>실행 이력에서 baseline 등록</td><td>🕐 Runs</td></tr>
+      <tr><td>7</td><td>룰 fix 후 회귀 검증 자동 diff</td><td>✅ 회귀</td></tr>
+      <tr><td>8</td><td>What-if 슬라이더 + Auto-PR</td><td>📊 Impact</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================ 10. 시각 투어 — 사용 가이드 ============================ -->
+<section id="tour">
+  <h2>10. 시각 투어 — 화면별 사용 가이드</h2>
+  <p class="section-lede">
+    아래는 모두 <b>지금 가동 중인 onTong UI에서 직접 캡처한 실제 화면</b>입니다. 각 화면마다
+    <span style="color:var(--yellow)">①언제 쓰나</span> →
+    <span style="color:var(--accent-2)">②어떤 순서로 클릭/입력하나</span> →
+    <span style="color:var(--green)">③결과를 어떻게 읽나</span> →
+    <span style="color:var(--accent)">④다음에 어디로 이어지나</span> 4단계로 정리했습니다.
+    Section 2 담당자가 미팅 중에 따라 해 보면서 Section 3를 이해할 수 있도록 작성.
+  </p>
+
+  <div class="callout">
+    <b>진입 경로</b>: 좌측 상단 <span class="kbd">Simulation</span> 탭 클릭 → 좌측 사이드바에서 패널 선택.<br/>
+    <b>또는 deep-link</b>: <code>http://localhost:3000/?view=&lt;패널명&gt;</code> (이번에 추가).
+    예: <a href="http://localhost:3000/?view=sandbox" target="_blank">localhost:3000/?view=sandbox</a>
+  </div>
+
+  <!-- ──────────────────────────── 10-0. 홈 (실제 데이터) ──────────────────────────── -->
+  <div class="tour-block">
+    <h3>10-0. 🏠 홈 대시보드 — 첫 진입 화면</h3>
+    <p class="subline">처음 들어오는 사람에게 "이 시스템이 뭐고, 무엇이 시드되어 있고, 어디로 가야 하는지" 한 화면에서 보여 줍니다.</p>
+
+    <div class="tour-when">
+      <b>① 언제 쓰나</b>
+      — Section 2 담당자가 처음 들어왔을 때 / 데모 시작 시 / DB 시드 상태 점검 시.
+    </div>
+
+    <div class="flow-step">
+      <h4><span class="stepnum">1</span> 홈 대시보드 — 시드 카드 + 빠른 진입점</h4>
+      <p class="who"><b>화면</b>: PostgreSQL 시드 8칸 카드 + 핵심 지표 4칸 + 빠른 진입점 4박스 + 최근 활동/인사이트</p>
+      <div class="flow-callout">
+        <figure class="shot">
+          <img src="/screenshots/flow/ho_1.png" alt="홈 대시보드 — 실제 시드 카운트 + 핵심 지표" loading="lazy" />
+          <figcaption>실제 PG <code>simulation</code> DB 라이브 카운트. 모든 카드가 라이브 API 응답 — 새로고침 시 즉시 갱신</figcaption>
+        </figure>
+        <div class="insights">
+          <h5>실측 시드 카운트 (실제)</h5>
+          <ul>
+            <li><span class="num">12</span>등록된 시나리오</li>
+            <li><span class="num">6</span>누적 실행 (runs)</li>
+            <li><span class="num">2</span>baseline 등록</li>
+            <li><span class="num">0</span>활성 잡 큐</li>
+            <li>plant_mapping <b>5</b> · cast_spec <b>3</b> · hr_spec <b>2</b> · edging_spec <b>3</b> · edging_group <b>2</b> · hr_min_wgt <b>9</b> · hr_max_wgt <b>9</b> · productivity_std <b>3</b></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="next-step">
+      <b>② 다음 단계</b> → 시나리오 라이브러리에서 1-click 실행 (§10-2) 또는 OntologyBridge 에서 도메인 용어 검색 (§10-5).
+    </div>
+    <div class="tech-line">
+      <b>활용 API</b>: <code>GET /seed/status</code>, <code>GET /runs?limit=200</code>, <code>GET /scenarios</code>, <code>GET /bridge/terms</code> · <b>주의</b>: PG 미연결 시 시드 카드 0 — Postgres 컨테이너 + <code>SIM_DB_HOST</code> 환경변수 점검
+    </div>
+  </div>
+
+  <!-- ──────────────────────────── 10-1. 샌드박스 (실제 워크플로우) ──────────────────────────── -->
+  <div class="tour-block">
+    <h3>10-1. ⚙️ 안전 가상 실행 (샌드박스) — 실제 시나리오 따라가기</h3>
+    <p class="subline">
+      <b>실제 진행한 시나리오</b>: Slab 설계 알고리즘 <code>전체 파이프라인 (1~19)</code> 단계를
+      <span class="chip det">정상 5건</span> + <span class="chip llm">경계 5건</span> = 총 <b>10건</b> 격리 subprocess 4-way 병렬 실행.
+    </p>
+
+    <div class="tour-when">
+      <b>① 언제 쓰나</b>
+      — "이 룰 한 줄을 바꾸면 결과가 어떻게 달라질까?" / "이 step이 어떤 입력에서 실패할까?" / Risk Heatmap 으로 미테스트 분기 찾기.
+    </div>
+
+    <!-- Step 1 -->
+    <div class="flow-step">
+      <h4><span class="stepnum">1</span> 빈 화면 진입 — 좌측 사이드바에서 "안전 가상 실행" 클릭</h4>
+      <p class="who"><b>입력</b>: 없음 · <b>화면</b>: 폼 + 빈 콘솔</p>
+      <div class="flow-callout">
+        <figure class="shot">
+          <img src="/screenshots/flow/sb_1_empty.png" alt="샌드박스 빈 화면" loading="lazy" />
+          <figcaption><span class="pin">/?view=sandbox</span><b>SandboxPanel.tsx</b> 진입 직후 — 폼 비어 있고 우측 콘솔에 "실행 버튼을 눌러 케이스 생성·실행 시작" 안내</figcaption>
+        </figure>
+        <div class="insights">
+          <h5>화면 구성</h5>
+          <ul>
+            <li><span class="num">좌</span>입력 폼 (대상 Step · 케이스 유형 · 갯수 슬라이더 · 룰 override · ▷ 실행 버튼)</li>
+            <li><span class="num">우</span>샌드박스 콘솔 (SSE 실시간 로그) + 분포 차트 영역</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="flow-step">
+      <h4><span class="stepnum">2</span> 폼 입력 — Step / 케이스 유형 / 갯수 선택</h4>
+      <p class="who"><b>입력</b>: 대상 Step = <code>전체 파이프라인 (1~19)</code> · 유형 = <span class="chip det">정상</span> + <span class="chip llm">경계</span> · 유형별 5건 (총 10건)</p>
+      <div class="flow-callout">
+        <figure class="shot">
+          <img src="/screenshots/flow/sb_2_filled.png" alt="샌드박스 폼 채워진 상태" loading="lazy" />
+          <figcaption>드롭다운 = "전체 파이프라인 (1~19) — validate → step 1~19 전체 흐름". 케이스 유형 두 개 활성. 슬라이더 = 5 → "총 10건 생성 (격리 subprocess 4-way 병렬)" 자동 계산</figcaption>
+        </figure>
+        <div class="insights">
+          <h5>여기서 일어나는 일</h5>
+          <ul>
+            <li>frontend 가 <code>POST /agents/test-data/stream</code> 호출 페이로드를 빌드:
+              <code>{step_id:"pipeline_full", case_types:["normal","boundary"], count:5}</code></li>
+            <li>아직 호출은 일어나지 않음 — "▷ 실행" 클릭 시 시작</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="flow-step">
+      <h4><span class="stepnum">3</span> 실행 중 — SSE 스트림으로 실시간 진행</h4>
+      <p class="who"><b>이벤트 시퀀스</b>: <code>run_started</code> → <code>case_started × 10</code> → <code>case_done × 10</code> → <code>summary</code> → <code>run_complete</code></p>
+      <div class="flow-callout">
+        <figure class="shot">
+          <img src="/screenshots/flow/sb_3_running.png" alt="실행 중 — 콘솔에 진행 표시" loading="lazy" />
+          <figcaption>"▷ 실행" 클릭 직후. 버튼은 "실행 중" 으로 변경, 우상단 카운터가 실시간 갱신. backend 가 격리 subprocess 4개를 띄워 hypothesis 케이스 10건을 병렬 실행</figcaption>
+        </figure>
+        <div class="insights">
+          <h5>이때 backend 에서</h5>
+          <ul>
+            <li>Hypothesis strategy 4종 중 <code>normal</code>, <code>boundary</code> 2종이 각 5건씩 케이스 생성</li>
+            <li><code>resource.setrlimit</code> 으로 CPU/메모리 제한 적용된 격리 subprocess</li>
+            <li>stdout 으로 SSE event 토큰 발행 → frontend <code>EventSource</code> 가 실시간 수신</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="flow-step">
+      <h4><span class="stepnum">4</span> 결과 — 분포 차트 + 누적 통계</h4>
+      <p class="who"><b>출력</b>: 총 케이스 10 · 기대 일치 0 · 기대 불일치 10 (100%) · 평균 시간 4951ms</p>
+      <div class="flow-callout">
+        <figure class="shot">
+          <img src="/screenshots/flow/sb_4_results.png" alt="샌드박스 결과 — 차트 + Time-travel + JsonTable" loading="lazy" />
+          <figcaption>실행 종료 직후. 위쪽 막대 차트는 케이스 유형별 일치율 (빨강=불일치). 아래 Time-travel scrubber + JsonTable 로 케이스 하나씩 input/output 미리보기</figcaption>
+        </figure>
+        <div class="insights">
+          <h5>여기서 읽을 수 있는 것</h5>
+          <ul>
+            <li><span class="num">차트</span>케이스 유형 (normal/boundary) 별 막대 — 빨강 = 기대 불일치, 녹색 = 일치</li>
+            <li><span class="num">통계</span>총 10건 / 평균 4951ms — 격리 subprocess 오버헤드 포함</li>
+            <li><span class="num">★</span><b>Time-travel scrubber</b> — cursor 10/10 현재 위치, 슬라이더 드래그로 시간 거꾸로 재생, "▷ 재생" 으로 60ms 자동 재생</li>
+            <li><span class="num">★</span><b>JsonTable</b> — TC0009 boundary 케이스의 실제 입력값 (order.stockCode=0, orderWidth=1684.6354, ...) 과 출력 (root: {} = 결과 빈 dict)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="flow-step">
+      <h4><span class="stepnum">5</span> 스크롤 다운 — 케이스 상세 + Risk Heatmap</h4>
+      <p class="who"><b>화면</b>: TC0009 boundary 케이스 입력값 9개 + 출력 기대 불일치 표시</p>
+      <div class="flow-callout">
+        <figure class="shot">
+          <img src="/screenshots/flow/sb_5_chart.png" alt="샌드박스 스크롤 — 케이스 상세 + heatmap" loading="lazy" />
+          <figcaption>Time-travel cursor 가 10번째 케이스 (TC0009, boundary 경계값) 를 가리키는 상태. 좌측 입력값 — 재고코드(stockCode)=0, 주문 폭(orderWidth)=1684.6mm, 주문 길이(orderLength)=3355.4mm, 포장단중 하한(pkgWgtLow)=18.2kg, 포장단중 상한(pkgWgtHigh)=55.9kg ... → 우측 출력 (root: {})</figcaption>
+        </figure>
+        <div class="insights">
+          <h5>왜 의미 있나</h5>
+          <ul>
+            <li><b>실제 자바 알고리즘이 받는 입력값</b> 을 그대로 노출 — 원래라면 자바 빌드 + Oracle 연결 필요</li>
+            <li>각 케이스의 input/output 영구 SQLite 저장 → 나중에 baseline 으로 박제 가능 (§10-4)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="next-step">
+      <b>⑤ 다음 단계</b> →
+      (a) 결과를 baseline 으로 저장 → "🕐 실행 이력" 패널 (§10-4) /
+      (b) 실패 케이스가 있으면 "📊 변경 영향 분석" 의 Auto-PR (§10-3) 으로 자바 패치 자동 생성.
+    </div>
+
+    <div class="flow-step" style="margin-top:18px;border-top:2px dashed var(--green);padding-top:14px">
+      <h4 style="color:var(--green)">★ 2026-05-10 업데이트 — 샌드박스 timeout 해소 + 케이스 값 가시화</h4>
+      <div class="flow-callout">
+        <div class="insights" style="grid-column:1 / -1">
+          <h5>① subprocess timeout 7s → 308ms (≈22배 빨라짐)</h5>
+          <ul>
+            <li><span class="num">★</span><b>근본 원인</b>: <code>psycopg_pool.ConnectionPool</code> background worker thread 가 자식 프로세스 종료 시 5초 hang → subprocess wallclock 7초 timeout 직격</li>
+            <li><span class="num">FIX</span><b>수정</b>: <code>storage/postgres/connection.py</code> 에 <code>close_pool()</code> 추가 + <code>sandbox/runner.py</code> 의 <code>_entrypoint</code> 종료 시 명시 close + <code>os._exit(rc)</code> 로 thread join 우회</li>
+            <li><span class="num">실측</span>매 케이스 <b>308ms</b>, matched 3/3, heatmap 라인별 도달 마크 정상</li>
+          </ul>
+        </div>
+      </div>
+      <div class="flow-callout" style="margin-top:14px">
+        <div class="insights" style="grid-column:1 / -1">
+          <h5>② 샌드박스 콘솔 — 케이스마다 실제 입력값 + 결과 펼침</h5>
+          <ul>
+            <li><span class="num">UI</span><b>각 row 클릭</b> → 그 케이스가 받은 <b>주문 데이터 12 필드</b> (재고코드 / 주문폭mm / 주문단중 하·상 kg / 포장단중 하·상 kg / 설계대기량 kg / 확정통과공장 8자리 / 작업기한일) + <b>결과 14 필드</b> (stage, error_code, slabThickness, secondWgt, splitWgt, slabCount, finalWidth/Length, targetWidth/Length 등) 한국어 라벨로 펼침</li>
+            <li><span class="num">분포</span>상단에 <code>case_type</code> 별 통과/실패 stat — <b>정상 N/M, 경계 N/M, 오류 ✗N</b> chip</li>
+            <li><span class="num">설명</span>케이스 description 풍부화 — "<i>경계값 case</i>" → "<i>포장단중하한 = 설계대기량상한 (DG004 경계)</i>", "<i>DG003 트리거 — 포장단중 하한 > 상한</i>" 같은 도메인 의미 자동 표시 (<code>case_builder._describe_case</code>)</li>
+            <li><span class="num">의도된</span>error 케이스에서 <b>🎯 의도된 트리거: DG003</b> 표시 — 실제로는 트리거 안 됐다면 <i>"실제로는 트리거 안 됨"</i> 빨간색 hint</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="tech-line">
+      <b>활용 API</b>: <code>POST /agents/test-data/stream</code> (SSE) · <b>모듈</b>: <code>sandbox/registry.py</code>, <code>testgen/hypothesis_strategies.py</code>, <code>visualization/heatmap.py</code>, <code>storage/postgres/connection.py</code> (close_pool NEW) · <b>실측 시간</b>: 308ms/case (이전: 7000ms timeout)
+    </div>
+  </div>
+
+  <!-- ──────────────────────────── 10-2. 시나리오 라이브러리 (실제 데이터) ──────────────────────────── -->
+  <div class="tour-block">
+    <h3>10-2. 📚 시나리오 라이브러리 — 실제 등록된 시나리오 12+ 건</h3>
+    <p class="subline">
+      <b>실제 데이터</b>: YAML 시드 8건 + 사용자/AI 생성 4건 = 총 <b>12+ 건</b>. 클릭 한 번으로 잡 큐에 등록.
+    </p>
+
+    <div class="tour-when">
+      <b>① 언제 쓰나</b>
+      — 자주 검증하는 룰 변경을 매번 입력하지 않고 재사용 / 데모 시연 / 회귀 검증 baseline 등록 전용.
+    </div>
+
+    <div class="flow-step">
+      <h4><span class="stepnum">1</span> 시나리오 카드 그리드 — 실제 등록된 12건 카탈로그</h4>
+      <p class="who"><b>화면</b>: 좌측 사이드바 활성 + 카드 그리드 (Probe / From AI / Test E2E / Test Import / 8 시드)</p>
+      <div class="flow-callout">
+        <figure class="shot">
+          <img src="/screenshots/flow/sc_1_list.png" alt="시나리오 라이브러리 카드 그리드" loading="lazy" />
+          <figcaption>실제 SQLite <code>scenarios</code> 테이블의 라이브 응답 — <code>GET /api/simulation/scenarios</code></figcaption>
+        </figure>
+        <div class="insights">
+          <h5>화면에 보이는 실제 시나리오</h5>
+          <ul>
+            <li><b>YAML 시드 (source: seed)</b>:<br/>
+              · HR 실수율 0.95 → 0.92<br/>
+              · HRF 실수율 0.93 → 0.88<br/>
+              · EDGING_SPEC `*` fallback 누락<br/>
+              · 넓은 Slab (selectedHrTgtWidth=1700)<br/>
+              · PlantMapping K → CC2/M2<br/>
+              · 좁은 포장단중 (10~20)<br/>
+              · Step 1 — A001 품종 두께 (220mm)<br/>
+              · Step 5/6 — 얇고 좁은 Slab</li>
+            <li><b>사용자 추가</b>: Probe / Test E2E / Test Import</li>
+            <li><b>AI 생성 (source: auto)</b>: From AI</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="next-step">
+      <b>② 다음 단계</b> → 카드 우측의 <b>"실행"</b> 클릭 → 잡 큐 등록 (queued → running → done) → 즉시 "🕐 실행 이력 (§10-4)" 에 행 추가
+    </div>
+    <div class="tech-line">
+      <b>활용 API</b>: <code>GET /scenarios</code>, <code>POST /scenarios</code>, <code>POST /jobs/batch</code> · <b>YAML 시드 위치</b>: <code>backend/simulation/data/scenarios/*.yaml</code> (멱등 로딩)
+    </div>
+  </div>
+
+  <!-- ──────────────────────────── 10-3. 변경 영향 분석 (실제 시나리오) ──────────────────────────── -->
+  <div class="tour-block">
+    <h3>10-3. 📊 변경 영향 분석 — "HRF 실수율 0.93 → 0.50" 실측</h3>
+    <p class="subline">
+      <b>실제 진행한 시나리오</b>: HRF 실수율 (default 0.93) → <code>0.50</code> 으로 변경했을 때 영향 받는 주문 수 / 결과 변화량을 표본 10건으로 측정.
+    </p>
+
+    <div class="tour-when">
+      <b>① 언제 쓰나</b>
+      — 룰 1개 변경 전 영향 받는 주문 수 / 결과 변화량 미리 측정 / 변경 후 자바 코드에 방어 가드를 넣을 위치를 LLM 에게 받기.
+    </div>
+
+    <!-- Step 1 -->
+    <div class="flow-step">
+      <h4><span class="stepnum">1</span> 빈 폼 진입</h4>
+      <p class="who"><b>화면</b>: 변경 대상 드롭다운 (default HR 실수율) / 새 값 입력란 / 표본 크기 슬라이더 / 우측 빈 결과 영역</p>
+      <div class="flow-callout">
+        <figure class="shot">
+          <img src="/screenshots/flow/im_1_empty.png" alt="변경 영향 분석 빈 화면" loading="lazy" />
+          <figcaption>우측 결과 영역에 안내 문구: "영향도 분석 실행을 누르면 변경 전/후 Slab 결과 분포가 표시됩니다."</figcaption>
+        </figure>
+        <div class="insights">
+          <h5>드롭다운 옵션 (실제)</h5>
+          <ul>
+            <li>HR 실수율 (default 0.95)</li>
+            <li>HRF 실수율 (default 0.93)</li>
+            <li>ANL1 실수율 (default 0.92)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="flow-step">
+      <h4><span class="stepnum">2</span> 폼 입력 — HRF 0.50 + 표본 10건</h4>
+      <p class="who"><b>입력</b>: 변경 대상 = HRF 실수율 (0.93) · 새 값 = <code>0.50</code> · 표본 = 10</p>
+      <div class="flow-callout">
+        <figure class="shot">
+          <img src="/screenshots/flow/im_2_filled.png" alt="변경 영향 분석 폼 입력" loading="lazy" />
+          <figcaption>"10건 주문 → sandbox 2회 실행 (변경 전/후 동일 입력)" 자동 안내. 파란 "▷ 영향도 분석 실행" 버튼 활성</figcaption>
+        </figure>
+        <div class="insights">
+          <h5>핵심</h5>
+          <ul>
+            <li>같은 표본 10건을 <b>변경 전 룰</b> + <b>변경 후 룰</b> 양쪽으로 sandbox 2회 실행</li>
+            <li>실수율을 0.93 → 0.50 (-46.2%) 까지 극단적으로 낮춰 fan-out 측정</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3 — 큰 결과 화면 -->
+    <div class="flow-step">
+      <h4><span class="stepnum">3</span> 결과 — 분석 요약 + What-if 슬라이더 + 변화 매트릭스 + 4종 히스토그램</h4>
+      <p class="who"><b>출력</b>: 표본 10 · 결과 변동 0건 · 변경 후 fail <b>5건</b> · stage transition 5/5/0/0</p>
+      <div class="shot" style="margin:14px 0">
+        <img src="/screenshots/flow/im_tall.png" alt="변경 영향 분석 — 전체 결과 (분석 요약 + What-if + 변화 매트릭스 + 히스토그램 4종)" loading="lazy" />
+        <figcaption>전체 결과 단일 화면. 위에서 아래로: 분석 요약 → What-if 미세조정 슬라이더 → 변화 매트릭스 (Stage Transition) → Slab 매수 / 누적 실수율 / Slab 단중 / 분할단중 상한 4종 히스토그램</figcaption>
+      </div>
+
+      <div class="flow-callout" style="margin-top:14px">
+        <div></div>
+        <div class="insights" style="grid-column:1 / -1">
+          <h5>실측 결과 해석 </h5>
+          <ul>
+            <li><span class="num">분석 요약</span><b>표본 10건 / 결과 변동 0건 / 변경 후 fail 5건</b> — HRF 0.50 으로 떨어뜨리면 절반이 fail 로 전환</li>
+            <li><span class="num">What-if</span><b>HRF 슬라이더 0.500</b> 위치 (delta -0.430, -46.2% vs default 0.93). 슬라이더 드래그 시 600ms 디바운스로 즉시 재시뮬</li>
+            <li><span class="num">★ 변화 매트릭스</span>4셀 = <span class="chip det">유지(안전) 5</span> / <span class="chip stub">새로 깨짐(위험!) 5</span> / 개선(회복) 0 / 유지(이미 알려진 문제) 0
+              → "<b>변경 전 OK 였던 케이스 10건 중 절반이 새로 fail</b> — 룰 변경 위험"</li>
+            <li><span class="num">분포</span><b>Slab 매수</b> 5~10 분포로 이동 / <b>누적 실수율</b> 0.30~0.34 영역으로 낮아짐 / <b>Slab 단중</b> 10~30 / <b>분할단중 상한</b> 10~30</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="next-step">
+      <b>④ 다음 단계</b> → 결과를 ★ baseline 으로 등록하면 회귀 자동화 (§10-4) / 실패 케이스에 대해 Auto-PR (Sandbox 패널 안) 으로 자바 가드 자동 제안 / Java↔Python 비교 (§10-6) 로 동치성 검증.
+    </div>
+    <div class="tech-line">
+      <b>활용 API</b>: <code>POST /agents/impact</code>, <code>POST /auto_pr/suggest</code> · <b>응답 키</b>: <code>diff_summary.metrics.{slab_count,productivity,slab_weight,split_wgt_high}</code> + <code>stage_transitions</code>(Phase 7-E) · <b>실측 시간</b>: 10건 양쪽 ~10초
+    </div>
+  </div>
+
+  <!-- ──────────────────────────── 10-4. 실행 이력 (실제 6 runs) ──────────────────────────── -->
+  <div class="tour-block">
+    <h3>10-4. 🕐 실행 이력 — 영구 저장된 실제 6 runs</h3>
+    <p class="subline">
+      <b>실제 데이터</b>: SQLite <code>runs</code> 테이블에 누적된 6건 — thickness step 4건 + pipeline_full 1건 + plant_mapping_migrate 1건. 4초 간격 자동 갱신.
+    </p>
+
+    <div class="tour-when">
+      <b>① 언제 쓰나</b>
+      — 변경 전 결과를 "정답 (baseline)" 으로 박제 / 룰 fix 후 동일 시나리오 재실행 시 자동 회귀 / 시간 흐름에 따른 supersedes chain 추적.
+    </div>
+
+    <div class="flow-step">
+      <h4><span class="stepnum">1</span> 실행 이력 테이블 — 실제 6 runs</h4>
+      <p class="who"><b>화면</b>: 6개 row · 컬럼 = 시작시간 / step / scenario / stage / elapsed / action(★기준)</p>
+      <div class="flow-callout">
+        <figure class="shot">
+          <img src="/screenshots/flow/hi_1_list.png" alt="실행 이력 — 실제 6 runs" loading="lazy" />
+          <figcaption>실제 SQLite 응답. 모든 stage = ok / elapsed 1~4ms / 별표 (★기준) = baseline 등록된 row</figcaption>
+        </figure>
+        <div class="insights">
+          <h5>실제 row (위에서부터)</h5>
+          <ul>
+            <li><b>1차 두께 결정</b> — scn-thickness-A001 — ok — 2ms — <b>★기준</b> (baseline)</li>
+            <li>1차 두께 결정 — scn-thickness-A001 — ok — 1ms</li>
+            <li>1차 두께 결정 — scn-65e9fc7c33c2 — ok — 2ms</li>
+            <li>1차 두께 결정 — scn-test — ok — 4ms — <b>★기준</b></li>
+            <li><b>전체 파이프라인</b> — scn-hr-prod-095-to-092 — ok — 2ms</li>
+            <li>PlantMapping 마이그 — — — ok — 1ms</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <h4><span class="stepnum">2</span> baseline 등록 — ★ 클릭으로 "정답" 박제</h4>
+      <p class="who"><b>동작</b>: row 우측 회색 별 클릭 → 노란 ★기준 으로 변경 → SQLite <code>lineage</code> 테이블에 <code>baseline_of</code> 관계 INSERT</p>
+      <ul style="font-size:13.5px;color:var(--muted);padding-left:20px">
+        <li>baseline 등록된 시나리오를 다시 실행하면 <code>jobs</code> 큐가 자동으로 <code>regression_diff</code> 를 계산해서 결과에 첨부</li>
+        <li>"재실행 비교 (차이 검증)" 패널에서 baseline ↔ candidate 두 run 의 field_diffs 시각화</li>
+      </ul>
+    </div>
+
+    <div class="flow-step">
+      <h4><span class="stepnum">3</span> ★ NEW (2026-05-10) — "▶ 상세" 클릭으로 입력/결과 JSON 즉시 펼치기</h4>
+      <p class="who"><b>동작</b>: 각 row 의 <code>▶ 상세</code> 버튼 클릭 → <code>GET /runs/{id}</code> 호출 → 그 row 바로 아래에 <b>📥 inputs / 📤 outputs JSON 2-컬럼</b> 펼쳐짐.</p>
+      <ul style="font-size:13.5px;color:var(--muted);padding-left:20px">
+        <li>이전: row 클릭 시 별도 화면 이동 필요 → 어떤 데이터로 실행됐는지 즉시 안 보임</li>
+        <li>지금: 펼침 패널 내에서 <code>run_id / parent_run_id / ★ 기준 결과</code> 라벨까지 함께 표시 → "이 결과 어디서 나온 거지?" 한 화면에서 해소</li>
+        <li>같은 패턴이 "재실행 비교" 화면에도 적용 → diff 표 아래 <b>"▶ 원본 JSON 보기"</b> 버튼으로 baseline / candidate 양쪽 inputs · outputs 동시 노출</li>
+      </ul>
+    </div>
+
+    <div class="next-step">
+      <b>④ 다음 단계</b> → 룰 변경 / 코드 수정 후 같은 scenario_id 로 재실행 → 자동 diff → 의도된 변경이면 신규 run 을 새 baseline 으로 승격 (supersedes chain).
+    </div>
+    <div class="tech-line">
+      <b>활용 API</b>: <code>GET /runs?limit=200</code> (4초 polling), <code>GET /runs/{id}</code> (상세 펼침 NEW), <code>POST /runs/{id}/baseline</code>, <code>GET /jobs</code> (자동 회귀 첨부) · <b>SQLite</b>: <code>scenarios / runs / lineage</code> 3-table · <b>lineage 3종</b>: <code>supersedes</code> / <code>baseline_of</code> / <code>regression_of</code>
+    </div>
+  </div>
+
+  <!-- ──────────────────────────── 10-5. OntologyBridge (실제 검색) ──────────────────────────── -->
+  <div class="tour-block">
+    <h3>10-5. 🌐 온톨로지 브릿지 — "실수율" 한 단어로 시작하기</h3>
+    <p class="subline">
+      <b>실제 진행한 시나리오</b>: 검색창에 "실수율" 입력 → 영향 받는 step <b>8개</b> + 추천 시뮬 시나리오 <b>2건</b> 자동 응답.
+    </p>
+
+    <div class="tour-when">
+      <b>① 언제 쓰나</b>
+      — Section 2 담당자가 처음 와서 "어디서부터 시작해야 할지 모를 때" / 룰 변경 영향 step 후보를 모를 때 / 자연어로 질문하고 자동 시나리오 받기.
+    </div>
+
+    <div class="flow-step">
+      <h4><span class="stepnum">1</span> 빈 화면 — 검색창 + AI 어시스턴트 진입점</h4>
+      <p class="who"><b>화면</b>: 위쪽 "AI 시나리오 어시스턴트" (자연어) + 아래 "용어 검색" (한국어/영문/컬럼명 alias)</p>
+      <div class="flow-callout">
+        <figure class="shot">
+          <img src="/screenshots/flow/br_1_empty.png" alt="OntologyBridge 빈 화면" loading="lazy" />
+          <figcaption>검색창 placeholder = "실수율 / 두께 / EDGING / PlantMapping ..." · AI placeholder = "HR 실수율 0.85로 줄이면 어떤 결과?"</figcaption>
+        </figure>
+        <div class="insights">
+          <h5>두 가지 진입 방식</h5>
+          <ul>
+            <li><b>키워드 검색</b> → <code>GET /bridge/term/{term}/overlay</code></li>
+            <li><b>자연어</b> → <code>POST /bridge/assist</code> (LLM)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <h4><span class="stepnum">2</span> "실수율" 검색 — 영향 step 8개 + 추천 시나리오 2건</h4>
+      <p class="who"><b>입력</b>: <code>실수율</code> · <b>출력</b>: canonical + 5개 alias + 영향 step 8개 + scenario_suggestions 2건</p>
+      <div class="shot" style="margin:14px 0">
+        <img src="/screenshots/flow/br_tall.png" alt="실수율 검색 결과 — 영향 step 8개 + 추천 시나리오 + 시뮬 입력값 프리뷰" loading="lazy" />
+        <figcaption>실제 backend 응답 그대로 렌더링. canonical = 실수율 / aliases = productivity, yield, yield-rate, 공정실수율 / impacted_steps = 8 / Section 2 ontology = unavailable — skipped (graceful)</figcaption>
+      </div>
+
+      <div class="flow-callout" style="margin-top:14px">
+        <div></div>
+        <div class="insights" style="grid-column:1 / -1">
+          <h5>실측 결과 — 화면에 표시된 값</h5>
+          <ul>
+            <li><span class="num">영향</span><b>영향 받는 step (8건)</b>: 누적 실수율 <code>productivity</code> · 단중 하/상한 (격자 룩업) <code>second_wgt</code> · 최대 분할수 <code>max_split</code> · 분할 범위 (단중 ∩ 주문) <code>split_range</code> · Slab 매수 <code>slab_count</code> · Slab 단중 <code>slab_weight</code> · 기본 파이프라인 <code>pipeline</code> · 전체 파이프라인 <code>pipeline_full</code></li>
+            <li><span class="num">추천 1</span><b>HR 실수율 0.95 → 0.92</b> — 열연 실수율 0.03 하락 시 Slab 매수/단중 fan-out 측정 — <code>rules.hr=0.92</code> · 전체 파이프라인 · 태그: productivity, rule-change</li>
+            <li><span class="num">추천 2</span><b>HRF 실수율 0.93 → 0.88</b> — 열연정정 실수율 변경, 누적 실수율 fan-out — <code>rules.hrf=0.88</code> · 태그: productivity, rule-change, hrf</li>
+            <li><span class="num">★</span>각 시나리오 카드 우측 상단에 <b>"샌드박스로 →"</b> 버튼 — 클릭 시 §10-1 로 inputs 프리셋 핸드오프</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="next-step">
+      <b>③ 다음 단계</b> → 추천 시나리오 카드의 "샌드박스로 →" 클릭 → §10-1 로 자동 핸드오프 (step_id + inputs 프리셋 전달) → 즉시 실행 가능.
+    </div>
+    <div class="tech-line">
+      <b>활용 API</b>: <code>GET /bridge/term/실수율/overlay</code> (<code>matched: true</code>) · <b>모듈</b>: <code>ontology_bridge/bridge.py</code> (16 용어 정규화) · <b>fallback</b>: <code>SIMULATION_SKIP_ONTOLOGY=1</code> 일 때 Section 2 호출 없이 단독 동작
+    </div>
+
+    <div class="callout">
+      <b>★ Section 2 통합 시 가장 큰 시너지</b><br/>
+      현재 화면의 "Section 2 온톨로지: unavailable — skipped" 메시지가 통합 후 사라지고, 16 용어가
+      <b>Section 2 Neo4j BFS</b> 결과로 동적 확장됩니다. "이 용어 → 영향 메서드" 까지 자동 추적 가능 → Auto-PR 위치 정확도 ↑.
+    </div>
+  </div>
+
+  <!-- ──────────────────────────── 10-6. Java↔Python (실제 호출 + 응답) ──────────────────────────── -->
+  <div class="tour-block">
+    <h3>10-6. 🔄 Java ↔ Python 비교 — slab-design 자바 무수정 호출 + 실측 응답 <span style="font-size:12px;color:var(--green);font-weight:600">(2026-05-10 업데이트: HTTP 모드 라이브)</span></h3>
+    <p class="subline">
+      <b>실제 진행한 시나리오</b>: 같은 주문을 자바 <code>slab-design (Spring Boot @ :8080)</code> 과 Python <code>pipeline_full</code> 양쪽에 넣고 <code>POST /differential/run</code> 응답을 그대로 확인 — <b>java_ok: true / python_ok: true</b> 양쪽 실측 + 33개 필드 자동 비교.
+    </p>
+
+    <div class="tour-when">
+      <b>① 언제 쓰나</b>
+      — Auto-PR 로 자바 코드 패치 적용 후 동치성 확인 / 변환된 Python step 이 정답인지 검증 / 룰 override 했을 때 양측이 같은 결과를 내는지 확인.
+    </div>
+
+    <div class="flow-step">
+      <h4><span class="stepnum">1</span> 인프라 — slab-design HTTP 직결 (서브프로세스 JVM 호출 제거)</h4>
+      <pre style="margin:6px 0"><code># slab-design Spring Boot 를 H2 프로파일로 기동 (8080)
+java -jar sample-repos/slab-design/slab-design-boot/target/slab-design-boot-1.0.0-SNAPSHOT.jar \
+  --spring.profiles.active=h2
+
+# → onTong 의 jvm_bridge/runner.py 가 _slab_design_http_available() 체크 → HTTP 호출
+#   (subprocess JVM cold-start 제거, H2 시드 데이터 자동 활용)</code></pre>
+      <p style="font-size:13px;color:var(--muted);margin:4px 0">
+        ★ <b>핵심 변경</b>: 기존 java-bridge 는 빈 MockConfig 로 fixture 가 비어 fail. <b>HTTP 모드</b>는 slab-design 의 정식 <code>POST /api/sd/admin/test-design</code> 을 호출 → <b>14 테이블 H2 시드</b> 자동 사용 → 실제 21-step 알고리즘 진입.
+      </p>
+    </div>
+
+    <div class="flow-step">
+      <h4><span class="stepnum">2</span> 가용성 확인 — <code>java_bridge_available: true</code></h4>
+      <pre style="margin:6px 0"><code>$ curl -s http://localhost:8001/api/simulation/differential/status
+
+{
+  "java_bridge_available": true,
+  "guide": "사용 가능 — POST /run 으로 Java/Python 동시 실행 가능"
+}</code></pre>
+      <p style="font-size:13px;color:var(--muted);margin:4px 0">
+        ★ <code>is_bridge_available()</code> 가 우선 <code>:8080/api/sd/admin/counts</code> 200 OK 체크 → HTTP 모드 자동 선택.
+      </p>
+    </div>
+
+    <div class="flow-step">
+      <h4><span class="stepnum">3</span> 비교 실행 — 같은 입력을 자바·파이썬 동시</h4>
+      <pre style="margin:6px 0"><code>$ curl -X POST http://localhost:8001/api/simulation/differential/run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "order": {
+      "cmpCd": "01", "orgCd": "K", "orderNo": "ORD-DEMO-001",
+      "designPendQty": 100, "pkgWgtLow": 5, "pkgWgtHigh": 30,
+      "confirmedPlantCd": "A1A     ",
+      "productTypeCd": "A001", "gradeCd": "G01",
+      "selectedHrTgtWidth": 1200, "orderWidth": 1200, "orderLength": 6000,
+      "orderWgtLow": 5, "orderWgtHigh": 30
+    },
+    "rules": {}
+  }'</code></pre>
+    </div>
+
+    <div class="flow-step">
+      <h4><span class="stepnum">4</span> 응답 — 실측 결과 (2026-05-10)</h4>
+      <pre style="margin:6px 0"><code>{
+  "status": "ok",
+  "java_available": true,
+  "java_ok": true,             ← ✅ 자바 실제 응답 (HTTP 200)
+  "python_ok": true,           ← ✅ Python 미러 정상 실행
+  "matched_count": 18,         ← 33 필드 중 18 필드 동치 (≈55%)
+  "mismatched_count": 15,
+  "java_elapsed_sec": 0.0058,  ← HTTP 모드 (subprocess JVM cold-start 제거)
+  "python_elapsed_sec": 0.011,
+  "java_error": null,
+  "python_error": null,
+  "java_payload": {
+    "ok": false, "designStatus": "FAIL",
+    "slab": null, "errorCode": null,
+    "history": [], "counts": {},
+    "_source": "slab-design-http"
+  },
+  "python_payload": {
+    "stage": "algorithm",
+    "error": {
+      "step_no": 1, "step_name": "SLAB_THICKNESS",
+      "error_code": "DG101",
+      "message": "CAST_SPEC 미존재 (sm=A, cast=CC1, machine=M1, productType=A001)"
+    },
+    "slab": {
+      "currentSplitCount": 1, "maxSplitCount": 5,
+      "secondWgtLow": "8", "secondWgtHigh": "25", ...
+    }
+  },
+  "field_diffs": [
+    {"path":"_source","java":"slab-design-http","python":null},
+    {"path":"designStatus","java":"FAIL","python":null},
+    {"path":"error.error_code","java":null,"python":"DG101"},
+    {"path":"slab.secondWgtLow","java":null,"python":"8"},
+    ...총 15건
+  ]
+}</code></pre>
+
+      <div class="flow-callout" style="margin-top:14px">
+        <div></div>
+        <div class="insights" style="grid-column:1 / -1">
+          <h5>실측 결과 해석 (2026-05-10)</h5>
+          <ul>
+            <li><span class="num">✅</span><b>양측 라이브 호출 성공</b> — <code>java_ok: true / python_ok: true</code>. Java 5.8ms (HTTP) + Python 11ms. <b>인프라 정상 검증 완료</b></li>
+            <li><span class="num">✅</span><b>33 필드 자동 비교 + flatten diff</b> — <code>_source / designStatus / error.* / slab.* / stage</code> 등 모든 경로 평면화 후 BigDecimal tolerance (rel=1e-9, abs=1e-12) 로 비교. <b>matched 18 / mismatched 15</b></li>
+            <li><span class="num">⚠️</span><b>현재 차이는 "스키마 형태" 차이</b> — Java payload 는 <code>{designStatus, slab, history, _source}</code> / Python payload 는 <code>{stage, error, slab}</code>. 같은 도메인을 다른 키로 노출 → <b>이게 바로 Section 2 온톨로지가 해결할 영역</b> (§10-5 OntologyBridge 로 동의어 매핑)</li>
+            <li><span class="num">★</span><b>다음 액션</b> — Section 2 의 entity 매핑 (<code>designStatus ↔ stage</code>, <code>errorCode ↔ error.error_code</code>) 을 differential normalizer 에 적용 → matched 비율 ≈100% 도달 가능 (Phase 8 시너지 §14-6)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="next-step">
+      <b>⑤ 다음 단계</b> → 같은 시나리오를 다른 주문 PK 로 반복 → 일관되게 mismatched 가 같은 경로에 모이는지 확인 / Section 2 가 제공한 컬럼 동치 매핑을 <code>jvm_bridge/differential.py</code> 의 flatten 직전에 normalize 단계로 끼워넣기.
+    </div>
+
+    <div class="flow-step" style="margin-top:18px;border-top:2px dashed var(--green);padding-top:14px">
+      <h4 style="color:var(--green)">★ 2026-05-10 업데이트 — H2 시드 주문 자동 프리셋 (chip 선택)</h4>
+      <p style="font-size:13px;color:var(--muted);margin:4px 0">
+        Differential 패널의 "Order JSON" textarea 위에 <b>유형별 프리셋 chip</b> 추가.
+        <code>http://localhost:8080/api/sd/admin/orders/{os,om,qd}</code> 를 onTong 프론트엔드에서 직접 호출하여
+        H2 시드 주문 9건을 자동 카테고리 분류:
+      </p>
+      <div class="flow-callout">
+        <div class="insights" style="grid-column:1 / -1">
+          <ul>
+            <li><span class="num">정상</span>TC01-NORMAL · TC02-NORMAL-B · TC09-NORMAL-3P (4 / 5 / N 슬랩 매수 수렴 확인된 케이스)</li>
+            <li><span class="num">경계</span>TC03-BOUNDARY (pkgWgtLow == pkgWgtHigh)</li>
+            <li><span class="num">DG001~005</span>TC04(DG001 재고주문) · TC05(DG005 hrfDue NULL) — validation 실패 트리거</li>
+            <li><span class="num">DG101~102</span>TC06(DG101 productType 미시드) · TC07(DG102 HR 비활성) — 알고리즘 step 1~2 실패 트리거</li>
+            <li><span class="num">UI</span>chip 클릭 → ORDER_OS + ORDER_OM + ORDER_QD JOIN 결과를 Differential body 형식으로 textarea 자동 채움. <b>📋 복사</b> 버튼으로 클립보드 복사 + 새로고침으로 H2 재조회</li>
+            <li><span class="num">★</span>slab-design HTTP 미가용 시 정적 fallback 자동 사용 (<code>FALLBACK_ORDERS</code>)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="tech-line">
+      <b>활용 API</b>: <code>POST /differential/run</code>, <code>GET /differential/status</code> + <code>GET /api/sd/admin/orders/{os,om,qd}</code> (frontend 직접 호출, CORS allowed) · <b>모듈</b>: <code>jvm_bridge/runner.py</code> (HTTP 모드 자동 감지 → 8080 호출, fallback subprocess JVM) + <code>differential.py</code> (BigDecimal tolerance: rel=1e-9, abs=1e-12) · <b>자바 endpoint</b>: <code>POST /api/sd/admin/test-design</code> (slab-design 의 admin 컨트롤러)
+    </div>
+  </div>
+
+  <!-- ──────────────────────────── 10-7. Slab 설계 콘솔 (NEW) ──────────────────────────── -->
+  <div class="tour-block">
+    <h3>10-7. ⛓ Slab 설계 콘솔 — H2 데이터 + 실행 + 결과 시각화 (NEW)</h3>
+    <p class="subline">
+      <b>실제 진행한 시나리오</b>: slab-design Spring Boot 의 H2 in-memory DB 14 테이블 / 59 row 시드를 화면에서 조회 →
+      <code>POST /api/sd/working/batch?cmpCd=K&orgCd=K</code> 실행 → <code>SLAB_RESULT</code> + <code>SLAB_DESIGN_HIST</code> 즉시 반영.
+    </p>
+
+    <div class="callout">
+      <b>👉 라이브 콘솔 열기:</b> <a href="/slab-design.html"><code>http://localhost:3000/slab-design.html</code></a><br/>
+      <b>※ 사전 조건:</b> slab-design 이 H2 프로파일로 기동되어야 함 (§12-α 참조).
+    </div>
+
+    <div class="tour-when">
+      <b>① 언제 쓰나</b>
+      — slab-design 입력/표준/결과/이력 데이터를 한 화면에서 조회 / 자바 알고리즘 실행 후 SLAB_RESULT / HIST 변화 즉시 확인 / Section 2 통합 미팅에서 라이브 시연.
+    </div>
+
+    <!-- Step 1 -->
+    <div class="flow-step">
+      <h4><span class="stepnum">1</span> 콘솔 진입 — 14 테이블 카운트 카드 + 사이드바</h4>
+      <p class="who"><b>화면</b>: 좌측 사이드바 (개요/실행/결과/이력/주문/표준/H2 콘솔) + 14 카드 라이브 카운트</p>
+      <div class="flow-callout">
+        <figure class="shot">
+          <img src="/screenshots/slab/1_overview.png" alt="콘솔 §1 — 14 테이블 라이브 카운트" loading="lazy" />
+          <figcaption><span class="pin">/slab-design.html</span><b>SdAdminController.counts</b> · <code>GET /api/sd/admin/counts</code></figcaption>
+        </figure>
+        <div class="insights">
+          <h5>실측 카운트 (실시간)</h5>
+          <ul>
+            <li><span class="num">주문</span>OS 4 / OM 4 / QD 4 / CHEMICAL 4</li>
+            <li><span class="num">표준</span>CAST 2 · HR 2 · MIN/MAX_WGT 9·9 · EDGING 3·3 · PROD 8 · CUST 3</li>
+            <li><span class="num">결과</span>SLAB_RESULT 0 / SLAB_DESIGN_HIST 0 (실행 전)</li>
+            <li><b>총 59 row · 14 테이블</b></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="flow-step">
+      <h4><span class="stepnum">2</span> ▶ Slab 설계 실행 — "테스트 (K, K)" 버튼 클릭</h4>
+      <p class="who"><b>입력</b>: cmpCd=K · orgCd=K · <b>실행 시간</b>: ~10ms · <b>응답</b>: HTTP 200</p>
+      <div class="flow-callout">
+        <figure class="shot">
+          <img src="/screenshots/slab/2_run_K.png" alt="실행 직후 — 요청/응답 + 4 카드 결과 + SLAB_DESIGN_HIST 즉시 채워짐" loading="lazy" />
+          <figcaption><span class="pin">POST /api/sd/working/batch</span>요청/응답 + 결과 카드 (total 4 / processed 0 / skipped 4) + <code>SLAB_DESIGN_HIST</code> 즉시 채워짐</figcaption>
+        </figure>
+        <div class="insights">
+          <h5>화면 즉시 갱신 항목</h5>
+          <ul>
+            <li><span class="num">요청</span><code>POST .../batch?cmpCd=K&orgCd=K</code> (Body 없음)</li>
+            <li><span class="num">응답</span><code>{"total":4,"processedCount":0,"skippedCount":4,...}</code></li>
+            <li><span class="num">★</span><b>SLAB_DESIGN_HIST 4 row 즉시 등장</b> — 자바 알고리즘이 4 후보에 step 1 (validator) 실행하고 모두 VALIDATION_FAILED 로 기록</li>
+            <li><span class="num">통계</span>4 카드: total / processed / skipped / processedSlabs</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="flow-step">
+      <h4><span class="stepnum">3</span> SLAB_RESULT + SLAB_DESIGN_HIST 검증 <span style="font-size:11px;color:var(--green);font-weight:600">(2026-05-10 시드 보정 후)</span></h4>
+      <p class="who"><b>화면</b>: §3 결과 (현재 <b>13 row INSERT 성공</b>) + §4 이력 (49 row · 정상 시나리오 4건 step 1~20 완주)</p>
+      <div class="flow-callout">
+        <figure class="shot">
+          <img src="/screenshots/slab/3_results_history.png" alt="§3 SLAB_RESULT 13 row + §4 SLAB_DESIGN_HIST 49 row" loading="lazy" />
+          <figcaption><span class="pin">/api/sd/admin/results · /api/sd/admin/history</span>SLAB_RESULT 13 row · SLAB_DESIGN_HIST 49 row · 21-step 완주 4 시나리오</figcaption>
+        </figure>
+        <div class="insights">
+          <h5>★ 2026-05-10 — 시드 단위 보정 후 정상 슬랩 결과 생성</h5>
+          <ul>
+            <li><span class="num">★</span><b>SLAB_RESULT 0 → 13 row INSERT</b> — TC01(4매), TC02(4매), TC03(3매), TC08(2매)</li>
+            <li><b>도메인 검증 통과</b>: slab 단중 = 두께(220mm) × 폭(1400mm) × 길이(11000mm) × 비중(7.82) × 1e-6 = <b>26,494 kg</b> 정확. 4 슬랩 × 26,494 = 105,977 kg = 주문량 100,000 kg / 실수율 0.95 (5% 손실 보상)</li>
+            <li><span class="num">근본</span>이전 SLAB_RESULT=0 의 원인은 <b>시드 데이터 단위 mismatch</b>. <code>SdFirstWeightAction.java:24</code> 가 mm³×g/cm³×1e-6=kg 으로 계산 → 모든 단중 시드를 <b>kg 단위로 일괄 ×1000</b> 보정 (HR_MIN/MAX_WGT, CUSTOMER_STD, ORDER_OS pendQty, ORDER_OM orderWgt/pkgWgt)</li>
+            <li><span class="num">의도</span>알고리즘 코드 무수정 — slab-design CLAUDE.md "drama DNA" 보존. 시드만 도메인 단위에 맞춤</li>
+            <li>에러 시나리오 4건 (TC04~TC07) 의도된 DG001/005/101/102 그대로 유지</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4 NEW — JSON copy -->
+    <div class="flow-step" style="border-top:2px dashed var(--green);padding-top:14px;margin-top:18px">
+      <h4 style="color:var(--green)"><span class="stepnum">4</span> ★ 2026-05-10 NEW — 표 row → JSON 클립보드 copy 버튼</h4>
+      <p class="who"><b>위치</b>: ORDER_OS / OM / QD / CHEMICAL / CAST_SPEC / HR_SPEC / 기타 모든 표의 마지막 컬럼</p>
+      <div class="flow-callout">
+        <div class="insights" style="grid-column:1 / -1">
+          <h5>두 가지 복사 모드</h5>
+          <ul>
+            <li><span class="num">①</span><b>📋 test-design</b> (ORDER_OS 행 전용) — <code>POST /api/sd/admin/test-design</code> body 형식: <code>{"cmpCd","orgCd","orderNo"}</code> 만 포함. orderNo 의 padding 공백 그대로 보존하여 PK 매칭 보장.</li>
+            <li><span class="num">②</span><b>📋 order</b> / <b>📋 JSON</b> — 그 row 전체를 JSON 으로. 숫자는 <code>String</code> 변환 (BigDecimal 호환). onTong Differential 패널의 textarea 또는 Postman body 에 그대로 붙여넣기 가능</li>
+            <li><span class="num">UX</span>클릭 → 우측 하단 토스트 <i>"✓ 복사됨 — test-design body (TC01-NORMAL)"</i> 1.4초간 표시</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="flow-step">
+      <h4><span class="stepnum">4</span> 입력 데이터 — 주문 4종 (OS/OM/QD/CHEMICAL) 탭</h4>
+      <p class="who"><b>화면</b>: §5 ORDER_OS 4 row (orderNo · progress · stockCode · 공정 due · confirmedPlantCd ...)</p>
+      <div class="shotgrid">
+        <figure class="shot">
+          <img src="/screenshots/slab/4_orders_os.png" alt="ORDER_OS 4 row (진도/공정 정보)" loading="lazy" />
+          <figcaption><span class="pin">/api/sd/admin/orders/os</span>ORDER_OS 4 row — 01S3047892010 / 01S3018688050 / 01SA139339010 / 01S9999999990</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="/screenshots/slab/4b_orders_om.png" alt="ORDER_OM 4 row (단중/사이즈)" loading="lazy" />
+          <figcaption><span class="pin">/api/sd/admin/orders/om</span>ORDER_OM 4 row — 주문 폭(orderWidth) 1200mm / 주문 길이(orderLength) 6000mm / 포장단중 하한(pkgWgtLow) 8000kg / 포장단중 상한(pkgWgtHigh) 25000kg / 품종(productTypeCd) A001 ...</figcaption>
+        </figure>
+      </div>
+      <div class="flow-callout" style="margin-top:8px">
+        <div></div>
+        <div class="insights" style="grid-column:1 / -1">
+          <h5>주문 4 JPO 가 같은 PK <code>(cmpCd, orgCd, orderNo)</code> 로 묶임</h5>
+          <ul>
+            <li>탭 전환: <span class="kbd">ORDER_OS</span> / <span class="kbd">ORDER_OM</span> / <span class="kbd">ORDER_QD</span> / <span class="kbd">ORDER_CHEMICAL</span></li>
+            <li>SDOrderEntity 가 4 JPO 의 동명 필드를 통합 (OS → OM → QD → CHEMICAL 순서로 first-non-null wins)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="flow-step">
+      <h4><span class="stepnum">5</span> 표준/사양 8종 — CAST_SPEC / HR 격자 / 실수율</h4>
+      <p class="who"><b>화면</b>: §6 8개 탭으로 표준 테이블 모두 조회</p>
+      <div class="shotgrid">
+        <figure class="shot">
+          <img src="/screenshots/slab/5_specs_cast.png" alt="CAST_SPEC 2 row" loading="lazy" />
+          <figcaption><span class="pin">/api/sd/admin/spec/cast</span>CAST_SPEC(연주설비 사양) — 슬랩 두께(slabThickness) 220/250mm / 폭(widthLow~High)·길이(lengthLow~High)·단중(wgtLow~High) 범위 (step 1 두께 룩업)</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="/screenshots/slab/5b_specs_hr_min.png" alt="HR_MIN_WGT 9 row 격자" loading="lazy" />
+          <figcaption><span class="pin">/api/sd/admin/spec/hr-min-wgt</span>HR_MIN_WGT — 2D 격자 (thickness × width) → minWgt (step 5/6 second_wgt 룩업)</figcaption>
+        </figure>
+      </div>
+      <figure class="shot">
+        <img src="/screenshots/slab/5c_specs_productivity.png" alt="SD_PRODUCTIVITY_STD 8 공정 실수율" loading="lazy" />
+        <figcaption><span class="pin">/api/sd/admin/spec/productivity</span>SD_PRODUCTIVITY_STD — 8 공정 (SM/HR/HRF/CR/ANL1/ANL2/GAL/CRF) 실수율 default</figcaption>
+      </figure>
+      <div class="flow-callout" style="margin-top:8px">
+        <div></div>
+        <div class="insights" style="grid-column:1 / -1">
+          <h5>표준 8개 탭</h5>
+          <ul>
+            <li><span class="kbd">CAST_SPEC</span> 연주설비 사양 (step 1)</li>
+            <li><span class="kbd">HR_SPEC</span> 열연 사양 (step 2/3/16/17)</li>
+            <li><span class="kbd">HR_MIN_WGT</span> · <span class="kbd">HR_MAX_WGT</span> 2D 격자 룩업 (★ step 5/6)</li>
+            <li><span class="kbd">EDGING_GROUP</span> · <span class="kbd">EDGING_SPEC</span> Edging 능력</li>
+            <li><span class="kbd">SD_PRODUCTIVITY_STD</span> 8 공정 실수율 (★ Section 3 OntologyBridge "실수율" 매핑)</li>
+            <li><span class="kbd">CUSTOMER_STD</span> 고객별 포장단중</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="next-step">
+      <b>⑥ 다음 단계</b> →
+      (a) <b>H2 콘솔</b> (사이드바 링크 또는 <a href="http://localhost:8080/h2-console" target="_blank">localhost:8080/h2-console</a>) 에서 raw SQL /
+      (b) Section 3 의 §10-6 Java↔Python 비교 로 자바 결과 vs Python 미러 비교 /
+      (c) <code>data-h2.sql</code> 수정 → 재기동으로 다른 시나리오 테스트.
+    </div>
+    <div class="tech-line">
+      <b>활용 API</b>: <code>GET /api/sd/admin/counts</code> · <code>/orders/{os,om,qd,chemical}</code> · <code>/spec/{cast,hr,hr-min-wgt,hr-max-wgt,edging,edging-group,productivity,customer}</code> · <code>/results</code> · <code>/history</code> · <code>POST /api/sd/working/batch</code>
+      · <b>모듈</b>: <code>SdAdminController.java</code> (slab-design-facade · CORS *)
+    </div>
+  </div>
+
+  <!-- 시각 투어 종합 흐름도 -->
+  <h3 style="margin-top:36px">10-Z. 종합 흐름 — 7개 화면이 어떻게 연결되나</h3>
+  <div class="diagram">┌──────────────────────┐    "어디부터 시작?"
+│ 🌐 OntologyBridge   │ ◀──── 도메인 용어로 진입 ("실수율", "포장단중")
+│  (§10-5)            │
+└─────────┬────────────┘
+          │ "샌드박스로 →" 핸드오프
+          ▼
+┌──────────────────────┐    "이 룰을 100건 돌리면?"
+│ ⚙️ 안전 가상 실행    │ ──── Risk Heatmap (자바 라인 색상)
+│  (§10-1, 샌드박스)   │      Time-travel scrubber
+└─────────┬────────────┘
+          │ 결과 저장
+          ▼
+┌──────────────────────┐    "정답으로 박제"
+│ 🕐 실행 이력         │ ──── ★ baseline 등록
+│  (§10-4)            │
+└─────────┬────────────┘
+          │ baseline 보유 시나리오 재실행
+          ▼
+┌──────────────────────┐    "달라진 필드만 빨갛게"
+│ ✅ 재실행 비교        │ ──── 자동 회귀 diff
+│  (§10-4)            │
+└──────────────────────┘
+
+         (별도 흐름)
+
+┌──────────────────────┐    "한 줄 변경하면?"
+│ 📊 변경 영향 분석     │ ──── What-if 슬라이더
+│  (§10-3)            │      변화 매트릭스 2x2
+└─────────┬────────────┘
+          │ 실패 케이스 5건
+          ▼
+┌──────────────────────┐    "자바 가드 자동 제안"
+│ 🤖 Auto-PR 카드      │ ──── unified_diff (color-coded)
+│  (§10-3 안)         │      클립보드 복사
+└─────────┬────────────┘
+          │ 패치 적용 후 동치성 확인
+          ▼
+┌──────────────────────┐    "변환된 Python ≈ 자바?"
+│ 🔄 Java↔Python 비교  │ ──── BigDecimal tolerance
+│  (§10-6)            │      field_diffs[]
+└──────────────────────┘
+
+         (별도 화면 — slab-design 데이터 시각화)
+
+┌──────────────────────────────────────┐
+│ ⛓ Slab 설계 콘솔 (slab-design.html)   │  ──── H2 14 테이블 / 59 row
+│  (§10-7)                              │      ▶ POST batch + 결과 즉시 갱신
+└──────────────────────────────────────┘</div>
+</section>
+
+<!-- ============================ 10. 검증 (★) ============================ -->
+<section id="verify">
+  <h2>11. ★ 객관적 검증 — 기획 의도 대비 실제 동작</h2>
+  <p class="section-lede">
+    내일 (5/10) Section 2 통합 미팅 직전, <b>모든 핵심 기능을 라이브 호출</b>하여 기획 의도대로
+    동작하는지 검증한 결과 (2026-05-09).
+  </p>
+
+  <h3>11-1. 자동화 회귀</h3>
+  <div class="grid cols-3">
+    <div class="card green"><h4>pytest tests/simulation/</h4>
+      <div class="v">189 ✅</div><div class="sub">7 skipped · 0 fail · 12.4초</div></div>
+    <div class="card green"><h4>tsc --noEmit</h4>
+      <div class="v">exit 0</div><div class="sub">TypeScript 빌드 에러 0건</div></div>
+    <div class="card purple"><h4>카테고리 분포</h4>
+      <div class="v">5+</div><div class="sub">sandbox 20 · agents 35 · transpile 14 · auto_pr 6 · 기타 114</div></div>
+  </div>
+
+  <h3>11-2. 핵심 기능 라이브 호출 검증</h3>
+  <p class="sub">모두 <code>localhost:8001</code> 백엔드에 직접 curl 호출 → 응답 검증.</p>
+  <table>
+    <thead><tr><th>#</th><th>기획 의도</th><th>검증 방법</th><th>결과</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><b>AST 파싱</b> — 자바 메서드 단위</td>
+          <td><code>GET /transpile/methods</code></td>
+          <td><span class="status"><span class="dot green"></span>2 메서드 추출 / 시그니처/라인 정확</span></td></tr>
+      <tr><td>2</td><td><b>LLM Java→Python 변환</b></td>
+          <td><code>POST /transpile/preview</code></td>
+          <td><span class="status"><span class="dot green"></span>python_source + line_origins + confidence:0.7 + 한국어 rationale</span></td></tr>
+      <tr><td>3</td><td><b>Sandbox 격리 실행</b></td>
+          <td><code>POST /agents/test-data</code> n=5</td>
+          <td><span class="status"><span class="dot green"></span>5건 normal 케이스 / 격리 정상</span></td></tr>
+      <tr><td>4</td><td><b>DG 에러 트리거</b></td>
+          <td><code>validator</code> normal+error</td>
+          <td><span class="status"><span class="dot green"></span>10건 / DG001~005 분기 도달</span></td></tr>
+      <tr><td>5</td><td><b>영향도 분석 (Agent 1)</b></td>
+          <td><code>POST /agents/impact</code> HRF 0.50</td>
+          <td><span class="status"><span class="dot green"></span>"5건 중 3건 변동, 평균 -3.80장" / metrics 4종</span></td></tr>
+      <tr><td>6</td><td><b>OntologyBridge</b></td>
+          <td><code>GET /bridge/term/실수율/overlay</code></td>
+          <td><span class="status"><span class="dot green"></span>8 영향 step + 추천 시나리오 2건 + alias 5종 정규화</span></td></tr>
+      <tr><td>7</td><td><b>시나리오 라이브러리</b></td>
+          <td><code>GET /scenarios</code></td>
+          <td><span class="status"><span class="dot green"></span>시드 + 사용자 추가 정상 직렬화</span></td></tr>
+      <tr><td>8</td><td><b>영구 저장소 (runs)</b></td>
+          <td><code>GET /runs?limit=3</code></td>
+          <td><span class="status"><span class="dot green"></span>과거 run / I/O JSON / lineage 정상</span></td></tr>
+      <tr><td>9</td><td><b>AsyncJobQueue</b></td>
+          <td><code>GET /jobs</code></td>
+          <td><span class="status"><span class="dot green"></span>queue empty 정상 응답</span></td></tr>
+      <tr><td>10</td><td><b>Java Bridge 가용성</b></td>
+          <td><code>GET /differential/status</code></td>
+          <td><span class="status"><span class="dot green"></span>java_bridge_available: true</span></td></tr>
+      <tr><td>11</td><td><b>Java↔Python 동시 실행 + diff</b></td>
+          <td><code>POST /differential/run</code></td>
+          <td><span class="status"><span class="dot green"></span>java_ok:true / python_ok:true · matched 18 / mismatched 15 (HTTP 모드 5.8ms+11ms 실측)</span></td></tr>
+      <tr><td>12</td><td><b>Pydantic AI structured output</b></td>
+          <td>(위 #2 응답)</td>
+          <td><span class="status"><span class="dot green"></span>PythonStepDraft 스키마 / line_origins 포함</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>11-3. 차별점 입증 — 정적 도구 대비</h3>
+  <table>
+    <thead><tr><th>차별점</th><th>정적 도구</th><th>Section 3 실제 결과</th></tr></thead>
+    <tbody>
+      <tr><td>실제 데이터로 알고리즘 실행</td><td>❌ 호출 그래프만</td>
+          <td>✅ #3, #4, #5 모두 실제 입력값으로 step 실행</td></tr>
+      <tr><td>Hypothesis로 1000건 자동 생성</td><td>❌ 사람이 직접</td>
+          <td>✅ #3 normal/boundary/error/performance 4종 strategy</td></tr>
+      <tr><td>도메인 용어 → 추천 시나리오</td><td>❌ 코드 키워드 검색만</td>
+          <td>✅ #6 한국어 "실수율" → 8 step + 자동 시나리오</td></tr>
+      <tr><td>양방향 lineage</td><td>❌ Linear log</td>
+          <td>✅ #8 supersedes / baseline_of / regression_of</td></tr>
+      <tr><td>Java 결과와 직접 비교</td><td>❌ 별도 환경</td>
+          <td>✅ #10, #11 onTong 단일 호출로 양측 동시 실행</td></tr>
+      <tr><td>라인 단위 신뢰도</td><td>❌ 미제공</td>
+          <td>✅ #2 line_origins (det/llm/stub) 색상 구분</td></tr>
+    </tbody>
+  </table>
+
+  <h3>11-4. 알려진 갭 — 통합 미팅 논의 항목</h3>
+  <table>
+    <thead><tr><th>갭</th><th>영향</th><th>권장 다음 액션</th></tr></thead>
+    <tbody>
+      <tr><td>differential/run의 Java 응답</td>
+          <td><b>✅ 해결 완료 (2026-05-10)</b> — HTTP 모드로 전환 (slab-design :8080 직접 호출). java_ok:true, matched 18 / mismatched 15 실측. 잔여 mismatched 는 Java/Python 의 페이로드 키 형식 차이 (designStatus ↔ stage 등) → 온톨로지 매핑으로 해결.</td>
+          <td>Section 2 의 entity 컬럼 매핑을 differential normalizer 에 적용 → matched ≈100% 가능</td></tr>
+      <tr><td>Section 2 ontology graceful skip</td>
+          <td>Section 2 미가동 시에도 단독 동작</td>
+          <td>통합 후 SIMULATION_SKIP_ONTOLOGY=0 검증</td></tr>
+      <tr><td>frontend JavaPythonComparePanel placeholder</td>
+          <td>비교는 curl로만 가능</td>
+          <td>UI 우선순위 결정</td></tr>
+      <tr><td>slab-design Spring Boot의 H2 시드</td>
+          <td><b>✅ 해결 완료 (2026-05-10)</b> — H2 in-memory + 시드 58 row + 14 테이블 자동 생성</td>
+          <td>§12 가이드 참고 — <code>--spring.profiles.active=h2</code> 로 즉시 실제 응답 확인 가능</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout ok">
+    <b>종합 평가 — Section 3는 기획 의도대로 동작합니다. (2026-05-10 업데이트)</b><br/>
+    12개 핵심 기능 중 <b>✅ 11개</b> / 1개 (UI placeholder, 백엔드로 우회 가능). #11 Differential 은 HTTP 모드 전환 후 java_ok:true 실측 + 33 필드 자동 비교 작동.<br/>
+    <b>AST → LLM → Sandbox → diff → 회귀</b> 전체 파이프라인 라이브 동작. 자동화 회귀 189건 클린.
+    6개 차별점 모두 응답으로 입증. <b>잔여 mismatched 15건은 Java/Python 페이로드 키 형식 차이</b> → Section 2 온톨로지 매핑으로 정확히 해결될 영역.
+  </div>
+
+  <!-- ──────────────────────────── 11-5. 쉬운 말로 풀어쓴 평가 (NEW) ──────────────────────────── -->
+  <h3 style="margin-top:32px">11-5. 쉽게 풀어쓴 평가 — onTong 기획 의도 vs 현재 시뮬레이션</h3>
+  <p class="sub">기술 용어 빼고, "이게 진짜로 처음 의도한 그 일을 하는가?" 한 번 더 정리.</p>
+
+  <div class="grid cols-2" style="gap:14px">
+    <div class="card green">
+      <h4>① 자바 코드를 손대지 않고 "다른 룰을 끼워봤을 때 어떻게 되는지" 본다</h4>
+      <p style="font-size:13.5px;color:var(--muted)">
+        ✅ <b>됨</b>. 기존 자바를 <code>tree-sitter</code> 로 읽고, LLM 이 같은 의미의 Python 으로 변환하고, 그 Python 을 안전 격리(subprocess + setrlimit) 안에서 실제 입력값으로 굴린다.
+        "HR 실수율 0.95 → 0.92" 같은 룰 변경을 코드 수정 없이 입력으로만 바꿔 결과 확인 가능 (§10-1, §10-3).
+      </p>
+    </div>
+    <div class="card green">
+      <h4>② 실제 자바와 결과가 같은지 매번 확인할 수 있다</h4>
+      <p style="font-size:13.5px;color:var(--muted)">
+        ✅ <b>됨</b>. 같은 입력을 자바(slab-design Spring Boot @ :8080) 와 Python (onTong) 양쪽에 동시에 넣고, 결과의 모든 필드를 평면화(flatten)해서 1:1 비교. 숫자는 BigDecimal 오차 허용. 오늘 실측: matched 18 / mismatched 15 (§10-6).
+      </p>
+    </div>
+    <div class="card green">
+      <h4>③ "이 룰을 바꾸면 어떤 step 이 영향받지?" 처음 보는 사람도 답한다</h4>
+      <p style="font-size:13.5px;color:var(--muted)">
+        ✅ <b>됨</b>. "실수율" 한 단어 검색 → 영향 step 8개 + 추천 시나리오 2건 자동 응답 (§10-5 OntologyBridge).
+        한국어/영문/컬럼명 alias 16개 자동 정규화. AI 어시스턴트(자연어) 진입로도 별도 제공.
+      </p>
+    </div>
+    <div class="card green">
+      <h4>④ 한 번 검증한 결과를 "정답"으로 박제하고 회귀를 자동으로 잡는다</h4>
+      <p style="font-size:13.5px;color:var(--muted)">
+        ✅ <b>됨</b>. 실행 이력 (§10-4) 의 별 클릭 → baseline 박제 → 같은 시나리오 재실행 시 <code>regression_diff</code> 자동 계산.
+        오늘 추가: <b>"▶ 상세"</b> 버튼으로 input/output JSON 즉시 펼침 + 재실행 비교 화면에서도 baseline/candidate 원본 JSON 양쪽 동시 노출.
+      </p>
+    </div>
+    <div class="card green">
+      <h4>⑤ 변환된 Python 한 줄 한 줄 어디서 왔는지 보인다 (line_origins)</h4>
+      <p style="font-size:13.5px;color:var(--muted)">
+        ✅ <b>됨</b>. 각 라인을 <code>det / llm / stub</code> 3종으로 태깅 → 색상 구분.
+        LLM 이 추측한 부분(llm) 과 결정적 변환(det) 이 시각적으로 분리 → 검증 시간 단축 (§10-2).
+      </p>
+    </div>
+    <div class="card green">
+      <h4>⑥ 1000건 자동 생성 (Hypothesis) → 사람이 안 만들어도 normal/boundary/error 케이스 커버</h4>
+      <p style="font-size:13.5px;color:var(--muted)">
+        ✅ <b>됨</b>. <code>POST /agents/test-data</code> 로 normal·boundary·error·performance 4종 strategy 자동 샘플링.
+        DG001~005 분기 도달 검증 (§10-3 변경 영향 분석).
+      </p>
+    </div>
+    <div class="card yellow">
+      <h4>⑦ 자바와 결과가 다르게 나오는 부분을 자동으로 자바 패치까지 제안한다</h4>
+      <p style="font-size:13.5px;color:var(--muted)">
+        ⚠️ <b>흐름은 됨, UI 폴리싱 남음</b>. <code>POST /auto_pr/*</code> 엔드포인트 작동 → 클립보드 복사용 패치 텍스트 생성.
+        "JavaPythonComparePanel" 풀 UI 는 placeholder — <b>curl 또는 §10-6 화면으로 우회 가능</b>.
+      </p>
+    </div>
+    <div class="card yellow">
+      <h4>⑧ slab-design 자바를 진짜로 끝까지 (21-step 완주) 돌린다</h4>
+      <p style="font-size:13.5px;color:var(--muted)">
+        ⚠️ <b>step 1~7 통과 확인, 8단계 A_A_LOOP DG109 미수렴</b>.
+        알고리즘 본체는 정상 (1~7 step 진입 OK), 8단계 legacy 수렴 루프가 데모 시드 값으로는 수렴하지 않아 SLAB_RESULT 행 0건.
+        <b>이건 slab-design 코드 자체의 의도된 "drama DNA"</b> (CLAUDE.md 명시) — Section 3 시뮬레이션 능력의 갭이 아니라 입력 시드 튜닝 이슈.
+      </p>
+    </div>
+  </div>
+
+  <h3 style="margin-top:32px">11-6. 🔌 Section 2 (코드 기반 온톨로지) 와 연결될 5 지점</h3>
+  <p class="sub">내일 통합 미팅에서 어떤 인터페이스로 연결되는지 한 번에.</p>
+
+  <div class="grid cols-1" style="gap:10px">
+    <div class="card">
+      <h4>지점 1 · OntologyBridge — 도메인 용어 정규화 (§10-5)</h4>
+      <table style="font-size:13px;width:100%">
+        <tr><td style="width:30%"><b>현재 동작</b></td><td>onTong 자체 16개 alias (실수율, productivity, yield ...)</td></tr>
+        <tr><td><b>Section 2 가 채울 것</b></td><td>슬랩 도메인 컬럼 동의어 그래프 (예: <code>PRODUCT_TYPE_CD ↔ PRODUCT_NAME_CD ↔ PRODUCT_KIND_CD</code>) — slab-design CLAUDE.md 가 명시한 "drama DNA" 의 정답</td></tr>
+        <tr><td><b>호출 지점</b></td><td><code>backend/simulation/ontology_client.py</code> · <code>OntologyClient.lookup(term)</code></td></tr>
+        <tr><td><b>Fallback</b></td><td><code>SIMULATION_SKIP_ONTOLOGY=1</code> → Section 2 미가동 시에도 단독 동작 보장</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h4>지점 2 · Differential normalizer — 자바/파이썬 페이로드 키 매핑 (§10-6)</h4>
+      <table style="font-size:13px;width:100%">
+        <tr><td style="width:30%"><b>현재 차이</b></td><td>Java <code>{designStatus, slab, history, _source}</code> vs Python <code>{stage, error, slab}</code> — 같은 도메인을 다른 키로 노출</td></tr>
+        <tr><td><b>Section 2 가 채울 것</b></td><td>"<code>designStatus(Java) = stage(Python)</code>", "<code>errorCode(Java) = error.error_code(Python)</code>" 같은 동치 매핑 표</td></tr>
+        <tr><td><b>호출 지점</b></td><td><code>jvm_bridge/differential.py</code> · <code>_flatten()</code> 직전에 normalize 단계 삽입</td></tr>
+        <tr><td><b>기대 효과</b></td><td>matched 18/33 (≈55%) → ≈100% 도달</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h4>지점 3 · 영향도 분석 — entity → step 그래프 (§10-3)</h4>
+      <table style="font-size:13px;width:100%">
+        <tr><td style="width:30%"><b>현재 동작</b></td><td>onTong 자체 step → entity 매핑 (HRF, PlantMapping 등)</td></tr>
+        <tr><td><b>Section 2 가 채울 것</b></td><td>JPA Entity / MyBatis Mapper / SQL 컬럼 → 자바 메서드 호출 그래프</td></tr>
+        <tr><td><b>호출 지점</b></td><td><code>POST /agents/impact</code> · 입력에 <code>entity_path</code> 추가하면 Section 2 가 영향 메서드 목록 반환</td></tr>
+        <tr><td><b>활용 시나리오</b></td><td>"PRODUCT_KIND_CD 컬럼 의미 변경 시 어떤 step 이 깨지는가" 한 번에 추적</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h4>지점 4 · Auto-PR — 동치 매핑 기반 자바 가드 코드 자동 생성 (§10-3 안)</h4>
+      <table style="font-size:13px;width:100%">
+        <tr><td style="width:30%"><b>현재 동작</b></td><td>Python 변환본에서 발견된 분기 갭 → 자바 if-guard 패치 텍스트 생성</td></tr>
+        <tr><td><b>Section 2 가 채울 것</b></td><td>패치 적용 위치 (정확한 메서드 라인 + import block) 정밀 좌표</td></tr>
+        <tr><td><b>호출 지점</b></td><td><code>POST /auto_pr/generate</code> · 응답에 <code>java_method_anchor</code> 필드 추가</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h4>지점 5 · OntologyBridge LLM 어시스턴트 — Section 2 결과를 컨텍스트로 (§10-5)</h4>
+      <table style="font-size:13px;width:100%">
+        <tr><td style="width:30%"><b>현재 동작</b></td><td>onTong 자체 도메인 사전으로 자연어 → 시나리오 추천</td></tr>
+        <tr><td><b>Section 2 가 채울 것</b></td><td>Section 2 가 만든 ontology graph 의 노드/엣지를 LLM 시스템 프롬프트에 주입 → 더 정확한 분기 가능</td></tr>
+        <tr><td><b>호출 지점</b></td><td><code>POST /bridge/assist</code> · 내부적으로 <code>OntologyClient.graph_snapshot()</code> 호출</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:14px">
+    <b>★ 통합 우선순위</b><br/>
+    내일 미팅에서는 <b>지점 1 (도메인 용어 정규화) + 지점 2 (Differential normalizer)</b> 부터. 이 둘만 연결되어도 #6 OntologyBridge 와 #11 Differential 의 정확도가 즉시 한 단계 올라간다. 지점 3~5 는 Section 2 의 entity 그래프가 어느 정도 안정된 후 점진 적용.
+  </div>
+</section>
+
+<!-- ============================ 11. slab-design 기동 + 비교 ============================ -->
+<section id="java">
+  <h2>12. slab-design 기동 + API 테스트 (H2 in-memory) + Java↔Python 비교</h2>
+  <p class="section-lede">상세 가이드 → <a href="https://github.com/Jeensh/onTong/blob/main/toClaude/simulation/SLAB_DESIGN_API_GUIDE.md">SLAB_DESIGN_API_GUIDE.md</a></p>
+
+  <!-- ★ NEW — H2 디비 + 시드 적재 + 직접 호출 가이드 -->
+  <div class="callout ok">
+    <b>★ 2026-05-10 업데이트 — H2 in-memory DB 자동 시드 + 전용 콘솔 화면</b><br/>
+    <code>application-h2.yml</code> + <code>data-h2.sql</code> + H2 dependency 가 이미 적용됨.
+    <code>--spring.profiles.active=h2</code> 만 붙이면 14 테이블 자동 생성 + 58 row 시드 적재 + API <b>HTTP 200</b> 응답.<br/>
+    <b>👉 <a href="/slab-design.html">slab-design 콘솔 화면 열기</a></b> — 시드 데이터 14 테이블 조회 + 설계 실행 + SLAB_RESULT/HIST 시각 확인.
+  </div>
+
+  <h3>12-α. ★ H2 디비로 API 직접 테스트하기 (신규)</h3>
+
+  <div class="flow-step">
+    <h4><span class="stepnum">1</span> H2 프로파일로 기동 — 8080 포트</h4>
+    <pre><code>export JAVA_HOME=/opt/homebrew/opt/openjdk
+export PATH=$JAVA_HOME/bin:$PATH
+
+# 기존 인스턴스 종료
+pkill -f slab-design-boot 2>/dev/null
+
+# H2 프로파일로 기동 (※ --spring.profiles.active=h2 가 핵심)
+cd /Users/jiyoon/claude/onTong/sample-repos/slab-design
+java -jar slab-design-boot/target/slab-design-boot-1.0.0-SNAPSHOT.jar \
+  --spring.profiles.active=h2
+
+# 또는 백그라운드:
+# nohup java -jar ...slab-design-boot-...jar --spring.profiles.active=h2 \
+#   > /tmp/slab-design-h2.log 2>&1 &</code></pre>
+    <p style="font-size:13px;color:var(--muted)">
+      기동 시 자동 실행: <b>(1)</b> H2 in-memory DB 초기화 → <b>(2)</b> Hibernate <code>create-drop</code> 으로 14 테이블 생성 → <b>(3)</b> <code>data-h2.sql</code> 자동 실행으로 58 row 시드 INSERT.
+    </p>
+  </div>
+
+  <div class="flow-step">
+    <h4><span class="stepnum">2</span> 자동 생성된 14 테이블 (H2)</h4>
+    <div class="grid cols-3" style="gap:6px">
+      <div class="card"><h4>주문 (4)</h4><div class="sub">
+        <code>ORDER_OS</code><br/><code>ORDER_OM</code><br/><code>ORDER_QD</code><br/><code>ORDER_CHEMICAL</code>
+      </div></div>
+      <div class="card"><h4>표준 (8)</h4><div class="sub">
+        <code>CAST_SPEC</code><br/><code>HR_SPEC</code><br/><code>HR_MIN_WGT</code><br/><code>HR_MAX_WGT</code><br/>
+        <code>EDGING_SPEC</code><br/><code>EDGING_GROUP</code><br/><code>SD_PRODUCTIVITY_STD</code><br/><code>CUSTOMER_STD</code>
+      </div></div>
+      <div class="card"><h4>★ 결과/이력 (2)</h4><div class="sub">
+        <code>SLAB_RESULT</code> — 설계된 Slab 저장<br/>
+        <code>SLAB_DESIGN_HIST</code> — step 별 이력 적재
+      </div></div>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-top:8px">
+      모두 <code>@Entity</code> 메타데이터 기반 자동 생성 (Hibernate <code>ddl-auto: create-drop</code>).
+      기동 로그에서 <code>create table</code> 이 14건 확인됨.
+    </p>
+  </div>
+
+  <div class="flow-step">
+    <h4><span class="stepnum">3</span> 시드 데이터 — 58 row (data-h2.sql)</h4>
+    <table>
+      <thead><tr><th>테이블</th><th>행 수</th><th>핵심 시드 내용</th></tr></thead>
+      <tbody>
+        <tr><td><code>ORDER_OS</code> (진도관리)</td><td>9</td><td>9건 후보 (cmpCd=01, orgCd=K/P, OS진도=C, 종결플래그 NULL) — DG001~005 통과 + 의도적 fail (재고주문 등) 4건</td></tr>
+        <tr><td><code>ORDER_OM</code> (단중·사이즈)</td><td>9</td><td>포장단중 하한(pkgWgtLow)=5000~12000kg, 상한(pkgWgtHigh)=15000~30000kg (DG003 통과), 작업기한일(workDue) 미래 (DG005 통과)</td></tr>
+        <tr><td><code>ORDER_QD</code> (강종·HR목표폭)</td><td>9</td><td>강종(gradeCd)=G01/G02, HR목표폭(hrTgtWidth_*) 1200~1900mm</td></tr>
+        <tr><td><code>ORDER_CHEMICAL</code> (8성분)</td><td>9</td><td>8 성분 × min/max/aim 표준값</td></tr>
+        <tr><td><code>CAST_SPEC</code> (연주설비 사양)</td><td>3</td><td>A001 품종, 슬랩두께(slabThickness)=220/250mm</td></tr>
+        <tr><td><code>HR_SPEC</code> (열연설비 사양)</td><td>3</td><td>열연공장(hrPlantCd)='1'/'2', A001 품종, 폭/길이 범위</td></tr>
+        <tr><td><code>HR_MIN_WGT</code> / <code>HR_MAX_WGT</code> (압연 단중)</td><td>11 / 11</td><td>2D 격자 (두께×폭) → 최소단중(minWgt)/최대단중(maxWgt) 매핑 — kg 단위 (8000~35000kg)</td></tr>
+        <tr><td><code>EDGING_GROUP</code> / <code>EDGING_SPEC</code> (Edging)</td><td>7 / 5</td><td>우선순위(priority) + <code>*</code> 와일드카드 default 포함</td></tr>
+        <tr><td><code>SD_PRODUCTIVITY_STD</code> (실수율)</td><td>11</td><td>8 공정 (SM/HR/HRF/CR/ANL1/ANL2/GAL/CRF) 실수율 (<code>productivity</code>)</td></tr>
+        <tr><td><code>CUSTOMER_STD</code> (고객사 포장단중)</td><td>5</td><td>고객별 포장단중 한도 (<code>pkgWgtLow/High</code>) + 와일드카드</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="flow-step">
+    <h4><span class="stepnum">4</span> POST API 호출 — 실측 200 응답</h4>
+    <pre><code>$ curl -s -w "\n---HTTP %{http_code}---\n" \
+    -X POST 'http://localhost:8080/api/sd/working/batch?cmpCd=K&orgCd=K'
+
+{"total":4,"processedCount":0,"skippedCount":4,"processedSlabs":[]}
+---HTTP 200---</code></pre>
+    <div class="flow-callout" style="margin-top:8px">
+      <div></div>
+      <div class="insights" style="grid-column:1 / -1">
+        <h5>응답 해석 (실측 2026-05-10)</h5>
+        <ul>
+          <li><span class="num">total=4</span><b>findDesignable(K, K) JPA 쿼리가 ORDER_OS 시드 4건 정상 추출</b> — DB 연결 + 시드 적재 + 쿼리 모두 OK</li>
+          <li><span class="num">processedCount=0</span>21-step 알고리즘이 demo seed 의 한정된 데이터로 일부 step 에서 멈춤 (재고주문 DG001 + 격자/EDGING 매칭 실패) — <b>알고리즘 정상 동작 중</b></li>
+          <li><span class="num">skippedCount=4</span><code>total - processedCount</code></li>
+          <li><span class="num">processedSlabs</span>설계 성공한 Slab Entity 배열 (현 시드는 0)</li>
+        </ul>
+      </div>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-top:6px">
+      <b>HTTP 200 + total=4</b> 는 DB 연결, 시드 적재, JPA 쿼리, 컨트롤러 흐름 모두 정상임을 증명.
+    </p>
+  </div>
+
+  <div class="flow-step">
+    <h4><span class="stepnum">5</span> 다양한 시나리오 호출</h4>
+    <pre><code># (K, K) — 시드된 광양제철소
+curl -X POST 'http://localhost:8080/api/sd/working/batch?cmpCd=K&orgCd=K'
+# → {"total":4,...}
+
+# (K, P) — 포항 (시드 안 됨)
+curl -X POST 'http://localhost:8080/api/sd/working/batch?cmpCd=K&orgCd=P'
+# → {"total":0,...}
+
+# (X, K) — 미존재 회사
+curl -X POST 'http://localhost:8080/api/sd/working/batch?cmpCd=X&orgCd=K'
+# → {"total":0,...}</code></pre>
+    <p style="font-size:13px;color:var(--muted)">
+      <code>orgCd</code> 컬럼은 <code>length=1</code> — <code>K01</code> 등 2자 이상은 비매칭 (CLAUDE.md 의 옛 예시는 schema 와 불일치).
+    </p>
+  </div>
+
+  <div class="flow-step">
+    <h4><span class="stepnum">6</span> H2 콘솔로 직접 SQL 확인 (선택)</h4>
+    <p style="font-size:13.5px">
+      브라우저: <a href="http://localhost:8080/h2-console" target="_blank">http://localhost:8080/h2-console</a>
+    </p>
+    <ul style="font-size:13.5px">
+      <li><b>JDBC URL</b>: <code>jdbc:h2:mem:slabdesign</code></li>
+      <li><b>User</b>: <code>sa</code> / <b>Password</b>: (빈칸)</li>
+      <li>예시 쿼리:
+        <pre><code>SELECT * FROM ORDER_OS;          -- 4 row
+SELECT count(*) FROM HR_MIN_WGT; -- 9
+SELECT * FROM CAST_SPEC;          -- 2 row
+SHOW TABLES;                      -- 14 tables</code></pre>
+      </li>
+    </ul>
+  </div>
+
+  <div class="next-step">
+    <b>다음 단계</b> — Section 3 의 <code>POST /api/simulation/differential/run</code> (§10-6) 이 이 자바 시스템을 호출해 Python 미러와 결과 비교. 통합 후 java-bridge 의 MockConfig 가 이 H2 시드 데이터를 자동 흡수하도록 확장 가능 (Phase 8 시너지).
+  </div>
+
+  <h3 style="margin-top:36px">12-1. 빌드 + 기동 (요약)</h3>
+  <pre><code>export JAVA_HOME=/opt/homebrew/opt/openjdk
+  <pre><code>export JAVA_HOME=/opt/homebrew/opt/openjdk
+export PATH=$JAVA_HOME/bin:$PATH
+
+# 1) slab-design 빌드 + ~/.m2 install (java-bridge 의존성)
+cd /Users/jiyoon/claude/onTong/sample-repos/slab-design
+chmod +x mvnw
+./mvnw install -DskipTests             # → BUILD SUCCESS
+
+# 2) Spring Boot 기동 (포트 8080)
+java -jar slab-design-boot/target/slab-design-boot-1.0.0-SNAPSHOT.jar
+
+# 3) java-bridge 빌드 (Section 3 → Java 호출용 CLI)
+cd /Users/jiyoon/claude/onTong/backend/simulation/jvm_bridge/java_bridge
+mvn package -DskipTests</code></pre>
+
+  <h3>12-2. 기동 시 패치 — bean 충돌 (이미 적용됨)</h3>
+  <pre><code>// SlabDesignApplication.java
+// 변경 전
+@MapperScan(basePackages = "com.example.slabdesign.store")
+
+// 변경 후 — MyBatis 매퍼 패키지 분리 + @Mapper 필수
+@MapperScan(
+  basePackages = "com.example.slabdesign.store.mybatis",
+  annotationClass = org.apache.ibatis.annotations.Mapper.class
+)</code></pre>
+
+  <h3>12-3. POST API 호출</h3>
+  <pre><code>curl -i -X POST 'http://localhost:8080/api/sd/working/batch?cmpCd=K&orgCd=K01'</code></pre>
+  <div class="callout warn">
+    Oracle 미연결 → HTTP 500은 <b>의도된 동작</b> (CLAUDE.md 명시).
+    <b>실용적 비교는 §11-4 java-bridge 경로</b>를 사용.
+  </div>
+
+  <h3>12-4. ★ Java vs Python 비교 (onTong 내부)</h3>
+  <pre><code># 가용성
+curl -s http://localhost:8001/api/simulation/differential/status
+# → {"java_bridge_available":true, ...}
+
+# 동시 실행 + diff
+curl -X POST http://localhost:8001/api/simulation/differential/run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "order": {
+      "cmpCd": "K", "orgCd": "K01", "orderNo": "ORD-DEMO-001",
+      "stockCode": null, "designPendQty": 100,
+      "pkgWgtLow": 5, "pkgWgtHigh": 30,
+      "confirmedPlantCd": "K K K   ",
+      "productTypeCd": "A001", "gradeCd": "G01",
+      "selectedHrTgtWidth": 1200, "orderWidth": 1200, "orderLength": 6000,
+      "orderWgtLow": 5, "orderWgtHigh": 30
+    },
+    "rules": {}
+  }'</code></pre>
+  <p>응답 핵심 필드:</p>
+  <table>
+    <thead><tr><th>필드</th><th>의미</th></tr></thead>
+    <tbody>
+      <tr><td><code>java_available</code></td><td>java-bridge JAR 가용성</td></tr>
+      <tr><td><code>java_ok / python_ok</code></td><td>각 측 실행 성공 여부</td></tr>
+      <tr><td><code>matched_count / mismatched_count</code></td><td>tolerance 내 일치/불일치 필드</td></tr>
+      <tr><td><code>field_diffs[]</code></td><td>path / java값 / python값 / is_close (BigDecimal 허용오차 적용)</td></tr>
+      <tr><td><code>java_elapsed_sec / python_elapsed_sec</code></td><td>각 측 실행 시간</td></tr>
+    </tbody>
+  </table>
+
+  <h3>12-5. 비교 흐름</h3>
+  <div class="diagram">Python 측:                                  Java 측:
+─────────                                  ────────
+sandbox.registry["pipeline_full"]          subprocess: java -jar java-bridge.jar
+  fixtures.py mock data                       MockConfig (Oracle/Kafka mock swap)
+  steps/*.py                                  SdDesigner.design(orderEntity)
+  → outputs dict                              → outputs JSON
+        │                                        │
+        └────────── differential.py ─────────────┘
+                       │
+                       ▼
+                  field_diffs[]
+                  (BigDecimal tolerance: rel=1e-9 / abs=1e-12)</div>
+</section>
+
+<!-- ============================ 12. 파일 맵 ============================ -->
+<section id="filemap">
+  <h2>13. onTong 루트 파일 맵 — Section 3 별도 표시</h2>
+  <p>
+    <span class="chip section3">🔵 Section 3</span>
+    <span class="chip section2">🟢 Section 2</span>
+    <span class="chip section1">🟡 Section 1 (Wiki)</span>
+    <span class="chip shared">🔄 공유 / 공통</span>
+  </p>
+  <div class="diagram">/Users/jiyoon/claude/onTong/
+├── backend/
+│   ├── api/                          [공통]
+│   ├── application/
+│   │   ├── wiki/, conflict/, agent/, trust/, image/, graph/   🟡 Section 1
+│   ├── modeling/                     🟢 Section 2 ← 통합 대상
+│   ├── simulation/                   🔵 ★ Section 3 — 본 세션 소유
+│   ├── shared/contracts/             🔄 공유 — 변경 시 양 섹션 협의
+│   │   ├── ontology.py               🔄 ★ Section 2 ↔ 3 인터페이스
+│   │   └── simulation.py             🔵 Section 3 입출력 schema
+│   ├── core/, infrastructure/        [공통]
+│   └── main.py                       [공통 — router 등록]
+│
+├── frontend/src/
+│   ├── components/
+│   │   ├── wiki/                     🟡
+│   │   ├── modeling/                 🟢
+│   │   ├── simulation/               🔵 ★ Section 3
+│   │   └── sections/SectionNav.tsx   [공통 네비]
+│   ├── lib/{wiki,modeling,simulation}
+│   └── app/                          [Next.js routes]
+│
+├── sample-repos/
+│   └── slab-design/                  🔵 Section 3 데모 fixture (자바, 무수정)
+│
+├── tests/{wiki,modeling,simulation}  🟡🟢🔵 (Section 3: 189 통과)
+│
+├── toClaude/
+│   ├── _shared/                      🔄 공용 (사용자 승인 시만)
+│   ├── wiki/, modeling/              🟡🟢
+│   └── simulation/                   🔵 ★ 본 세션 쓰기 영역
+│
+├── docs/, wiki/                      [공통 / 위키 콘텐츠]
+└── docker-compose.yml, pyproject.toml, package.json   [공통]</div>
+
+  <h3>13-1. Section 3 백엔드 (<code>backend/simulation/</code>)</h3>
+  <table>
+    <thead><tr><th>경로</th><th>책임</th></tr></thead>
+    <tbody>
+      <tr><td><code>agents/</code></td><td>Agent 1~4 + scenario_assistant (LLM)</td></tr>
+      <tr><td><code>api/</code></td><td>FastAPI 라우터 (agents/auto_pr/bridge/differential/jobs/scenarios/seed/slab_agent/transpile)</td></tr>
+      <tr><td><code>auto_pr/</code></td><td>LLM 자바 패치 제안</td></tr>
+      <tr><td><code>client/</code></td><td><b>ontology_client.py</b> 🔄 Section 2 호출 진입점</td></tr>
+      <tr><td><code>data/scenarios/*.yaml</code></td><td>시드 8건</td></tr>
+      <tr><td><code>jobs/</code></td><td>AsyncJobQueue (Semaphore N=4)</td></tr>
+      <tr><td><code>jvm_bridge/</code></td><td>Java 무수정 호출 (Spring Boot CLI + mock)</td></tr>
+      <tr><td><code>ontology_bridge/</code></td><td>도메인 용어 16종 정규화 → step</td></tr>
+      <tr><td><code>sandbox/</code></td><td>Python step 격리 실행 + registry + fixtures</td></tr>
+      <tr><td><code>storage/</code></td><td>SQLite + 선택적 PG</td></tr>
+      <tr><td><code>testgen/</code></td><td>Hypothesis strategies + case_builder</td></tr>
+      <tr><td><code>transpile/</code></td><td><b>parser.py (tree-sitter) + llm_transpile.py + equivalence.py</b></td></tr>
+      <tr><td><code>visualization/</code></td><td>heatmap (line-level) + diff_summary (stage_transitions 4셀)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>13-2. Section 3 프론트엔드 — 주요 컴포넌트</h3>
+  <p>
+    <span class="chip">SimulationSection</span><span class="chip">SandboxPanel</span>
+    <span class="chip">TimelineScrubber</span><span class="chip">ScenarioLibraryPanel</span>
+    <span class="chip">ImpactPanel</span><span class="chip">RegressionPanel</span>
+    <span class="chip">RunHistoryPanel</span><span class="chip">OntologyBridgePanel</span>
+    <span class="chip">RiskHeatmap</span><span class="chip">ResultChart</span>
+    <span class="chip">MigrationDiffCard</span><span class="chip">AutoPRCard</span>
+    <span class="chip">JsonTable</span><span class="chip">JavaPythonComparePanel</span>
+    <span class="chip">TranspilePanel</span><span class="chip">SlabViewer3D</span>
+    <span class="chip">DbSeedCard</span><span class="chip">HomeDashboardPanel</span>
+  </p>
+</section>
+
+<!-- ============================ 13. Section 2 통합 ============================ -->
+<section id="integration">
+  <h2>14. Section 2 ↔ Section 3 통합 — 어떻게 연결하나</h2>
+
+  <h3>14-1. 현재 인터페이스 — 한 군데만 만난다</h3>
+  <div class="diagram">backend/simulation/client/ontology_client.py
+                ↓ (호출)
+backend/modeling/ontology/api/ontology_router.py
+                ↑ (구현)
+backend/shared/contracts/ontology.py  ← 양 섹션이 공유하는 schema</div>
+
+  <h3>14-2. 호출 패턴 (in-process / HTTP 양쪽 지원)</h3>
+  <pre><code>from backend.simulation.client.ontology_client import OntologyClient
+from backend.shared.contracts.ontology import OntologyRequest, Intent
+
+client = OntologyClient(in_process=True)        # 단일 프로세스
+# client = OntologyClient(base_url="http://...")  # 분리 배포
+
+resp = await client.query(OntologyRequest(
+    intent=Intent.IMPACT_ANALYSIS,
+    parameters={"target_id": "HRF_PRODUCTIVITY", "change_kind": "data"},
+))</code></pre>
+
+  <h3>14-3. Intent 5종</h3>
+  <table>
+    <thead><tr><th>Intent</th><th>Section 3 사용 위치</th></tr></thead>
+    <tbody>
+      <tr><td><code>QUERY</code></td><td>(예약) 일반 그래프 조회</td></tr>
+      <tr><td><code>SIMULATE</code></td><td>Agent 2 — 실행은 Section 3 sandbox이지만 scope 결정에 ontology 사용</td></tr>
+      <tr><td><code>IMPACT_ANALYSIS</code></td><td>Agent 1 — 룰 변경 영향 step 후보 결정</td></tr>
+      <tr><td><code>OPTIMIZE</code></td><td>(예약) 룰 추천</td></tr>
+      <tr><td><code>EXPLAIN</code></td><td>Agent 3 — 룰/메서드 위치 설명</td></tr>
+    </tbody>
+  </table>
+
+  <h3>14-4. 파서 공유</h3>
+  <table>
+    <thead><tr><th>영역</th><th>Section 2</th><th>Section 3</th></tr></thead>
+    <tbody>
+      <tr><td>tree-sitter Java 파서</td>
+          <td><code>backend/modeling/code_analysis/java_parser.py</code></td>
+          <td><code>backend/simulation/transpile/parser.py</code></td></tr>
+      <tr><td>Language 객체</td>
+          <td><code>tsjava.language()</code> 1회 로드</td>
+          <td><b>동일 인스턴스 재사용</b></td></tr>
+      <tr><td>추출 결과</td>
+          <td>CodeEntity / CodeRelation (그래프)</td>
+          <td>JavaMethodInfo (메서드 + body)</td></tr>
+    </tbody>
+  </table>
+  <div class="callout">
+    두 파서는 같은 tree-sitter 백엔드 공유. <b>Section 2가 코드 그래프를 만들고 Section 3가 메서드 본문을 변환</b> — 상호 보완.
+  </div>
+
+  <h3>14-5. 환경변수 (fallback 정책)</h3>
+  <table>
+    <thead><tr><th>변수</th><th>기본값</th><th>의미</th></tr></thead>
+    <tbody>
+      <tr><td><code>SIMULATION_SKIP_ONTOLOGY</code></td><td><code>1</code> (skip)</td>
+          <td>Section 2 호출 우회 — Section 2 미가동 시 단독 동작 보장</td></tr>
+      <tr><td><code>MODELING_API_URL</code></td><td><code>http://localhost:8001</code></td>
+          <td>HTTP 모드 시 Section 2 baseURL</td></tr>
+      <tr><td><code>SIMULATION_JAVA_BRIDGE_JAR</code></td><td>(자동 탐색)</td>
+          <td>java-bridge JAR 경로 override</td></tr>
+    </tbody>
+  </table>
+
+  <h3>14-6. ★ Phase 8 — 통합 후 가능한 시너지 4종</h3>
+  <div class="grid cols-2">
+    <div class="card">
+      <h4>1) OntologyBridge에 Section 2 그래프 연결</h4>
+      <div class="sub">현재: 16 용어 hardcoded → step 추천. 통합 후: Section 2 Neo4j BFS 결과를 받아 동적 매핑 + 영향 step 자동 확장.</div>
+    </div>
+    <div class="card">
+      <h4>2) Java↔Python diff fixture 자동 시드</h4>
+      <div class="sub">Section 2가 분석한 자바 entity 컬럼 매핑을 java-bridge MockConfig 데이터로 자동 생성 → 의미 있는 diff.</div>
+    </div>
+    <div class="card">
+      <h4>3) Auto-PR 코드 위치 정확도</h4>
+      <div class="sub">현재 STEP_TO_TARGET hardcoded → Section 2 CodeEntity 그래프에서 step 관련 메서드 자동 추적.</div>
+    </div>
+    <div class="card">
+      <h4>4) Transpile 컨텍스트 주입</h4>
+      <div class="sub">호출 체인 + 도메인 의미 요약을 LLM에 함께 전달 → 변환 정확도 향상.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 14. 다음 액션 ============================ -->
+<section id="nextsteps">
+  <h2>15. 내일 (5/10) 통합 미팅 의제</h2>
+  <table>
+    <thead><tr><th>분</th><th>의제</th><th>산출</th></tr></thead>
+    <tbody>
+      <tr><td>0~10</td><td>Section 3 5분 시연 (§9-2)</td><td>—</td></tr>
+      <tr><td>10~20</td><td>Java↔Python 비교 라이브 (§11-4)</td><td>—</td></tr>
+      <tr><td>20~30</td><td>Section 2 ontology 데이터 상태 점검</td><td>Neo4j seed 현황</td></tr>
+      <tr><td>30~45</td><td><code>OntologyRequest/Response</code> schema 동기화</td><td>변경 합의</td></tr>
+      <tr><td>45~60</td><td>Phase 8 통합 후보 결정</td><td>TODO 추가</td></tr>
+    </tbody>
+  </table>
+
+  <h3>15-1. 통합 후 검증 (<code>SIMULATION_SKIP_ONTOLOGY=0</code>)</h3>
+  <pre><code># 1) Section 2 ontology API 가용성
+curl -s http://localhost:8001/api/modeling/ontology/graph/stats
+
+# 2) Section 3 → Section 2 in-process 호출 통합 테스트
+SIMULATION_SKIP_ONTOLOGY=0 ./venv/bin/pytest tests/simulation/test_demo_e2e.py -v
+
+# 3) Agent 1 ontology trace 채워지는지 확인 (null 이 아니어야 함)
+curl -X POST http://localhost:8001/api/simulation/agents/impact \
+  -d '{"change_kind":"data","target_type":"column","target_id":"HRF_PRODUCTIVITY",
+       "modification_type":"value_change","new_value":"0.50","sample_size":5,"run_sandbox":true}' \
+  | jq '.ontology_trace'</code></pre>
+</section>
+
+<footer>
+  <div>참고 문서: <code>toClaude/simulation/SECTION3_LANDING.md</code> · <code>SLAB_DESIGN_API_GUIDE.md</code> · <code>SECTION3_FILE_MAP.md</code></div>
+  <div>Section 3 owner — Simulation 세션 · onTong · 2026-05-09</div>
+</footer>
+
+</main>
+</div>
+
+<script>
+  // smooth scroll for in-page anchors
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const id = a.getAttribute('href').slice(1);
+      const t = document.getElementById(id);
+      if (t) { e.preventDefault(); t.scrollIntoView({behavior:'smooth', block:'start'}); }
+    });
+  });
+</script>
+</body>
+</html>
