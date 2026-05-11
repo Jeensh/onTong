@@ -11,6 +11,12 @@ REST:
 
 confirm: confirmed=True (Action 은 추가로 verification_level: draft → signature_locked).
 reject: row 삭제 (recommend 다시 돌리면 재생성됨).
+
+Wave 2 (2026-05-10): inline edit (PATCH) + confirm/unconfirm 모두 audit_log 에 기록.
+- Pydantic Patch 모델은 `_generated_patch_models` (codegen, SSOT = editable_fields.yaml) 에서 import.
+- `audit_patch` context manager 로 PATCH before/after diff → audit row.
+- confirm/unconfirm 은 `record_audit` 직접 호출 (entity-level action, field=None).
+- user_id 는 `Depends(get_current_user)` 로 plumbing.
 """
 from __future__ import annotations
 
@@ -18,10 +24,20 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import delete, select
 
+from backend.core.auth import User, get_current_user
+from backend.modeling.api._generated_patch_models import (
+    ActionPatch,
+    AnchorPatch,
+    BRPatch,
+    CodeTypePatch,
+    TermPatch,
+)
+from backend.modeling.audit import audit_patch, record_audit
+from backend.modeling.code_layer.orm import CodeTypeRow
 from backend.modeling.domain_layer.orm import BusinessRuleRow, BusinessTermRow
 from backend.modeling.mapping_layer.orm import (
     ActionRow,
@@ -34,6 +50,14 @@ from backend.modeling.persistence.database import session_scope
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ontology/repos", tags=["ontology-queue"])
+
+
+# ---------------------------------------------------------------------------
+# user_id plumbing — single shared dependency for all PATCH/confirm endpoints.
+# ---------------------------------------------------------------------------
+def _user_dep(user: User = Depends(get_current_user)) -> str:
+    """Resolve the current user's id (string). Falls back to "system" if absent."""
+    return user.id if user and user.id else "system"
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +180,9 @@ class ActionResult(BaseModel):
 
 
 @router.post("/{repo_id}/terms/{fqn:path}/confirm", response_model=ActionResult)
-def confirm_term(repo_id: str, fqn: str) -> ActionResult:
+def confirm_term(
+    repo_id: str, fqn: str, user_id: str = Depends(_user_dep),
+) -> ActionResult:
     with session_scope() as s:
         row = s.execute(
             select(BusinessTermRow).where(
@@ -167,6 +193,11 @@ def confirm_term(repo_id: str, fqn: str) -> ActionResult:
             raise HTTPException(status_code=404, detail=f"term not found: {fqn}")
         row.confirmed = True
         row.source = "user"
+        record_audit(
+            s, repo_id=repo_id, entity_kind="term", entity_id=fqn,
+            field=None, before=None, after=None,
+            action="confirmed", user_id=user_id,
+        )
     return ActionResult(ok=True, action="confirmed", target=fqn)
 
 
@@ -191,7 +222,11 @@ def reject_term(repo_id: str, fqn: str) -> ActionResult:
 
 
 @router.post("/{repo_id}/actions/{fqn:path}/confirm", response_model=ActionResult)
-def confirm_action(repo_id: str, fqn: str, by: str = Query("user")) -> ActionResult:
+def confirm_action(
+    repo_id: str, fqn: str,
+    by: str = Query("user"),
+    user_id: str = Depends(_user_dep),
+) -> ActionResult:
     with session_scope() as s:
         row = s.execute(
             select(ActionRow).where(
@@ -204,6 +239,11 @@ def confirm_action(repo_id: str, fqn: str, by: str = Query("user")) -> ActionRes
         # verification 진척: draft → signature_locked (이미 더 높은 단계면 그대로)
         if row.verification_level == "draft" or row.verification_level == "unmapped":
             row.verification_level = "signature_locked"
+        record_audit(
+            s, repo_id=repo_id, entity_kind="action", entity_id=fqn,
+            field=None, before=None, after=None,
+            action="confirmed", user_id=user_id,
+        )
     return ActionResult(ok=True, action="confirmed", target=fqn)
 
 
@@ -263,7 +303,9 @@ def _check_field(row: Any, attr: str) -> Any:
 # 5-ii Stage 1 — BusinessRule confirmed toggle
 # ---------------------------------------------------------------------------
 @router.post("/{repo_id}/business-rules/{fqn:path}/confirm", response_model=ActionResult)
-def confirm_business_rule(repo_id: str, fqn: str) -> ActionResult:
+def confirm_business_rule(
+    repo_id: str, fqn: str, user_id: str = Depends(_user_dep),
+) -> ActionResult:
     with session_scope() as s:
         row = s.execute(
             select(BusinessRuleRow).where(
@@ -274,11 +316,18 @@ def confirm_business_rule(repo_id: str, fqn: str) -> ActionResult:
             raise HTTPException(status_code=404, detail=f"business rule not found: {fqn}")
         row.confirmed = True
         row.source = "user"
+        record_audit(
+            s, repo_id=repo_id, entity_kind="rule", entity_id=fqn,
+            field=None, before=None, after=None,
+            action="confirmed", user_id=user_id,
+        )
     return ActionResult(ok=True, action="confirmed", target=fqn)
 
 
 @router.post("/{repo_id}/business-rules/{fqn:path}/unconfirm", response_model=ActionResult)
-def unconfirm_business_rule(repo_id: str, fqn: str) -> ActionResult:
+def unconfirm_business_rule(
+    repo_id: str, fqn: str, user_id: str = Depends(_user_dep),
+) -> ActionResult:
     """draft 로 되돌림 (BR row 자체는 보존). reject 와 다름 — reject 는 row 삭제."""
     with session_scope() as s:
         row = s.execute(
@@ -289,6 +338,11 @@ def unconfirm_business_rule(repo_id: str, fqn: str) -> ActionResult:
         if row is None:
             raise HTTPException(status_code=404, detail=f"business rule not found: {fqn}")
         row.confirmed = False
+        record_audit(
+            s, repo_id=repo_id, entity_kind="rule", entity_id=fqn,
+            field=None, before=None, after=None,
+            action="unconfirmed", user_id=user_id,
+        )
     return ActionResult(ok=True, action="unconfirmed", target=fqn)
 
 
@@ -296,7 +350,9 @@ def unconfirm_business_rule(repo_id: str, fqn: str) -> ActionResult:
 # 5-ii Stage 1 — AnchorBinding confirmed toggle
 # ---------------------------------------------------------------------------
 @router.post("/{repo_id}/anchor-bindings/{anchor_id}/confirm", response_model=ActionResult)
-def confirm_anchor_binding(repo_id: str, anchor_id: str) -> ActionResult:
+def confirm_anchor_binding(
+    repo_id: str, anchor_id: str, user_id: str = Depends(_user_dep),
+) -> ActionResult:
     with session_scope() as s:
         row = s.execute(
             select(AnchorBindingRow).where(
@@ -307,11 +363,18 @@ def confirm_anchor_binding(repo_id: str, anchor_id: str) -> ActionResult:
             raise HTTPException(status_code=404, detail=f"anchor not found: {anchor_id}")
         row.confirmed = True
         row.source = "user"
+        record_audit(
+            s, repo_id=repo_id, entity_kind="anchor", entity_id=anchor_id,
+            field=None, before=None, after=None,
+            action="confirmed", user_id=user_id,
+        )
     return ActionResult(ok=True, action="confirmed", target=anchor_id)
 
 
 @router.post("/{repo_id}/anchor-bindings/{anchor_id}/unconfirm", response_model=ActionResult)
-def unconfirm_anchor_binding(repo_id: str, anchor_id: str) -> ActionResult:
+def unconfirm_anchor_binding(
+    repo_id: str, anchor_id: str, user_id: str = Depends(_user_dep),
+) -> ActionResult:
     """draft 로 되돌림 (AnchorBinding row 자체는 보존)."""
     with session_scope() as s:
         row = s.execute(
@@ -322,6 +385,11 @@ def unconfirm_anchor_binding(repo_id: str, anchor_id: str) -> ActionResult:
         if row is None:
             raise HTTPException(status_code=404, detail=f"anchor not found: {anchor_id}")
         row.confirmed = False
+        record_audit(
+            s, repo_id=repo_id, entity_kind="anchor", entity_id=anchor_id,
+            field=None, before=None, after=None,
+            action="unconfirmed", user_id=user_id,
+        )
     return ActionResult(ok=True, action="unconfirmed", target=anchor_id)
 
 
@@ -329,7 +397,9 @@ def unconfirm_anchor_binding(repo_id: str, anchor_id: str) -> ActionResult:
 # 5-ii Stage 1 — Term unconfirm (기존 confirm 엔드포인트 mate)
 # ---------------------------------------------------------------------------
 @router.post("/{repo_id}/terms/{fqn:path}/unconfirm", response_model=ActionResult)
-def unconfirm_term(repo_id: str, fqn: str) -> ActionResult:
+def unconfirm_term(
+    repo_id: str, fqn: str, user_id: str = Depends(_user_dep),
+) -> ActionResult:
     with session_scope() as s:
         row = s.execute(
             select(BusinessTermRow).where(
@@ -339,6 +409,11 @@ def unconfirm_term(repo_id: str, fqn: str) -> ActionResult:
         if row is None:
             raise HTTPException(status_code=404, detail=f"term not found: {fqn}")
         row.confirmed = False
+        record_audit(
+            s, repo_id=repo_id, entity_kind="term", entity_id=fqn,
+            field=None, before=None, after=None,
+            action="unconfirmed", user_id=user_id,
+        )
     return ActionResult(ok=True, action="unconfirmed", target=fqn)
 
 
@@ -346,7 +421,9 @@ def unconfirm_term(repo_id: str, fqn: str) -> ActionResult:
 # 5-ii Stage 1 — Action unconfirm (verification_level → draft 로 되돌림)
 # ---------------------------------------------------------------------------
 @router.post("/{repo_id}/actions/{fqn:path}/unconfirm", response_model=ActionResult)
-def unconfirm_action(repo_id: str, fqn: str) -> ActionResult:
+def unconfirm_action(
+    repo_id: str, fqn: str, user_id: str = Depends(_user_dep),
+) -> ActionResult:
     with session_scope() as s:
         row = s.execute(
             select(ActionRow).where(
@@ -360,26 +437,29 @@ def unconfirm_action(repo_id: str, fqn: str) -> ActionResult:
         if row.verification_level in ("signature_locked", "body_anchored"):
             row.verification_level = "draft"
         row.confirmed_by = None
+        record_audit(
+            s, repo_id=repo_id, entity_kind="action", entity_id=fqn,
+            field=None, before=None, after=None,
+            action="unconfirmed", user_id=user_id,
+        )
     return ActionResult(ok=True, action="unconfirmed", target=fqn)
 
 
 # ---------------------------------------------------------------------------
-# 5-ii Stage 2 — inline field edit (Term / Action / BR / Anchor)
+# 5-ii Stage 2 — inline field edit (Term / Action / BR / Anchor / CodeType)
+#
+# Pydantic Patch 모델은 codegen module 에서 import — SSOT = editable_fields.yaml.
+# 절대 여기서 재정의하지 말 것 (yaml 변경 시 scripts/codegen_patch_models.py 재실행).
 # ---------------------------------------------------------------------------
-class TermPatch(BaseModel):
-    """Term 의 일부 field 갱신. None 인 field 는 변경 안 함."""
-    label: str | None = None
-    aliases: list[str] | None = None
-    description: str | None = None
-    domain: str | None = None
-    value_type: str | None = None      # atomic 만 의미
-    unit: str | None = None
-    enum_values: list[str] | None = None
-
-
 @router.patch("/{repo_id}/terms/{fqn:path}", response_model=ActionResult)
-def patch_term(repo_id: str, fqn: str, patch: TermPatch) -> ActionResult:
-    with session_scope() as s:
+def patch_term(
+    repo_id: str, fqn: str, patch: TermPatch,
+    user_id: str = Depends(_user_dep),
+) -> ActionResult:
+    with session_scope() as s, audit_patch(
+        session=s, repo_id=repo_id, entity_kind="term",
+        entity_id=fqn, user_id=user_id,
+    ) as actx:
         row = s.execute(
             select(BusinessTermRow).where(
                 BusinessTermRow.repo_id == repo_id, BusinessTermRow.fqn == fqn,
@@ -387,26 +467,51 @@ def patch_term(repo_id: str, fqn: str, patch: TermPatch) -> ActionResult:
         ).scalar_one_or_none()
         if row is None:
             raise HTTPException(status_code=404, detail=f"term not found: {fqn}")
+
+        patch_data = patch.model_dump(exclude_none=True)
+        # before snapshot — only the fields being patched (codegen YAML field names,
+        # mapped to ORM column names where they differ).
+        before = _term_snapshot(row, patch_data.keys())
+
         if patch.label is not None:       row.label = patch.label
         if patch.aliases is not None:     row.aliases_json = json.dumps(patch.aliases, ensure_ascii=False)
         if patch.description is not None: row.description = patch.description
         if patch.domain is not None:      row.domain = patch.domain
         if patch.value_type is not None:  row.value_type = patch.value_type
         if patch.unit is not None:        row.unit = patch.unit
+        if patch.range is not None:       row.range_json = json.dumps(patch.range)
         if patch.enum_values is not None:
             row.enum_values_json = json.dumps(patch.enum_values, ensure_ascii=False)
+
+        actx.set_before(before)
+        actx.set_after(_term_snapshot(row, patch_data.keys()))
     return ActionResult(ok=True, action="patched", target=fqn)
 
 
-class ActionPatch(BaseModel):
-    label: str | None = None
-    aliases: list[str] | None = None
-    description: str | None = None
+def _term_snapshot(row: BusinessTermRow, fields: Any) -> dict[str, Any]:
+    """ORM row → dict (only requested patch field names — codegen YAML keys)."""
+    out: dict[str, Any] = {}
+    for f in fields:
+        if f == "aliases":
+            out["aliases"] = json.loads(row.aliases_json or "[]")
+        elif f == "range":
+            out["range"] = json.loads(row.range_json) if row.range_json else None
+        elif f == "enum_values":
+            out["enum_values"] = json.loads(row.enum_values_json) if row.enum_values_json else None
+        else:
+            out[f] = getattr(row, f, None)
+    return out
 
 
 @router.patch("/{repo_id}/actions/{fqn:path}", response_model=ActionResult)
-def patch_action(repo_id: str, fqn: str, patch: ActionPatch) -> ActionResult:
-    with session_scope() as s:
+def patch_action(
+    repo_id: str, fqn: str, patch: ActionPatch,
+    user_id: str = Depends(_user_dep),
+) -> ActionResult:
+    with session_scope() as s, audit_patch(
+        session=s, repo_id=repo_id, entity_kind="action",
+        entity_id=fqn, user_id=user_id,
+    ) as actx:
         row = s.execute(
             select(ActionRow).where(
                 ActionRow.repo_id == repo_id, ActionRow.fqn == fqn,
@@ -414,22 +519,41 @@ def patch_action(repo_id: str, fqn: str, patch: ActionPatch) -> ActionResult:
         ).scalar_one_or_none()
         if row is None:
             raise HTTPException(status_code=404, detail=f"action not found: {fqn}")
+
+        patch_data = patch.model_dump(exclude_none=True)
+        before = _action_snapshot(row, patch_data.keys())
+
         if patch.label is not None:       row.label = patch.label
         if patch.aliases is not None:     row.aliases_json = json.dumps(patch.aliases, ensure_ascii=False)
         if patch.description is not None: row.description = patch.description
+
+        actx.set_before(before)
+        actx.set_after(_action_snapshot(row, patch_data.keys()))
     return ActionResult(ok=True, action="patched", target=fqn)
 
 
-class BRPatch(BaseModel):
-    statement: str | None = None
-    severity: str | None = None        # "hard" / "soft"
+def _action_snapshot(row: ActionRow, fields: Any) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for f in fields:
+        if f == "aliases":
+            out["aliases"] = json.loads(row.aliases_json or "[]")
+        else:
+            out[f] = getattr(row, f, None)
+    return out
 
 
 @router.patch("/{repo_id}/business-rules/{fqn:path}", response_model=ActionResult)
-def patch_business_rule(repo_id: str, fqn: str, patch: BRPatch) -> ActionResult:
+def patch_business_rule(
+    repo_id: str, fqn: str, patch: BRPatch,
+    user_id: str = Depends(_user_dep),
+) -> ActionResult:
+    # severity 는 codegen Literal["hard", "soft"] 로 이미 검증되지만 방어 한 번 더.
     if patch.severity is not None and patch.severity not in ("hard", "soft"):
         raise HTTPException(status_code=400, detail=f"invalid severity: {patch.severity}")
-    with session_scope() as s:
+    with session_scope() as s, audit_patch(
+        session=s, repo_id=repo_id, entity_kind="rule",
+        entity_id=fqn, user_id=user_id,
+    ) as actx:
         row = s.execute(
             select(BusinessRuleRow).where(
                 BusinessRuleRow.repo_id == repo_id, BusinessRuleRow.fqn == fqn,
@@ -437,20 +561,27 @@ def patch_business_rule(repo_id: str, fqn: str, patch: BRPatch) -> ActionResult:
         ).scalar_one_or_none()
         if row is None:
             raise HTTPException(status_code=404, detail=f"business rule not found: {fqn}")
+
+        patch_data = patch.model_dump(exclude_none=True)
+        before = {f: getattr(row, f, None) for f in patch_data.keys()}
+
         if patch.statement is not None: row.statement = patch.statement
         if patch.severity is not None:  row.severity = patch.severity
+
+        actx.set_before(before)
+        actx.set_after({f: getattr(row, f, None) for f in patch_data.keys()})
     return ActionResult(ok=True, action="patched", target=fqn)
 
 
-class AnchorPatch(BaseModel):
-    anchor_locator: str | None = None
-    target_slot: str | None = None
-    rationale: str | None = None
-
-
 @router.patch("/{repo_id}/anchor-bindings/{anchor_id}", response_model=ActionResult)
-def patch_anchor_binding(repo_id: str, anchor_id: str, patch: AnchorPatch) -> ActionResult:
-    with session_scope() as s:
+def patch_anchor_binding(
+    repo_id: str, anchor_id: str, patch: AnchorPatch,
+    user_id: str = Depends(_user_dep),
+) -> ActionResult:
+    with session_scope() as s, audit_patch(
+        session=s, repo_id=repo_id, entity_kind="anchor",
+        entity_id=anchor_id, user_id=user_id,
+    ) as actx:
         row = s.execute(
             select(AnchorBindingRow).where(
                 AnchorBindingRow.repo_id == repo_id, AnchorBindingRow.id == anchor_id,
@@ -458,7 +589,47 @@ def patch_anchor_binding(repo_id: str, anchor_id: str, patch: AnchorPatch) -> Ac
         ).scalar_one_or_none()
         if row is None:
             raise HTTPException(status_code=404, detail=f"anchor not found: {anchor_id}")
+
+        patch_data = patch.model_dump(exclude_none=True)
+        before = {f: getattr(row, f, None) for f in patch_data.keys()}
+
         if patch.anchor_locator is not None: row.anchor_locator = patch.anchor_locator
         if patch.target_slot is not None:    row.target_slot = patch.target_slot
         if patch.rationale is not None:      row.rationale = patch.rationale
+
+        actx.set_before(before)
+        actx.set_after({f: getattr(row, f, None) for f in patch_data.keys()})
     return ActionResult(ok=True, action="patched", target=anchor_id)
+
+
+# ---------------------------------------------------------------------------
+# Wave 2 — CodeType.role inline edit (Decision #8).
+#
+# CodeType row 는 fqn 이 PK (글로벌). repo_id 에서 lookup 해서 잘못된 repo 의
+# CodeType 을 patch 하지 못하도록 방어.
+# ---------------------------------------------------------------------------
+@router.patch("/{repo_id}/code-types/{fqn:path}", response_model=ActionResult)
+def patch_code_type(
+    repo_id: str, fqn: str, patch: CodeTypePatch,
+    user_id: str = Depends(_user_dep),
+) -> ActionResult:
+    with session_scope() as s, audit_patch(
+        session=s, repo_id=repo_id, entity_kind="code_type",
+        entity_id=fqn, user_id=user_id,
+    ) as actx:
+        row = s.execute(
+            select(CodeTypeRow).where(
+                CodeTypeRow.repo_id == repo_id, CodeTypeRow.fqn == fqn,
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            raise HTTPException(status_code=404, detail=f"code type not found: {fqn}")
+
+        patch_data = patch.model_dump(exclude_none=True)
+        before = {f: getattr(row, f, None) for f in patch_data.keys()}
+
+        if patch.role is not None: row.role = patch.role
+
+        actx.set_before(before)
+        actx.set_after({f: getattr(row, f, None) for f in patch_data.keys()})
+    return ActionResult(ok=True, action="patched", target=fqn)

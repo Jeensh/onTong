@@ -1,0 +1,2331 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>onTong · 편집 가능 필드 가이드 (5-ii)</title>
+<style>
+  /* ------------------------------------------------------------------ */
+  /* Light-mode design tokens — match modeling section's reverted theme  */
+  /* ------------------------------------------------------------------ */
+  :root {
+    --bg:        #fafafa;
+    --card:     #ffffff;
+    --muted:    #f4f4f5;
+    --border:   #e4e4e7;
+    --border-2: #d4d4d8;
+    --fg:       #18181b;
+    --fg-2:     #3f3f46;
+    --fg-3:     #71717a;
+    --fg-4:     #a1a1aa;
+    --primary:  #0284c7;     /* sky-600 */
+    --primary-bg: #f0f9ff;   /* sky-50 */
+    --inline:   #16a34a;     /* green-600 */
+    --inline-bg:#dcfce7;     /* green-100 */
+    --toggle:   #2563eb;     /* blue-600 */
+    --toggle-bg:#dbeafe;     /* blue-100 */
+    --authoring:#9333ea;     /* purple-600 */
+    --authoring-bg:#f3e8ff;
+    --readonly: #71717a;
+    --readonly-bg:#f4f4f5;
+    --warn:     #b45309;     /* amber-700 */
+    --warn-bg:  #fef3c7;
+    --danger:   #b91c1c;     /* red-700 */
+    --danger-bg:#fee2e2;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 24px 80px;
+  }
+  h1.page-title {
+    font-size: 24px;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+  .subtitle {
+    color: var(--fg-3);
+    font-size: 13px;
+    margin: 0 0 20px;
+  }
+
+  /* ------------------------------ Intro ------------------------------ */
+  .intro {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 18px;
+  }
+  .intro p { margin: 6px 0; color: var(--fg-2); }
+  .intro strong { color: var(--fg); }
+  .intro code {
+    font-family: var(--mono);
+    background: var(--muted);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+
+  /* ----------------------------- Legend ------------------------------ */
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px;
+    margin: 14px 0 6px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+  }
+  .legend-icon {
+    font-size: 18px;
+    line-height: 1;
+    width: 24px;
+    flex-shrink: 0;
+  }
+  .legend-body { font-size: 12.5px; }
+  .legend-body strong { display: block; margin-bottom: 2px; }
+  .legend-body span { color: var(--fg-3); }
+
+  /* --------------------------- Search bar ---------------------------- */
+  .search-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin: 16px 0 12px;
+  }
+  .search-row input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-2);
+    border-radius: 6px;
+    background: var(--card);
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .search-row input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-bg);
+  }
+  .search-counter {
+    color: var(--fg-3);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  /* ------------------------------ Tabs ------------------------------- */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid var(--border);
+    margin: 18px 0 0;
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 10px 16px;
+    border: 1px solid transparent;
+    border-bottom: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 13.5px;
+    color: var(--fg-3);
+    border-radius: 6px 6px 0 0;
+    transition: all 0.12s ease;
+    white-space: nowrap;
+    position: relative;
+    top: 1px;
+    font-family: inherit;
+  }
+  .tab:hover { color: var(--fg); background: var(--muted); }
+  .tab.active {
+    background: var(--card);
+    border-color: var(--border);
+    color: var(--fg);
+    font-weight: 600;
+  }
+  .tab .count {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 11px;
+    color: var(--fg-4);
+    font-weight: 400;
+  }
+  .tab.active .count { color: var(--primary); }
+
+  .panel {
+    display: none;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 0;
+  }
+  .panel.active { display: block; }
+
+  /* ----------------------------- Header ------------------------------ */
+  .panel-header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--muted);
+    border-radius: 0 0 0 0;
+  }
+  .panel-header h2 {
+    margin: 0 0 4px;
+    font-size: 17px;
+  }
+  .panel-header .meta {
+    color: var(--fg-3);
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+  .panel-header code {
+    font-family: var(--mono);
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11.5px;
+  }
+  .breakdown {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11.5px;
+    border: 1px solid var(--border-2);
+    background: var(--card);
+  }
+  .pill.inline    { background: var(--inline-bg);    border-color: #86efac; color: #166534; }
+  .pill.toggle    { background: var(--toggle-bg);    border-color: #93c5fd; color: #1e40af; }
+  .pill.authoring { background: var(--authoring-bg); border-color: #d8b4fe; color: #6b21a8; }
+  .pill.readonly  { background: var(--readonly-bg);  border-color: #d4d4d8; color: #3f3f46; }
+
+  /* ----------------------------- Table ------------------------------- */
+  table.fields {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  table.fields th {
+    text-align: left;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    color: var(--fg-3);
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: var(--card);
+  }
+  table.fields td {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  table.fields tr.row { cursor: pointer; transition: background 0.08s; }
+  table.fields tr.row:hover { background: var(--muted); }
+  table.fields tr.row.expanded { background: var(--primary-bg); }
+  table.fields tr.row.expanded:hover { background: var(--primary-bg); }
+  table.fields tr.row.hidden { display: none; }
+
+  .field-name {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--fg);
+    font-weight: 600;
+  }
+  .field-type {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--fg-3);
+  }
+  .endpoint {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--primary);
+    word-break: break-all;
+  }
+  .endpoint.dash { color: var(--fg-4); }
+  .notes-col { color: var(--fg-2); font-size: 12.5px; }
+
+  .aff {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 9px;
+    border-radius: 12px;
+    font-size: 11.5px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .aff-icon { font-size: 13px; }
+  .aff.inline    { background: var(--inline-bg);    color: #166534; }
+  .aff.toggle    { background: var(--toggle-bg);    color: #1e40af; }
+  .aff.authoring { background: var(--authoring-bg); color: #6b21a8; }
+  .aff.readonly  { background: var(--readonly-bg);  color: #3f3f46; }
+
+  .expand-arrow {
+    display: inline-block;
+    width: 12px;
+    color: var(--fg-4);
+    font-size: 10px;
+    transition: transform 0.15s;
+  }
+  tr.row.expanded .expand-arrow { transform: rotate(90deg); color: var(--primary); }
+
+  /* ----------------------- Detail expansion -------------------------- */
+  tr.detail { display: none; }
+  tr.detail.shown { display: table-row; }
+  tr.detail td {
+    background: #f8fafc;
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .detail-inner {
+    padding: 14px 22px 16px 38px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 28px;
+  }
+  .detail-block { font-size: 12.5px; }
+  .detail-block h4 {
+    margin: 0 0 4px;
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--fg-3);
+    letter-spacing: 0.04em;
+  }
+  .detail-block p { margin: 0; color: var(--fg-2); line-height: 1.55; }
+  .detail-block code {
+    font-family: var(--mono);
+    background: var(--muted);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11.5px;
+  }
+  .detail-block .xref {
+    display: inline-block;
+    margin: 2px 4px 0 0;
+    padding: 2px 7px;
+    background: var(--card);
+    border: 1px solid var(--border-2);
+    border-radius: 10px;
+    font-size: 11px;
+    color: var(--fg-2);
+    font-family: var(--mono);
+  }
+  .detail-block.full { grid-column: 1 / -1; }
+
+  /* --------------------------- Mismatches --------------------------- */
+  .mismatch-section {
+    margin-top: 22px;
+    padding: 16px 18px;
+    border: 1px solid var(--warn-bg);
+    background: #fffbeb;
+    border-radius: 8px;
+  }
+  .mismatch-section h2 {
+    margin: 0 0 10px;
+    font-size: 15px;
+    color: var(--warn);
+  }
+  .mismatch-section .item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    font-size: 12.5px;
+    color: var(--fg-2);
+  }
+  .mismatch-section .item strong {
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .mismatch-section .item .tag {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 10.5px;
+    margin-right: 6px;
+    background: var(--warn-bg);
+    color: var(--warn);
+  }
+
+  /* --------------------------- Footer ------------------------------- */
+  .footer-note {
+    margin-top: 28px;
+    padding: 12px 14px;
+    font-size: 12px;
+    color: var(--fg-3);
+    border-top: 1px dashed var(--border);
+    line-height: 1.6;
+  }
+  .footer-note code {
+    font-family: var(--mono);
+    background: var(--muted);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+  }
+
+  /* small screens */
+  @media (max-width: 720px) {
+    .detail-inner { grid-template-columns: 1fr; padding-left: 22px; }
+    table.fields th:nth-child(4),
+    table.fields td:nth-child(4) { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1 class="page-title">편집 가능 필드 가이드 — Modeling Section</h1>
+  <p class="subtitle">5-ii Stage 1/2/3 어포던스 — 어떤 필드가 어떻게 편집되는지 한 눈에</p>
+
+  <!-- Intro -->
+  <div class="intro">
+    <p><strong>5-ii (편집 어포던스) 단계 요약</strong></p>
+    <p><strong>Stage 1 — Confirm Toggle.</strong> 우상단 <code>ConfirmToggle</code>로 <em>draft ↔ confirmed</em> 전환만. 필드 본체는 안 건드림. 팀 동의 도장을 찍는 단계. (Term/Action/BR/Anchor)</p>
+    <p><strong>Stage 2 — Inline Edit.</strong> 디테일 패널에서 ✏️ 아이콘 hover → 클릭 → 그 자리에서 편집. 단일 field 단위. 4가지 primitive (<code>InlineEditText</code>, <code>InlineEditTextArea</code>, <code>InlineEditList</code>, <code>InlineEditSelect</code>) 가 PATCH endpoint 1번 호출. 실수 정정 / 한 글자 수정용.</p>
+    <p><strong>Stage 3 — Authoring Bridge.</strong> entity 신규 작성, 다중 field 동시 갱신, 코드↔온톨로지 연결 변경 등 <em>대량 변경</em>은 LLM 기반 Authoring 모드로. 디테일 패널 하단의 보라색 “✏️ Authoring 모드로” 버튼이 brigde.</p>
+    <p>각 entity 의 <strong>코드(파서 산출물)</strong>·<strong>구조 메타(verification_level, FQN)</strong> 같은 derived/structural field 는 절대 직접 수정 ❌ — Java 재파싱 또는 confirm toggle 로만 변경.</p>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item">
+      <span class="legend-icon">🟢</span>
+      <span class="legend-body">
+        <strong>Inline Edit (Stage 2)</strong>
+        <span>디테일 패널에서 ✏️ 클릭 → 그 자리에서 편집 → PATCH 1회</span>
+      </span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-icon">🔵</span>
+      <span class="legend-body">
+        <strong>Confirm Toggle (Stage 1)</strong>
+        <span>draft ↔ confirmed 전환만. 본체 데이터는 변경 X</span>
+      </span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-icon">🟣</span>
+      <span class="legend-body">
+        <strong>Authoring (Stage 3)</strong>
+        <span>LLM 기반 대량 변경 — 별도 Authoring 모드 진입 필요</span>
+      </span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-icon">⚪</span>
+      <span class="legend-body">
+        <strong>Read-only</strong>
+        <span>파서 산출물/derived/구조 — UI 에서 편집 불가</span>
+      </span>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="search-row">
+    <input id="search" type="search" placeholder="필드 이름으로 검색 (예: label / aliases / severity / verification_level)…" autocomplete="off" />
+    <span class="search-counter" id="search-counter"></span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="term">Term <span class="count">15</span></button>
+    <button class="tab" data-tab="action">Action <span class="count">19</span></button>
+    <button class="tab" data-tab="rule">BusinessRule <span class="count">10</span></button>
+    <button class="tab" data-tab="anchor">AnchorBinding <span class="count">10</span></button>
+    <button class="tab" data-tab="codetype">CodeType <span class="count">15</span></button>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- TERM PANEL                                                          -->
+  <!-- =================================================================== -->
+  <div class="panel active" data-panel="term">
+    <div class="panel-header">
+      <h2>BusinessTerm — 도메인 의미 단위</h2>
+      <div class="meta">
+        DTO: <code>TermDTO</code> · Patch: <code>TermPatchDTO</code> · DB: <code>BusinessTermRow</code> ·
+        Detail Component: <code>TermDetail()</code> in <code>MainPanel.tsx:761</code>
+      </div>
+      <div class="breakdown">
+        <span class="pill inline">🟢 Inline · 7</span>
+        <span class="pill toggle">🔵 Toggle · 1</span>
+        <span class="pill authoring">🟣 Authoring · 0</span>
+        <span class="pill readonly">⚪ Read-only · 7</span>
+      </div>
+    </div>
+
+    <table class="fields">
+      <thead>
+        <tr>
+          <th style="width:24px"></th>
+          <th style="width:170px">Field</th>
+          <th style="width:170px">Type</th>
+          <th style="width:130px">Affordance</th>
+          <th style="width:280px">Endpoint</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- label -->
+        <tr class="row" data-detail="t-label" data-name="label">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">label</span></td>
+          <td><span class="field-type">string</span></td>
+          <td><span class="aff inline"><span class="aff-icon">🟢</span>Inline</span></td>
+          <td><span class="endpoint">PATCH /terms/{fqn}</span></td>
+          <td class="notes-col">제목 옆 <code>InlineEditText</code> — 빈 값 시 “(label 미지정)” placeholder</td>
+        </tr>
+        <tr class="detail" data-for="t-label">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 inline?</h4>
+              <p>한 글자 오타 / 한국어 다듬기 같은 단발 정정이 잦음. modal 띄울 만큼 무겁지 않아 ✏️ 클릭 → 즉시 PATCH 가 적합.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>BusinessTermRow.label</code>. recommend 가 자동 생성 후 사용자가 다듬는 패턴.</p>
+            </div>
+            <div class="detail-block full">
+              <h4>Cross-references</h4>
+              <span class="xref">aliases</span>
+              <span class="xref">domain</span>
+              <span class="xref">Action.label (동일 패턴)</span>
+            </div>
+          </div></td>
+        </tr>
+
+        <!-- aliases -->
+        <tr class="row" data-detail="t-aliases" data-name="aliases">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">aliases</span></td>
+          <td><span class="field-type">string[]</span></td>
+          <td><span class="aff inline"><span class="aff-icon">🟢</span>Inline</span></td>
+          <td><span class="endpoint">PATCH /terms/{fqn}</span></td>
+          <td class="notes-col">comma-separated input → 자동 split. <code>InlineEditList</code></td>
+        </tr>
+        <tr class="detail" data-for="t-aliases">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 inline?</h4>
+              <p>BM25/검색 hit 율을 늘리는 키워드 추가가 잦은 작업. 한 줄에 콤마로 구분 입력 → 빠른 batch.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>BusinessTermRow.aliases_json</code> (JSON 직렬화).</p>
+            </div>
+            <div class="detail-block full">
+              <h4>Cross-references</h4>
+              <span class="xref">label</span>
+              <span class="xref">term-search BM25 weight</span>
+            </div>
+          </div></td>
+        </tr>
+
+        <!-- description -->
+        <tr class="row" data-detail="t-desc" data-name="description">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">description</span></td>
+          <td><span class="field-type">string (long)</span></td>
+          <td><span class="aff inline"><span class="aff-icon">🟢</span>Inline</span></td>
+          <td><span class="endpoint">PATCH /terms/{fqn}</span></td>
+          <td class="notes-col"><code>InlineEditTextArea</code> rows=3, Cmd/Ctrl+Enter 저장</td>
+        </tr>
+        <tr class="detail" data-for="t-desc">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 inline?</h4>
+              <p>설명 보강 = 가장 흔한 wiki-style 편집. multi-line 이지만 modal 까지는 필요 없음.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>BusinessTermRow.description</code>.</p>
+            </div>
+            <div class="detail-block full">
+              <h4>Cross-references</h4>
+              <span class="xref">Action.description (동일 패턴)</span>
+              <span class="xref">BR.statement (동일 패턴)</span>
+              <span class="xref">Anchor.rationale (동일 패턴)</span>
+            </div>
+          </div></td>
+        </tr>
+
+        <!-- domain -->
+        <tr class="row" data-detail="t-domain" data-name="domain">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">domain</span></td>
+          <td><span class="field-type">string</span></td>
+          <td><span class="aff inline"><span class="aff-icon">🟢</span>Inline</span></td>
+          <td><span class="endpoint">PATCH /terms/{fqn}</span></td>
+          <td class="notes-col">FQN 옆 small <code>InlineEditText</code></td>
+        </tr>
+        <tr class="detail" data-for="t-domain">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 inline?</h4>
+              <p>도메인 분류 정정 — 잘못 짝지어진 자유텍스트 한 단어 수정. 추후 enum 화 가능 (현재는 string).</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>BusinessTermRow.domain</code>. listTerms 의 filter 로도 활용.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <!-- value_type -->
+        <tr class="row" data-detail="t-vt" data-name="value_type">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">value_type</span></td>
+          <td><span class="field-type">string?</span></td>
+          <td><span class="aff inline"><span class="aff-icon">🟢</span>Inline</span></td>
+          <td><span class="endpoint">PATCH /terms/{fqn}</span></td>
+          <td class="notes-col">atomic kind 일 때만 노출. e.g. <code>int</code>, <code>decimal</code></td>
+        </tr>
+        <tr class="detail" data-for="t-vt">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 inline?</h4>
+              <p>atomic Term 의 값 형식 보정 — 자유 string. 향후 enum 으로 좁힐 여지 있음.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>BusinessTermRow.value_type</code>. UI 는 <code>kind === "atomic"</code> 분기에서만 렌더.</p>
+            </div>
+            <div class="detail-block full">
+              <h4>Cross-references</h4>
+              <span class="xref">unit</span>
+              <span class="xref">range</span>
+              <span class="xref">enum_values</span>
+            </div>
+          </div></td>
+        </tr>
+
+        <!-- unit -->
+        <tr class="row" data-detail="t-unit" data-name="unit">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">unit</span></td>
+          <td><span class="field-type">string?</span></td>
+          <td><span class="aff inline"><span class="aff-icon">🟢</span>Inline</span></td>
+          <td><span class="endpoint">PATCH /terms/{fqn}</span></td>
+          <td class="notes-col">atomic 한정. e.g. <code>kg</code>, <code>EA</code></td>
+        </tr>
+        <tr class="detail" data-for="t-unit">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 inline?</h4>
+              <p>단위 표기 정정. 표준화 필요 시 추후 dropdown 으로 전환 가능.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>BusinessTermRow.unit</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <!-- enum_values -->
+        <tr class="row" data-detail="t-enum" data-name="enum_values">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">enum_values</span></td>
+          <td><span class="field-type">string[]?</span></td>
+          <td><span class="aff inline"><span class="aff-icon">🟢</span>Inline</span></td>
+          <td><span class="endpoint">PATCH /terms/{fqn}</span></td>
+          <td class="notes-col">atomic 한정. <code>InlineEditList</code> (콤마 구분)</td>
+        </tr>
+        <tr class="detail" data-for="t-enum">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 inline?</h4>
+              <p>enum 도메인 값 보강 — Java enum 클래스 + 운영 데이터에서 추출한 후 사용자가 누락 보강.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>BusinessTermRow.enum_values_json</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <!-- confirmed -->
+        <tr class="row" data-detail="t-conf" data-name="confirmed">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">confirmed</span></td>
+          <td><span class="field-type">boolean</span></td>
+          <td><span class="aff toggle"><span class="aff-icon">🔵</span>Toggle</span></td>
+          <td><span class="endpoint">POST /terms/{fqn}/confirm | /unconfirm</span></td>
+          <td class="notes-col">우상단 <code>ConfirmToggle</code> — Stage 1 “팀 도장”</td>
+        </tr>
+        <tr class="detail" data-for="t-conf">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 toggle?</h4>
+              <p>본체 데이터 변경 없이 “이 추천 후보를 우리가 정식으로 인정” 표시. confirm/unconfirm 두 endpoint 로 idempotent.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>BusinessTermRow.confirmed</code> (+ <code>source</code>="user").</p>
+            </div>
+            <div class="detail-block full">
+              <h4>Cross-references</h4>
+              <span class="xref">Action.confirmed_by</span>
+              <span class="xref">BR.confirmed</span>
+              <span class="xref">Anchor.confirmed</span>
+              <span class="xref">queue 에서 빠지는 기준</span>
+            </div>
+          </div></td>
+        </tr>
+
+        <!-- fqn -->
+        <tr class="row" data-detail="t-fqn" data-name="fqn">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">fqn</span></td>
+          <td><span class="field-type">string (PK)</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">PK. 변경 = 다른 entity. (rename 은 추후 별도 endpoint 필요)</td>
+        </tr>
+        <tr class="detail" data-for="t-fqn">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>FQN 은 모든 cross-ref (Action.declared_on_term, BR.terms_ref, AnchorBinding.target_action_fqn 등) 의 키. 수정하면 graph 깨짐. rename 은 별도 “merge/move” 흐름 필요.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB primary key (repo_id, fqn).</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <!-- kind -->
+        <tr class="row" data-detail="t-kind" data-name="kind">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">kind</span></td>
+          <td><span class="field-type">enum atomic|composite</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">UI 분기 결정 (atomic 만 value_type/unit 노출). Patch DTO 미포함.</td>
+        </tr>
+        <tr class="detail" data-for="t-kind">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>atomic ↔ composite 전환은 schema migration 급. composition_parts / value_type 등 부수 데이터 정합성 깨짐. Authoring 모드에서 새 entity 로 만드는 게 안전.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>BusinessTermRow.kind</code>. recommend 단계에서 결정.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <!-- is_root_entity -->
+        <tr class="row" data-detail="t-root" data-name="is_root_entity">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">is_root_entity</span></td>
+          <td><span class="field-type">boolean</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">composition graph 의 root flag — Patch DTO 미포함</td>
+        </tr>
+        <tr class="detail" data-for="t-root">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>recommend 가 “이 term 이 다른 어떤 part 에도 종속되지 않음” 판단으로 set. 사용자 수정 = 도메인 모델 root 재구성 = Authoring 영역.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>BusinessTermRow.is_root_entity</code>. recommendation engine 결과.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <!-- is_abstract -->
+        <tr class="row" data-detail="t-abs" data-name="is_abstract">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">is_abstract</span></td>
+          <td><span class="field-type">boolean</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">Java 클래스 abstract 여부에서 derive — KV 행으로 ✓/—만 표시</td>
+        </tr>
+        <tr class="detail" data-for="t-abs">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>코드 ground truth. Java parser 가 추출 → recommend 가 매핑된 Term 으로 전이. 코드와 동기화 필요.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser → mapping_layer 가 set. <code>BusinessTermRow.is_abstract</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <!-- is_interface -->
+        <tr class="row" data-detail="t-iface" data-name="is_interface">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">is_interface</span></td>
+          <td><span class="field-type">boolean</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">Java interface 여부 derive</td>
+        </tr>
+        <tr class="detail" data-for="t-iface">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>코드 ground truth (Java parser). 직접 변경 시 realization 매칭 깨짐.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser. <code>BusinessTermRow.is_interface</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <!-- struct_like_hint -->
+        <tr class="row" data-detail="t-struct" data-name="struct_like_hint">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">struct_like_hint</span></td>
+          <td><span class="field-type">boolean</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">DTO/POJO/Record 휴리스틱 — recommend 산출. Patch DTO 미포함.</td>
+        </tr>
+        <tr class="detail" data-for="t-struct">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>휴리스틱 결과. UI 분류 hint 로 쓰임. 직접 set 보다 휴리스틱 개선이 옳음.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>recommendation engine. <code>BusinessTermRow.struct_like_hint</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <!-- range -->
+        <tr class="row" data-detail="t-range" data-name="range">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">range</span></td>
+          <td><span class="field-type">number[]?</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">UI 에 <code>[min, max]</code> 표시만. Patch DTO 미포함 → <strong>편집 불가</strong></td>
+        </tr>
+        <tr class="detail" data-for="t-range">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>현재 TermPatchDTO 에 range 가 없음. UI 도 KV 행으로만 출력. <strong>UX 개선 후보</strong>: enum_values 처럼 inline 추가 검토.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>BusinessTermRow.range_min/range_max</code> (TermDTO 에서 array 로 합쳐 노출).</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <!-- repo_id -->
+        <tr class="row" data-detail="t-repo" data-name="repo_id">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">repo_id</span></td>
+          <td><span class="field-type">string (PK part)</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">소속 repo. PATCH URL 의 path 일부.</td>
+        </tr>
+        <tr class="detail" data-for="t-repo">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>multi-tenant 분리 키. 변경 = 다른 repo 로 이동 = re-import.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>repo import 시 set. composite PK <code>(repo_id, fqn)</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- ACTION PANEL                                                        -->
+  <!-- =================================================================== -->
+  <div class="panel" data-panel="action">
+    <div class="panel-header">
+      <h2>Action — 도메인 동작 (다형성 realization)</h2>
+      <div class="meta">
+        DTO: <code>ActionDTO</code> · Patch: <code>ActionPatchDTO</code> · DB: <code>ActionRow</code> ·
+        Detail Component: <code>ActionDetail()</code> in <code>MainPanel.tsx:145</code>
+      </div>
+      <div class="breakdown">
+        <span class="pill inline">🟢 Inline · 3</span>
+        <span class="pill toggle">🔵 Toggle · 1</span>
+        <span class="pill authoring">🟣 Authoring · 4</span>
+        <span class="pill readonly">⚪ Read-only · 11</span>
+      </div>
+    </div>
+
+    <table class="fields">
+      <thead>
+        <tr>
+          <th style="width:24px"></th>
+          <th style="width:200px">Field</th>
+          <th style="width:200px">Type</th>
+          <th style="width:130px">Affordance</th>
+          <th style="width:280px">Endpoint</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <tr class="row" data-detail="a-label" data-name="label">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">label</span></td>
+          <td><span class="field-type">string</span></td>
+          <td><span class="aff inline"><span class="aff-icon">🟢</span>Inline</span></td>
+          <td><span class="endpoint">PATCH /actions/{fqn}</span></td>
+          <td class="notes-col">제목 옆 <code>InlineEditText</code></td>
+        </tr>
+        <tr class="detail" data-for="a-label">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 inline?</h4>
+              <p>Term.label 와 같은 패턴. 한 글자 단위 정정용.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>ActionRow.label</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-aliases" data-name="aliases">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">aliases</span></td>
+          <td><span class="field-type">string[]</span></td>
+          <td><span class="aff inline"><span class="aff-icon">🟢</span>Inline</span></td>
+          <td><span class="endpoint">PATCH /actions/{fqn}</span></td>
+          <td class="notes-col"><code>InlineEditList</code></td>
+        </tr>
+        <tr class="detail" data-for="a-aliases">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 inline?</h4>
+              <p>Term.aliases 와 동일 패턴 — 검색 hit 보강용.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>ActionRow.aliases_json</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-desc" data-name="description">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">description</span></td>
+          <td><span class="field-type">string (long)</span></td>
+          <td><span class="aff inline"><span class="aff-icon">🟢</span>Inline</span></td>
+          <td><span class="endpoint">PATCH /actions/{fqn}</span></td>
+          <td class="notes-col"><code>InlineEditTextArea</code> rows=3</td>
+        </tr>
+        <tr class="detail" data-for="a-desc">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 inline?</h4>
+              <p>비즈니스 의미 설명 보강. multi-line.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>ActionRow.description</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-conf" data-name="confirmed_by">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">confirmed_by</span></td>
+          <td><span class="field-type">string?</span></td>
+          <td><span class="aff toggle"><span class="aff-icon">🔵</span>Toggle</span></td>
+          <td><span class="endpoint">POST /actions/{fqn}/confirm | /unconfirm</span></td>
+          <td class="notes-col">Toggle 시 verification_level 도 동시 갱신 (draft → signature_locked)</td>
+        </tr>
+        <tr class="detail" data-for="a-conf">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 toggle?</h4>
+              <p>“user 가 정식 확정” 도장. confirm 시 backend 가 verification_level: draft|unmapped → signature_locked 자동 전이. unconfirm 시 draft 로 회귀.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>ActionRow.confirmed_by</code> + <code>verification_level</code>. UI confirmed 판정: <code>!!confirmed_by || (verification_level !== unmapped|draft)</code></p>
+            </div>
+            <div class="detail-block full">
+              <h4>Cross-references</h4>
+              <span class="xref">verification_level (동시 갱신)</span>
+              <span class="xref">queue 에서 빠지는 기준</span>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-vl" data-name="verification_level">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">verification_level</span></td>
+          <td><span class="field-type">enum unmapped|draft|signature_locked|body_anchored|sim_verified|pr_proven</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">— (간접: confirm toggle)</span></td>
+          <td class="notes-col">UI 에 <em>UPPERCASE</em> badge. confirm/unconfirm 으로만 간접 변경.</td>
+        </tr>
+        <tr class="detail" data-for="a-vl">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>“이 Action 매핑이 얼마나 검증되었는가” derived state. 단계별 상승 조건 (anchor 매핑, simulation 통과, PR merge 등) 이 명확. 직접 클릭으로 임의 단계 점프 = ground truth 깨짐.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>ActionRow.verification_level</code>. 변경 트리거는 backend 비즈니스 로직 (confirm endpoint, anchor 추가, sim 결과 등).</p>
+            </div>
+            <div class="detail-block full">
+              <h4>Cross-references</h4>
+              <span class="xref">confirmed_by (confirm 시 동시 갱신)</span>
+              <span class="xref">signature_locked_at</span>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-fqn" data-name="fqn">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">fqn</span></td>
+          <td><span class="field-type">string (PK)</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">PK. Term.fqn 과 같은 이유로 read-only</td>
+        </tr>
+        <tr class="detail" data-for="a-fqn">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>모든 cross-ref (Realization, AnchorBinding) 의 키.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB primary key (repo_id, fqn).</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-kind" data-name="kind">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">kind</span></td>
+          <td><span class="field-type">enum pure_function|effectful|workflow</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">recommend 단계 분류. Patch DTO 미포함.</td>
+        </tr>
+        <tr class="detail" data-for="a-kind">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>분류 변경은 effects/workflow 정합성에 영향. Authoring 모드에서 다중 field 동시 갱신.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>recommend 추출. <code>ActionRow.kind</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-abs" data-name="is_abstract">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">is_abstract</span></td>
+          <td><span class="field-type">boolean</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">Java parser derive</td>
+        </tr>
+        <tr class="detail" data-for="a-abs">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>코드 산출물.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser → ActionRow.is_abstract.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-decl" data-name="declared_on_term">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">declared_on_term</span></td>
+          <td><span class="field-type">string?</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">소속 Term FQN. 변경은 Authoring 모드 / 매핑 재배정.</td>
+        </tr>
+        <tr class="detail" data-for="a-decl">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Action ↔ Term graph 의 edge. 단순 string 변경이 아니라 매핑 재배정 절차 필요.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>recommend / TypeRealization 매칭 결과. <code>ActionRow.declared_on_term</code>.</p>
+            </div>
+            <div class="detail-block full">
+              <h4>Cross-references</h4>
+              <span class="xref">FqnLink → TermDetail</span>
+              <span class="xref">TypeRealization (코드 클래스 ↔ Term)</span>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-params" data-name="params">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">params</span></td>
+          <td><span class="field-type">ActionParamDTO[]</span></td>
+          <td><span class="aff authoring"><span class="aff-icon">🟣</span>Authoring</span></td>
+          <td><span class="endpoint dash">— (Authoring 모드)</span></td>
+          <td class="notes-col"><code>ParamRow</code> 로 표시만. <code>AuthoringBridge</code> note 명시.</td>
+        </tr>
+        <tr class="detail" data-for="a-params">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 authoring?</h4>
+              <p>각 param 마다 name / type / object_ref_term / unit / range / nullable / description / anchor_locator / confirmed 9 field. 단일 PATCH 로 다루기엔 너무 풍성. LLM 추천 + 사용자 확정 흐름이 적합.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB <code>ActionParamRow</code>. recommend 가 Java method signature 에서 추출.</p>
+            </div>
+            <div class="detail-block full">
+              <h4>Cross-references</h4>
+              <span class="xref">AnchorBinding.target_slot (params[N].name)</span>
+              <span class="xref">Realization (code method 의 param 과 매칭)</span>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-output" data-name="output">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">output</span></td>
+          <td><span class="field-type">{ type, object_ref_term?, description }?</span></td>
+          <td><span class="aff authoring"><span class="aff-icon">🟣</span>Authoring</span></td>
+          <td><span class="endpoint dash">— (Authoring 모드)</span></td>
+          <td class="notes-col">반환값. <code>ParamRow</code> k="return" 으로 표시만</td>
+        </tr>
+        <tr class="detail" data-for="a-output">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 authoring?</h4>
+              <p>params 와 동일 — 다중 sub-field. 변경 = signature 변화 = realization 재매칭 필요.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>recommend 추출. ActionRow.output_* columns.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-real" data-name="realizations">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">realizations</span></td>
+          <td><span class="field-type">RealizationDTO[]</span></td>
+          <td><span class="aff authoring"><span class="aff-icon">🟣</span>Authoring</span></td>
+          <td><span class="endpoint dash">— (별도 confirm endpoint)</span></td>
+          <td class="notes-col">다형성 (primary/partial). 카드로만 표시. 개별 confirm 은 <code>type-realizations/{id}/confirm</code></td>
+        </tr>
+        <tr class="detail" data-for="a-real">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 authoring?</h4>
+              <p>code_method_fqn ↔ Action 매핑. 신규 추가/제거는 매핑 큐 (TypeRealization) 흐름. 카드의 ✓ scope 표시는 별도 confirm/reject endpoint 가 처리.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB <code>RealizationRow</code>. mapping queue.</p>
+            </div>
+            <div class="detail-block full">
+              <h4>Cross-references</h4>
+              <span class="xref">CodeType.methods (FQN 매칭)</span>
+              <span class="xref">TypeRealization queue</span>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-sub" data-name="sub_actions">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">sub_actions</span></td>
+          <td><span class="field-type">string[]</span></td>
+          <td><span class="aff authoring"><span class="aff-icon">🟣</span>Authoring</span></td>
+          <td><span class="endpoint dash">— (Authoring 모드)</span></td>
+          <td class="notes-col">workflow 분해. UI 노출은 미미 (<code>AuthoringBridge</code> note)</td>
+        </tr>
+        <tr class="detail" data-for="a-sub">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 authoring?</h4>
+              <p>Action 간 graph edge. 단순 string list 가 아니라 reachability/cycle 검증 필요. AuthoringBridge note 가 명시: “sub_actions 의 대량 변경은 Authoring 모드에서”.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB <code>ActionRow.sub_actions_json</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-pre" data-name="preconditions">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">preconditions</span></td>
+          <td><span class="field-type">string[]</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">BR FQN 참조 list. 단순 표시만.</td>
+        </tr>
+        <tr class="detail" data-for="a-pre">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>BR ↔ Action 매핑은 BR 측 enforced_by 가 source of truth. preconditions 는 그 reverse 캐시. UI 도 list rendering 만.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>BR.enforced_by 의 reverse — 별도 로직.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-post" data-name="postconditions">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">postconditions</span></td>
+          <td><span class="field-type">string[]</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">DTO 정의는 있으나 UI 미노출 (현재 implementation)</td>
+        </tr>
+        <tr class="detail" data-for="a-post">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Phase 2+ 의 BR linkage. 현재는 DTO field 만 존재 + Detail 컴포넌트에서 미렌더.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB <code>ActionRow.postconditions_json</code> (사용 미정).</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-eff" data-name="effects">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">effects</span></td>
+          <td><span class="field-type">ActionEffectDTO[]</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">create/mutate/read/delete 분류. UI 미노출.</td>
+        </tr>
+        <tr class="detail" data-for="a-eff">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Phase 2+ 의 simulation 입력. 현재 ActionDetail 에서 렌더 안 함.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB <code>ActionRow.effects_json</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-domain" data-name="domain">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">domain</span></td>
+          <td><span class="field-type">string</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">DTO 에 있지만 ActionDetail 에서 노출/편집 안 함. <strong>Term.domain 과 비대칭</strong></td>
+        </tr>
+        <tr class="detail" data-for="a-domain">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Term 은 domain inline 가능, Action 은 ActionPatchDTO 에 미포함. <strong>UX 비대칭 — 추후 통일 검토</strong>.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB <code>ActionRow.domain</code>. recommend 가 declared_on_term 의 domain 을 상속.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-locked" data-name="signature_locked_at">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">signature_locked_at</span></td>
+          <td><span class="field-type">datetime?</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">UI 미노출. signature_locked 전이 시각.</td>
+        </tr>
+        <tr class="detail" data-for="a-locked">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>audit timestamp. 사용자 수정 의미 없음.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>backend confirm endpoint 가 set.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="a-repo" data-name="repo_id">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">repo_id</span></td>
+          <td><span class="field-type">string (PK part)</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">소속 repo</td>
+        </tr>
+        <tr class="detail" data-for="a-repo">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>multi-tenant 키.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>composite PK (repo_id, fqn).</p>
+            </div>
+          </div></td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- BUSINESS RULE PANEL                                                 -->
+  <!-- =================================================================== -->
+  <div class="panel" data-panel="rule">
+    <div class="panel-header">
+      <h2>BusinessRule — 도메인 제약 (코드 가드)</h2>
+      <div class="meta">
+        DTO: <code>BusinessRuleDTO</code> · Patch: <code>BRPatchDTO</code> · DB: <code>BusinessRuleRow</code> ·
+        Detail Component: <code>BusinessRuleDetail()</code> in <code>MainPanel.tsx:1035</code>
+      </div>
+      <div class="breakdown">
+        <span class="pill inline">🟢 Inline · 2</span>
+        <span class="pill toggle">🔵 Toggle · 1</span>
+        <span class="pill authoring">🟣 Authoring · 0</span>
+        <span class="pill readonly">⚪ Read-only · 7</span>
+      </div>
+    </div>
+
+    <table class="fields">
+      <thead>
+        <tr>
+          <th style="width:24px"></th>
+          <th style="width:200px">Field</th>
+          <th style="width:200px">Type</th>
+          <th style="width:130px">Affordance</th>
+          <th style="width:280px">Endpoint</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <tr class="row" data-detail="r-stmt" data-name="statement">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">statement</span></td>
+          <td><span class="field-type">string (long)</span></td>
+          <td><span class="aff inline"><span class="aff-icon">🟢</span>Inline</span></td>
+          <td><span class="endpoint">PATCH /business-rules/{fqn}</span></td>
+          <td class="notes-col"><code>InlineEditTextArea</code> rows=4 — 자연어 룰 본문</td>
+        </tr>
+        <tr class="detail" data-for="r-stmt">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 inline?</h4>
+              <p>BR 의 핵심 텍스트. 자연어 표현이라 자주 다듬게 됨.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>BusinessRuleRow.statement</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="r-sev" data-name="severity">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">severity</span></td>
+          <td><span class="field-type">enum hard|soft</span></td>
+          <td><span class="aff inline"><span class="aff-icon">🟢</span>Inline</span></td>
+          <td><span class="endpoint">PATCH /business-rules/{fqn}</span></td>
+          <td class="notes-col"><code>InlineEditSelect</code> — backend validation: hard|soft 만 허용 (400 if invalid)</td>
+        </tr>
+        <tr class="detail" data-for="r-sev">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 inline?</h4>
+              <p>2-value enum 이라 dropdown UX 가 적합. backend 가 hard|soft 외 값을 거절.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>BusinessRuleRow.severity</code>. backend validation in <code>patch_business_rule()</code>.</p>
+            </div>
+            <div class="detail-block full">
+              <h4>Cross-references</h4>
+              <span class="xref">UI badge 색상 (rose=hard, amber=soft)</span>
+              <span class="xref">Split mode 의 BR 점 색상</span>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="r-conf" data-name="confirmed">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">confirmed</span></td>
+          <td><span class="field-type">boolean</span></td>
+          <td><span class="aff toggle"><span class="aff-icon">🔵</span>Toggle</span></td>
+          <td><span class="endpoint">POST /business-rules/{fqn}/confirm | /unconfirm</span></td>
+          <td class="notes-col">우상단 <code>ConfirmToggle</code></td>
+        </tr>
+        <tr class="detail" data-for="r-conf">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 toggle?</h4>
+              <p>본체 변경 없이 “팀 인정” 도장.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>BusinessRuleRow.confirmed</code> + source="user".</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="r-fqn" data-name="fqn">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">fqn</span></td>
+          <td><span class="field-type">string (PK)</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">PK</td>
+        </tr>
+        <tr class="detail" data-for="r-fqn">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>모든 cross-ref 의 키.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>composite PK (repo_id, fqn).</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="r-enf" data-name="enforced_by">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">enforced_by</span></td>
+          <td><span class="field-type">string[] (method FQN)</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">코드 가드 method 들. 카드 list. 개별 method 는 <code>FqnLink</code></td>
+        </tr>
+        <tr class="detail" data-for="r-enf">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>recommend / 사고 분석이 자동 검출하는 mapping. 사용자가 수동 추가/제거는 별도 매핑 큐 흐름. UI 는 list 와 “미등록 시 자동 검출 큐로 보강” 메시지.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB <code>BusinessRuleEnforcementRow</code> (별도 테이블). BR list 시 join.</p>
+            </div>
+            <div class="detail-block full">
+              <h4>Cross-references</h4>
+              <span class="xref">CodeMethod (FQN 매칭)</span>
+              <span class="xref">Split mode 의 “BR enforced” 카드</span>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="r-terms" data-name="terms_ref">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">terms_ref</span></td>
+          <td><span class="field-type">string[] (term FQN)</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">참조 Term FQN. <code>FqnLink</code> 로 navigation 만</td>
+        </tr>
+        <tr class="detail" data-for="r-terms">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>statement 분석에서 추출. 사용자가 수동 set 하는 게 아니라 NLP 결과 검증.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>backend NLP / recommend.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="r-hist" data-name="operational_history">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">operational_history</span></td>
+          <td><span class="field-type">IncidentRefDTO[]</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">사고 이력 — 외부 incident DB / 운영 로그 link.</td>
+        </tr>
+        <tr class="detail" data-for="r-hist">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>incident 외부 시스템 import. 5-ii 범위 밖.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>외부 incident DB → import.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="r-vio" data-name="violated_at_call">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">violated_at_call</span></td>
+          <td><span class="field-type">Record[]</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">위반된 call site dict. 미가공 JSON 표시.</td>
+        </tr>
+        <tr class="detail" data-for="r-vio">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>위반 분석 산출물. UI 는 raw JSON 으로만 표시 (Phase 2+ 정식 렌더 예정).</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>backend rule violation analyzer.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="r-src" data-name="source">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">source</span></td>
+          <td><span class="field-type">string</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">— (간접: confirm 시 "user")</span></td>
+          <td class="notes-col">출처 (recommend, user, incident…)</td>
+        </tr>
+        <tr class="detail" data-for="r-src">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>provenance audit. confirm endpoint 가 자동으로 "user" 로 set.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB column <code>BusinessRuleRow.source</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="r-repo" data-name="repo_id">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">repo_id</span></td>
+          <td><span class="field-type">string (PK part)</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">소속 repo</td>
+        </tr>
+        <tr class="detail" data-for="r-repo">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>multi-tenant 키.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>composite PK (repo_id, fqn).</p>
+            </div>
+          </div></td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- ANCHOR BINDING PANEL                                                -->
+  <!-- =================================================================== -->
+  <div class="panel" data-panel="anchor">
+    <div class="panel-header">
+      <h2>AnchorBinding — 코드 fragment ↔ Action slot</h2>
+      <div class="meta">
+        DTO: <code>AnchorBindingDTO</code> · Patch: <code>AnchorPatchDTO</code> · DB: <code>AnchorBindingRow</code> ·
+        Detail Component: <code>AnchorDetail()</code> in <code>MainPanel.tsx:1166</code>
+      </div>
+      <div class="breakdown">
+        <span class="pill inline">🟢 Inline · 3</span>
+        <span class="pill toggle">🔵 Toggle · 1</span>
+        <span class="pill authoring">🟣 Authoring · 0</span>
+        <span class="pill readonly">⚪ Read-only · 6</span>
+      </div>
+    </div>
+
+    <table class="fields">
+      <thead>
+        <tr>
+          <th style="width:24px"></th>
+          <th style="width:200px">Field</th>
+          <th style="width:200px">Type</th>
+          <th style="width:130px">Affordance</th>
+          <th style="width:280px">Endpoint</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <tr class="row" data-detail="x-loc" data-name="anchor_locator">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">anchor_locator</span></td>
+          <td><span class="field-type">string</span></td>
+          <td><span class="aff inline"><span class="aff-icon">🟢</span>Inline</span></td>
+          <td><span class="endpoint">PATCH /anchor-bindings/{id}</span></td>
+          <td class="notes-col"><code>InlineEditText</code> wide. e.g. <code>arg_idx_2</code>, <code>return</code></td>
+        </tr>
+        <tr class="detail" data-for="x-loc">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 inline?</h4>
+              <p>Java fragment 식별자. 단일 string 정정 (param 인덱스 변경, return 으로 전환 등).</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB <code>AnchorBindingRow.anchor_locator</code>. recommend 가 처음 추출 → 사용자가 정정.</p>
+            </div>
+            <div class="detail-block full">
+              <h4>Cross-references</h4>
+              <span class="xref">code_method_fqn (안에서 의미)</span>
+              <span class="xref">Split mode 의 line marker</span>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="x-slot" data-name="target_slot">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">target_slot</span></td>
+          <td><span class="field-type">string</span></td>
+          <td><span class="aff inline"><span class="aff-icon">🟢</span>Inline</span></td>
+          <td><span class="endpoint">PATCH /anchor-bindings/{id}</span></td>
+          <td class="notes-col"><code>InlineEditText</code>. e.g. <code>params[1].order_id</code></td>
+        </tr>
+        <tr class="detail" data-for="x-slot">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 inline?</h4>
+              <p>Action slot path. 단일 string. params[N].field 표기 보정.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB <code>AnchorBindingRow.target_slot</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="x-rat" data-name="rationale">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">rationale</span></td>
+          <td><span class="field-type">string (long)</span></td>
+          <td><span class="aff inline"><span class="aff-icon">🟢</span>Inline</span></td>
+          <td><span class="endpoint">PATCH /anchor-bindings/{id}</span></td>
+          <td class="notes-col"><code>InlineEditTextArea</code> rows=3. “왜 이렇게 매핑?” 메모</td>
+        </tr>
+        <tr class="detail" data-for="x-rat">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 inline?</h4>
+              <p>매핑 근거 메모. multi-line 자유텍스트.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB <code>AnchorBindingRow.rationale</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="x-conf" data-name="confirmed">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">confirmed</span></td>
+          <td><span class="field-type">boolean</span></td>
+          <td><span class="aff toggle"><span class="aff-icon">🔵</span>Toggle</span></td>
+          <td><span class="endpoint">POST /anchor-bindings/{id}/confirm | /unconfirm</span></td>
+          <td class="notes-col"><code>ConfirmToggle</code>. 미확정 시 카드 좌측에 amber 라인.</td>
+        </tr>
+        <tr class="detail" data-for="x-conf">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 toggle?</h4>
+              <p>매핑 자체 인정. confirmed=false 인 채로 두면 ActionDetail 의 anchor list 에 “매핑” 버튼이 띄움.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB <code>AnchorBindingRow.confirmed</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="x-id" data-name="id">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">id</span></td>
+          <td><span class="field-type">string (PK)</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">PK (UUID-ish)</td>
+        </tr>
+        <tr class="detail" data-for="x-id">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>PK. URL 경로의 일부.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>insert 시 generate.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="x-method" data-name="code_method_fqn">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">code_method_fqn</span></td>
+          <td><span class="field-type">string</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col"><code>FqnLink</code> 로 navigation. 변경은 Authoring/매핑 재배정 흐름.</td>
+        </tr>
+        <tr class="detail" data-for="x-method">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>매핑 대상. 변경 = anchor 자체 재배정 = recommend/Authoring 흐름.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB <code>AnchorBindingRow.code_method_fqn</code>. 매핑 추가 시 결정.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="x-action" data-name="target_action_fqn">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">target_action_fqn</span></td>
+          <td><span class="field-type">string</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">버튼 클릭 시 ActionDetail 로 이동.</td>
+        </tr>
+        <tr class="detail" data-for="x-action">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>대상 Action. anchor 의 정체성. 변경 = anchor 재배정.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB <code>AnchorBindingRow.target_action_fqn</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="x-conf-num" data-name="confidence">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">confidence</span></td>
+          <td><span class="field-type">number 0~1</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">recommend 추론 신뢰도. UI badge.</td>
+        </tr>
+        <tr class="detail" data-for="x-conf-num">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>알고리즘 산출. 사용자가 인위적으로 set 하면 metric 오염.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>recommend / matcher.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="x-src" data-name="source">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">source</span></td>
+          <td><span class="field-type">string</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">— (간접: confirm 시 "user")</span></td>
+          <td class="notes-col">recommend/user/llm 등.</td>
+        </tr>
+        <tr class="detail" data-for="x-src">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>provenance. confirm 시 자동 user.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>DB <code>AnchorBindingRow.source</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="x-line" data-name="line">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">line</span></td>
+          <td><span class="field-type">int? (1-indexed)</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">2026-05-10 추가. Java parser line. Split mode 의 hover sync 에 사용.</td>
+        </tr>
+        <tr class="detail" data-for="x-line">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Java parser 가 추출한 위치. 사용자 수정 시 코드 ↔ marker mismatch.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser → AnchorBindingRow.line.</p>
+            </div>
+          </div></td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- CODE TYPE PANEL                                                     -->
+  <!-- =================================================================== -->
+  <div class="panel" data-panel="codetype">
+    <div class="panel-header">
+      <h2>CodeType — Java 클래스/인터페이스 (mirror)</h2>
+      <div class="meta">
+        DTO: <code>CodeTypeDTO</code> · Patch DTO: <strong>없음 (의도적)</strong> · DB: <code>CodeTypeRow</code> ·
+        Detail Component: <code>CodeTypeDetail()</code> in <code>MainPanel.tsx:918</code>
+      </div>
+      <div class="breakdown">
+        <span class="pill inline">🟢 Inline · 0</span>
+        <span class="pill toggle">🔵 Toggle · 0</span>
+        <span class="pill authoring">🟣 Authoring · 1</span>
+        <span class="pill readonly">⚪ Read-only · 14</span>
+      </div>
+      <p style="margin-top:10px;color:var(--fg-3);font-size:12px;">
+        ⚠ <strong>전 필드 read-only.</strong> CodeType 은 Java 코드의 mirror — 직접 편집 ❌. <code>role</code> 분류 / Action 매핑 추가는 Authoring 모드.
+      </p>
+    </div>
+
+    <table class="fields">
+      <thead>
+        <tr>
+          <th style="width:24px"></th>
+          <th style="width:200px">Field</th>
+          <th style="width:200px">Type</th>
+          <th style="width:130px">Affordance</th>
+          <th style="width:280px">Endpoint</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <tr class="row" data-detail="c-fqn" data-name="fqn">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">fqn</span></td>
+          <td><span class="field-type">string (PK)</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">Java fully-qualified name</td>
+        </tr>
+        <tr class="detail" data-for="c-fqn">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Java parser 가 추출. 코드 ground truth.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser. PK <code>(repo_id, fqn)</code>.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="c-simple" data-name="simple_name">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">simple_name</span></td>
+          <td><span class="field-type">string</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">FQN 의 마지막 segment</td>
+        </tr>
+        <tr class="detail" data-for="c-simple">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>derived from FQN.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="c-pkg" data-name="package">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">package</span></td>
+          <td><span class="field-type">string</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">Java package</td>
+        </tr>
+        <tr class="detail" data-for="c-pkg">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Java parser.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="c-kind" data-name="kind">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">kind</span></td>
+          <td><span class="field-type">enum class|abstract_class|interface|enum|record</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">Java 분류</td>
+        </tr>
+        <tr class="detail" data-for="c-kind">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Java parser.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="c-role" data-name="role">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">role</span></td>
+          <td><span class="field-type">enum domain|framework|infra|unknown</span></td>
+          <td><span class="aff authoring"><span class="aff-icon">🟣</span>Authoring</span></td>
+          <td><span class="endpoint dash">— (Authoring / 분류기)</span></td>
+          <td class="notes-col"><strong>편집 가능성 있음</strong> — 현재는 분류기 산출 + AuthoringBridge note</td>
+        </tr>
+        <tr class="detail" data-for="c-role">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 authoring?</h4>
+              <p>분류기가 추정 (domain/framework/infra). 사용자 수정 의도 있을 수 있으나 inline 미제공. AuthoringBridge note: “role 분류 / Action 매핑 추가는 Authoring 모드에서.”</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>backend role classifier. <code>CodeTypeRow.role</code>.</p>
+            </div>
+            <div class="detail-block full">
+              <h4>Cross-references</h4>
+              <span class="xref">UnmappedMethod queue 의 reason 결정</span>
+              <span class="xref">recommend 가 domain role 만 Term 후보로 고려</span>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="c-abs" data-name="is_abstract">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">is_abstract</span></td>
+          <td><span class="field-type">boolean</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">Java parser</td>
+        </tr>
+        <tr class="detail" data-for="c-abs">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Java parser.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="c-ext" data-name="extends">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">extends</span></td>
+          <td><span class="field-type">string?</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">parent class FQN. <code>FqnLink</code></td>
+        </tr>
+        <tr class="detail" data-for="c-ext">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Java parser.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="c-impl" data-name="implements">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">implements</span></td>
+          <td><span class="field-type">string[]</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">interface FQN list</td>
+        </tr>
+        <tr class="detail" data-for="c-impl">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Java parser.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="c-fields" data-name="fields">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">fields</span></td>
+          <td><span class="field-type">CodeFieldDTO[]</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">Java field list (~30개 까지 보여주고 + N 더)</td>
+        </tr>
+        <tr class="detail" data-for="c-fields">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Java parser.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="c-meth" data-name="methods">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">methods</span></td>
+          <td><span class="field-type">CodeMethodDTO[]</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">Java method list (~50개 까지). method.role 분류 포함.</td>
+        </tr>
+        <tr class="detail" data-for="c-meth">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Java parser. method.role (business/helper/adapter) 도 분류기 자동.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser + method role classifier.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="c-ann" data-name="annotations">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">annotations</span></td>
+          <td><span class="field-type">string[]</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">Java annotation 이름 list. <code>@Entity</code> 등.</td>
+        </tr>
+        <tr class="detail" data-for="c-ann">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Java parser.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="c-mod" data-name="modifiers">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">modifiers</span></td>
+          <td><span class="field-type">string[]</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">public/static/final 등 (UI 미렌더 — DTO field 만)</td>
+        </tr>
+        <tr class="detail" data-for="c-mod">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Java parser. UI 노출 안 됨.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="c-src" data-name="source_file">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">source_file</span></td>
+          <td><span class="field-type">string</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">상대 경로</td>
+        </tr>
+        <tr class="detail" data-for="c-src">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Java parser.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="c-lines" data-name="line_start">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">line_start / line_end</span></td>
+          <td><span class="field-type">int?</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">소스 line range</td>
+        </tr>
+        <tr class="detail" data-for="c-lines">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>Java parser.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>Java parser.</p>
+            </div>
+          </div></td>
+        </tr>
+
+        <tr class="row" data-detail="c-repo" data-name="repo_id">
+          <td><span class="expand-arrow">▶</span></td>
+          <td><span class="field-name">repo_id</span></td>
+          <td><span class="field-type">string (PK part)</span></td>
+          <td><span class="aff readonly"><span class="aff-icon">⚪</span>Read-only</span></td>
+          <td><span class="endpoint dash">—</span></td>
+          <td class="notes-col">소속 repo</td>
+        </tr>
+        <tr class="detail" data-for="c-repo">
+          <td colspan="6"><div class="detail-inner">
+            <div class="detail-block">
+              <h4>왜 read-only?</h4>
+              <p>multi-tenant 키.</p>
+            </div>
+            <div class="detail-block">
+              <h4>Source of Truth</h4>
+              <p>composite PK (repo_id, fqn).</p>
+            </div>
+          </div></td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- Mismatch / Gap report                                               -->
+  <!-- =================================================================== -->
+  <div class="mismatch-section">
+    <h2>⚠ DTO ↔ Patch 어포던스 비대칭 / 갭 (검토 필요)</h2>
+
+    <div class="item">
+      <span class="tag">UI 비대칭</span>
+      <strong>Action.domain</strong> — Term 은 <code>domain</code> inline 가능, Action 은 ActionDetail 에서 노출/편집 모두 X.
+      <strong>ActionPatchDTO 에 <code>domain</code> 추가</strong> + UI 노출 검토. (DB 컬럼은 이미 존재, recommend 가 declared_on_term.domain 상속)
+    </div>
+
+    <div class="item">
+      <span class="tag">UI 비대칭</span>
+      <strong>Term.range</strong> — 보여주기만 하고 편집 불가 (KV 한 줄). value_type / unit / enum_values 는 inline 가능한데 range 만 빠짐. <strong>TermPatchDTO 에 range 추가</strong> 검토.
+    </div>
+
+    <div class="item">
+      <span class="tag">미노출</span>
+      <strong>Action.postconditions / Action.effects</strong> — DTO 정의는 있으나 ActionDetail 에서 렌더 안 함. Phase 2+ simulation/BR linkage 의 기반인데 현재 visibility 0. 의도적 deferred 인지 확인 필요.
+    </div>
+
+    <div class="item">
+      <span class="tag">UX gap</span>
+      <strong>CodeType 전 필드 read-only</strong> — CodeType 자체에는 PATCH endpoint 가 없어서, role 재분류조차 Authoring 모드를 거쳐야 함. role 만이라도 inline select (domain|framework|infra|unknown) 추가 검토.
+    </div>
+
+    <div class="item">
+      <span class="tag">UI 누락</span>
+      <strong>ActionParam (params[*])</strong> — name / type / object_ref_term / unit / range / nullable / description 등 sub-field 가 풍부하지만, UI 는 <code>ParamRow</code> 로 name + ref + confirmed 만 노출. Authoring 모드 의존도 매우 높음.
+    </div>
+
+    <div class="item">
+      <span class="tag">consistency</span>
+      <strong>BR.terms_ref</strong> — UI 는 violet badge + <code>FqnLink</code> 로 표시만. statement edit 시 자동으로 재추출되는지(NLP 트리거) 명확하지 않음. 현재는 stale 가능.
+    </div>
+
+    <div class="item">
+      <span class="tag">정상</span>
+      <strong>Term/Action/BR/Anchor 의 confirmed toggle</strong> — 4 entity 모두 동일 패턴. 일관성 OK.
+    </div>
+
+    <div class="item">
+      <span class="tag">정상</span>
+      <strong>Patch DTO ↔ UI inline 매핑</strong> — TermPatch (7 field) / ActionPatch (3 field) / BRPatch (2 field) / AnchorPatch (3 field) 모두 UI 가 1:1 노출. 백엔드만 정의되고 UI 미연결인 “고아 patch field” 없음.
+    </div>
+  </div>
+
+  <div class="footer-note">
+    <p>이 가이드는 <code>frontend/src/components/sections/modeling/MainPanel.tsx</code>, <code>frontend/src/lib/api/ontology.ts</code>, <code>backend/modeling/api/queue_actions_api.py</code>, <code>frontend/src/components/sections/modeling/InlineEdit.tsx</code> 4개 파일을 cross-check 하여 작성. PATCH endpoint 가 추가되거나 InlineEdit primitive 가 새 field 에 wire 되면 이 표도 함께 업데이트해야 함.</p>
+    <p>5-ii Stage 2 의 inline edit 4 primitive 정의: <code>InlineEditText</code> / <code>InlineEditTextArea</code> / <code>InlineEditList</code> / <code>InlineEditSelect</code>. 모두 ✏️ pencil hover → 클릭 → input → Save/Cancel + Cmd/Ctrl+Enter 단축키.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // -------- Tab switching --------
+  const tabs = document.querySelectorAll('.tab');
+  const panels = document.querySelectorAll('.panel');
+  tabs.forEach((t) => t.addEventListener('click', () => {
+    tabs.forEach((x) => x.classList.remove('active'));
+    panels.forEach((p) => p.classList.remove('active'));
+    t.classList.add('active');
+    const id = t.dataset.tab;
+    document.querySelector('.panel[data-panel="' + id + '"]').classList.add('active');
+  }));
+
+  // -------- Row expand/collapse --------
+  document.querySelectorAll('tr.row').forEach((row) => {
+    row.addEventListener('click', () => {
+      const key = row.dataset.detail;
+      const detail = document.querySelector('tr.detail[data-for="' + key + '"]');
+      if (!detail) return;
+      const isOpen = row.classList.contains('expanded');
+      if (isOpen) {
+        row.classList.remove('expanded');
+        detail.classList.remove('shown');
+      } else {
+        row.classList.add('expanded');
+        detail.classList.add('shown');
+      }
+    });
+  });
+
+  // -------- Search filter (across tabs) --------
+  const search = document.getElementById('search');
+  const counter = document.getElementById('search-counter');
+  function applyFilter() {
+    const q = search.value.trim().toLowerCase();
+    let totalShown = 0;
+    let totalAll = 0;
+    document.querySelectorAll('.panel').forEach((panel) => {
+      let panelShown = 0;
+      panel.querySelectorAll('tr.row').forEach((row) => {
+        totalAll++;
+        const name = (row.dataset.name || '').toLowerCase();
+        const match = q === '' || name.includes(q);
+        if (match) {
+          row.classList.remove('hidden');
+          panelShown++;
+          totalShown++;
+        } else {
+          row.classList.add('hidden');
+          // also hide its detail row if open
+          const key = row.dataset.detail;
+          const detail = document.querySelector('tr.detail[data-for="' + key + '"]');
+          if (detail) detail.classList.remove('shown');
+          row.classList.remove('expanded');
+        }
+      });
+      // optional: highlight tab if no match in panel
+      const tab = document.querySelector('.tab[data-tab="' + panel.dataset.panel + '"]');
+      if (tab) {
+        if (q !== '' && panelShown === 0) tab.style.opacity = '0.4';
+        else tab.style.opacity = '';
+      }
+    });
+    if (q === '') counter.textContent = '';
+    else counter.textContent = totalShown + ' / ' + totalAll + ' 매치';
+  }
+  search.addEventListener('input', applyFilter);
+})();
+</script>
+</body>
+</html>

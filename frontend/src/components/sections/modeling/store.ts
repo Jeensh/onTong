@@ -12,6 +12,19 @@ export type Direction = "fwd" | "bwd";
 export type Lens = "verify" | "domain" | "confidence" | "simulation" | "none";
 export type GraphViewMode = "neighborhood" | "path" | "cluster";
 
+/**
+ * Code Peek modal target — drives a single global CodePeekModal mounted in MainPanel.
+ *
+ * Use `openPeek()` from any FqnLink (or other code-pointing affordance) so the user
+ * can browse a class / method body without losing the current Detail selection.
+ */
+export interface PeekTarget {
+  kind: "code_type" | "code_method";
+  fqn: string;
+  repoId: string;
+  highlightLine?: number;
+}
+
 interface WorkbenchStore {
   // panels
   leftTab: LeftTab;
@@ -67,6 +80,11 @@ interface WorkbenchStore {
   // repo
   activeRepoId: string;
   setRepoId: (id: string) => void;
+
+  // Code peek — global modal driver. null = closed.
+  peekTarget: PeekTarget | null;
+  openPeek: (target: PeekTarget) => void;
+  closePeek: () => void;
 }
 
 export const useWorkbench = create<WorkbenchStore>((set) => ({
@@ -144,4 +162,9 @@ export const useWorkbench = create<WorkbenchStore>((set) => ({
   // 기본 repo — Phase 3 데모 정합. Import 모달이 done 시 setRepoId 로 갱신.
   activeRepoId: "slab-design-real",
   setRepoId: (id) => set({ activeRepoId: id }),
+
+  // Code peek — null = closed. selection state intentionally untouched on open.
+  peekTarget: null,
+  openPeek: (target) => set({ peekTarget: target }),
+  closePeek: () => set({ peekTarget: null }),
 }));

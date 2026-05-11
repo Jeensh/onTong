@@ -559,6 +559,36 @@ export const ontologyApi = {
       `/api/ontology/repos/${encodeURIComponent(repo_id)}/anchor-bindings/${encodeURIComponent(anchor_id)}`,
       { method: "PATCH", body: JSON.stringify(patch) },
     ),
+
+  // ---------------------------------------------------------------------------
+  // Wave 1 W1-D / W2-A — CodeType.role PATCH + AnchorBinding anchor_locator candidates.
+  // ---------------------------------------------------------------------------
+  /**
+   * PATCH CodeType.role — domain | framework | infra | unknown.
+   * (W2-A is wiring this endpoint in parallel; if backend 404s we surface the error.)
+   */
+  patchCodeType: (repo_id: string, fqn: string, patch: CodeTypePatchDTO) =>
+    fetchJson<QueueActionResultDTO>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/code-types/${encodeURIComponent(fqn)}`,
+      { method: "PATCH", body: JSON.stringify(patch) },
+    ),
+  /**
+   * AnchorBinding autocomplete — returns dropdown-friendly fragment locators
+   * derived from the method body (W1-A's `anchor_candidate_extractor`).
+   */
+  getAnchorCandidates: (method_fqn: string, repo_id: string) =>
+    fetchJson<AnchorCandidateDTO[]>(
+      `/api/ontology/code-methods/${encodeURIComponent(method_fqn)}/anchor-candidates${qs({ repo_id })}`,
+    ),
+
+  /**
+   * CodePeekModal (Wave C-A, 2026-05-10) — fetch ONLY a single method's body
+   * + line range. Avoids the full CodeType payload that getCodeType() returns.
+   */
+  getCodeMethodBody: (method_fqn: string, repo_id: string) =>
+    fetchJson<CodeMethodBodyDTO>(
+      `/api/ontology/code-methods/${encodeURIComponent(method_fqn)}/body${qs({ repo_id })}`,
+    ),
 };
 
 // ---------------------------------------------------------------------------
@@ -571,7 +601,40 @@ export interface TermPatchDTO {
   domain?: string;
   value_type?: string;
   unit?: string;
+  /**
+   * range = [min, max] for atomic terms.
+   *
+   * NOTE: 2026-05-10 — `range` is in the CODEGEN'd patch model
+   * (`_generated_patch_models.py:TermPatch`) but the hand-written
+   * `queue_actions_api.TermPatch` has not yet been regenerated, so PATCH
+   * with `range` may currently 422. W2-A is regenerating this in parallel.
+   */
+  range?: number[];
   enum_values?: string[];
+}
+
+export interface CodeTypePatchDTO {
+  role?: CodeTypeRole;
+}
+
+/** Wave 1 W1-A — fragment locator candidate for anchor_locator dropdown. */
+export interface AnchorCandidateDTO {
+  locator: string;
+  kind: string;            // method-body | param-name | if-stmt | loop-body | return-stmt | try-block | assignment | call
+  line: number | null;
+  snippet: string;
+  description: string;
+}
+
+/** Wave C-A (2026-05-10) — minimal DTO for CodePeekModal method-body fetch. */
+export interface CodeMethodBodyDTO {
+  fqn: string;
+  parent_type_fqn: string;
+  name: string;
+  return_type: string;
+  body_text: string | null;
+  line_start: number | null;
+  line_end: number | null;
 }
 
 export interface ActionPatchDTO {

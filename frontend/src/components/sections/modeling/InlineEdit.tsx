@@ -315,53 +315,227 @@ export function InlineEditList({
 
 // ---------------------------------------------------------------------------
 // InlineEditSelect — fixed enum
+//
+// 2026-05-10 (#1, #3) — gained two opt-in props:
+//   - confirmModal: show a modal "Y → X 로 바꿀까요?" before calling onSave.
+//     Useful for high-impact fields (BR.severity, CodeType.role).
+//   - fallbackText: { value, label } — selecting that option swaps the select
+//     into a free-text input so the user can type any value not in the enum.
+//     Used by Term.value_type "기타..." fallback.
 // ---------------------------------------------------------------------------
+type ConfirmModalOpts<T> = boolean | { title?: string; body?: (v: T) => string };
+
 export function InlineEditSelect<T extends string>({
   value,
   options,
   onSave,
   className,
   renderOption,
+  confirmModal,
+  fallbackText,
 }: {
   value: T;
   options: readonly T[];
   onSave: SaveFn<T>;
   className?: string;
   renderOption?: (v: T) => string;
+  confirmModal?: ConfirmModalOpts<T>;
+  fallbackText?: { value: T; label: string };
 }) {
   const s = useSaver(value, onSave);
   const ref = useRef<HTMLSelectElement>(null);
-  useEffect(() => { if (s.editing) ref.current?.focus(); }, [s.editing]);
+  const textRef = useRef<HTMLInputElement>(null);
+  // Confirmation modal — staged value waiting for user OK.
+  const [pending, setPending] = useState<T | null>(null);
+  // Free-text mode — set when user picks the fallback option.
+  const [textMode, setTextMode] = useState(false);
+  const [text, setText] = useState("");
+
+  useEffect(() => {
+    if (s.editing && !textMode) ref.current?.focus();
+  }, [s.editing, textMode]);
+  useEffect(() => {
+    if (textMode) textRef.current?.focus();
+  }, [textMode]);
 
   const display = renderOption ? renderOption(value) : value;
 
+  // Save flow: if confirmModal is set, stage the current value and let the
+  // modal call s.save(). Otherwise call s.save() directly — `s.value` is
+  // already up-to-date because the <select onChange> wrote to it.
+  const requestSave = () => {
+    if (confirmModal) {
+      setPending(s.value);
+    } else {
+      void s.save();
+    }
+  };
+
+  const cancelEdit = () => {
+    setTextMode(false);
+    setText("");
+    setPending(null);
+    s.cancel();
+  };
+
+  const confirmModalBody = (v: T): string => {
+    if (typeof confirmModal === "object" && confirmModal?.body) return confirmModal.body(v);
+    return `값을 ${v} 로 바꿉니다.`;
+  };
+  const confirmModalTitle = (v: T): string => {
+    if (typeof confirmModal === "object" && confirmModal?.title) return confirmModal.title;
+    return `정말 ${value} → ${v} 로 바꿀까요?`;
+  };
+
+  // Editing state ----------------------------------------------------------
   if (s.editing) {
+    // 1) Free-text fallback — user picked the "기타..." option.
+    if (textMode) {
+      const saveText = async () => {
+        const trimmed = text.trim();
+        if (!trimmed) return;
+        s.setValue(trimmed as T);
+        // Use save directly with the typed text (skipping confirmModal — text edit IS the confirm).
+        try {
+          await onSave(trimmed as T);
+          cancelEdit();
+        } catch (e) {
+          // Surface error via the saver state machine instead of throwing.
+          // (useSaver doesn't expose setErr — fall back to inline display.)
+          // eslint-disable-next-line no-console
+          console.error("[InlineEditSelect.fallbackText] save failed", e);
+        }
+      };
+      return (
+        <span className={cn("inline-flex items-center", className)}>
+          <input
+            ref={textRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") cancelEdit();
+              if (e.key === "Enter") { e.preventDefault(); void saveText(); }
+            }}
+            placeholder={fallbackText?.label ?? "직접 입력"}
+            className="border border-sky-400 rounded px-1.5 py-0.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-sky-400"
+          />
+          <EditButtons onSave={() => void saveText()} onCancel={cancelEdit} saving={s.saving} />
+          <ErrSpan err={s.err} />
+        </span>
+      );
+    }
+
     return (
       <span className={cn("inline-flex items-center", className)}>
         <select
           ref={ref}
           value={s.value}
-          onChange={(e) => s.setValue(e.target.value as T)}
+          onChange={(e) => {
+            const next = e.target.value as T;
+            // If user picked the fallback sentinel → swap to text mode (don't save yet).
+            if (fallbackText && next === fallbackText.value) {
+              setTextMode(true);
+              return;
+            }
+            s.setValue(next);
+          }}
           onKeyDown={(e) => {
-            if (e.key === "Escape") s.cancel();
-            if (e.key === "Enter") { e.preventDefault(); s.save(); }
+            if (e.key === "Escape") cancelEdit();
+            if (e.key === "Enter") { e.preventDefault(); requestSave(); }
           }}
           disabled={s.saving}
           className="border border-sky-400 rounded px-1.5 py-0.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-sky-400"
         >
           {options.map((o) => (
-            <option key={o} value={o}>{renderOption ? renderOption(o) : o}</option>
+            <option key={o} value={o}>
+              {fallbackText && o === fallbackText.value
+                ? fallbackText.label
+                : renderOption ? renderOption(o) : o}
+            </option>
           ))}
         </select>
-        <EditButtons onSave={s.save} onCancel={s.cancel} saving={s.saving} />
+        <EditButtons onSave={requestSave} onCancel={cancelEdit} saving={s.saving} />
         <ErrSpan err={s.err} />
+        {pending !== null && (
+          <ConfirmModal
+            title={confirmModalTitle(pending)}
+            body={confirmModalBody(pending)}
+            onConfirm={async () => {
+              // s.value is already === pending (staged from s.value at request).
+              setPending(null);
+              await s.save();
+            }}
+            onCancel={() => setPending(null)}
+            saving={s.saving}
+          />
+        )}
       </span>
     );
   }
+
   return (
     <span className={cn("group inline-flex items-center", className)}>
       <span>{display}</span>
       <EditPencil onClick={s.start} />
     </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ConfirmModal — small inline modal, used by InlineEditSelect when
+// `confirmModal` prop is set. Light-mode style, Esc/Enter shortcuts.
+// ---------------------------------------------------------------------------
+function ConfirmModal({
+  title,
+  body,
+  onConfirm,
+  onCancel,
+  saving,
+}: {
+  title: string;
+  body: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  saving: boolean;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { e.preventDefault(); onCancel(); }
+      if (e.key === "Enter")  { e.preventDefault(); onConfirm(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onConfirm, onCancel]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div
+        className="bg-white border border-border rounded-lg shadow-lg p-4 w-[420px] max-w-[90vw]"
+        // Stop the click from reaching the backdrop.
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-sm font-semibold text-foreground mb-2">{title}</div>
+        <div className="text-[12.5px] text-muted-foreground mb-4 leading-relaxed">{body}</div>
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={saving}
+            className="text-xs px-3 py-1 rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={saving}
+            className="text-xs px-3 py-1 rounded border border-emerald-400 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 disabled:opacity-50 inline-flex items-center gap-1"
+          >
+            {saving && <Loader2 className="w-3 h-3 animate-spin" />}
+            확인
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

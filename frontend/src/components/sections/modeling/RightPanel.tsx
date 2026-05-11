@@ -12,16 +12,33 @@ import {
   type CodeMethodDTO,
   type CodeTypeDTO,
 } from "@/lib/api/ontology";
+import { auditApi, type AuditEntityKind, type AuditLogDTO } from "@/lib/api/audit";
 import { Loader2 } from "lucide-react";
 import { HelpHint } from "./HelpHint";
 import { JavaCode } from "./JavaCode";
 
-const TABS = [
-  { id: "code",     label: "📄 코드",       hint: null },
+type TabDef = { id: string; label: string; hint: string | null };
+
+const ALL_TABS: TabDef[] = [
+  { id: "code",     label: "📄 코드",       hint: "code_method" },
   { id: "callsite", label: "📞 호출지점",   hint: "call_site" },
-  { id: "impact",   label: "🌊 영향",       hint: null },
+  { id: "impact",   label: "🌊 영향",       hint: "mapping" },
   { id: "manual",   label: "📖 매뉴얼",     hint: null },
+  { id: "history",  label: "📜 이력",       hint: "audit_log" },
 ];
+
+/**
+ * Some tabs aren't meaningful for every selection kind.
+ * - Term/Rule: callsite (no method) and manual (Phase E placeholder) are hidden.
+ *   Code tab still appears but renders an explanatory message inside.
+ * For other kinds we keep all tabs visible.
+ */
+function tabsForSelectionKind(kind: Selection["kind"] | null): TabDef[] {
+  if (kind === "term" || kind === "rule") {
+    return ALL_TABS.filter((t) => t.id !== "callsite" && t.id !== "manual");
+  }
+  return ALL_TABS;
+}
 
 /**
  * 우측 사이드바 — 좌측 selection 에 따라 4 탭 content 가 바뀜.
@@ -46,6 +63,16 @@ export function RightPanel() {
     if (selectedAnchorId) return { kind: "anchor" as const, id: selectedAnchorId };
     return null;
   }, [selectedActionFqn, selectedCodeTypeFqn, selectedTermFqn, selectedRuleFqn, selectedAnchorId]);
+
+  // Tab list adapts to the current selection kind. If the active tab is no
+  // longer in the visible set (e.g. user switched from Action to Term while
+  // sitting on the callsite tab), fall back to the first visible tab.
+  const visibleTabs = useMemo(() => tabsForSelectionKind(selection?.kind ?? null), [selection?.kind]);
+  useEffect(() => {
+    if (!visibleTabs.some((t) => t.id === activeTab)) {
+      setActiveTab(visibleTabs[0]?.id ?? "code");
+    }
+  }, [visibleTabs, activeTab]);
 
   useEffect(() => {
     const handle = dragRef.current;
@@ -86,44 +113,53 @@ export function RightPanel() {
       />
       {/* 탭 */}
       <div className="flex border-b border-border px-2 pt-1.5 shrink-0">
-        {TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id)}
             className={cn(
-              "rounded-t px-2 py-1 text-[11px] border-b-2 inline-flex items-center gap-0.5",
+              "rounded-t px-2 py-1 text-[11px] border-b-2 inline-flex items-center gap-0.5 shrink-0",
               activeTab === t.id
                 ? "text-foreground border-primary"
                 : "text-muted-foreground border-transparent hover:text-foreground",
             )}
           >
-            {t.label}
-            {t.hint && <HelpHint term={t.hint} inline />}
+            <span className="shrink-0">{t.label}</span>
+            {t.hint && (
+              <span className="shrink-0 inline-flex">
+                <HelpHint term={t.hint} inline />
+              </span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* selection breadcrumb */}
-      <div className="px-2.5 py-1 border-b border-border bg-muted/40 flex gap-1.5 items-center text-[10.5px] shrink-0">
-        {selection ? (
-          <span className="truncate min-w-0 flex-1">
-            <span className="text-muted-foreground">선택:</span>{" "}
-            <span className="font-mono text-foreground">{selection.id.split(".").pop() ?? selection.id}</span>{" "}
-            <span className="text-muted-foreground">({selection.kind})</span>
-          </span>
-        ) : (
-          <span className="text-muted-foreground flex-1">선택 없음</span>
-        )}
-        {selectedActionFqn && (
-          <button
-            onClick={() => setMainMode("split")}
-            className="text-[10.5px] px-2 py-0.5 rounded border border-primary text-primary hover:bg-primary/10 shrink-0"
-            title="↕ Split mode 로"
-          >
-            ↕ Split
-          </button>
-        )}
-      </div>
+      {/* selection chip + Split shortcut (선택 entity 의 자세한 식별은 가운데 패널 Detail h1 참조) */}
+      {(selection || selectedActionFqn) && (
+        <div className="px-2.5 py-1 border-b border-border bg-muted/40 flex gap-1.5 items-center text-[10.5px] shrink-0">
+          {selection && (
+            <span
+              className={cn(
+                "shrink-0 inline-flex items-center text-[10px] px-1.5 py-px rounded border font-mono",
+                KIND_CHIP[selection.kind],
+              )}
+              title={selection.id}
+            >
+              {KIND_ABBR[selection.kind]}
+            </span>
+          )}
+          <span className="flex-1" />
+          {selectedActionFqn && (
+            <button
+              onClick={() => setMainMode("split")}
+              className="text-[10.5px] px-2 py-0.5 rounded border border-primary text-primary hover:bg-primary/10 shrink-0"
+              title="↕ Split mode 로"
+            >
+              ↕ Split
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 본문 */}
       <div className="overflow-y-auto flex-1 p-2.5 text-xs min-w-0">
@@ -136,6 +172,7 @@ export function RightPanel() {
         {selection && activeTab === "callsite" && <TabCallSite selection={selection} />}
         {selection && activeTab === "impact" && <TabImpact selection={selection} />}
         {selection && activeTab === "manual" && <TabManual selection={selection} />}
+        {selection && activeTab === "history" && <TabHistory selection={selection} />}
       </div>
     </aside>
   );
@@ -144,6 +181,22 @@ export function RightPanel() {
 type Selection = {
   kind: "action" | "codeType" | "term" | "rule" | "anchor";
   id: string;
+};
+
+const KIND_CHIP: Record<Selection["kind"], string> = {
+  action:   "border-orange-300 text-orange-700 bg-orange-50",
+  term:     "border-violet-300 text-violet-700 bg-violet-50",
+  codeType: "border-primary/40 text-primary bg-primary/10",
+  rule:     "border-rose-300 text-rose-700 bg-rose-50",
+  anchor:   "border-sky-300 text-sky-700 bg-sky-50",
+};
+
+const KIND_ABBR: Record<Selection["kind"], string> = {
+  action:   "ACT",
+  term:     "TERM",
+  codeType: "CODE",
+  rule:     "BR",
+  anchor:   "ANCH",
 };
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -205,37 +258,15 @@ function TabCode({ selection }: { selection: Selection }) {
   if (content.method?.body_text) {
     const m = content.method;
     return (
-      <div>
-        <div className="text-[10.5px] text-muted-foreground mb-1 break-all">
-          {m.parent_type_fqn}
-        </div>
-        <div className="text-[11px] text-foreground mb-1.5 font-semibold break-all">
-          {m.name}({m.params.map(p => p.type).join(", ")}) → {m.return_type}
-        </div>
-        <div className="text-[10px] text-muted-foreground mb-2">
-          line {m.line_start}–{m.line_end} · role: {m.role}
-        </div>
-        <div className="bg-muted border border-border rounded text-[11px] overflow-x-auto">
-          <JavaCode source={m.body_text ?? ""} startLine={m.line_start ?? 1} />
-        </div>
+      <div className="bg-muted border border-border rounded text-[11px] overflow-x-auto">
+        <JavaCode source={m.body_text ?? ""} startLine={m.line_start ?? 1} />
       </div>
     );
   }
 
   if (content.codeType) {
-    const ct = content.codeType;
     return (
-      <div>
-        <div className="text-[10.5px] text-muted-foreground break-all mb-1">{ct.fqn}</div>
-        <div className="text-[11px] text-foreground mb-1.5 font-semibold">{ct.simple_name}</div>
-        <div className="text-[10px] text-muted-foreground mb-2">
-          {ct.kind} · role {ct.role} · {ct.fields.length} field · {ct.methods.length} method
-        </div>
-        <div className="text-[10px] text-muted-foreground mt-2 break-all">{ct.source_file}</div>
-        <p className="text-[11px] text-muted-foreground mt-2">
-          (전체 detail 은 가운데 패널 참고. 우측은 요약.)
-        </p>
-      </div>
+      <p className="text-muted-foreground p-2">메서드 미선택 — 가운데 패널에서 메서드 선택 시 본문 표시.</p>
     );
   }
 
@@ -303,8 +334,11 @@ function TabCallSite({ selection }: { selection: Selection }) {
 
   return (
     <div className="space-y-1">
-      <div className="text-[10.5px] text-muted-foreground mb-1">
-        이 method 가 호출하는 곳 · {callSites.length}건 <HelpHint term="call_site" inline />
+      <div className="text-[10.5px] text-muted-foreground mb-1 flex items-center gap-1">
+        <span className="truncate min-w-0">이 method 가 호출하는 곳 · {callSites.length}건</span>
+        <span className="shrink-0 inline-flex">
+          <HelpHint term="call_site" inline />
+        </span>
       </div>
       {callSites.slice(0, 50).map((cs) => (
         <div key={cs.id} className="bg-muted px-2 py-1 rounded text-[11px]">
@@ -314,9 +348,15 @@ function TabCallSite({ selection }: { selection: Selection }) {
             </span>
             {cs.line && <span className="font-mono text-[9.5px] text-muted-foreground shrink-0">L{cs.line}</span>}
           </div>
-          <div className="text-[10px] text-muted-foreground mt-0.5 break-all">
-            on {cs.callee_receiver_static_type} · {cs.analysis_source}
-            {cs.needs_user_confirm && <span className="ml-1 text-amber-700">(모호)</span>}
+          <div className="text-[10px] text-muted-foreground mt-0.5 break-all inline-flex items-center flex-wrap gap-x-1">
+            <span>on {cs.callee_receiver_static_type} · {cs.analysis_source}</span>
+            <span className="shrink-0 inline-flex"><HelpHint term="dispatch_source" inline /></span>
+            {cs.needs_user_confirm && (
+              <span className="text-amber-700 inline-flex items-center">
+                (모호)
+                <span className="shrink-0 inline-flex"><HelpHint term="ambiguous_call_site" inline /></span>
+              </span>
+            )}
           </div>
           {cs.user_confirmed_type && (
             <div className="text-[10px] text-emerald-700 mt-0.5">
@@ -394,8 +434,9 @@ function TabImpact({ selection }: { selection: Selection }) {
     <div className="space-y-3">
       {data.actions && data.actions.length > 0 && (
         <div>
-          <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
+          <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground font-semibold mb-1 inline-flex items-center">
             연결 Actions · {data.actions.length}
+            <span className="shrink-0 inline-flex"><HelpHint term="action" inline /></span>
           </div>
           {data.actions.map((a) => (
             <button
@@ -413,8 +454,9 @@ function TabImpact({ selection }: { selection: Selection }) {
       )}
       {data.rules && data.rules.length > 0 && (
         <div>
-          <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
+          <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground font-semibold mb-1 inline-flex items-center">
             연결 BR · {data.rules.length}
+            <span className="shrink-0 inline-flex"><HelpHint term="business_rule" inline /></span>
           </div>
           {data.rules.map((r) => (
             <button
@@ -436,24 +478,30 @@ function TabImpact({ selection }: { selection: Selection }) {
       )}
       {data.anchors && data.anchors.length > 0 && (
         <div>
-          <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
+          <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground font-semibold mb-1 inline-flex items-center">
             연결 Anchor · {data.anchors.length}
+            <span className="shrink-0 inline-flex"><HelpHint term="anchor" inline /></span>
           </div>
           {data.anchors.map((a) => (
             <div key={a.id} className="bg-muted px-2 py-1 rounded text-[11px] my-0.5">
               <div className="flex items-center gap-1.5">
                 <span className="font-mono text-[9.5px] text-sky-700">L{a.line ?? "?"}</span>
                 <span className="font-mono truncate flex-1 break-all">{a.anchor_locator}</span>
+                <span className="shrink-0 inline-flex"><HelpHint term="anchor_locator" inline /></span>
               </div>
-              <div className="text-[10px] text-muted-foreground break-all">→ {a.target_slot}</div>
+              <div className="text-[10px] text-muted-foreground break-all inline-flex items-center flex-wrap gap-x-0.5">
+                <span>→ {a.target_slot}</span>
+                <span className="shrink-0 inline-flex"><HelpHint term="target_slot" inline /></span>
+              </div>
             </div>
           ))}
         </div>
       )}
       {data.relatedTerms && data.relatedTerms.length > 0 && (
         <div>
-          <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
+          <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground font-semibold mb-1 inline-flex items-center">
             참조 Terms · {data.relatedTerms.length}
+            <span className="shrink-0 inline-flex"><HelpHint term="term" inline /></span>
           </div>
           {data.relatedTerms.map((t) => (
             <button
@@ -498,4 +546,138 @@ function parentTypeFqnOfMethod(methodFqn: string): string | null {
   const lastDot = beforeParen.lastIndexOf(".");
   if (lastDot < 0) return null;
   return beforeParen.slice(0, lastDot);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 탭 5 — 이력 (audit log)
+// ─────────────────────────────────────────────────────────────────────────
+
+/** RightPanel 의 selection.kind → audit_api 의 entity_kind. */
+function mapSelectionKindToAuditKind(kind: Selection["kind"]): AuditEntityKind {
+  if (kind === "codeType") return "code_type";
+  return kind;        // action / term / rule / anchor 는 동일
+}
+
+/** ts ISO 를 짧은 로컬 표기로 (yyyy-MM-dd HH:mm). */
+function formatTs(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** {field: value} 또는 임의 값 → 한 줄 요약 string. */
+function summarizeJson(jsonStr: string, field: string | null): string {
+  if (jsonStr === "null") return "—";
+  try {
+    const parsed = JSON.parse(jsonStr);
+    if (parsed === null || parsed === undefined) return "—";
+    if (field && typeof parsed === "object" && !Array.isArray(parsed) && field in parsed) {
+      const v = (parsed as Record<string, unknown>)[field];
+      return v === null || v === undefined ? "—" : JSON.stringify(v);
+    }
+    return JSON.stringify(parsed);
+  } catch {
+    return jsonStr;
+  }
+}
+
+function TabHistory({ selection }: { selection: Selection }) {
+  const { activeRepoId } = useWorkbench();
+  const [rows, setRows] = useState<AuditLogDTO[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setErr(null);
+    setRows([]);
+    (async () => {
+      try {
+        const auditKind = mapSelectionKindToAuditKind(selection.kind);
+        const data = await auditApi.getEntityHistory(
+          auditKind,
+          selection.id,
+          activeRepoId,
+          50,
+        );
+        if (!cancelled) setRows(data);
+      } catch (e) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selection.kind, selection.id, activeRepoId]);
+
+  if (loading) return <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />;
+  if (err) {
+    return (
+      <div className="p-2 text-[11px]">
+        <div className="text-rose-700 mb-1">이력 로드 실패</div>
+        <div className="text-muted-foreground break-all">{err}</div>
+      </div>
+    );
+  }
+  if (rows.length === 0) {
+    return (
+      <p className="text-muted-foreground p-2 text-[11px]">
+        이 entity 의 변경 이력 없음. PATCH/confirm 동작이 기록되면 여기 표시됩니다.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="text-[10.5px] text-muted-foreground mb-1 inline-flex items-center gap-1">
+        <span>최근 변경 · {rows.length}건 {rows.length >= 50 && "(상위 50)"}</span>
+        <span className="shrink-0 inline-flex"><HelpHint term="audit_log" inline /></span>
+      </div>
+      {rows.map((r) => {
+        const before = summarizeJson(r.before_json, r.field);
+        const after = summarizeJson(r.after_json, r.field);
+        const isFieldLevel = r.field !== null;
+        return (
+          <div
+            key={r.id}
+            className="bg-muted px-2 py-1 rounded text-[11px] border border-border/50"
+          >
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-mono text-[9.5px] text-muted-foreground shrink-0">
+                {formatTs(r.ts)}
+              </span>
+              <span className="text-foreground shrink-0">
+                {r.user_id ?? "system"}
+              </span>
+              <span
+                className={cn(
+                  "shrink-0 px-1 rounded text-[9.5px] font-medium",
+                  r.action === "patched" && "bg-sky-100 text-sky-800",
+                  r.action === "confirmed" && "bg-emerald-100 text-emerald-800",
+                  r.action === "unconfirmed" && "bg-amber-100 text-amber-800",
+                  r.action === "created" && "bg-violet-100 text-violet-800",
+                  r.action === "deleted" && "bg-rose-100 text-rose-800",
+                )}
+              >
+                {r.action}
+              </span>
+              {isFieldLevel && (
+                <span className="font-mono text-foreground shrink-0">{r.field}</span>
+              )}
+            </div>
+            {isFieldLevel && (
+              <div className="text-[10px] text-muted-foreground mt-0.5 break-all inline-flex items-center flex-wrap gap-x-0.5">
+                <span className="line-through opacity-70">{before}</span>
+                <span>→</span>
+                <span className="text-foreground">{after}</span>
+                <span className="shrink-0 inline-flex"><HelpHint term="diff" inline /></span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }

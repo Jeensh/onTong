@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  ChevronRight, ChevronDown, Folder, FolderOpen, Box, Loader2, Search, X as XIcon,
+  ChevronRight, ChevronDown, Folder, FolderOpen, Box, Loader2, Search, X as XIcon, Eye,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,7 @@ import {
   type SearchHitDTO,
 } from "@/lib/api/ontology";
 import { useWorkbench } from "./store";
+import { HelpHint } from "./HelpHint";
 
 /**
  * 좌측 navigator (V7 IA, D plan).
@@ -22,7 +23,7 @@ import { useWorkbench } from "./store";
  *
  * - 상단: 검색 (label/path 부분 매치)
  * - 트리: Maven module / package 계층, 각 노드 inventory 카운트
- * - leaf 클릭 또는 expand: 우측 inventory 패널에 그 패키지의 CodeType list
+ * - 패키지 expand → 직접 클래스/Action 들이 트리 leaf 로 inline 노출 (lazy fetch).
  *
  * 5000+ class 가정 → 트리 자체는 가벼움 (서버에서 집계). 잎 패키지의 inventory 만 lazy load.
  */
@@ -35,14 +36,17 @@ export function ModuleTree() {
     selectedCodeTypeFqn,
     setSelectedAction,
     setSelectedTerm,
+    setSelectedRule,
+    openPeek,
   } = useWorkbench();
   const [data, setData] = useState<ModulesResponseDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Highlighted package in the tree. Was previously also driving a bottom
+  // inventory panel that duplicated the expanded children — removed in
+  // Wave C cleanup. Kept for the row highlight + scroll affordance only.
   const [selectedPkg, setSelectedPkg] = useState<string | null>(null);
-  const [inventory, setInventory] = useState<ModuleInventoryItemDTO[]>([]);
-  const [invLoading, setInvLoading] = useState(false);
   const [searchQ, setSearchQ] = useState("");
 
   // Per-package inventory cache for inline tree rendering. Populated when a
@@ -134,25 +138,14 @@ export function ModuleTree() {
     else if (hit.kind === "action") setSelectedAction(hit.fqn);
     else if (hit.kind === "term") setSelectedTerm(hit.fqn);
     else if (hit.kind === "code_method") {
-      // method 의 parent type fqn 으로 fallback selection (Authoring 입력으로 사용 가능)
-      const parent = hit.fqn.replace(/[.#][^.#]+$/, "");
-      if (parent) setSelectedCodeType(parent);
+      // Mirror FqnLink behaviour for code_method — primary click opens the
+      // global Code Peek modal so the user can read the body without losing
+      // the current Detail selection. (Old behaviour navigated to the parent
+      // class, which was confusing — now matches Detail-pane FqnLinks.)
+      openPeek({ kind: "code_method", fqn: hit.fqn, repoId: activeRepoId });
     }
-    // rule — 별도 selection 없음 (앞으로 추가 가능)
+    else if (hit.kind === "rule") setSelectedRule(hit.fqn);
   };
-
-  // 패키지 선택 → inventory load
-  useEffect(() => {
-    if (!selectedPkg) { setInventory([]); return; }
-    let cancelled = false;
-    setInvLoading(true);
-    ontologyApi
-      .getModuleInventory(activeRepoId, { package: selectedPkg, recursive: false })
-      .then((items) => { if (!cancelled) setInventory(items); })
-      .catch(() => { if (!cancelled) setInventory([]); })
-      .finally(() => { if (!cancelled) setInvLoading(false); });
-    return () => { cancelled = true; };
-  }, [selectedPkg, activeRepoId]);
 
   const toggle = (path: string) => {
     setExpanded((s) => {
@@ -261,6 +254,19 @@ export function ModuleTree() {
       ensureActionsFor(n.path);
     }
 
+    // Package rows (containers — has children OR direct classes/actions) get a
+    // subtle background tint so they visually separate from leaf class rows
+    // when scrolling through hundreds of rows at 5K-class scale. Compressed
+    // chains are still containers so they share the tint.
+    const isPackageRow = hasChildren || hasDirectClasses || hasDirectActions;
+
+    // Hover-only T/A counts to reduce visual noise at scale. The count info
+    // is preserved in the row's title attribute as a keyboard-only fallback.
+    const countTitle = [
+      n.direct_terms > 0 ? `Term ${n.direct_terms}` : null,
+      n.direct_actions > 0 ? `Action ${n.direct_actions}` : null,
+    ].filter(Boolean).join(" · ");
+
     return (
       <div key={n.path}>
         <button
@@ -269,10 +275,12 @@ export function ModuleTree() {
             if (hasDirectClasses) setSelectedPkg(n.path);
           }}
           className={cn(
-            "w-full text-left px-1 py-0.5 text-[12px] flex items-center gap-1 hover:bg-muted/50 transition-colors",
+            "group w-full text-left px-1 py-0.5 text-[12px] flex items-center gap-1 hover:bg-muted/50 transition-colors",
+            isPackageRow && !isSelected && "bg-muted/30",
             isSelected && "bg-primary/10 text-foreground",
           )}
           style={{ paddingLeft: 4 + depth * 12 }}
+          title={countTitle || undefined}
         >
           {isToggleable ? (
             isExpanded ? <ChevronDown className="w-3 h-3 shrink-0" />
@@ -295,8 +303,12 @@ export function ModuleTree() {
                 <span>/{n.total_classes}</span>
               )}
               {n.direct_classes === 0 && n.total_classes > 0 && <span>·{n.total_classes}</span>}
-              {n.direct_terms > 0 && <span className="text-violet-400 ml-1">T{n.direct_terms}</span>}
-              {n.direct_actions > 0 && <span className="text-orange-400 ml-1">A{n.direct_actions}</span>}
+              {(n.direct_terms > 0 || n.direct_actions > 0) && (
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                  {n.direct_terms > 0 && <span className="text-violet-400 ml-1">T{n.direct_terms}</span>}
+                  {n.direct_actions > 0 && <span className="text-orange-400 ml-1">A{n.direct_actions}</span>}
+                </span>
+              )}
             </span>
           )}
         </button>
@@ -366,9 +378,15 @@ export function ModuleTree() {
                   {a.name}
                 </span>
                 {a.confirmed ? (
-                  <span className="text-[9px] text-emerald-700 shrink-0" title="confirmed (signature_locked 이상)">✓</span>
+                  <span className="shrink-0 inline-flex items-center gap-0.5">
+                    <span className="text-[9px] text-emerald-700" title="confirmed (signature_locked 이상)">✓</span>
+                    <HelpHint term="confirmed" inline />
+                  </span>
                 ) : (
-                  <span className="text-[9px] text-amber-700 shrink-0" title="draft (큐에서 confirm 대기)">·</span>
+                  <span className="shrink-0 inline-flex items-center gap-0.5">
+                    <span className="text-[9px] text-amber-700" title="draft (큐에서 confirm 대기)">·</span>
+                    <HelpHint term="draft" inline />
+                  </span>
                 )}
                 <span className="text-[9px] text-muted-foreground/60 font-mono shrink-0">
                   {a.realization_count}r
@@ -425,6 +443,8 @@ export function ModuleTree() {
       {/* Search results panel — replaces tree while query is active */}
       {isSearching ? (
         <div className="overflow-y-auto flex-1 py-1">
+          {/* One-time kind legend so first-time users can decode the 5 KindBadges. */}
+          {searchResults.length > 0 && <KindBadgeLegend />}
           {searchLoading && searchResults.length === 0 && (
             <div className="flex items-center justify-center p-4">
               <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
@@ -440,18 +460,31 @@ export function ModuleTree() {
               hit.kind === "code_type" && selectedCodeTypeFqn === hit.fqn;
             const simple = hit.fqn.split(/[.#]/).pop() ?? hit.fqn;
             const parent = hit.fqn.slice(0, hit.fqn.length - simple.length).replace(/[.#]$/, "");
+            // Peek eye icon for code_type (mirrors FqnLink). code_method's
+            // primary click is already peek, so no extra eye needed there.
+            const showPeekEye = hit.kind === "code_type";
+            // Outer becomes a role=button div so we can nest a real <button>
+            // (Eye / peek) without violating hydration.
             return (
-              <button
+              <div
                 key={`${hit.kind}|${hit.fqn}`}
+                role="button"
+                tabIndex={0}
                 onClick={() => onPickSearchHit(hit)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onPickSearchHit(hit);
+                  }
+                }}
                 title={hit.fqn}
                 className={cn(
-                  "w-full text-left px-2 py-1 text-[11px] hover:bg-muted/50 border-b border-border/40 last:border-b-0 flex items-center gap-1.5",
+                  "w-full text-left px-2 py-1 text-[11px] hover:bg-muted/50 border-b border-border/40 last:border-b-0 flex items-center gap-1.5 cursor-pointer",
                   isCodeTypeSelected && "bg-primary/15 ring-1 ring-primary/40",
                 )}
               >
                 <KindBadge kind={hit.kind} />
-                <span className={cn("font-mono truncate flex-1", isCodeTypeSelected && "font-semibold")}>
+                <span className={cn("font-mono truncate flex-1 min-w-0", isCodeTypeSelected && "font-semibold")}>
                   {simple}
                 </span>
                 {hit.label && hit.label !== simple && (
@@ -464,7 +497,21 @@ export function ModuleTree() {
                     {parent}
                   </span>
                 )}
-              </button>
+                {showPeekEye && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openPeek({ kind: "code_type", fqn: hit.fqn, repoId: activeRepoId });
+                    }}
+                    className="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                    title="코드 미리보기 (현재 선택 유지)"
+                    aria-label="코드 미리보기"
+                  >
+                    <Eye className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             );
           })}
           {searchHasMore && !searchLoading && (
@@ -506,46 +553,6 @@ export function ModuleTree() {
         </div>
       )}
 
-      {/* Inventory panel — 선택된 패키지 안의 CodeType list */}
-      {selectedPkg && (
-        <div className="border-t border-border max-h-72 overflow-hidden flex flex-col">
-          <div className="px-2 py-1 bg-muted/40 text-[10px] font-mono text-muted-foreground truncate flex items-center justify-between">
-            <span className="truncate" title={selectedPkg}>{selectedPkg}</span>
-            <button
-              onClick={() => setSelectedPkg(null)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              ✕
-            </button>
-          </div>
-          <div className="overflow-y-auto flex-1">
-            {invLoading ? (
-              <div className="p-3"><Loader2 className="w-3 h-3 animate-spin" /></div>
-            ) : inventory.length === 0 ? (
-              <p className="text-[10px] text-muted-foreground p-2">직접 클래스 없음</p>
-            ) : (
-              inventory.map((it) => (
-                <button
-                  key={it.fqn}
-                  onClick={() => setSelectedCodeType(it.fqn)}
-                  className="w-full text-left px-2 py-1 text-[11px] hover:bg-muted border-b border-border last:border-b-0 flex items-center gap-1"
-                >
-                  <RoleDot role={it.role} />
-                  <span className="truncate flex-1">{it.simple_name}</span>
-                  {it.has_term && (
-                    <span className="text-[9px] text-violet-400 shrink-0" title="primary term mapping">
-                      ★
-                    </span>
-                  )}
-                  <span className="text-[9px] text-muted-foreground/60 font-mono shrink-0">
-                    {it.method_count}m
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -573,7 +580,7 @@ function KindBadge({ kind }: { kind: SearchHitDTO["kind"] }) {
   );
 }
 
-function RoleDot({ role }: { role: string }) {
+export function RoleDot({ role }: { role: string }) {
   const color =
     role === "domain" ? "#a78bfa" :
     role === "framework" ? "#94a3b8" :
@@ -585,5 +592,76 @@ function RoleDot({ role }: { role: string }) {
       style={{ width: 6, height: 6, background: color }}
       title={role}
     />
+  );
+}
+
+/**
+ * Sticky 1-line legend explaining RoleDot colors + tree's C/T/A counts.
+ * Sits above the code tree so first-time users can read what the dots and
+ * abbreviated counts mean without hovering each row. Kept tight (~36px max).
+ */
+export function RoleDotLegend() {
+  const items: { role: string; label: string }[] = [
+    { role: "domain", label: "domain" },
+    { role: "framework", label: "framework" },
+    { role: "infra", label: "infra" },
+    { role: "unknown", label: "unknown" },
+  ];
+  return (
+    <div className="px-2 py-0.5 border-b border-border bg-muted/20 text-[10px] text-muted-foreground">
+      <div className="flex items-center gap-2 flex-wrap">
+        {items.map((it, i) => (
+          <span key={it.role} className="inline-flex items-center gap-1">
+            <RoleDot role={it.role} />
+            <span>{it.label}</span>
+            {i === 0 && <HelpHint term="role" inline />}
+            {i < items.length - 1 && <span className="text-muted-foreground/40 ml-1">·</span>}
+          </span>
+        ))}
+      </div>
+      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+        <span className="text-muted-foreground/70">카운트:</span>
+        <span className="inline-flex items-center gap-0.5">
+          <span className="font-mono text-foreground">C</span>=class
+          <HelpHint term="code_type" inline />
+        </span>
+        <span className="text-muted-foreground/40">·</span>
+        <span className="inline-flex items-center gap-0.5">
+          <span className="font-mono text-violet-400">T</span>=term
+          <HelpHint term="term" inline />
+        </span>
+        <span className="text-muted-foreground/40">·</span>
+        <span className="inline-flex items-center gap-0.5">
+          <span className="font-mono text-orange-400">A</span>=action
+          <HelpHint term="action" inline />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One-time legend that decodes the 5 KindBadges (class/mtd/term/act/rule)
+ * shown in search results. Renders once at the top of the result list so
+ * the badges aren't a mystery — each entry has its own HelpHint.
+ */
+function KindBadgeLegend() {
+  const items: { kind: SearchHitDTO["kind"]; term: string }[] = [
+    { kind: "code_type",   term: "code_type" },
+    { kind: "code_method", term: "code_method" },
+    { kind: "term",        term: "term" },
+    { kind: "action",      term: "action" },
+    { kind: "rule",        term: "business_rule" },
+  ];
+  return (
+    <div className="px-2 py-1 border-b border-border bg-muted/20 flex items-center gap-1.5 flex-wrap text-[9.5px] text-muted-foreground">
+      <span className="text-muted-foreground/70">종류:</span>
+      {items.map((it) => (
+        <span key={it.kind} className="inline-flex items-center gap-0.5">
+          <KindBadge kind={it.kind} />
+          <HelpHint term={it.term} inline />
+        </span>
+      ))}
+    </div>
   );
 }

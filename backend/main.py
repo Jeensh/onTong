@@ -58,12 +58,15 @@ from backend.infrastructure.events.event_bus import event_bus
 # C2~C5 완료 (2026-05-02): Code/Domain/Mapping Layer + Query API.
 from backend.api import authoring as authoring_api
 from backend.modeling.api import ontology_router as ontology_query_api
+from backend.modeling.api import anchor_candidates_api
+from backend.modeling.api import code_method_body_api
 from backend.modeling.api import graph_api as ontology_graph_api
 from backend.modeling.api import modules_api as ontology_modules_api
 from backend.modeling.api import perspective_api
 from backend.modeling.api import queue_actions_api
 from backend.modeling.api import recommend_api
 from backend.modeling.api import repo_import as repo_import_api
+from backend.modeling.api import audit_api as ontology_audit_api
 from backend.modeling.persistence.database import bootstrap_database
 
 setup_logging(
@@ -273,6 +276,9 @@ async def lifespan(app: FastAPI):
     from backend.modeling.mapping_layer import orm as _mapping_orm  # noqa: F401
     from backend.modeling.view_layer import orm as _view_orm  # noqa: F401
     from backend.application.authoring import orm as _authoring_orm  # noqa: F401
+    # Audit log (Wave 1) — register before bootstrap so create_all picks up audit_log table.
+    # 기존 DB 와 호환: create_all 은 IF NOT EXISTS 동작이라 기존 76MB DB 안 깨짐.
+    from backend.modeling.audit import orm as _audit_orm  # noqa: F401
     bootstrap_database()
     ontology_query_api.init()
     logger.info("Ontology Core wired: Code/Domain/Mapping Layer + Query API")
@@ -452,6 +458,12 @@ app.include_router(ontology_graph_api.router)
 app.include_router(ontology_modules_api.router)
 app.include_router(perspective_api.router)
 app.include_router(queue_actions_api.router)
+# AnchorBinding dropdown candidates (Wave 1, 2026-05-10)
+app.include_router(anchor_candidates_api.router)
+# Code peek modal — single method body fetch (Wave C-A, 2026-05-10)
+app.include_router(code_method_body_api.router)
+# Modeling section audit log (Wave 1, 2026-05-10)
+app.include_router(ontology_audit_api.router)
 # Authoring AI (2026-05-05 — B.5 prototype)
 app.include_router(authoring_api.router)
 

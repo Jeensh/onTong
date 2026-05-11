@@ -1,15 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, Eye, ArrowUpRight } from "lucide-react";
 import { useWorkbench, type MainMode } from "./store";
 import {
   ontologyApi,
   type ActionDTO,
+  type ActionParamDTO,
   type AnchorBindingDTO,
+  type AnchorCandidateDTO,
   type BusinessRuleDTO,
   type CodeTypeDTO,
+  type CodeTypeRole,
   type CompositionDTO,
   type TermDTO,
+  type VerificationLevel,
 } from "@/lib/api/ontology";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -19,6 +24,11 @@ import { HelpHint } from "./HelpHint";
 import { JavaCode } from "./JavaCode";
 import { ConfirmToggle } from "./ConfirmToggle";
 import { InlineEditList, InlineEditSelect, InlineEditText, InlineEditTextArea } from "./InlineEdit";
+import { InlineEditRange } from "./InlineEditRange";
+import { InlineEditAutocomplete, type AutocompleteSuggestion } from "./InlineEditAutocomplete";
+import { ParamDrawer } from "./ParamDrawer";
+import { FlagsRow, PanelStripe } from "./_panel_helpers";
+import { CodePeekModal } from "./CodePeekModal";
 
 const MODE_LABELS: { id: MainMode | "graph"; label: string }[] = [
   { id: "detail", label: "Detail" },
@@ -46,31 +56,17 @@ export function MainPanel() {
   return (
     <>
       <div className="h-8 px-3 bg-card border-b border-border flex items-center gap-2 flex-shrink-0">
-        <div className="text-[11px] text-muted-foreground flex-1 truncate">
-          {activeKind ? (
-            <>현재 <span className="text-foreground font-semibold">{KIND_LABEL[activeKind.kind]}</span>:{" "}
-            <code className="font-mono text-foreground">{activeKind.id.split(".").pop() ?? activeKind.id}</code></>
-          ) : (
-            "선택 없음 — 좌측 트리에서 Term / Action / CodeType / BR / Anchor 선택"
-          )}
-        </div>
-        {/* Direction toggle (Backward 는 다음 phase) */}
+        <div className="flex-1" />
+        {/* Direction indicator (Forward only — Backward is a future phase) */}
         <div className="flex bg-muted border border-border rounded overflow-hidden mr-2">
           <button
             onClick={() => setDirection("fwd")}
             className={cn(
-              "px-2.5 py-0.5 text-[11px] border-r border-border",
+              "px-2.5 py-0.5 text-[11px]",
               direction === "fwd" ? "bg-primary text-primary-foreground" : "text-muted-foreground",
             )}
           >
             🔍 Forward
-          </button>
-          <button
-            disabled
-            className="px-2.5 py-0.5 text-[11px] text-muted-foreground/40 cursor-not-allowed"
-            title="Backward 모드 — 다음 phase"
-          >
-            🔧 Backward
           </button>
         </div>
         {/* Mode toggle */}
@@ -105,17 +101,30 @@ export function MainPanel() {
         {direction === "fwd" && mainMode === "authoring" && <AuthoringMode />}
         {direction === "bwd" && <BackwardMode />}
       </div>
+      <PeekModalHost />
     </>
   );
 }
 
-const KIND_LABEL: Record<"action" | "term" | "codeType" | "rule" | "anchor", string> = {
-  action:   "Action",
-  term:     "Term",
-  codeType: "CodeType",
-  rule:     "BusinessRule",
-  anchor:   "AnchorBinding",
-};
+/**
+ * Single global CodePeekModal driver — reads peek target from Zustand and
+ * renders a modal so any FqnLink (deep in a panel) can open it without
+ * disturbing the active Detail selection.
+ */
+function PeekModalHost() {
+  const peekTarget = useWorkbench((s) => s.peekTarget);
+  const closePeek = useWorkbench((s) => s.closePeek);
+  return (
+    <CodePeekModal
+      open={peekTarget !== null}
+      onClose={closePeek}
+      kind={peekTarget?.kind ?? "code_type"}
+      fqn={peekTarget?.fqn ?? ""}
+      repoId={peekTarget?.repoId ?? ""}
+      highlightLine={peekTarget?.highlightLine}
+    />
+  );
+}
 
 type ActiveKind =
   | { kind: "action";   id: string }
@@ -143,10 +152,13 @@ function ForwardDetail({ activeKind }: { activeKind: ActiveKind | null }) {
 
 // ── Action Detail (기존 ForwardDetail 의 본체) ─────────────────────────
 function ActionDetail({ fqn }: { fqn: string }) {
+  const { setMainMode } = useWorkbench();
   const selectedActionFqn = fqn;
   const [action, setAction] = useState<ActionDTO | null>(null);
   const [anchors, setAnchors] = useState<AnchorBindingDTO[]>([]);
   const [loading, setLoading] = useState(false);
+  // #9 — ParamDrawer state.
+  const [drawerParam, setDrawerParam] = useState<{ p: ActionParamDTO; i: number } | null>(null);
 
   useEffect(() => {
     if (!selectedActionFqn) {
@@ -186,31 +198,26 @@ function ActionDetail({ fqn }: { fqn: string }) {
     setAction({ ...action, ...p } as ActionDTO);
   };
 
-  return (
-    <div className="p-5 max-w-[920px]">
-      <div className="bg-primary/5 border-l-2 border-primary px-3 py-1.5 mb-3 text-[11.5px] text-muted-foreground">
-        🔍 <strong className="text-primary">Forward 매핑</strong> — 코드를 도메인 의미로 매핑 (초기 작업)
-      </div>
+  // Action h1-area boolean flags (only `is_abstract` so far). Use FlagsRow so
+  // false values render nothing.
+  const actionFlags = [
+    { key: "abstract", value: !!action.is_abstract, tooltip: "abstract Action — 직접 호출되지 않고 realization 통해 dispatch" },
+  ];
 
+  return (
+    <PanelStripe color="primary">
+    <div className="p-5 max-w-[920px]">
       <h1 className="text-lg font-semibold mb-1 flex items-center gap-2">
         <InlineEditText
           value={action.label}
           onSave={(v) => patch({ label: v })}
           placeholder="(label 미지정)"
         />
-        <span className="text-[11px] px-1.5 py-px rounded-full border text-orange-700 border-orange-400 bg-orange-50">
-          action
-          <HelpHint term="action" inline />
-        </span>
-        <span className="text-[11px] px-1.5 py-px rounded-full border text-muted-foreground border-border">
+        <span className="text-[11px] px-1.5 py-px rounded-full border text-muted-foreground border-border shrink-0 inline-flex items-center">
           {action.kind}
           <HelpHint term={action.kind} inline />
         </span>
-        {action.is_abstract && (
-          <span className="text-[11px] px-1.5 py-px rounded-full border text-muted-foreground border-border">
-            abstract
-          </span>
-        )}
+        <FlagsRow flags={actionFlags} />
         <span className="ml-auto">
           <ConfirmToggle
             kind="action"
@@ -228,7 +235,7 @@ function ActionDetail({ fqn }: { fqn: string }) {
           />
         </span>
       </h1>
-      <div className="text-xs text-muted-foreground mb-4 font-mono">
+      <div className="text-xs text-muted-foreground mb-2 font-mono">
         {action.fqn}
         {action.declared_on_term && (
           <>
@@ -236,11 +243,16 @@ function ActionDetail({ fqn }: { fqn: string }) {
             · declared on <FqnLink kind="term" fqn={action.declared_on_term} />
           </>
         )}
-        <span className="ml-2 text-[11px] px-1.5 py-px rounded-full border border-amber-400 text-amber-700 bg-amber-50">
-          {action.verification_level.toUpperCase()}
-          <HelpHint term={action.verification_level} inline />
-        </span>
       </div>
+      {/* Wave C-B Change 1 — 6-step verification stepper. Replaces tiny amber pill. */}
+      <VerificationStepper level={action.verification_level} />
+      {/* #5 — Action.domain (derived, read-only). Render only if set. */}
+      {action.domain && (
+        <div className="text-xs text-muted-foreground italic mb-4">
+          domain (derived): <span className="font-mono not-italic">{action.domain}</span>
+        </div>
+      )}
+      {!action.domain && <div className="mb-4" />}
 
       <Section title="설명">
         <InlineEditTextArea
@@ -252,13 +264,15 @@ function ActionDetail({ fqn }: { fqn: string }) {
         />
       </Section>
 
-      <Section title={`Aliases · ${action.aliases.length}`}>
-        <InlineEditList
-          value={action.aliases}
-          onSave={(v) => patch({ aliases: v })}
-          placeholder="(alias 미등록 — 클릭해서 추가)"
-        />
-      </Section>
+      {action.aliases.length > 0 && (
+        <Section title={`Aliases · ${action.aliases.length}`}>
+          <InlineEditList
+            value={action.aliases}
+            onSave={(v) => patch({ aliases: v })}
+            placeholder="(alias 미등록 — 클릭해서 추가)"
+          />
+        </Section>
+      )}
 
       <Section title={<>Parameters · {action.params.length} <HelpHint term="action" inline /></>}>
         {action.params.map((p, i) => (
@@ -268,6 +282,8 @@ function ActionDetail({ fqn }: { fqn: string }) {
             name={p.name}
             refTerm={p.object_ref_term ?? null}
             confirmed={p.confirmed}
+            // #9 — click opens ParamDrawer with all 9 fields.
+            onClick={() => setDrawerParam({ p, i })}
           />
         ))}
       </Section>
@@ -283,6 +299,7 @@ function ActionDetail({ fqn }: { fqn: string }) {
         </Section>
       )}
 
+      {action.realizations.length > 0 && (
       <Section title={<>Realizations · {action.realizations.length} (다형성) <HelpHint term="realization" inline /></>}>
         {action.realizations.map((r, i) => (
           <div key={i} className="bg-muted px-3 py-2 rounded my-1.5 min-w-0">
@@ -307,22 +324,67 @@ function ActionDetail({ fqn }: { fqn: string }) {
               applies to{" "}
               {r.applies_to_code_type_fqn
                 ? <FqnLink kind="code_type" fqn={r.applies_to_code_type_fqn} />
-                : <span className="font-mono">(base)</span>} ·{" "}
+                : <><span className="font-mono">(base)</span><HelpHint term="realization" inline /></>} ·{" "}
               {r.dispatch_source} <HelpHint term="dispatch_source" inline /> · conf {r.confidence} <HelpHint term="confidence" inline />
             </div>
           </div>
         ))}
       </Section>
+      )}
+
+      {/* #7 — Postconditions (read-only string list). Hidden when empty. */}
+      {action.postconditions.length > 0 && (
+      <Section title={<>Postconditions · {action.postconditions.length} <HelpHint term="business_rule" inline /></>}>
+        <ul className="list-disc pl-5 space-y-0.5 text-[12px] text-foreground">
+          {action.postconditions.map((p, i) => (
+            <li key={i} className="font-mono break-all">{p}</li>
+          ))}
+        </ul>
+      </Section>
+      )}
+
+      {/* #7 — Effects (read-only ActionEffectDTO list, color-coded by op). Hidden when empty. */}
+      {action.effects.length > 0 && (
+      <Section title={<>Effects · {action.effects.length} <HelpHint term="effectful" inline /></>}>
+        {action.effects.map((e, i) => (
+          <div key={i} className="bg-muted px-3 py-1.5 rounded my-1 text-xs flex items-start gap-2">
+            <span className={cn(
+              "text-[10px] px-1.5 py-px rounded-full border shrink-0 font-semibold uppercase",
+              e.op === "create" && "border-emerald-400 text-emerald-700 bg-emerald-50",
+              e.op === "mutate" && "border-amber-400 text-amber-700 bg-amber-50",
+              e.op === "read"   && "border-sky-400 text-sky-700 bg-sky-50",
+              e.op === "delete" && "border-rose-400 text-rose-700 bg-rose-50",
+            )}>
+              {e.op}
+            </span>
+            <span className="min-w-0 flex-1">
+              <FqnLink kind="term" fqn={e.target_term} className="text-[11.5px]" />
+              {e.target_attr && (
+                <span className="font-mono text-[11px] text-muted-foreground">.{e.target_attr}</span>
+              )}
+              {e.description && (
+                <div className="text-[11px] text-muted-foreground mt-0.5">{e.description}</div>
+              )}
+            </span>
+          </div>
+        ))}
+      </Section>
+      )}
 
       {action.preconditions.length > 0 && (
-        <Section title={`Preconditions · ${action.preconditions.length}`}>
+        <Section title={<>Preconditions · {action.preconditions.length} <HelpHint term="business_rule" inline /></>}>
           {action.preconditions.map((p, i) => (
             <div key={i} className="flex items-center gap-2 text-xs my-1">
-              <span className="font-mono text-primary">[{i}]</span>
-              <span className="text-[10px] text-pink-400 border border-pink-400 bg-pink-400/10 px-1 rounded">
-                rule
-              </span>
-              <span className="font-mono text-muted-foreground">{p}</span>
+              <span className="font-mono text-[10px] text-muted-foreground/70 shrink-0">[{i}]</span>
+              {/* Subtle 8px dot replacing the heavier pink "rule" pill — keeps
+                  the row recognisable as a precondition without competing with
+                  the condition text. */}
+              <span
+                className="w-2 h-2 rounded-full bg-pink-400/70 shrink-0"
+                aria-label="precondition"
+                title="precondition (rule)"
+              />
+              <span className="font-mono text-muted-foreground break-all">{p}</span>
             </div>
           ))}
         </Section>
@@ -355,9 +417,12 @@ function ActionDetail({ fqn }: { fqn: string }) {
                 ✓
               </span>
             ) : (
-              <Button size="sm" className="text-[11px] h-6">
-                매핑
-              </Button>
+              <span className="inline-flex items-center gap-1">
+                <Button size="sm" className="text-[11px] h-6">
+                  매핑
+                </Button>
+                <HelpHint term="binding" inline />
+              </span>
             )}
           </div>
         ))}
@@ -369,7 +434,16 @@ function ActionDetail({ fqn }: { fqn: string }) {
       </Section>
 
       <AuthoringBridge note="Action params / output / sub_actions / anchor mapping 의 대량 변경은 Authoring 모드에서 LLM 도움 받아." />
+
+      {/* #9 — ParamDrawer (slide-in from right). Renders nothing when drawerParam is null. */}
+      <ParamDrawer
+        param={drawerParam?.p ?? null}
+        index={drawerParam?.i ?? null}
+        onClose={() => setDrawerParam(null)}
+        onOpenAuthoring={() => { setDrawerParam(null); setMainMode("authoring"); }}
+      />
     </div>
+    </PanelStripe>
   );
 }
 
@@ -398,19 +472,48 @@ function ParamRow({
   name,
   refTerm,
   confirmed,
+  onClick,
 }: {
   k: string;
   name: string;
   refTerm: string | null;
   confirmed: boolean;
+  onClick?: () => void;
 }) {
+  // #9 — when onClick is supplied, the whole row becomes clickable to open
+  // the ParamDrawer. Note: avoid nested <button> (FqnLink is a button).
+  // Use role="button" on a <div> so we can keep the FqnLink interactive.
+  const interactive = !!onClick;
   return (
-    <div className="bg-muted px-3 py-1.5 rounded my-1 grid grid-cols-[110px_1fr_60px] gap-2 items-center text-xs">
-      <span className="font-mono text-primary">{k}</span>
+    <div
+      className={cn(
+        "bg-muted px-3 py-1.5 rounded my-1 grid grid-cols-[110px_1fr_60px] gap-2 items-center text-xs",
+        interactive && "cursor-pointer hover:bg-muted/70 transition-colors",
+      )}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (!interactive) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+      title={interactive ? "클릭 → param 상세 (drawer)" : undefined}
+    >
+      <span className="font-mono text-primary inline-flex items-center gap-0.5">
+        {k}
+        <HelpHint term="action" inline />
+      </span>
       <span className="min-w-0 break-all">
         <strong>{name}</strong>
         {refTerm && (
-          <span className="ml-2 text-[10px] border border-violet-300 bg-violet-50 px-1 rounded">
+          <span
+            className="ml-2 text-[10px] border border-violet-300 bg-violet-50 px-1 rounded"
+            // Don't bubble FqnLink clicks to the row's onClick.
+            onClick={(e) => e.stopPropagation()}
+          >
             → <FqnLink kind="term" fqn={refTerm} className="text-[10px]" />
           </span>
         )}
@@ -425,6 +528,75 @@ function ParamRow({
       >
         {confirmed ? "✓" : "..."}
       </span>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Wave C-B Change 1 — VerificationStepper
+//
+// Compact 6-step horizontal progress indicator for Action.verification_level.
+// Past steps = filled muted dot. Current = larger amber filled dot + label.
+// Future steps = empty bordered dot. Each dot has a tooltip via HelpHint.
+// ─────────────────────────────────────────────────────────────────────────
+const VERIFICATION_STEPS: Array<{
+  level: VerificationLevel;
+  shortLabel: string;
+  glossaryKey: string;
+}> = [
+  { level: "unmapped",         shortLabel: "미매핑",  glossaryKey: "verification_level" },
+  { level: "draft",            shortLabel: "초안",    glossaryKey: "draft" },
+  { level: "signature_locked", shortLabel: "시그니처", glossaryKey: "signature_locked" },
+  { level: "body_anchored",    shortLabel: "본체",    glossaryKey: "body_anchored" },
+  { level: "sim_verified",     shortLabel: "시뮬",    glossaryKey: "sim_verified" },
+  { level: "pr_proven",        shortLabel: "PR",      glossaryKey: "pr_proven" },
+];
+
+function VerificationStepper({ level }: { level: VerificationLevel }) {
+  const currentIdx = VERIFICATION_STEPS.findIndex((s) => s.level === level);
+  return (
+    <div className="mb-4 flex items-center gap-0 select-none" role="group" aria-label="Verification level progress">
+      {VERIFICATION_STEPS.map((step, idx) => {
+        const isCurrent = idx === currentIdx;
+        const isPast = idx < currentIdx;
+        const isFuture = idx > currentIdx;
+        return (
+          <div key={step.level} className="flex items-center flex-1 min-w-0 last:flex-initial">
+            {/* dot + label */}
+            <div className="flex flex-col items-center gap-0.5 shrink-0">
+              <span
+                className={cn(
+                  "rounded-full inline-flex items-center justify-center transition-colors",
+                  isCurrent && "w-3.5 h-3.5 bg-amber-500 ring-2 ring-amber-200",
+                  isPast && "w-2.5 h-2.5 bg-amber-400/70",
+                  isFuture && "w-2.5 h-2.5 border border-muted-foreground/40 bg-card",
+                )}
+                title={step.level}
+              />
+              <span
+                className={cn(
+                  "text-[10px] leading-none whitespace-nowrap inline-flex items-center gap-0.5",
+                  isCurrent && "text-amber-700 font-semibold",
+                  isPast && "text-muted-foreground",
+                  isFuture && "text-muted-foreground/50",
+                )}
+              >
+                {step.shortLabel}
+                <HelpHint term={step.glossaryKey} inline />
+              </span>
+            </div>
+            {/* connector line (not after last) */}
+            {idx < VERIFICATION_STEPS.length - 1 && (
+              <span
+                className={cn(
+                  "h-px flex-1 min-w-[12px] mx-1.5 mt-[-12px]",
+                  idx < currentIdx ? "bg-amber-400/60" : "bg-muted-foreground/20",
+                )}
+              />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -549,16 +721,19 @@ function SplitMode() {
             <span className="text-[10px] px-1.5 py-px rounded-full border border-orange-300 text-orange-700 bg-orange-50">
               {action.kind}
             </span>
-            <span className="text-[10px] px-1.5 py-px rounded-full border border-amber-300 text-amber-700 bg-amber-50">
-              {action.verification_level}
-            </span>
+          </div>
+          {/* Wave C cleanup — same VerificationStepper as Detail mode so the
+              same Action shows the same verification UI everywhere. */}
+          <div className="mt-2">
+            <VerificationStepper level={action.verification_level} />
           </div>
         </div>
 
         {/* Semantic AnchorBinding (Action slot 매핑) — 핵심 차별점 */}
         <div className="bg-card border border-border rounded p-3">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 inline-flex items-center gap-1">
             ⚓ Semantic Anchors (Action ↔ slot) · {methodAnchors.length}
+            <HelpHint term="anchor" inline />
           </div>
           {methodAnchors.length === 0 && (
             <p className="text-[11px] text-muted-foreground">이 method 에 매핑된 AnchorBinding 없음.</p>
@@ -590,8 +765,9 @@ function SplitMode() {
         {/* Static parser anchors — param/return 자동 추출 */}
         {method && method.anchors.length > 0 && (
           <div className="bg-card border border-border rounded p-3">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 inline-flex items-center gap-1">
               📍 Static Parser Anchors · {method.anchors.length}
+              <HelpHint term="anchor" inline />
             </div>
             <div className="space-y-0.5">
               {method.anchors.slice(0, 12).map((a, i) => (
@@ -756,6 +932,49 @@ function parentTypeFqnOfMethod(methodFqn: string): string | null {
 // Backward — BackwardMode.tsx 로 분리 (Phase 2a 완료)
 
 // ─────────────────────────────────────────────────────────────────────────
+// #3 — Term.value_type editor.
+//
+// Common Java-ish types as a typed enum, with "기타..." fallback that swaps
+// to free-text input. Backend stores plain str; any text is accepted.
+// ─────────────────────────────────────────────────────────────────────────
+const VALUE_TYPE_OPTIONS = [
+  "int", "long", "double", "float",
+  "boolean", "String", "BigDecimal",
+  "LocalDate", "LocalDateTime",
+  "기타...",            // sentinel — fallback to free-text input
+] as const;
+type ValueTypeOption = typeof VALUE_TYPE_OPTIONS[number];
+
+function ValueTypeEdit({
+  value,
+  onSave,
+}: {
+  value: string;
+  onSave: (v: string) => Promise<void>;
+}) {
+  // If current value is a known option, show it directly. Otherwise the value
+  // came from a previous "기타" save — pre-select the fallback so the user can
+  // re-edit it as text. We use the saved value as the displayed text.
+  const isKnown = (VALUE_TYPE_OPTIONS as readonly string[]).includes(value) && value !== "기타...";
+  const display: ValueTypeOption = isKnown ? (value as ValueTypeOption) : "기타...";
+  return (
+    <InlineEditSelect<ValueTypeOption>
+      value={display}
+      options={VALUE_TYPE_OPTIONS}
+      // The Save handler receives the picked enum value. If user picked the
+      // sentinel "기타...", the InlineEditSelect's fallbackText branch already
+      // swapped to text mode and will dispatch the typed string here directly
+      // (so the only way "기타..." reaches us is the no-op identity case).
+      onSave={async (v) => {
+        if (v === "기타...") return;       // sentinel itself never persisted
+        await onSave(v);
+      }}
+      fallbackText={{ value: "기타...", label: "직접 입력" }}
+    />
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Term Detail
 // ─────────────────────────────────────────────────────────────────────────
 function TermDetail({ fqn }: { fqn: string }) {
@@ -786,10 +1005,8 @@ function TermDetail({ fqn }: { fqn: string }) {
   };
 
   return (
+    <PanelStripe color="violet">
     <div className="p-5 max-w-[920px]">
-      <div className="bg-violet-500/5 border-l-2 border-violet-500 px-3 py-1.5 mb-3 text-[11.5px] text-muted-foreground">
-        🧬 <strong className="text-violet-700">BusinessTerm</strong> — 도메인 의미 단위
-      </div>
       <h1 className="text-lg font-semibold mb-1 flex items-center gap-2">
         <InlineEditText
           value={term.label}
@@ -842,13 +1059,12 @@ function TermDetail({ fqn }: { fqn: string }) {
       </Section>
 
       {term.kind === "atomic" && (
-        <Section title="값 형식 (atomic)">
+        <Section title={<>값 형식 (atomic) <HelpHint term="atomic" inline /></>}>
+          {/* #3 — value_type as a typed select with "기타..." free-text fallback. */}
           <KV k="value_type" v={
-            <InlineEditText
+            <ValueTypeEdit
               value={term.value_type ?? ""}
               onSave={(v) => patch({ value_type: v })}
-              placeholder="(미지정)"
-              inputClassName="text-xs font-mono"
             />
           } />
           <KV k="unit" v={
@@ -859,8 +1075,16 @@ function TermDetail({ fqn }: { fqn: string }) {
               inputClassName="text-xs font-mono"
             />
           } />
-          <KV k="range" v={term.range ? `[${term.range.join(", ")}]` : "—"} />
-          <KV k="enum_values" v={
+          {/* #6 — range edit (min → max). NOTE: backend `queue_actions_api.TermPatch`
+                may not yet expose `range` (W2-A regenerating in parallel). If so the
+                save will surface a 422 inline. */}
+          <KV k={<>range <HelpHint term="atomic" inline /></>} v={
+            <InlineEditRange
+              value={term.range ?? null}
+              onSave={async (v) => { await patch({ range: v }); }}
+            />
+          } />
+          <KV k={<>enum_values <HelpHint term="atomic" inline /></>} v={
             <InlineEditList
               value={term.enum_values ?? []}
               onSave={(v) => patch({ enum_values: v })}
@@ -870,19 +1094,18 @@ function TermDetail({ fqn }: { fqn: string }) {
         </Section>
       )}
 
-      <Section title={`Aliases · ${term.aliases.length}`}>
-        <InlineEditList
-          value={term.aliases}
-          onSave={(v) => patch({ aliases: v })}
-          placeholder="(alias 미등록 — 클릭해서 추가)"
-        />
-      </Section>
+      {term.aliases.length > 0 && (
+        <Section title={`Aliases · ${term.aliases.length}`}>
+          <InlineEditList
+            value={term.aliases}
+            onSave={(v) => patch({ aliases: v })}
+            placeholder="(alias 미등록 — 클릭해서 추가)"
+          />
+        </Section>
+      )}
 
-      {term.kind === "composite" && (
-        <Section title={`Composition Parts · ${parts.length}`}>
-          {parts.length === 0 && (
-            <p className="text-[11.5px] text-muted-foreground">part 미정의 (effective parts 0)</p>
-          )}
+      {term.kind === "composite" && parts.length > 0 && (
+        <Section title={<>Composition Parts · {parts.length} <HelpHint term="composition" inline /></>}>
           {parts.map((p, i) => (
             <button
               key={i}
@@ -901,14 +1124,22 @@ function TermDetail({ fqn }: { fqn: string }) {
         </Section>
       )}
 
-      <Section title="Flags">
-        <KV k="is_abstract" v={term.is_abstract ? "✓" : "—"} />
-        <KV k="is_interface" v={term.is_interface ? "✓" : "—"} />
-        <KV k="struct_like_hint" v={term.struct_like_hint ? "✓" : "—"} />
-      </Section>
+      {/* Flags — only TRUE flags render. If all false, the section disappears. */}
+      {(term.is_abstract || term.is_interface || term.struct_like_hint) && (
+        <Section title="Flags">
+          <FlagsRow
+            flags={[
+              { key: "abstract",         label: "abstract",         value: !!term.is_abstract,      tooltip: "추상 Term — 자식 Term 의 공통 골격" },
+              { key: "interface",        label: "interface",        value: !!term.is_interface,     tooltip: "인터페이스성 Term — 행위 계약" },
+              { key: "struct_like_hint", label: "struct_like_hint", value: !!term.struct_like_hint, tooltip: "Java struct 처럼 단순 데이터 묶음 hint", glossaryKey: "struct_like_hint" },
+            ]}
+          />
+        </Section>
+      )}
 
       <AuthoringBridge note="Term 의 label / aliases / facets 등 대량 변경은 Authoring 모드에서 LLM 도움 받아 진행." />
     </div>
+    </PanelStripe>
   );
 }
 
@@ -919,10 +1150,15 @@ function CodeTypeDetail({ fqn }: { fqn: string }) {
   const { setSelectedAction } = useWorkbench();
   const [ct, setCt] = useState<CodeTypeDTO | null>(null);
   const [loading, setLoading] = useState(true);
+  // Wave C-B Change 2 — track which method bodies are expanded (lazy JavaCode render).
+  const [expandedMethods, setExpandedMethods] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    // Reset expansion when switching to a different CodeType to avoid carrying
+    // stale fqns from the previous class.
+    setExpandedMethods(new Set());
     ontologyApi.getCodeType(fqn).then((t) => {
       if (cancelled) return;
       setCt(t); setLoading(false);
@@ -933,18 +1169,43 @@ function CodeTypeDetail({ fqn }: { fqn: string }) {
   if (loading) return <div className="p-6 text-muted-foreground text-sm">Loading…</div>;
   if (!ct)     return <div className="p-6 text-muted-foreground text-sm">CodeType 찾을 수 없음</div>;
 
+  const visibleMethods = ct.methods.slice(0, 50);
+  const allExpanded =
+    visibleMethods.length > 0 && visibleMethods.every((m) => expandedMethods.has(m.fqn));
+  const toggleMethod = (mfqn: string) =>
+    setExpandedMethods((prev) => {
+      const next = new Set(prev);
+      if (next.has(mfqn)) next.delete(mfqn);
+      else next.add(mfqn);
+      return next;
+    });
+  const expandAll = () =>
+    setExpandedMethods(new Set(visibleMethods.map((m) => m.fqn)));
+  const collapseAll = () => setExpandedMethods(new Set());
+
   return (
+    <PanelStripe color="primary">
     <div className="p-5 max-w-[1000px]">
-      <div className="bg-primary/5 border-l-2 border-primary px-3 py-1.5 mb-3 text-[11.5px] text-muted-foreground">
-        📦 <strong className="text-primary">CodeType</strong> — Java 클래스/인터페이스 (mirror)
-      </div>
       <h1 className="text-lg font-semibold mb-1 flex items-center gap-2">
         {ct.simple_name}
         <span className="text-[11px] px-1.5 py-px rounded-full border border-primary/40 text-primary bg-primary/10">
           {ct.kind}
         </span>
-        <span className="text-[11px] px-1.5 py-px rounded-full border border-border text-muted-foreground">
-          role: {ct.role}
+        {/* #8 — role as inline select with confirm modal (impactful change). */}
+        <span className="text-[11px] px-1.5 py-px rounded-full border border-border text-muted-foreground inline-flex items-center gap-1">
+          role:
+          <HelpHint term="role" inline />
+          <InlineEditSelect<CodeTypeRole>
+            value={ct.role}
+            options={["domain", "framework", "infra", "unknown"] as const}
+            onSave={async (v) => {
+              await ontologyApi.patchCodeType(ct.repo_id, ct.fqn, { role: v });
+              setCt({ ...ct, role: v });
+            }}
+            confirmModal={{
+              body: (v) => `type role 을 ${v} 로 바꿉니다. classification 결과가 달라질 수 있습니다.`,
+            }}
+          />
         </span>
         {ct.is_abstract && (
           <span className="text-[11px] px-1.5 py-px rounded-full border border-amber-400 text-amber-700 bg-amber-50">abstract</span>
@@ -989,43 +1250,90 @@ function CodeTypeDetail({ fqn }: { fqn: string }) {
         </Section>
       )}
 
-      <Section title={`Methods · ${ct.methods.length}`}>
+      <Section
+        title={<>Methods · {ct.methods.length} <HelpHint term="code_method" inline /></>}
+        action={
+          visibleMethods.length > 0 && (
+            <div className="flex gap-1 normal-case tracking-normal">
+              <button
+                type="button"
+                onClick={allExpanded ? collapseAll : expandAll}
+                className="text-[10.5px] px-2 py-0.5 rounded border border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                title={allExpanded ? "모든 method 본체 접기" : "모든 method 본체 펼치기"}
+              >
+                {allExpanded ? "Collapse all" : "Expand all"}
+              </button>
+            </div>
+          )
+        }
+      >
         {ct.methods.length === 0 && (
           <p className="text-[11.5px] text-muted-foreground">메서드 없음</p>
         )}
-        {ct.methods.slice(0, 50).map((m, i) => (
-          <div key={i} className="bg-muted px-3 py-1 rounded my-0.5 text-xs">
-            <div className="flex items-center gap-2">
-              <span className={cn(
-                "text-[9.5px] px-1 rounded border",
-                m.role === "business" ? "text-emerald-700 border-emerald-300 bg-emerald-50"
-                : m.role === "helper" ? "text-amber-700 border-amber-300 bg-amber-50"
-                : "text-muted-foreground border-border bg-card"
-              )}>{m.role}</span>
-              <span className="font-mono truncate flex-1">
-                {m.name}({m.params.map(p => p.type).join(", ")}) → {m.return_type}
-              </span>
-              {m.line_start && <span className="text-[9.5px] text-muted-foreground font-mono">L{m.line_start}</span>}
-              {m.is_override && <span className="text-[9px] text-muted-foreground border border-border px-1 rounded">@Override</span>}
+        {visibleMethods.map((m, i) => {
+          const expanded = expandedMethods.has(m.fqn);
+          const hasBody = !!(m.body_text && m.body_text.trim().length > 0);
+          return (
+            <div key={i} className="bg-muted rounded my-0.5 text-xs overflow-hidden">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => toggleMethod(m.fqn)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggleMethod(m.fqn);
+                  }
+                }}
+                className="px-2.5 py-1 flex items-center gap-2 cursor-pointer hover:bg-muted/70 transition-colors"
+                title={expanded ? "본체 접기" : "본체 펼치기"}
+              >
+                <span className="shrink-0 text-muted-foreground">
+                  {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                </span>
+                <span className={cn(
+                  "text-[9.5px] px-1 rounded border shrink-0 inline-flex items-center gap-0.5",
+                  m.role === "business" ? "text-emerald-700 border-emerald-300 bg-emerald-50"
+                  : m.role === "helper" ? "text-amber-700 border-amber-300 bg-amber-50"
+                  : "text-muted-foreground border-border bg-card"
+                )}>
+                  {m.role}
+                  <HelpHint term="role" inline />
+                </span>
+                <span className="font-mono truncate flex-1">
+                  {m.name}({m.params.map(p => p.type).join(", ")}) → {m.return_type}
+                </span>
+                {m.line_start && <span className="text-[9.5px] text-muted-foreground font-mono shrink-0">L{m.line_start}</span>}
+                {m.is_override && <span className="text-[9px] text-muted-foreground border border-border px-1 rounded shrink-0">@Override</span>}
+              </div>
+              {expanded && (
+                <div className="border-t border-border/60 bg-card pl-5 pr-2 py-1">
+                  <div className="text-[10px] text-muted-foreground mb-1 font-mono">
+                    L{m.line_start ?? "?"}-{m.line_end ?? "?"}
+                  </div>
+                  {hasBody ? (
+                    <JavaCode
+                      source={m.body_text ?? ""}
+                      startLine={m.line_start ?? 1}
+                    />
+                  ) : (
+                    <div className="text-[11px] text-muted-foreground italic px-2 py-1">
+                      (body 없음)
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
         {ct.methods.length > 50 && (
           <p className="text-[11px] text-muted-foreground mt-1">… {ct.methods.length - 50} 더</p>
         )}
       </Section>
 
-      <Section title="원본 파일">
-        <p className="text-[11.5px] text-foreground font-mono">{ct.source_file}</p>
-      </Section>
-
-      <div className="text-[11px] text-muted-foreground mt-2">
-        * 이 CodeType 에 매핑된 Action/Term 이 있는지 확인하려면 좌측 검색에서 simple_name 검색
-        또는 미래 phase 의 reverse-lookup endpoint (Phase E #50+) 활용.
-      </div>
-
       <AuthoringBridge note="CodeType 자체는 Java 코드의 mirror — 직접 수정 ❌. role 분류 / Action 매핑 추가는 Authoring 모드에서." />
     </div>
+    </PanelStripe>
   );
 }
 
@@ -1058,10 +1366,8 @@ function BusinessRuleDetail({ fqn }: { fqn: string }) {
   };
 
   return (
+    <PanelStripe color="rose">
     <div className="p-5 max-w-[920px]">
-      <div className="bg-rose-500/5 border-l-2 border-rose-500 px-3 py-1.5 mb-3 text-[11.5px] text-muted-foreground">
-        ⚖ <strong className="text-rose-700">BusinessRule</strong> — 도메인 제약 (코드 가드 enforced)
-      </div>
       <h1 className="text-lg font-semibold mb-1 flex items-center gap-2">
         <span className="font-mono text-foreground text-[15px] truncate">{rule.fqn}</span>
         <span className={cn(
@@ -1074,6 +1380,10 @@ function BusinessRuleDetail({ fqn }: { fqn: string }) {
             value={rule.severity as "hard" | "soft"}
             options={["hard", "soft"] as const}
             onSave={(v) => patch({ severity: v })}
+            // #1 — confirm modal for severity (impacts code guard behavior).
+            confirmModal={{
+              body: (v) => `severity 를 ${v} 로 바꿉니다. 관련 코드 가드 거동에 영향이 있을 수 있습니다.`,
+            }}
           />
         </span>
         <span className="ml-auto">
@@ -1142,21 +1452,64 @@ function BusinessRuleDetail({ fqn }: { fqn: string }) {
       )}
 
       {rule.violated_at_call.length > 0 && (
-        <Section title={`Violated-At Call Sites · ${rule.violated_at_call.length}`}>
-          {rule.violated_at_call.map((v, i) => (
-            <div key={i} className="bg-muted px-3 py-1 rounded my-1 text-xs font-mono">
-              {JSON.stringify(v)}
-            </div>
-          ))}
+        <Section title={<>Violated-At Call Sites · {rule.violated_at_call.length} <HelpHint term="violated_at_call" inline /></>}>
+          {rule.violated_at_call.map((v, i) => {
+            const callerFqn = typeof v.caller_method_fqn === "string" ? v.caller_method_fqn : null;
+            const line = typeof v.line === "number" ? v.line : null;
+            const reason = typeof v.reason === "string" ? v.reason : null;
+            const severity = typeof v.severity === "string" ? v.severity : null;
+            const at = typeof v.at === "string" ? v.at : null;
+            const knownKeys = new Set(["caller_method_fqn", "line", "reason", "severity", "at"]);
+            const extras = Object.entries(v).filter(([k]) => !knownKeys.has(k));
+            return (
+              <div key={i} className="bg-muted px-3 py-1.5 rounded my-1 text-xs">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {severity && (
+                    <span className={cn(
+                      "text-[10px] px-1 rounded border",
+                      severity === "hard"
+                        ? "border-rose-300 text-rose-700 bg-rose-50"
+                        : "border-amber-300 text-amber-700 bg-amber-50"
+                    )}>{severity}</span>
+                  )}
+                  {callerFqn ? (
+                    <FqnLink kind="code_method" fqn={callerFqn} className="text-[12px]" />
+                  ) : (
+                    <span className="text-muted-foreground italic">caller 미상</span>
+                  )}
+                  {line !== null && (
+                    <span className="text-[10.5px] text-muted-foreground font-mono">L{line}</span>
+                  )}
+                  {at && <span className="text-[10px] text-muted-foreground ml-auto">{at}</span>}
+                </div>
+                {reason && (
+                  <div className="text-[11px] text-muted-foreground mt-1">{reason}</div>
+                )}
+                {extras.length > 0 && (
+                  <dl className="text-[10.5px] text-muted-foreground/80 mt-1 pl-2 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
+                    {extras.map(([k, val]) => (
+                      <span key={k} className="contents">
+                        <dt className="font-mono">{k}</dt>
+                        <dd className="font-mono break-all">{renderExtraValue(val)}</dd>
+                      </span>
+                    ))}
+                  </dl>
+                )}
+              </div>
+            );
+          })}
         </Section>
       )}
 
-      <Section title="Source / Origin">
-        <KV k="source" v={rule.source || "(미지정)"} />
-      </Section>
+      {rule.source && (
+        <Section title="Source / Origin">
+          <KV k="source" v={rule.source} />
+        </Section>
+      )}
 
       <AuthoringBridge note="BR statement / severity / enforced_by 의 대량 보강은 Authoring 모드에서 LLM 도움 받아." />
     </div>
+    </PanelStripe>
   );
 }
 
@@ -1189,17 +1542,17 @@ function AnchorDetail({ id }: { id: string }) {
   };
 
   return (
+    <PanelStripe color="sky">
     <div className="p-5 max-w-[920px]">
-      <div className="bg-sky-500/5 border-l-2 border-sky-500 px-3 py-1.5 mb-3 text-[11.5px] text-muted-foreground">
-        ⚓ <strong className="text-sky-700">AnchorBinding</strong> — 코드 fragment ↔ Action slot
-      </div>
-      <h1 className="text-lg font-semibold mb-1 flex items-center gap-2">
-        <span className="font-mono text-foreground text-[15px] truncate">{anchor.id}</span>
-        <span className="text-[11px] px-1.5 py-px rounded-full border border-sky-400 text-sky-700 bg-sky-50">
+      <h1 className="text-lg font-semibold mb-0.5 flex items-center gap-2">
+        <span className="font-mono text-foreground text-[15px] truncate min-w-0">
+          {anchor.anchor_locator || "(locator 미지정)"}
+        </span>
+        <span className="text-[11px] px-1.5 py-px rounded-full border border-sky-400 text-sky-700 bg-sky-50 shrink-0 inline-flex items-center">
           conf {anchor.confidence.toFixed(2)}
           <HelpHint term="confidence" inline />
         </span>
-        <span className="text-[11px] px-1.5 py-px rounded-full border border-border text-muted-foreground">
+        <span className="text-[11px] px-1.5 py-px rounded-full border border-border text-muted-foreground shrink-0">
           src: {anchor.source}
         </span>
         <span className="ml-auto">
@@ -1212,14 +1565,29 @@ function AnchorDetail({ id }: { id: string }) {
           />
         </span>
       </h1>
+      <div className="text-xs text-muted-foreground font-mono mb-3 truncate" title={anchor.id}>
+        id: {anchor.id}
+      </div>
 
-      <Section title={<>Anchor Locator <HelpHint term="anchor_locator" inline /></>}>
+      <Section title={<>Anchor Locator (편집) <HelpHint term="anchor_locator" inline /> <span className="text-[10px] text-muted-foreground normal-case font-normal tracking-normal ml-1">↑ h1 와 동일</span></>}>
         <div className="font-mono text-[13px] text-foreground bg-muted px-3 py-2 rounded break-all">
-          <InlineEditText
+          {/* #2 — autocomplete dropdown sourced from `getAnchorCandidates`. */}
+          <InlineEditAutocomplete
             value={anchor.anchor_locator ?? ""}
             onSave={(v) => patch({ anchor_locator: v })}
             placeholder="(locator 미지정)"
             inputClassName="text-[13px] font-mono w-full min-w-[400px]"
+            fetchSuggestions={async (): Promise<AutocompleteSuggestion[]> => {
+              const cands: AnchorCandidateDTO[] = await ontologyApi
+                .getAnchorCandidates(anchor.code_method_fqn, anchor.repo_id)
+                .catch(() => [] as AnchorCandidateDTO[]);
+              return cands.map((c) => ({
+                value: c.locator,
+                kind: c.kind,
+                description: c.description || c.snippet,
+                line: c.line,
+              }));
+            }}
           />
         </div>
       </Section>
@@ -1254,7 +1622,7 @@ function AnchorDetail({ id }: { id: string }) {
         </div>
       </Section>
 
-      <Section title="Rationale">
+      <Section title={<>Rationale <HelpHint term="confidence" inline /></>}>
         <InlineEditTextArea
           value={anchor.rationale ?? ""}
           onSave={(v) => patch({ rationale: v })}
@@ -1266,16 +1634,74 @@ function AnchorDetail({ id }: { id: string }) {
 
       <AuthoringBridge note="Anchor locator / target_slot 재바인딩은 Authoring 모드 또는 Split mode 에서 직접 코드 fragment 클릭 매핑." />
     </div>
+    </PanelStripe>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────
-function KV({ k, v }: { k: string; v: React.ReactNode }) {
+
+/**
+ * Renders an arbitrary value coming from a server payload's "extras" bucket
+ * (e.g. unknown keys on `BR.violated_at_call`). Avoids dumping raw JSON for
+ * common shapes like arrays-of-primitives and shallow objects so the user
+ * sees a readable key:value, not `[{"x":1,"y":2}]`. JSON.stringify is only
+ * the last-ditch fallback for deeply nested or opaque shapes.
+ */
+function renderExtraValue(val: unknown): React.ReactNode {
+  if (val === null || val === undefined) {
+    return <span className="text-muted-foreground/60 italic">{val === null ? "null" : "—"}</span>;
+  }
+  if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") {
+    return String(val);
+  }
+  if (Array.isArray(val)) {
+    if (val.length === 0) return <span className="text-muted-foreground/60 italic">[]</span>;
+    const allPrim = val.every(
+      (x) =>
+        x === null ||
+        typeof x === "string" ||
+        typeof x === "number" ||
+        typeof x === "boolean",
+    );
+    if (allPrim) return val.map((x) => (x === null ? "null" : String(x))).join(", ");
+    // Heterogeneous / nested array — fall back, but keep it short.
+    return <span className="text-muted-foreground/70">{JSON.stringify(val)}</span>;
+  }
+  if (typeof val === "object") {
+    const entries = Object.entries(val as Record<string, unknown>);
+    if (entries.length === 0) return <span className="text-muted-foreground/60 italic">{"{}"}</span>;
+    // Render shallow objects as a nested key:value list. Anything with object
+    // children gets compacted to JSON to keep the row scannable.
+    const allShallow = entries.every(
+      ([, v]) =>
+        v === null ||
+        typeof v === "string" ||
+        typeof v === "number" ||
+        typeof v === "boolean",
+    );
+    if (allShallow) {
+      return (
+        <span className="inline-flex flex-wrap gap-x-2 gap-y-0">
+          {entries.map(([ek, ev]) => (
+            <span key={ek}>
+              <span className="text-muted-foreground/70">{ek}:</span>{" "}
+              <span>{ev === null ? "null" : String(ev)}</span>
+            </span>
+          ))}
+        </span>
+      );
+    }
+    return <span className="text-muted-foreground/70">{JSON.stringify(val)}</span>;
+  }
+  return <span className="text-muted-foreground/70">{String(val)}</span>;
+}
+
+function KV({ k, v }: { k: React.ReactNode; v: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[120px_1fr] gap-2 my-0.5 text-xs">
-      <span className="text-muted-foreground">{k}</span>
+      <span className="text-muted-foreground inline-flex items-center gap-0.5">{k}</span>
       <span className="text-foreground min-w-0 break-all">{v}</span>
     </div>
   );
@@ -1305,7 +1731,17 @@ function AuthoringBridge({ note }: { note: string }) {
 
 /**
  * Clickable FQN link — entity 종류별 selectXxx 액션 호출.
- * code_method 의 경우 parent class 로 navigate (method 단일 페이지 미존재).
+ *
+ * Wave C-B Change 3:
+ *   - code_type: primary click → navigate to Detail (unchanged); small Eye icon
+ *     opens CodePeekModal without losing current selection.
+ *   - code_method: primary click → opens CodePeekModal (methods have no
+ *     dedicated Detail). Small ↗ icon = secondary "go to parent class" nav.
+ *   - All other kinds (term/action/rule/anchor): unchanged.
+ *
+ * Hydration safety: nested <button> inside another <button> would crash. We
+ * render the outer trigger as a `role="button"` `<span>` for code kinds so the
+ * Eye / ↗ children can be real <button>s (and stop event propagation).
  */
 function FqnLink({
   kind, fqn, label, className,
@@ -1317,18 +1753,27 @@ function FqnLink({
 }) {
   const {
     setSelectedTerm, setSelectedAction, setSelectedCodeType, setSelectedRule, setSelectedAnchor,
+    activeRepoId, openPeek,
   } = useWorkbench();
-  const onClick = () => {
+
+  const navigate = () => {
     if (kind === "term") setSelectedTerm(fqn);
     else if (kind === "action") setSelectedAction(fqn);
     else if (kind === "code_type") setSelectedCodeType(fqn);
     else if (kind === "code_method") {
+      // Secondary affordance: jump to parent class Detail.
       const parent = parentTypeFqnOfMethod(fqn);
       if (parent) setSelectedCodeType(parent);
     }
     else if (kind === "rule") setSelectedRule(fqn);
     else if (kind === "anchor") setSelectedAnchor(fqn);
   };
+
+  const peek = () => {
+    if (kind !== "code_type" && kind !== "code_method") return;
+    openPeek({ kind, fqn, repoId: activeRepoId });
+  };
+
   const colorClass: Record<typeof kind, string> = {
     term:        "text-violet-700 hover:bg-violet-50",
     action:      "text-orange-700 hover:bg-orange-50",
@@ -1337,17 +1782,85 @@ function FqnLink({
     rule:        "text-rose-700 hover:bg-rose-50",
     anchor:      "text-sky-700 hover:bg-sky-50",
   };
+
+  // For non-code kinds: simple <button> as before.
+  if (kind !== "code_type" && kind !== "code_method") {
+    return (
+      <button
+        onClick={navigate}
+        className={cn(
+          "font-mono break-all hover:underline transition-colors px-1 -mx-1 rounded",
+          colorClass[kind],
+          className,
+        )}
+        title={`${kind} detail 로 이동: ${fqn}`}
+      >
+        {label ?? fqn}
+      </button>
+    );
+  }
+
+  // For code_type / code_method: render a span container with multiple
+  // interactive children (so we can nest <button>s safely).
+  const isMethod = kind === "code_method";
+  // Primary click on code_method = peek; on code_type = navigate.
+  const primaryClick = isMethod ? peek : navigate;
+  const primaryTitle = isMethod
+    ? `code body 미리보기 (현재 선택 유지): ${fqn}`
+    : `code_type detail 로 이동: ${fqn}`;
+
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "font-mono break-all hover:underline transition-colors px-1 -mx-1 rounded",
-        colorClass[kind],
-        className,
+    <span className={cn("inline-flex items-center gap-0.5 min-w-0", className)}>
+      <span
+        role="button"
+        tabIndex={0}
+        onClick={primaryClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            primaryClick();
+          }
+        }}
+        className={cn(
+          "font-mono break-all hover:underline transition-colors px-1 -mx-1 rounded cursor-pointer min-w-0",
+          colorClass[kind],
+        )}
+        title={primaryTitle}
+      >
+        {label ?? fqn}
+      </span>
+      {/* Eye = peek. Always rendered for code kinds. For code_method, this is
+          redundant with the primary click (also peek) but it gives a stable
+          affordance + keyboard target. */}
+      {!isMethod && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            peek();
+          }}
+          className="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+          title="코드 미리보기 (현재 선택 유지)"
+          aria-label="코드 미리보기"
+        >
+          <Eye className="w-3 h-3" />
+        </button>
       )}
-      title={`${kind} detail 로 이동: ${fqn}`}
-    >
-      {label ?? fqn}
-    </button>
+      {/* code_method: secondary "go to parent class" nav as an arrow icon. */}
+      {isMethod && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate();
+          }}
+          className="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+          title="parent class detail 로 이동"
+          aria-label="parent class 로 이동"
+        >
+          <ArrowUpRight className="w-3 h-3" />
+        </button>
+      )}
+    </span>
   );
 }

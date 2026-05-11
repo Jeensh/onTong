@@ -1,19 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Network, Play, FolderInput, ChevronRight } from "lucide-react";
+import { Search, Network, FolderInput, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWorkbench } from "./store";
 import { RepoImportModal } from "./RepoImportModal";
 
 /**
  * TopBar (V7 IA, D plan) — 항상 어디 있는지 보이는 breadcrumb 노출.
- * `repo / view / selection / lens` 패턴.
+ * `repo / view / selection` 패턴.
  */
 export function TopBar() {
   const {
     activeRepoId, setGraphMode, toggleCmdK,
-    graphModeActive, selectedActionFqn, selectedCodeTypeFqn, selectedTermFqn, lens,
+    graphModeActive, selectedActionFqn, selectedCodeTypeFqn, selectedTermFqn,
   } = useWorkbench();
   const [importOpen, setImportOpen] = useState(false);
 
@@ -44,12 +44,6 @@ export function TopBar() {
             <Crumb label={selection} mono />
           </>
         )}
-        {lens !== "none" && (
-          <>
-            <ChevronRight className="w-3 h-3 shrink-0" />
-            <Crumb label={`Lens: ${lens}`} subtle />
-          </>
-        )}
       </nav>
 
       <button
@@ -77,9 +71,6 @@ export function TopBar() {
       >
         <Network className="w-3.5 h-3.5" /> 그래프
       </Button>
-      <Button size="sm" className="gap-1.5 shrink-0" disabled title="Simulation Engine — 다음 phase">
-        <Play className="w-3.5 h-3.5" /> 시뮬
-      </Button>
 
       <RepoImportModal open={importOpen} onOpenChange={setImportOpen} />
     </header>
@@ -87,13 +78,12 @@ export function TopBar() {
 }
 
 function Crumb({
-  label, primary, mono, subtle,
-}: { label: string; primary?: boolean; mono?: boolean; subtle?: boolean }) {
+  label, primary, mono,
+}: { label: string; primary?: boolean; mono?: boolean }) {
   return (
     <span
       className={
         (primary ? "text-foreground font-semibold " : "") +
-        (subtle ? "text-muted-foreground/60 " : "") +
         (mono ? "font-mono text-[10.5px] " : "") +
         "truncate min-w-0"
       }

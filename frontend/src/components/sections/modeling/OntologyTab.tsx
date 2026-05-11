@@ -171,10 +171,32 @@ export function OntologyTab() {
             <strong className="text-foreground">{filteredAnchors.length}</strong>/{anchors.length} anchor
           </>
         ) : (
-          <>
-            {atomicTerms.length} atomic <HelpHint term="atomic" inline /> · {compositeTerms.length} composite <HelpHint term="composite" inline /> · {actions.length} action <HelpHint term="action" inline /> ·{" "}
-            {rules.length} rule <HelpHint term="business_rule" inline /> · {anchors.length} anchor <HelpHint term="anchor" inline />
-          </>
+          <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
+            <span className="inline-flex items-center whitespace-nowrap">
+              {atomicTerms.length}&nbsp;atomic
+              <span className="shrink-0 inline-flex"><HelpHint term="atomic" inline /></span>
+            </span>
+            <span>·</span>
+            <span className="inline-flex items-center whitespace-nowrap">
+              {compositeTerms.length}&nbsp;composite
+              <span className="shrink-0 inline-flex"><HelpHint term="composite" inline /></span>
+            </span>
+            <span>·</span>
+            <span className="inline-flex items-center whitespace-nowrap">
+              {actions.length}&nbsp;action
+              <span className="shrink-0 inline-flex"><HelpHint term="action" inline /></span>
+            </span>
+            <span>·</span>
+            <span className="inline-flex items-center whitespace-nowrap">
+              {rules.length}&nbsp;rule
+              <span className="shrink-0 inline-flex"><HelpHint term="business_rule" inline /></span>
+            </span>
+            <span>·</span>
+            <span className="inline-flex items-center whitespace-nowrap">
+              {anchors.length}&nbsp;anchor
+              <span className="shrink-0 inline-flex"><HelpHint term="anchor" inline /></span>
+            </span>
+          </div>
         )}
       </div>
       <div className="overflow-y-auto flex-1">
@@ -225,7 +247,19 @@ export function OntologyTab() {
       <SectionHeader
         section="actions"
         count={filteredActions.length}
-        sub={`confirmed ${filteredActions.filter((a) => a.verification_level !== "unmapped" && a.verification_level !== "draft").length} / draft ${filteredActions.filter((a) => a.verification_level === "draft").length}`}
+        sub={
+          <>
+            <span className="inline-flex items-center gap-0.5">
+              confirmed {filteredActions.filter((a) => a.verification_level !== "unmapped" && a.verification_level !== "draft").length}
+              <HelpHint term="confirmed" inline />
+            </span>
+            {" / "}
+            <span className="inline-flex items-center gap-0.5">
+              draft {filteredActions.filter((a) => a.verification_level === "draft").length}
+              <HelpHint term="draft" inline />
+            </span>
+          </>
+        }
         expanded={expanded.has("actions")}
         onToggle={() => toggle("actions")}
       />
@@ -250,7 +284,12 @@ export function OntologyTab() {
       <SectionHeader
         section="rules"
         count={filteredRules.length}
-        sub={`hard ${filteredRules.filter((r) => r.severity === "hard").length}`}
+        sub={
+          <span className="inline-flex items-center gap-0.5">
+            hard {filteredRules.filter((r) => r.severity === "hard").length}
+            <HelpHint term="severity" inline />
+          </span>
+        }
         expanded={expanded.has("rules")}
         onToggle={() => toggle("rules")}
       />
@@ -282,10 +321,17 @@ export function OntologyTab() {
   );
 }
 
+const SECTION_GLOSSARY: Record<Section, string> = {
+  terms: "term",
+  actions: "action",
+  rules: "business_rule",
+  anchors: "anchor",
+};
+
 function SectionHeader({
   section, count, sub, expanded, onToggle,
 }: {
-  section: Section; count: number; sub: string;
+  section: Section; count: number; sub: React.ReactNode;
   expanded: boolean; onToggle: () => void;
 }) {
   return (
@@ -294,8 +340,11 @@ function SectionHeader({
       className="w-full text-left px-2 py-1 flex items-center gap-1 border-b border-border/50 hover:bg-muted/40 transition-colors"
     >
       {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-      <span className={cn("font-semibold", SECTION_COLOR[section])}>{SECTION_LABEL[section]}</span>
-      <span className="text-[10.5px] text-muted-foreground ml-auto">{count} · {sub}</span>
+      <span className={cn("font-semibold inline-flex items-center gap-0.5", SECTION_COLOR[section])}>
+        {SECTION_LABEL[section]}
+        <HelpHint term={SECTION_GLOSSARY[section]} inline />
+      </span>
+      <span className="text-[10.5px] text-muted-foreground ml-auto inline-flex items-center gap-0.5">{count} · {sub}</span>
     </button>
   );
 }
@@ -323,6 +372,12 @@ function TermRow({ t, onClick }: { t: TermDTO; onClick: () => void }) {
 function ActionRow({ a, onClick }: { a: ActionDTO; onClick: () => void }) {
   const lvl = a.verification_level;
   const confirmed = lvl !== "unmapped" && lvl !== "draft";
+  // Map full kind to a glossary key — falls back to generic "action" if unknown.
+  const kindGlossary =
+    a.kind === "pure_function" ? "pure_function"
+    : a.kind === "effectful"   ? "effectful"
+    : a.kind === "workflow"    ? "workflow"
+    : "action";
   return (
     <button
       onClick={onClick}
@@ -332,11 +387,20 @@ function ActionRow({ a, onClick }: { a: ActionDTO; onClick: () => void }) {
       <span className="w-1.5 h-1.5 rounded-sm bg-orange-500 shrink-0" />
       <span className="truncate flex-1 font-mono text-foreground">{a.label}</span>
       {confirmed ? (
-        <span className="text-[9px] text-emerald-700 shrink-0" title={`confirmed (${lvl})`}>✓</span>
+        <span className="text-[9px] text-emerald-700 shrink-0 inline-flex items-center" title={`confirmed (${lvl})`}>
+          ✓
+          <HelpHint term="confirmed" inline />
+        </span>
       ) : (
-        <span className="text-[9px] text-amber-700 shrink-0" title="draft">·</span>
+        <span className="text-[9px] text-amber-700 shrink-0 inline-flex items-center" title="draft">
+          ·
+          <HelpHint term="draft" inline />
+        </span>
       )}
-      <span className="text-[9px] text-muted-foreground font-mono shrink-0">{a.kind.slice(0, 4)}</span>
+      <span className="text-[9px] text-muted-foreground font-mono shrink-0 inline-flex items-center">
+        {a.kind.slice(0, 4)}
+        <HelpHint term={kindGlossary} inline />
+      </span>
     </button>
   );
 }

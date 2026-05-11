@@ -13,8 +13,9 @@ import {
   type MappingQueueDTO,
 } from "@/lib/api/ontology";
 import { Check, X as XIcon, Loader2 } from "lucide-react";
-import { ModuleTree } from "./ModuleTree";
+import { ModuleTree, RoleDotLegend } from "./ModuleTree";
 import { OntologyTab } from "./OntologyTab";
+import { HelpHint } from "./HelpHint";
 
 // 좌측 탭 — 코드 (패키지 트리) / 온톨로지 (Term/Action/BR/Anchor 모음) / 큐 (자동 추천 confirm).
 const TABS: { id: LeftTab; label: string; icon: string }[] = [
@@ -35,7 +36,7 @@ export function LeftPanel() {
       className="bg-card border-r border-border flex flex-col overflow-hidden"
       style={{ gridArea: "left" }}
     >
-      <div className="flex border-b border-border px-1.5 pt-1.5 gap-0">
+      <div className="flex border-b border-border px-1.5 pt-1.5 gap-0 items-center">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -49,11 +50,18 @@ export function LeftPanel() {
           >
             <span className="mr-0.5">{t.icon}</span>
             {t.label}
+            {t.id === "queue" && <HelpHint term="matching" inline />}
+            {t.id === "code" && <HelpHint term="code_type" inline />}
           </button>
         ))}
       </div>
       <div className="flex-1 overflow-hidden flex flex-col">
-        {effectiveTab === "code" && <ModuleTree />}
+        {effectiveTab === "code" && (
+          <>
+            <RoleDotLegend />
+            <ModuleTree />
+          </>
+        )}
         {effectiveTab === "ontology" && <OntologyTab />}
         {effectiveTab === "queue" && <QueueTab />}
       </div>
@@ -350,11 +358,11 @@ function QueueTab() {
     }
   };
 
-  const sectionTabs: { id: QueueSection; label: string; count: number; color: string }[] = [
-    { id: "term", label: "Term", count: data?.summary.terms ?? 0, color: "text-violet-400" },
-    { id: "action", label: "Action", count: data?.summary.actions ?? 0, color: "text-orange-400" },
-    { id: "realization", label: "Real", count: data?.summary.type_realizations ?? 0, color: "text-emerald-500" },
-    { id: "legacy", label: "Code", count: legacy.unmapped.length + legacy.ambig.length, color: "text-amber-500" },
+  const sectionTabs: { id: QueueSection; label: string; count: number; color: string; glossaryKey: string }[] = [
+    { id: "term", label: "Term", count: data?.summary.terms ?? 0, color: "text-violet-400", glossaryKey: "term" },
+    { id: "action", label: "Action", count: data?.summary.actions ?? 0, color: "text-orange-400", glossaryKey: "action" },
+    { id: "realization", label: "Real", count: data?.summary.type_realizations ?? 0, color: "text-emerald-500", glossaryKey: "type_realization" },
+    { id: "legacy", label: "Code", count: legacy.unmapped.length + legacy.ambig.length, color: "text-amber-500", glossaryKey: "code_type" },
   ];
 
   return (
@@ -372,6 +380,7 @@ function QueueTab() {
             )}
           >
             <span>{t.label}</span>
+            <HelpHint term={t.glossaryKey} inline />
             <span className={cn("font-mono", section === t.id && t.color)}>{t.count}</span>
           </button>
         ))}
@@ -450,7 +459,10 @@ function QueueTab() {
             {legacy.ambig.map((a) => (
               <div key={a.call_site.id} className="px-3 py-2 border-b border-border">
                 <div className="text-[9.5px] text-amber-400 mb-1">🟡 CALLSITE</div>
-                <div className="text-[12px]">{a.call_site.callee_simple_name} 모호 dispatch</div>
+                <div className="text-[12px] inline-flex items-center gap-0.5">
+                  {a.call_site.callee_simple_name} 모호 dispatch
+                  <HelpHint term="ambiguous_call_site" inline />
+                </div>
                 <div className="text-[10.5px] text-muted-foreground mt-0.5 truncate">
                   후보 {a.call_site.possible_runtime_types.length} · {a.call_site.analysis_source}
                 </div>
@@ -458,7 +470,7 @@ function QueueTab() {
             ))}
             {legacy.unmapped.map((u) => (
               <div key={u.code_method.fqn} className="px-3 py-2 border-b border-border">
-                <div className="text-[9.5px] text-orange-400 mb-1">🟠 UNMAPPED</div>
+                <div className="text-[9.5px] text-orange-400 mb-1 inline-flex items-center gap-1">🟠 UNMAPPED <HelpHint term="code_method" inline /></div>
                 <div className="text-[12px] truncate">{u.code_method.fqn}</div>
                 <div className="text-[10.5px] text-muted-foreground mt-0.5">{u.reason}</div>
               </div>

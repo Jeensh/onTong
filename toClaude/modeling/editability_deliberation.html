@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>5-ii 편집 가능성 결정 — 고찰 / 토론</title>
+<style>
+  :root {
+    --fg: #18181b;
+    --muted: #71717a;
+    --bg: #fafafa;
+    --card: #ffffff;
+    --border: #e4e4e7;
+    --primary: #2563eb;
+    --green: #16a34a;
+    --amber: #d97706;
+    --rose: #be123c;
+    --violet: #7c3aed;
+    --sky: #0284c7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.55;
+    font-size: 14px;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+  .progress {
+    display: inline-flex; gap: 6px; align-items: center;
+    background: #f4f4f5; padding: 4px 10px; border-radius: 12px;
+    font-size: 11px; color: var(--muted); margin-left: 12px;
+  }
+  .progress strong { color: var(--green); font-weight: 600; }
+
+  nav.tabs {
+    display: flex; gap: 4px;
+    padding: 8px 24px 0;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 81px; z-index: 9;
+  }
+  .tab-btn {
+    background: none; border: none; padding: 8px 14px;
+    font-size: 13px; cursor: pointer;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .tab-btn:hover { color: var(--fg); }
+  .tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    font-weight: 600;
+  }
+  .tab-btn .count {
+    display: inline-block; min-width: 18px; padding: 1px 6px;
+    background: #e4e4e7; border-radius: 10px;
+    font-size: 10px; margin-left: 4px;
+  }
+  .tab-btn.active .count { background: #dbeafe; color: var(--primary); }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+
+  .tab-section { display: none; }
+  .tab-section.active { display: block; }
+
+  /* Summary tab */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .summary-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .summary-card h3 {
+    margin: 0 0 8px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+  }
+  .summary-card .num {
+    font-size: 28px; font-weight: 600; line-height: 1;
+  }
+  .summary-card .num.green  { color: var(--green); }
+  .summary-card .num.amber  { color: var(--amber); }
+  .summary-card .num.muted  { color: var(--muted); }
+
+  .decision-list {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-top: 12px;
+  }
+  .decision-list h2 {
+    margin: 0 0 10px;
+    font-size: 14px;
+  }
+  .decision-list ul { margin: 0; padding-left: 20px; }
+  .decision-list li {
+    margin: 4px 0;
+    font-size: 12.5px;
+  }
+  .decision-list code {
+    background: #f4f4f5;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11.5px;
+  }
+  .pick-A { color: var(--rose);   font-weight: 600; }
+  .pick-B { color: var(--green);  font-weight: 600; }
+  .pick-C { color: var(--amber);  font-weight: 600; }
+
+  /* Issue card */
+  .issue {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .issue-head {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    background: #fafafa;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .issue-num {
+    font-size: 11px; color: var(--muted);
+    background: #e4e4e7;
+    padding: 2px 8px; border-radius: 10px;
+    font-weight: 600;
+  }
+  .issue-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    flex: 1;
+  }
+  .issue-tag {
+    font-size: 10.5px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .tag-status   { background: #fef3c7; color: var(--amber); }
+  .tag-mismatch { background: #fee2e2; color: var(--rose); }
+  .tag-meta     { background: #ede9fe; color: var(--violet); }
+
+  .issue-body { padding: 14px 18px; }
+
+  .status-quo {
+    background: #f4f4f5;
+    border-left: 3px solid var(--muted);
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    font-size: 12.5px;
+  }
+  .status-quo strong { color: var(--fg); }
+
+  .positions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  @media (min-width: 720px) {
+    .positions.cols-2 { grid-template-columns: 1fr 1fr; }
+    .positions.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  }
+  .pos {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+  }
+  .pos h4 {
+    margin: 0 0 6px;
+    font-size: 12px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .pos.A { border-color: #fecaca; background: #fef2f2; }
+  .pos.A h4 { color: var(--rose); }
+  .pos.B { border-color: #bbf7d0; background: #f0fdf4; }
+  .pos.B h4 { color: var(--green); }
+  .pos.C { border-color: #fde68a; background: #fffbeb; }
+  .pos.C h4 { color: var(--amber); }
+  .pos .label {
+    display: inline-block;
+    font-size: 9.5px;
+    padding: 1px 5px;
+    background: rgba(0,0,0,0.05);
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .pos p { margin: 4px 0; }
+  .pos .delta {
+    margin-top: 8px; padding-top: 6px;
+    border-top: 1px dashed currentColor;
+    font-size: 11.5px;
+    opacity: 0.85;
+  }
+  .pos .delta strong { font-size: 11px; opacity: 0.7; }
+
+  table.tradeoff {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11.5px;
+    margin: 8px 0 12px;
+  }
+  table.tradeoff th, table.tradeoff td {
+    padding: 5px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  table.tradeoff th {
+    background: #f4f4f5;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 10.5px;
+  }
+  table.tradeoff td.A { background: #fef2f230; }
+  table.tradeoff td.B { background: #f0fdf430; }
+  table.tradeoff td.C { background: #fffbeb30; }
+
+  .recommendation {
+    background: #eff6ff;
+    border-left: 3px solid var(--primary);
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    font-size: 12.5px;
+  }
+  .recommendation strong { color: var(--primary); }
+
+  .decision-row {
+    background: #fff;
+    border: 2px dashed var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex; align-items: center; gap: 12px;
+    flex-wrap: wrap;
+  }
+  .decision-row.decided { border-style: solid; border-color: var(--green); background: #f0fdf4; }
+  .decision-row .dl {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+  .decision-row label {
+    font-size: 12.5px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px;
+    border-radius: 5px;
+    transition: background 0.1s;
+  }
+  .decision-row label:hover { background: rgba(0,0,0,0.04); }
+  .decision-row input[type="radio"] { margin: 0; }
+  .decision-row .reset {
+    margin-left: auto;
+    background: none; border: 1px solid var(--border);
+    padding: 3px 10px; border-radius: 5px;
+    font-size: 11px; color: var(--muted); cursor: pointer;
+  }
+  .decision-row .reset:hover { background: #f4f4f5; }
+
+  .impact {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  code.field { background: #f4f4f5; padding: 1px 5px; border-radius: 3px; font-size: 11.5px; font-family: ui-monospace, SFMono-Regular, monospace; }
+
+  .footer-actions {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 8px; justify-content: flex-end;
+  }
+  .btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  .btn:hover { background: #1d4ed8; }
+  .btn.secondary { background: #e4e4e7; color: var(--fg); }
+  .btn.secondary:hover { background: #d4d4d8; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📐 편집 가능성 결정 — 고찰 / 토론
+    <span class="progress"><span id="decided-count">0</span> / <strong>13</strong> 결정됨</span>
+  </h1>
+  <p>현재 5-ii Stage 2 의 inline 편집 화이트리스트는 명시적 스펙 없이 휴리스틱으로 구성되었음. 이 문서에서 <strong>13개 안건</strong>을 입장 A/B/C 로 토론하고, 각 안건마다 결정 라디오를 선택하면 마지막 "결정 요약" 탭에 누적됨. 탐색 후 결정 → 결정사항 기반으로 코드 작업.</p>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="summary">📋 결정 요약</button>
+  <button class="tab-btn" data-tab="g1">⚠️ 흔들리는 4건<span class="count">4</span></button>
+  <button class="tab-btn" data-tab="g2">🔄 Mismatch 5건<span class="count">5</span></button>
+  <button class="tab-btn" data-tab="g3">🧭 메타 결정 4건<span class="count">4</span></button>
+</nav>
+
+<main>
+
+<!-- ────────────── SUMMARY ────────────── -->
+<section class="tab-section active" id="tab-summary">
+
+  <div class="summary-grid">
+    <div class="summary-card">
+      <h3>결정 진행률</h3>
+      <div class="num" id="sum-progress">0 / 13</div>
+    </div>
+    <div class="summary-card">
+      <h3>유지 / 안전 (A)</h3>
+      <div class="num green" id="sum-a">0</div>
+    </div>
+    <div class="summary-card">
+      <h3>변경 / 진보 (B)</h3>
+      <div class="num amber" id="sum-b">0</div>
+    </div>
+    <div class="summary-card">
+      <h3>절충 (C)</h3>
+      <div class="num muted" id="sum-c">0</div>
+    </div>
+  </div>
+
+  <div class="decision-list">
+    <h2>🎯 현재까지의 결정</h2>
+    <ul id="decision-list">
+      <li style="color: var(--muted)">아직 결정된 안건 없음. 위 탭에서 결정해주세요.</li>
+    </ul>
+  </div>
+
+  <div class="decision-list">
+    <h2>📌 사용 흐름</h2>
+    <ul>
+      <li><strong>1. 각 안건 탭 순회</strong> — 흔들리는 4건 → Mismatch 5건 → 메타 4건</li>
+      <li><strong>2. 입장 A/B/C 비교 후 라디오 선택</strong> — 또는 X 로 보류</li>
+      <li><strong>3. 이 탭에 누적된 결정 요약 확인</strong></li>
+      <li><strong>4. 사용자 → Claude 한테 결정사항 알려줌</strong> ("X번은 A, Y번은 B, ...")</li>
+      <li><strong>5. Claude 가 결정 기반으로 코드 작업</strong></li>
+    </ul>
+  </div>
+
+  <div class="footer-actions">
+    <button class="btn secondary" onclick="resetAll()">전체 초기화</button>
+    <button class="btn" onclick="copyDecisions()">📋 결정 요약 복사</button>
+  </div>
+
+</section>
+
+<!-- ────────────── GROUP 1 — 흔들리는 4건 ────────────── -->
+<section class="tab-section" id="tab-g1">
+
+  <p style="color: var(--muted); font-size: 12.5px; margin-bottom: 16px;">
+    Stage 2 에서 이미 적용한 인라인 편집 중 사후 검토에서 의심스러운 4가지. 유지하거나 강등 or 보강 결정 필요.
+  </p>
+
+  <!-- 안건 1: severity -->
+  <article class="issue" id="issue-severity" data-issue="severity">
+    <div class="issue-head">
+      <span class="issue-num">#1</span>
+      <h3 class="issue-title"><code class="field">BR.severity</code> — 인라인 select (hard/soft)</h3>
+      <span class="issue-tag tag-status">현 적용</span>
+    </div>
+    <div class="issue-body">
+
+      <div class="status-quo">
+        <strong>현황</strong> — BR detail 의 severity 뱃지 클릭 → select 로 변환 → hard/soft 즉시 토글. PATCH /business-rules 에서 backend validation (`hard|soft` 만 허용).
+      </div>
+
+      <div class="positions cols-3">
+        <div class="pos A">
+          <h4>A · 보수 <span class="label">강등</span></h4>
+          <p>severity 는 도메인 정책의 강도 (hard = "위반 시 즉시 실패", soft = "경고만"). 정책 변경은 영향 범위가 매우 큼 — 관련 코드 가드 거동, 테스트 영향. 한 클릭으로 바뀌는 게 위험.</p>
+          <div class="delta"><strong>변경:</strong> Authoring 모드로 강등. rationale 함께 입력 강제.</div>
+        </div>
+        <div class="pos B">
+          <h4>B · 진보 <span class="label">유지</span></h4>
+          <p>17개밖에 안 되는 BR. 정책 결정은 사람이 하고 UI 는 입력 도구. 인라인이 빠르고 명확. confirm toggle 이 이미 안전판.</p>
+          <div class="delta"><strong>변경:</strong> 현 상태 유지. (지금 그대로)</div>
+        </div>
+        <div class="pos C">
+          <h4>C · 절충 <span class="label">confirm modal</span></h4>
+          <p>인라인은 두되, 변경 직전 confirmation modal 띄움 — "정말 hard → soft 로 바꿀까요? 영향: ..."</p>
+          <div class="delta"><strong>변경:</strong> InlineEditSelect 에 confirmModal 옵션 추가.</div>
+        </div>
+      </div>
+
+      <table class="tradeoff">
+        <thead><tr><th>측면</th><th>A · 강등</th><th>B · 유지</th><th>C · modal</th></tr></thead>
+        <tbody>
+          <tr><td>안전성</td><td class="A">⭐⭐⭐</td><td class="B">⭐</td><td class="C">⭐⭐</td></tr>
+          <tr><td>속도</td><td class="A">느림</td><td class="B">빠름</td><td class="C">중</td></tr>
+          <tr><td>구현 비용</td><td class="A">제거만</td><td class="B">0</td><td class="C">+modal</td></tr>
+          <tr><td>UX 일관성</td><td class="A">분리</td><td class="B">단순</td><td class="C">분리</td></tr>
+        </tbody>
+      </table>
+
+      <div class="recommendation">
+        <strong>추천: B 유지</strong> — confirm toggle 이 이미 안전판 (잘못 바꿔도 draft 로 되돌리기). 운영 시 PATCH 이력 audit (#12) 도입하면 후처리 충분.
+      </div>
+
+      <div class="decision-row">
+        <span class="dl">결정:</span>
+        <label><input type="radio" name="d-severity" value="A"> A 강등</label>
+        <label><input type="radio" name="d-severity" value="B"> B 유지</label>
+        <label><input type="radio" name="d-severity" value="C"> C modal</label>
+        <button class="reset" onclick="reset('severity')">×</button>
+      </div>
+      <div class="impact">⚙️ 작업량: A=1h (제거), B=0, C=4h (modal 컴포넌트 신규)</div>
+
+    </div>
+  </article>
+
+  <!-- 안건 2: anchor_locator -->
+  <article class="issue" id="issue-locator" data-issue="locator">
+    <div class="issue-head">
+      <span class="issue-num">#2</span>
+      <h3 class="issue-title"><code class="field">AnchorBinding.anchor_locator</code> — 자유 텍스트</h3>
+      <span class="issue-tag tag-status">현 적용</span>
+    </div>
+    <div class="issue-body">
+
+      <div class="status-quo">
+        <strong>현황</strong> — locator 는 코드 fragment 식별자 (예: <code class="field">if-stmt@line-42</code>, <code class="field">method-body</code>). 자유 텍스트 입력. backend validation 없음.
+      </div>
+
+      <div class="positions cols-2">
+        <div class="pos A">
+          <h4>A · 보수 <span class="label">dropdown</span></h4>
+          <p>locator 는 코드 파서가 인식 가능한 형식이라 매우 엄격해야 함. 사용자 오타 = 매핑 깨짐. fragment dropdown (현재 method 의 anchor 후보 list) 으로 제약.</p>
+          <div class="delta"><strong>변경:</strong> InlineEditText → autocomplete/select. 후보 추출 로직 (CallSiteAnalyzer 가 method 별 fragment list 노출) 신규.</div>
+        </div>
+        <div class="pos B">
+          <h4>B · 현 상태 <span class="label">유지</span></h4>
+          <p>locator 형식 다양, 새 anchor 종류도 생길 수 있음. 자유 텍스트가 유연. 잘못된 형식은 backend validation 으로 잡음 (추후 추가).</p>
+          <div class="delta"><strong>변경:</strong> 텍스트 유지, backend validation 추가.</div>
+        </div>
+      </div>
+
+      <table class="tradeoff">
+        <thead><tr><th>측면</th><th>A · dropdown</th><th>B · 유지</th></tr></thead>
+        <tbody>
+          <tr><td>안전성</td><td class="A">⭐⭐⭐</td><td class="B">⭐</td></tr>
+          <tr><td>유연성</td><td class="A">제한</td><td class="B">자유</td></tr>
+          <tr><td>구현 비용</td><td class="A">파서 변경 필요 (큼)</td><td class="B">validation regex (작음)</td></tr>
+          <tr><td>오타 위험</td><td class="A">없음</td><td class="B">중</td></tr>
+        </tbody>
+      </table>
+
+      <div class="recommendation">
+        <strong>추천: A dropdown</strong> — anchor 매핑 무결성이 system 핵심. 다만 작업량이 크니 단계적: 1) 우선 backend validation regex 추가 (B 단기), 2) 다음 phase 에서 dropdown (A 장기).
+      </div>
+
+      <div class="decision-row">
+        <span class="dl">결정:</span>
+        <label><input type="radio" name="d-locator" value="A"> A dropdown</label>
+        <label><input type="radio" name="d-locator" value="B"> B 유지</label>
+        <button class="reset" onclick="reset('locator')">×</button>
+      </div>
+      <div class="impact">⚙️ 작업량: A=1-2d (파서 노출 + UI), B=2h (regex)</div>
+
+    </div>
+  </article>
+
+  <!-- 안건 3: value_type -->
+  <article class="issue" id="issue-valuetype" data-issue="valuetype">
+    <div class="issue-head">
+      <span class="issue-num">#3</span>
+      <h3 class="issue-title"><code class="field">Term.value_type</code> (atomic) — 자유 텍스트</h3>
+      <span class="issue-tag tag-status">현 적용</span>
+    </div>
+    <div class="issue-body">
+
+      <div class="status-quo">
+        <strong>현황</strong> — atomic Term 의 value_type 자유 텍스트 (예: <code class="field">int</code>, <code class="field">double</code>, <code class="field">String</code>). Java type 이름이지만 검증 없음.
+      </div>
+
+      <div class="positions cols-2">
+        <div class="pos A">
+          <h4>A · 보수 <span class="label">enum</span></h4>
+          <p>Java type 이름은 사실상 정해진 set: int / long / double / float / boolean / String / BigDecimal / LocalDate. enum 으로 제약 → 오타 0.</p>
+          <div class="delta"><strong>변경:</strong> InlineEditText → InlineEditSelect. 옵션 list 8-12개 + "기타..." (text fallback).</div>
+        </div>
+        <div class="pos B">
+          <h4>B · 현 상태 <span class="label">유지</span></h4>
+          <p>사용자가 정확히 입력. 비표준 type (예: domain 별칭, generic) 도 자유롭게.</p>
+          <div class="delta"><strong>변경:</strong> 없음.</div>
+        </div>
+      </div>
+
+      <div class="recommendation">
+        <strong>추천: A enum</strong> — 작업량 작고 (InlineEditSelect 재활용), 오타 위험 0. "기타" fallback 추가하면 유연성도 보존.
+      </div>
+
+      <div class="decision-row">
+        <span class="dl">결정:</span>
+        <label><input type="radio" name="d-valuetype" value="A"> A enum</label>
+        <label><input type="radio" name="d-valuetype" value="B"> B 유지</label>
+        <button class="reset" onclick="reset('valuetype')">×</button>
+      </div>
+      <div class="impact">⚙️ 작업량: A=2h, B=0</div>
+
+    </div>
+  </article>
+
+  <!-- 안건 4: Action.aliases + description 신규 섹션 -->
+  <article class="issue" id="issue-actionnew" data-issue="actionnew">
+    <div class="issue-head">
+      <span class="issue-num">#4</span>
+      <h3 class="issue-title"><code class="field">Action.aliases / description</code> — 신규 섹션 추가</h3>
+      <span class="issue-tag tag-status">현 적용</span>
+    </div>
+    <div class="issue-body">
+
+      <div class="status-quo">
+        <strong>현황</strong> — 원래 ActionDetail 에 description / aliases 섹션이 없었는데, Stage 2 에서 신규 추가. ActionDTO 에는 두 필드 모두 정의되어 있음.
+      </div>
+
+      <div class="positions cols-2">
+        <div class="pos A">
+          <h4>A · 보수 <span class="label">제거</span></h4>
+          <p>Term 과 Action 은 다른 entity. aliases 가 Action(verb) 에 있는 건 모호. 원래 UI 가 노출 안 한 건 의도일 수도.</p>
+          <div class="delta"><strong>변경:</strong> 두 섹션 제거. 필요하면 Authoring 에서.</div>
+        </div>
+        <div class="pos B">
+          <h4>B · 현 상태 <span class="label">유지</span></h4>
+          <p>DTO 에 정의된 필드가 UI 에 미노출 = API/UI 비대칭. 일관성 차원에서 표시 + 편집 가능이 맞음.</p>
+          <div class="delta"><strong>변경:</strong> 없음. placeholder 좀 더 명확히 ("(action 설명 미지정)").</div>
+        </div>
+      </div>
+
+      <div class="recommendation">
+        <strong>추천: B 유지</strong> — DTO 가 ground truth. 안건 #5 (Action.domain) 와 같은 결의 결정. 일관성 ↑.
+      </div>
+
+      <div class="decision-row">
+        <span class="dl">결정:</span>
+        <label><input type="radio" name="d-actionnew" value="A"> A 제거</label>
+        <label><input type="radio" name="d-actionnew" value="B"> B 유지</label>
+        <button class="reset" onclick="reset('actionnew')">×</button>
+      </div>
+      <div class="impact">⚙️ 작업량: A=10min (섹션 삭제), B=0</div>
+
+    </div>
+  </article>
+
+</section>
+
+<!-- ────────────── GROUP 2 — Mismatch 5건 ────────────── -->
+<section class="tab-section" id="tab-g2">
+
+  <p style="color: var(--muted); font-size: 12.5px; margin-bottom: 16px;">
+    가이드 HTML 에서 발견한 UI ↔ DTO ↔ PatchDTO 불일치. 어느 방향으로 정렬할지 결정.
+  </p>
+
+  <!-- 안건 5: Action.domain -->
+  <article class="issue" id="issue-actiondomain" data-issue="actiondomain">
+    <div class="issue-head">
+      <span class="issue-num">#5</span>
+      <h3 class="issue-title"><code class="field">Action.domain</code> — Term 만 있고 Action 비대칭</h3>
+      <span class="issue-tag tag-mismatch">UI 누락</span>
+    </div>
+    <div class="issue-body">
+
+      <div class="status-quo">
+        <strong>현황</strong> — TermDetail 에 domain inline 편집 있음. ActionDTO.domain 은 존재하나 ActionDetail 에 표시도 편집도 X. ActionPatchDTO 에도 domain 필드 없음.
+      </div>
+
+      <div class="positions cols-3">
+        <div class="pos A">
+          <h4>A · 추가 <span class="label">대칭</span></h4>
+          <p>Action.domain 도 inline 편집 추가. Term 과 일관.</p>
+          <div class="delta"><strong>변경:</strong> ActionPatchDTO 에 domain 추가, ActionDetail h1 줄에 domain 인라인 편집 추가.</div>
+        </div>
+        <div class="pos B">
+          <h4>B · 표시만 <span class="label">read-only</span></h4>
+          <p>Action 의 domain 은 declared_on_term 의 domain 에서 derive 되어야 정합. 편집 X, 표시 O.</p>
+          <div class="delta"><strong>변경:</strong> ActionDetail 에 domain 표시. ActionPatchDTO 미변경.</div>
+        </div>
+        <div class="pos C">
+          <h4>C · 그대로 <span class="label">현 상태</span></h4>
+          <p>Action 의 domain 은 사실상 안 쓰는 필드. 표시도 안 함.</p>
+          <div class="delta"><strong>변경:</strong> 없음. 필요시 ActionDTO 에서도 제거 검토.</div>
+        </div>
+      </div>
+
+      <div class="recommendation">
+        <strong>추천: B 표시만</strong> — Action 의 domain 은 의미상 declared_on_term 따라야 정합. 자유 편집 허용하면 inconsistency. 단, DTO 에 있으니 read-only 표시는 해야.
+      </div>
+
+      <div class="decision-row">
+        <span class="dl">결정:</span>
+        <label><input type="radio" name="d-actiondomain" value="A"> A 추가</label>
+        <label><input type="radio" name="d-actiondomain" value="B"> B 표시만</label>
+        <label><input type="radio" name="d-actiondomain" value="C"> C 그대로</label>
+        <button class="reset" onclick="reset('actiondomain')">×</button>
+      </div>
+      <div class="impact">⚙️ 작업량: A=1h, B=20min, C=0</div>
+
+    </div>
+  </article>
+
+  <!-- 안건 6: Term.range -->
+  <article class="issue" id="issue-termrange" data-issue="termrange">
+    <div class="issue-head">
+      <span class="issue-num">#6</span>
+      <h3 class="issue-title"><code class="field">Term.range</code> — UI 표시되나 PatchDTO 누락</h3>
+      <span class="issue-tag tag-mismatch">PatchDTO 누락</span>
+    </div>
+    <div class="issue-body">
+
+      <div class="status-quo">
+        <strong>현황</strong> — atomic Term detail 에 <code class="field">range</code> KV 표시 (<code class="field">[min, max]</code>). 편집 UI 없음. TermPatchDTO 에 range 필드 없음. 표시는 하는데 편집은 못함.
+      </div>
+
+      <div class="positions cols-2">
+        <div class="pos A">
+          <h4>A · 편집 추가 <span class="label">완성</span></h4>
+          <p>range 는 atomic Term 핵심 메타데이터 (안전 범위). PatchDTO + 인라인 편집 추가. number[2] 라 InlineEditList + number 변환.</p>
+          <div class="delta"><strong>변경:</strong> TermPatchDTO 에 range 추가, ParseFloat 변환 InlineEdit 컴포넌트 (또는 2개 number input). backend ORM TermRow.range_json 갱신.</div>
+        </div>
+        <div class="pos B">
+          <h4>B · 표시 제거 <span class="label">단순화</span></h4>
+          <p>range 는 사실상 사용 안 되는 필드 (slab-design DB 에 0건). 노이즈 제거.</p>
+          <div class="delta"><strong>변경:</strong> TermDetail 에서 range KV 제거.</div>
+        </div>
+      </div>
+
+      <div class="recommendation">
+        <strong>추천: A 편집 추가</strong> — atomic Term 의 도메인 제약 표현 핵심. 시뮬레이션 단계에서 활용 (입력 값 검증). 작업량도 작음.
+      </div>
+
+      <div class="decision-row">
+        <span class="dl">결정:</span>
+        <label><input type="radio" name="d-termrange" value="A"> A 편집 추가</label>
+        <label><input type="radio" name="d-termrange" value="B"> B 제거</label>
+        <button class="reset" onclick="reset('termrange')">×</button>
+      </div>
+      <div class="impact">⚙️ 작업량: A=2h (range InlineEdit + backend), B=5min</div>
+
+    </div>
+  </article>
+
+  <!-- 안건 7: Action postconditions/effects -->
+  <article class="issue" id="issue-postcond" data-issue="postcond">
+    <div class="issue-head">
+      <span class="issue-num">#7</span>
+      <h3 class="issue-title"><code class="field">Action.postconditions / effects</code> — DTO 정의되나 UI 미렌더</h3>
+      <span class="issue-tag tag-mismatch">UI 미렌더</span>
+    </div>
+    <div class="issue-body">
+
+      <div class="status-quo">
+        <strong>현황</strong> — ActionDTO 에 <code class="field">postconditions: list[str]</code>, <code class="field">effects: list[ActionEffectDTO]</code> 정의되어 있음. ActionDetail 에 표시 X. 편집 X. (preconditions 는 표시 O)
+      </div>
+
+      <div class="positions cols-3">
+        <div class="pos A">
+          <h4>A · 표시 + Authoring <span class="label">완전</span></h4>
+          <p>두 필드 모두 표시. 편집은 구조 복잡 (postconditions: rule list, effects: op+target_term+target_attr) → Authoring 모드 위임.</p>
+          <div class="delta"><strong>변경:</strong> ActionDetail 에 두 섹션 추가 (read-only 표시 + Authoring 버튼).</div>
+        </div>
+        <div class="pos B">
+          <h4>B · 표시만 <span class="label">read-only</span></h4>
+          <p>표시는 해야 검토 가능. 편집은 일단 보류.</p>
+          <div class="delta"><strong>변경:</strong> 두 섹션 추가, 편집 affordance 없음.</div>
+        </div>
+        <div class="pos C">
+          <h4>C · 그대로 <span class="label">미사용</span></h4>
+          <p>Section 2 수준에서 불필요. Action 의 contract 는 preconditions 면 충분.</p>
+          <div class="delta"><strong>변경:</strong> 없음. 추후 ActionDTO 에서도 제거 검토.</div>
+        </div>
+      </div>
+
+      <div class="recommendation">
+        <strong>추천: B 표시만</strong> — Action contract 의 완전성 차원에서 표시 필요. 편집은 시뮬레이션 (Section 3) 시점에 결정.
+      </div>
+
+      <div class="decision-row">
+        <span class="dl">결정:</span>
+        <label><input type="radio" name="d-postcond" value="A"> A 완전</label>
+        <label><input type="radio" name="d-postcond" value="B"> B 표시만</label>
+        <label><input type="radio" name="d-postcond" value="C"> C 그대로</label>
+        <button class="reset" onclick="reset('postcond')">×</button>
+      </div>
+      <div class="impact">⚙️ 작업량: A=4h, B=1h, C=0</div>
+
+    </div>
+  </article>
+
+  <!-- 안건 8: CodeType.role -->
+  <article class="issue" id="issue-codetype-role" data-issue="codetype-role">
+    <div class="issue-head">
+      <span class="issue-num">#8</span>
+      <h3 class="issue-title"><code class="field">CodeType.role</code> — Authoring 전용</h3>
+      <span class="issue-tag tag-mismatch">권한 비대칭</span>
+    </div>
+    <div class="issue-body">
+
+      <div class="status-quo">
+        <strong>현황</strong> — CodeType.role (<code class="field">domain | framework | infra | unknown</code>) 은 자동 분류. 사용자 수정 시 Authoring 모드 통해서만. CodeType 은 read-only entity 라 inline 편집 자체 X.
+      </div>
+
+      <div class="positions cols-2">
+        <div class="pos A">
+          <h4>A · inline select 추가 <span class="label">예외</span></h4>
+          <p>분류 오류 빠른 수정에 큼 도움 (Java 파서 휴리스틱이 잘 못 잡는 케이스 多). enum 4개라 안전. read-only 원칙 깨지만 role 만 예외.</p>
+          <div class="delta"><strong>변경:</strong> CodeTypeDetail 에 role InlineEditSelect 추가. backend PATCH /code-types/{fqn} 신규 (role 만 허용).</div>
+        </div>
+        <div class="pos B">
+          <h4>B · 그대로 <span class="label">원칙</span></h4>
+          <p>CodeType 은 코드 mirror — 코드 수정으로 갱신. role 도 자동 분류 정확도 향상으로 해결. UI 편집 = ground truth divergence 시작.</p>
+          <div class="delta"><strong>변경:</strong> 없음.</div>
+        </div>
+      </div>
+
+      <div class="recommendation">
+        <strong>추천: A inline select</strong> — role 만 예외. 자동 분류는 fallback (정확도 70-80%) 이고, 사용자 수정이 ground truth. UI 편집 결과는 별도 column (`role_user_override`) 으로 저장하면 자동 vs 수동 구분 가능.
+      </div>
+
+      <div class="decision-row">
+        <span class="dl">결정:</span>
+        <label><input type="radio" name="d-codetype-role" value="A"> A 추가</label>
+        <label><input type="radio" name="d-codetype-role" value="B"> B 그대로</label>
+        <button class="reset" onclick="reset('codetype-role')">×</button>
+      </div>
+      <div class="impact">⚙️ 작업량: A=3h (PATCH + ORM column + UI), B=0</div>
+
+    </div>
+  </article>
+
+  <!-- 안건 9: Action.params 확장 -->
+  <article class="issue" id="issue-params" data-issue="params">
+    <div class="issue-head">
+      <span class="issue-num">#9</span>
+      <h3 class="issue-title"><code class="field">Action.params</code> — DTO 9 필드, UI 3개만 노출</h3>
+      <span class="issue-tag tag-mismatch">UI 축소</span>
+    </div>
+    <div class="issue-body">
+
+      <div class="status-quo">
+        <strong>현황</strong> — ActionParamDTO 에 9 필드 (<code class="field">name, type, object_ref_term, unit, range, nullable, description, anchor_locator, confirmed</code>). ParamRow 컴포넌트가 노출하는 건 name + ref + confirmed 3개만.
+      </div>
+
+      <div class="positions cols-3">
+        <div class="pos A">
+          <h4>A · ParamRow 확장 <span class="label">in-place</span></h4>
+          <p>ParamRow 가 9 필드 모두 노출 + 일부 inline 편집. h1 처럼 읽기 좋게 grid layout.</p>
+          <div class="delta"><strong>변경:</strong> ParamRow 확장. ActionPatchDTO 에 params 부분 갱신 endpoint 추가 (param index + field).</div>
+        </div>
+        <div class="pos B">
+          <h4>B · ParamDetail drawer <span class="label">drill-in</span></h4>
+          <p>ParamRow 클릭 → 별도 drawer 또는 모달 → 풀 노출 + 편집. 메인 detail 흐름 깨지 않음.</p>
+          <div class="delta"><strong>변경:</strong> ParamRow 클릭 핸들러 + 새 ParamDetail 컴포넌트 + 슬라이드 드로어 UI.</div>
+        </div>
+        <div class="pos C">
+          <h4>C · Authoring 만 <span class="label">현 상태</span></h4>
+          <p>params 는 구조 변경 (추가/제거/순서) 가 잦으니 Authoring 모드에서. inline 부분 편집은 오히려 혼란.</p>
+          <div class="delta"><strong>변경:</strong> 없음.</div>
+        </div>
+      </div>
+
+      <div class="recommendation">
+        <strong>추천: B drawer</strong> — 메인 흐름 보존 + 깊이 제공. drawer 패턴은 이후 다른 nested entity (effects, realizations) 에도 재활용 가능.
+      </div>
+
+      <div class="decision-row">
+        <span class="dl">결정:</span>
+        <label><input type="radio" name="d-params" value="A"> A 확장</label>
+        <label><input type="radio" name="d-params" value="B"> B drawer</label>
+        <label><input type="radio" name="d-params" value="C"> C 그대로</label>
+        <button class="reset" onclick="reset('params')">×</button>
+      </div>
+      <div class="impact">⚙️ 작업량: A=6h, B=1d, C=0</div>
+
+    </div>
+  </article>
+
+</section>
+
+<!-- ────────────── GROUP 3 — 메타 결정 ────────────── -->
+<section class="tab-section" id="tab-g3">
+
+  <p style="color: var(--muted); font-size: 12.5px; margin-bottom: 16px;">
+    개별 필드 너머 — 시스템 설계 / 운영 차원의 결정 4가지.
+  </p>
+
+  <!-- 안건 10: SSOT 스펙 문서 -->
+  <article class="issue" id="issue-ssot" data-issue="ssot">
+    <div class="issue-head">
+      <span class="issue-num">#10</span>
+      <h3 class="issue-title">SSOT 스펙 문서 도입?</h3>
+      <span class="issue-tag tag-meta">아키텍처</span>
+    </div>
+    <div class="issue-body">
+
+      <div class="status-quo">
+        <strong>현황</strong> — 어느 필드가 inline 편집인지 결정이 4 곳에 흩어짐: ① frontend MainPanel.tsx wiring ② InlineEdit 컴포넌트 선택 ③ backend Pydantic Patch 모델 ④ 가이드 HTML. 변경 시 동기화 누락 위험.
+      </div>
+
+      <div class="positions cols-3">
+        <div class="pos A">
+          <h4>A · YAML SSOT <span class="label">엄격</span></h4>
+          <p><code class="field">toClaude/modeling/editable_fields.yaml</code> 도입. backend Patch 모델 + frontend wiring + 가이드 HTML 모두 generator 또는 lint 로 sync 강제.</p>
+          <div class="delta"><strong>변경:</strong> YAML schema + codegen script + CI lint.</div>
+        </div>
+        <div class="pos B">
+          <h4>B · 가이드 HTML SSOT <span class="label">절충</span></h4>
+          <p>방금 만든 editable_fields_guide.html 을 SSOT 로 사용. 다만 자동 sync 없음 — 수동 갱신.</p>
+          <div class="delta"><strong>변경:</strong> 가이드 HTML 갱신 책임 명시 (PR template 에 추가).</div>
+        </div>
+        <div class="pos C">
+          <h4>C · Patch 모델 SSOT <span class="label">현 상태</span></h4>
+          <p>backend Pydantic Patch 모델이 사실상 SSOT. frontend 는 그것 보고 수동 동기화. 5 entity / ~30 field 규모에선 oversynchronization.</p>
+          <div class="delta"><strong>변경:</strong> 없음.</div>
+        </div>
+      </div>
+
+      <div class="recommendation">
+        <strong>추천: C 현 상태</strong> — 30 필드 규모. YAML + codegen 은 over-engineering. Phase 2 진입 시 (필드 수 100+, 팀 5+) 재검토.
+      </div>
+
+      <div class="decision-row">
+        <span class="dl">결정:</span>
+        <label><input type="radio" name="d-ssot" value="A"> A YAML</label>
+        <label><input type="radio" name="d-ssot" value="B"> B 가이드 HTML</label>
+        <label><input type="radio" name="d-ssot" value="C"> C 현 상태</label>
+        <button class="reset" onclick="reset('ssot')">×</button>
+      </div>
+      <div class="impact">⚙️ 작업량: A=2-3d, B=30min (PR template), C=0</div>
+
+    </div>
+  </article>
+
+  <!-- 안건 11: LLM 판단 editability -->
+  <article class="issue" id="issue-llm" data-issue="llm">
+    <div class="issue-head">
+      <span class="issue-num">#11</span>
+      <h3 class="issue-title">LLM-판단 editability 로 전환?</h3>
+      <span class="issue-tag tag-meta">아키텍처</span>
+    </div>
+    <div class="issue-body">
+
+      <div class="status-quo">
+        <strong>현황</strong> — 편집 가능 여부 = 코드 작성 시 사람이 결정 (whitelist). LLM 은 Authoring 모드 안에서만 활용.
+      </div>
+
+      <div class="positions cols-3">
+        <div class="pos A">
+          <h4>A · 매 PATCH LLM 검증 <span class="label">완전</span></h4>
+          <p>backend 가 PATCH 시 LLM 한테 "이 변경 안전?" 질의. hallucination 없는 변경만 통과.</p>
+          <div class="delta"><strong>변경:</strong> backend PATCH 미들웨어 + LLM 호출. 비용 + latency 큼.</div>
+        </div>
+        <div class="pos B">
+          <h4>B · 갭 발견만 자동화 <span class="label">절충</span></h4>
+          <p>이번 mismatch 5건 같은 갭 발견 LLM 으로 주기 자동화. 결정/구현은 사람.</p>
+          <div class="delta"><strong>변경:</strong> 주간 cron — 가이드 HTML 자동 재생성 + diff 알림.</div>
+        </div>
+        <div class="pos C">
+          <h4>C · 현 상태 <span class="label">분리</span></h4>
+          <p>인라인 = 빠른 안전 영역, Authoring = LLM 영역. 분리 유지.</p>
+          <div class="delta"><strong>변경:</strong> 없음.</div>
+        </div>
+      </div>
+
+      <div class="recommendation">
+        <strong>추천: C 현 상태</strong> — A 는 비용/latency 에 비해 이득 적음. B 는 가이드 HTML 활용도 안 검증된 상태에선 시기상조. 우선 C 유지하면서 가이드 HTML 사용해보고 결정.
+      </div>
+
+      <div class="decision-row">
+        <span class="dl">결정:</span>
+        <label><input type="radio" name="d-llm" value="A"> A 매 PATCH</label>
+        <label><input type="radio" name="d-llm" value="B"> B 갭 자동화</label>
+        <label><input type="radio" name="d-llm" value="C"> C 분리 유지</label>
+        <button class="reset" onclick="reset('llm')">×</button>
+      </div>
+      <div class="impact">⚙️ 작업량: A=1w+, B=2-3d (cron + diff), C=0</div>
+
+    </div>
+  </article>
+
+  <!-- 안건 12: PATCH 변경 이력 -->
+  <article class="issue" id="issue-audit" data-issue="audit">
+    <div class="issue-head">
+      <span class="issue-num">#12</span>
+      <h3 class="issue-title">PATCH 변경 이력 추적</h3>
+      <span class="issue-tag tag-meta">운영</span>
+    </div>
+    <div class="issue-body">
+
+      <div class="status-quo">
+        <strong>현황</strong> — PATCH 호출이 backend uvicorn log 외에 추적 안 됨. 누가 / 언제 / 무엇을 / 왜 바꿨는지 query 불가. 잘못 바꾼 변경 되돌리기 어려움.
+      </div>
+
+      <div class="positions cols-3">
+        <div class="pos A">
+          <h4>A · audit 테이블 <span class="label">완전</span></h4>
+          <p>PATCH 시 audit_log 테이블에 기록. user_id (ACL) + timestamp + entity + before/after JSON + 변경 사유 (optional).</p>
+          <div class="delta"><strong>변경:</strong> audit_log ORM + middleware + RightPanel 에 "변경 이력" 탭 신규.</div>
+        </div>
+        <div class="pos B">
+          <h4>B · git-style snapshot <span class="label">heavy</span></h4>
+          <p>매 변경마다 entity 전체 snapshot 을 git blob 처럼 저장. 시점별 restore 가능.</p>
+          <div class="delta"><strong>변경:</strong> snapshot 저장소 + diff 뷰 + restore API.</div>
+        </div>
+        <div class="pos C">
+          <h4>C · 현 상태 <span class="label">로그</span></h4>
+          <p>uvicorn 로그면 충분. 100K 가정에선 audit DB 부담.</p>
+          <div class="delta"><strong>변경:</strong> 없음.</div>
+        </div>
+      </div>
+
+      <div class="recommendation">
+        <strong>추천: A audit 테이블</strong> — 100K 문서 + Phase 2 다중 사용자 가정 시 필수. 인라인 편집 활성화한 상태에서 추적 없으면 운영 사고 (예: 잘못된 severity hard→soft 변경) 복구 불능.
+      </div>
+
+      <div class="decision-row">
+        <span class="dl">결정:</span>
+        <label><input type="radio" name="d-audit" value="A"> A audit</label>
+        <label><input type="radio" name="d-audit" value="B"> B snapshot</label>
+        <label><input type="radio" name="d-audit" value="C"> C 로그</label>
+        <button class="reset" onclick="reset('audit')">×</button>
+      </div>
+      <div class="impact">⚙️ 작업량: A=1d (table + middleware + UI), B=3-5d, C=0</div>
+
+    </div>
+  </article>
+
+  <!-- 안건 13: ACL -->
+  <article class="issue" id="issue-acl" data-issue="acl">
+    <div class="issue-head">
+      <span class="issue-num">#13</span>
+      <h3 class="issue-title">PATCH 권한 (ACL) 분리</h3>
+      <span class="issue-tag tag-meta">운영</span>
+    </div>
+    <div class="issue-body">
+
+      <div class="status-quo">
+        <strong>현황</strong> — ACL 시스템 (acl_api) 이 backend 에 있으나 modeling section 의 PATCH 엔드포인트에 미적용. 모든 인증 사용자가 모든 entity 편집 가능.
+      </div>
+
+      <div class="positions cols-3">
+        <div class="pos A">
+          <h4>A · 엔터티별 권한 <span class="label">엄격</span></h4>
+          <p>Term/Action/BR/Anchor 별 read/write 권한. domain 별 권한도 (예: 특정 도메인 owner 만 변경).</p>
+          <div class="delta"><strong>변경:</strong> ACL middleware 모든 PATCH 적용 + UI 권한 없을 시 InlineEdit 비활성화.</div>
+        </div>
+        <div class="pos B">
+          <h4>B · 단순 admin/user <span class="label">중간</span></h4>
+          <p>admin = 모든 편집, user = 읽기 + draft 추가만. confirm 은 admin 만.</p>
+          <div class="delta"><strong>변경:</strong> middleware 단순 role 체크 + UI 토글.</div>
+        </div>
+        <div class="pos C">
+          <h4>C · 현 상태 <span class="label">개방</span></h4>
+          <p>Phase 1 사용자 1-3명. 단순화 우선. Phase 2 입주 시 (5명+) 도입.</p>
+          <div class="delta"><strong>변경:</strong> 없음.</div>
+        </div>
+      </div>
+
+      <div class="recommendation">
+        <strong>추천: C 현 상태</strong> — Phase 1 (3인) 에선 권한 분리가 마찰. audit (#12) 만 있으면 잘못된 변경 되돌리기 가능. Phase 2 진입 시 B → A 단계적.
+      </div>
+
+      <div class="decision-row">
+        <span class="dl">결정:</span>
+        <label><input type="radio" name="d-acl" value="A"> A 엄격</label>
+        <label><input type="radio" name="d-acl" value="B"> B admin/user</label>
+        <label><input type="radio" name="d-acl" value="C"> C 그대로</label>
+        <button class="reset" onclick="reset('acl')">×</button>
+      </div>
+      <div class="impact">⚙️ 작업량: A=3-5d, B=1d, C=0</div>
+
+    </div>
+  </article>
+
+</section>
+
+</main>
+
+<script>
+  // ── tab nav ─────────────────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('.tab-section').forEach(s => s.classList.toggle('active', s.id === 'tab-' + tab));
+    });
+  });
+
+  // ── decision tracking ──────────────────────────────────────────────
+  const ISSUES = [
+    { id: 'severity',       title: 'BR.severity inline select',                          group: 1 },
+    { id: 'locator',        title: 'AnchorBinding.anchor_locator 자유 텍스트',           group: 1 },
+    { id: 'valuetype',      title: 'Term.value_type 자유 텍스트',                        group: 1 },
+    { id: 'actionnew',      title: 'Action.aliases / description 신규 섹션',             group: 1 },
+    { id: 'actiondomain',   title: 'Action.domain 비대칭',                               group: 2 },
+    { id: 'termrange',      title: 'Term.range PatchDTO 누락',                          group: 2 },
+    { id: 'postcond',       title: 'Action.postconditions / effects 미렌더',            group: 2 },
+    { id: 'codetype-role',  title: 'CodeType.role Authoring 전용',                       group: 2 },
+    { id: 'params',         title: 'Action.params sub-fields 축소',                     group: 2 },
+    { id: 'ssot',           title: 'SSOT 스펙 문서 도입',                                group: 3 },
+    { id: 'llm',            title: 'LLM-판단 editability 전환',                          group: 3 },
+    { id: 'audit',          title: 'PATCH 변경 이력 추적',                               group: 3 },
+    { id: 'acl',            title: 'PATCH 권한 (ACL) 분리',                              group: 3 },
+  ];
+
+  function getDecisions() {
+    const out = {};
+    ISSUES.forEach(iss => {
+      const checked = document.querySelector(`input[name="d-${iss.id}"]:checked`);
+      out[iss.id] = checked ? checked.value : null;
+    });
+    return out;
+  }
+
+  function refreshSummary() {
+    const dec = getDecisions();
+    const decided = Object.values(dec).filter(v => v !== null).length;
+    const cntA = Object.values(dec).filter(v => v === 'A').length;
+    const cntB = Object.values(dec).filter(v => v === 'B').length;
+    const cntC = Object.values(dec).filter(v => v === 'C').length;
+
+    document.getElementById('decided-count').textContent = decided;
+    document.getElementById('sum-progress').textContent = decided + ' / 13';
+    document.getElementById('sum-a').textContent = cntA;
+    document.getElementById('sum-b').textContent = cntB;
+    document.getElementById('sum-c').textContent = cntC;
+
+    const list = document.getElementById('decision-list');
+    if (decided === 0) {
+      list.innerHTML = '<li style="color: var(--muted)">아직 결정된 안건 없음. 위 탭에서 결정해주세요.</li>';
+    } else {
+      list.innerHTML = ISSUES
+        .filter(iss => dec[iss.id])
+        .map(iss => `<li>#${ISSUES.indexOf(iss) + 1} <strong>${iss.title}</strong> → <span class="pick-${dec[iss.id]}">${dec[iss.id]}</span></li>`)
+        .join('');
+    }
+
+    // mark decided
+    ISSUES.forEach(iss => {
+      const card = document.querySelector(`#issue-${iss.id} .decision-row`);
+      if (card) card.classList.toggle('decided', !!dec[iss.id]);
+    });
+  }
+
+  document.querySelectorAll('input[type="radio"]').forEach(r => {
+    r.addEventListener('change', refreshSummary);
+  });
+
+  function reset(id) {
+    document.querySelectorAll(`input[name="d-${id}"]`).forEach(r => r.checked = false);
+    refreshSummary();
+  }
+
+  function resetAll() {
+    if (!confirm('모든 결정을 초기화할까요?')) return;
+    document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+    refreshSummary();
+  }
+
+  function copyDecisions() {
+    const dec = getDecisions();
+    const decided = ISSUES.filter(iss => dec[iss.id]);
+    if (decided.length === 0) {
+      alert('결정된 안건이 없습니다.');
+      return;
+    }
+    const txt = decided
+      .map(iss => `#${ISSUES.indexOf(iss) + 1} ${iss.title} → ${dec[iss.id]}`)
+      .join('\n');
+    navigator.clipboard.writeText(txt).then(() => {
+      alert(`${decided.length}건 결정 복사됨.\n\n${txt}`);
+    });
+  }
+
+  refreshSummary();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,512 @@
+# =============================================================================
+# editable_fields.yaml — SSOT for the modeling section's editable-field surface
+# =============================================================================
+#
+# Authority:
+#   This file is the SINGLE SOURCE OF TRUTH for what fields are editable in the
+#   modeling section. Backend Pydantic Patch models, frontend inline-edit wiring,
+#   and the editable_fields_guide.html are all derived from this file via
+#   `scripts/codegen_*.py` and `scripts/lint_editable_sync.py`.
+#
+# Schema (informal):
+#   version:               int
+#   audit:                 mapping (audit middleware policy)
+#   entities:
+#     <EntityName>:
+#       table:             str   # ORM class name (BusinessTermRow, ActionRow, ...)
+#       patch_class:       str   # generated Pydantic class name (TermPatch, ...)
+#       endpoint:          str   # PATCH route (humans only — codegen doesn't read it)
+#       confirm_toggle:    bool  # has separate confirm/unconfirm endpoints
+#       fields:
+#         <field_name>:
+#           type:              str   # python type literal (str, int, list[str], ...)
+#           edit:              str   # see EditMode below
+#           backend_column:    str   # ORM column name (defaults to field_name)
+#           serialize:         str   # one of: none | json | csv  (default: none)
+#           immutable:         bool  # if true, never appears in PATCH (PK, repo_id...)
+#           derived_from:      str   # if set, field is read-only & display-only
+#           confidence_label:  str   # auto | mixed | user_only — for fields with
+#                                    # *_user_override companion column (#8 pattern)
+#           edit_opts:
+#             confirm_modal:        bool
+#             options:              list of str   # for inline_select
+#             fallback_text:        bool          # inline_select w/ "기타..." escape
+#             autocomplete_source:  str           # endpoint path for inline_autocomplete
+#             min:                  number
+#             max:                  number
+#             step:                 number
+#             rows:                 int           # for inline_textarea
+#           validation:
+#             min_length:    int
+#             max_length:    int
+#             regex:         str
+#             one_of:        list of str
+#
+# EditMode enum (the `edit` key):
+#   inline_text          single-line string
+#   inline_textarea      multi-line string (rows controlled by edit_opts.rows)
+#   inline_list          list of string (comma-separated input → string[])
+#   inline_select        fixed enum, optional fallback_text for "기타..."
+#   inline_autocomplete  free text + suggestions from autocomplete_source
+#   inline_number        single numeric value
+#   inline_range         number[2] — min/max pair
+#   read_only            display only; no PATCH; ✏️ icon hidden
+#   authoring_only       display only inline; bulk edit via Authoring mode
+#
+# Conventions:
+#   * Always set `backend_column` explicitly when it differs from the field name
+#     (e.g., `aliases` field maps to `aliases_json` ORM column).
+#   * Always set `serialize: json` for list/dict columns persisted as TEXT.
+#   * `immutable: true` implies `edit: read_only` automatically (lint enforces).
+#   * `derived_from` implies `edit: read_only` (lint enforces).
+#   * Field order in this file is the order PatchDTO emits them (stable diffs).
+# =============================================================================
+
+version: 1
+
+audit:
+  # Decision #12 — every PATCH passes through audit middleware that records
+  # (entity, fqn, field, old_value, new_value, who, when) into modeling_audit_log.
+  enabled: true
+  middleware: backend.modeling.audit.PatchAuditMiddleware
+  log_table: modeling_audit_log
+
+entities:
+
+  # ===========================================================================
+  # Term — BusinessTermRow (domain meaning unit)
+  # ===========================================================================
+  Term:
+    table: BusinessTermRow
+    patch_class: TermPatch
+    endpoint: "PATCH /api/ontology/repos/{repo_id}/terms/{fqn}"
+    confirm_toggle: true
+    fields:
+      # ---- identity / immutable ----------------------------------------------
+      fqn:
+        type: str
+        edit: read_only
+        immutable: true
+      repo_id:
+        type: str
+        edit: read_only
+        immutable: true
+
+      # ---- editable basics ---------------------------------------------------
+      label:
+        type: str
+        edit: inline_text
+        validation:
+          max_length: 200
+      aliases:
+        type: list[str]
+        edit: inline_list
+        backend_column: aliases_json
+        serialize: json
+      description:
+        type: str
+        edit: inline_textarea
+        edit_opts:
+          rows: 3
+        validation:
+          max_length: 4000
+      domain:
+        type: str
+        edit: inline_text
+        validation:
+          max_length: 80
+
+      # ---- atomic-only metadata ----------------------------------------------
+      value_type:
+        # Decision #3 — enum select with text fallback. Keep enum tight; users
+        # who need exotic types pick "기타..." and free-type.
+        type: str
+        edit: inline_select
+        edit_opts:
+          options:
+            - string
+            - int
+            - long
+            - float
+            - double
+            - boolean
+            - decimal
+            - date
+            - datetime
+            - uuid
+            - bytes
+            - enum
+          fallback_text: true
+        validation:
+          max_length: 80
+      unit:
+        type: str
+        edit: inline_text
+        validation:
+          max_length: 40
+      range:
+        # Decision #6 — atomic Term safe range [min, max].
+        # Stored JSON-encoded in `range_json` column.
+        type: list[float]
+        edit: inline_range
+        backend_column: range_json
+        serialize: json
+        edit_opts:
+          step: 0.01
+      enum_values:
+        type: list[str]
+        edit: inline_list
+        backend_column: enum_values_json
+        serialize: json
+
+      # ---- structural / derived (read-only) ----------------------------------
+      kind:
+        type: str
+        edit: read_only
+        validation:
+          one_of: [atomic, composite]
+      is_abstract:
+        type: bool
+        edit: read_only
+      is_interface:
+        type: bool
+        edit: read_only
+      is_root_entity:
+        type: bool
+        edit: read_only
+      struct_like_hint:
+        type: bool
+        edit: read_only
+      confirmed:
+        # Toggled via dedicated confirm/unconfirm endpoints, not PATCH body.
+        type: bool
+        edit: read_only
+
+  # ===========================================================================
+  # Action — ActionRow (verb / behavior unit)
+  # ===========================================================================
+  Action:
+    table: ActionRow
+    patch_class: ActionPatch
+    endpoint: "PATCH /api/ontology/repos/{repo_id}/actions/{fqn}"
+    confirm_toggle: true
+    fields:
+      # ---- identity / immutable ----------------------------------------------
+      fqn:
+        type: str
+        edit: read_only
+        immutable: true
+      repo_id:
+        type: str
+        edit: read_only
+        immutable: true
+
+      # ---- editable basics ---------------------------------------------------
+      label:
+        type: str
+        edit: inline_text
+        validation:
+          max_length: 200
+      aliases:
+        type: list[str]
+        edit: inline_list
+        backend_column: aliases_json
+        serialize: json
+      description:
+        type: str
+        edit: inline_textarea
+        edit_opts:
+          rows: 3
+        validation:
+          max_length: 4000
+
+      # ---- derived (display only) --------------------------------------------
+      domain:
+        # Decision #5 — Action.domain shown but not editable. Source of truth is
+        # the declared_on_term's domain. Editing here would risk inconsistency.
+        type: str
+        edit: read_only
+        derived_from: declared_on_term.domain
+
+      # ---- structural / authoring-only ---------------------------------------
+      kind:
+        type: str
+        edit: authoring_only
+        validation:
+          one_of: [pure_function, effectful, workflow]
+      is_abstract:
+        type: bool
+        edit: read_only
+      declared_on_term:
+        type: str
+        edit: authoring_only
+      params:
+        # Decision #9 (B drawer) — multi-field nested entity. Inline edit is
+        # too cramped; bulk edits route through the ParamDetail drawer or
+        # Authoring mode. Persisted as JSON list of ActionParamDTO.
+        type: list[dict]
+        edit: authoring_only
+        backend_column: params_json
+        serialize: json
+      output:
+        type: dict
+        edit: authoring_only
+        backend_column: output_json
+        serialize: json
+      preconditions:
+        type: list[str]
+        edit: authoring_only
+        backend_column: preconditions_json
+        serialize: json
+      postconditions:
+        type: list[str]
+        edit: authoring_only
+        backend_column: postconditions_json
+        serialize: json
+      effects:
+        type: list[dict]
+        edit: authoring_only
+        backend_column: effects_json
+        serialize: json
+      sub_actions:
+        type: list[str]
+        edit: authoring_only
+        backend_column: sub_actions_json
+        serialize: json
+      verification_level:
+        type: str
+        edit: read_only
+        validation:
+          one_of:
+            - unmapped
+            - draft
+            - signature_locked
+            - body_anchored
+            - sim_verified
+            - pr_proven
+      signature_locked_at:
+        type: str
+        edit: read_only
+      confirmed_by:
+        type: str
+        edit: read_only
+
+  # ===========================================================================
+  # BusinessRule — BusinessRuleRow (named domain rule)
+  # ===========================================================================
+  BusinessRule:
+    table: BusinessRuleRow
+    patch_class: BRPatch
+    endpoint: "PATCH /api/ontology/repos/{repo_id}/business-rules/{fqn}"
+    confirm_toggle: true
+    fields:
+      # ---- identity / immutable ----------------------------------------------
+      fqn:
+        type: str
+        edit: read_only
+        immutable: true
+      repo_id:
+        type: str
+        edit: read_only
+        immutable: true
+
+      # ---- editable ----------------------------------------------------------
+      statement:
+        type: str
+        edit: inline_textarea
+        edit_opts:
+          rows: 4
+        validation:
+          min_length: 1
+          max_length: 8000
+      severity:
+        # Decision #1 — keep inline select but require a confirm modal.
+        # Severity changes have wide blast radius (gates, tests, alerts).
+        type: str
+        edit: inline_select
+        edit_opts:
+          options: [hard, soft]
+          confirm_modal: true
+        validation:
+          one_of: [hard, soft]
+
+      # ---- derived / authoring-only -----------------------------------------
+      terms_ref:
+        type: list[str]
+        edit: authoring_only
+        backend_column: terms_ref_json
+        serialize: json
+      enforced_by:
+        # method_fqn list — derived from anchor analysis.
+        type: list[str]
+        edit: read_only
+        backend_column: enforced_by_json
+        serialize: json
+      violated_at_call:
+        type: list[dict]
+        edit: read_only
+        backend_column: violated_at_call_json
+        serialize: json
+      operational_history:
+        type: list[dict]
+        edit: read_only
+        backend_column: operational_history_json
+        serialize: json
+
+      # ---- bookkeeping -------------------------------------------------------
+      source:
+        type: str
+        edit: read_only
+      confirmed:
+        type: bool
+        edit: read_only
+
+  # ===========================================================================
+  # AnchorBinding — AnchorBindingRow (Action ↔ code fragment)
+  # ===========================================================================
+  AnchorBinding:
+    table: AnchorBindingRow
+    patch_class: AnchorPatch
+    endpoint: "PATCH /api/ontology/repos/{repo_id}/anchor-bindings/{anchor_id}"
+    confirm_toggle: true
+    fields:
+      # ---- identity / immutable ----------------------------------------------
+      id:
+        type: str
+        edit: read_only
+        immutable: true
+      repo_id:
+        type: str
+        edit: read_only
+        immutable: true
+
+      # ---- editable ----------------------------------------------------------
+      anchor_locator:
+        # Decision #2 — autocomplete from CallSiteAnalyzer fragment list.
+        # Free typing still allowed (autocomplete = suggestions, not enum).
+        type: str
+        edit: inline_autocomplete
+        edit_opts:
+          autocomplete_source: "/api/ontology/code-methods/{code_method_fqn}/fragments"
+        validation:
+          max_length: 200
+      target_slot:
+        type: str
+        edit: inline_text
+        validation:
+          max_length: 200
+      rationale:
+        type: str
+        edit: inline_textarea
+        edit_opts:
+          rows: 3
+        validation:
+          max_length: 4000
+
+      # ---- derived / structural (read-only) ---------------------------------
+      code_method_fqn:
+        type: str
+        edit: read_only
+      target_action_fqn:
+        type: str
+        edit: read_only
+      confidence:
+        type: float
+        edit: read_only
+      source:
+        type: str
+        edit: read_only
+      confirmed:
+        type: bool
+        edit: read_only
+      line:
+        type: int
+        edit: read_only
+
+  # ===========================================================================
+  # CodeType — CodeTypeRow (Java class mirror; mostly read-only)
+  # ===========================================================================
+  CodeType:
+    table: CodeTypeRow
+    patch_class: CodeTypePatch
+    endpoint: "PATCH /api/ontology/code-types/{fqn}"   # NEW endpoint (Wave 2)
+    confirm_toggle: false
+    fields:
+      # ---- identity / immutable ----------------------------------------------
+      fqn:
+        type: str
+        edit: read_only
+        immutable: true
+      repo_id:
+        type: str
+        edit: read_only
+        immutable: true
+
+      # ---- the one editable: role -------------------------------------------
+      role:
+        # Decision #8 — only editable field on CodeType. Auto-classified by
+        # the parser, but users can override.
+        #
+        # Wave 2 plan: introduce a companion column `role_user_override` via
+        # ALTER TABLE. When non-null it wins; otherwise the parser-derived
+        # `role` value is shown. confidence_label: mixed signals to the UI to
+        # display a "(user override)" badge whenever override is set.
+        #
+        # Until that ALTER lands, PATCH writes back to `role` directly and the
+        # lint guarantees the column exists.
+        type: str
+        edit: inline_select
+        edit_opts:
+          options: [domain, framework, infra, unknown]
+        backend_column: role
+        confidence_label: mixed
+        validation:
+          one_of: [domain, framework, infra, unknown]
+
+      # ---- everything else: parser-derived, read-only -----------------------
+      simple_name:
+        type: str
+        edit: read_only
+      package:
+        type: str
+        edit: read_only
+      kind:
+        type: str
+        edit: read_only
+        validation:
+          one_of: [class, abstract_class, interface, enum, record]
+      is_abstract:
+        type: bool
+        edit: read_only
+      extends:
+        type: str
+        edit: read_only
+      implements:
+        type: list[str]
+        edit: read_only
+        backend_column: implements_json
+        serialize: json
+      extends_interfaces:
+        type: list[str]
+        edit: read_only
+        backend_column: extends_interfaces_json
+        serialize: json
+      modifiers:
+        type: list[str]
+        edit: read_only
+        backend_column: modifiers_json
+        serialize: json
+      annotations:
+        type: list[str]
+        edit: read_only
+        backend_column: annotations_json
+        serialize: json
+      source_file:
+        type: str
+        edit: read_only
+      line_start:
+        type: int
+        edit: read_only
+      line_end:
+        type: int
+        edit: read_only
