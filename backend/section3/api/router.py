@@ -43,14 +43,24 @@ router = APIRouter(prefix="/api/section3", tags=["section3"])
 
 async def _sse(events: AsyncIterator[StreamEvent]) -> AsyncIterator[bytes]:
     """StreamEvent async generator → SSE byte stream."""
+    import asyncio
     try:
         async for ev in events:
             payload = ev.model_dump(mode="json")
             yield f"event: {ev.type}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n".encode("utf-8")
+            # 각 event 마다 asyncio scheduler 에 즉시 yield — uvicorn/proxy 가 chunk flush 하도록 강제
+            await asyncio.sleep(0)
     except Exception as e:
         logger.exception("SSE stream error")
         err = json.dumps({"type": "error", "payload": {"message": str(e)}}, ensure_ascii=False)
         yield f"event: error\ndata: {err}\n\n".encode("utf-8")
+
+
+_SSE_HEADERS = {
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",  # nginx / 다른 proxy 의 buffering 방지
+}
 
 
 # ─── endpoints ────────────────────────────────────────────────
@@ -63,7 +73,7 @@ async def chat(
 ):
     """온톨로지 브릿지 chat — bridge agent SSE streaming."""
     agent = BridgeAgent(modeling=modeling)
-    return StreamingResponse(_sse(agent.run(req)), media_type="text/event-stream")
+    return StreamingResponse(_sse(agent.run(req)), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 @router.post("/sandbox/run")
@@ -73,7 +83,7 @@ async def sandbox_run(
 ):
     """샌드박스 — 테스트 데이터 생성 + 격리 실행."""
     agent = SandboxAgent(modeling=modeling)
-    return StreamingResponse(_sse(agent.run(req)), media_type="text/event-stream")
+    return StreamingResponse(_sse(agent.run(req)), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 @router.post("/code-impact")
@@ -83,7 +93,7 @@ async def code_impact(
 ):
     """영향도 분석 (코드 변경)."""
     agent = CodeImpactAgent(modeling=modeling)
-    return StreamingResponse(_sse(agent.run(req)), media_type="text/event-stream")
+    return StreamingResponse(_sse(agent.run(req)), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 @router.post("/data-impact")
@@ -93,7 +103,7 @@ async def data_impact(
 ):
     """데이터 변경 분석 (기준/slab data)."""
     agent = DataImpactAgent(modeling=modeling)
-    return StreamingResponse(_sse(agent.run(req)), media_type="text/event-stream")
+    return StreamingResponse(_sse(agent.run(req)), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 @router.get("/stats")

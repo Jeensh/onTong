@@ -137,6 +137,16 @@ function parseSSEChunk(chunk: string): StreamEvent | null {
 
 // ─── Endpoint wrappers ──────────────────────────────────────
 
+/**
+ * SSE 는 Next.js dev rewrites() proxy 가 buffering 하기 때문에 backend 직접 호출.
+ * 일반 GET 은 proxy 그대로 (CORS 안 타도 됨).
+ * 환경변수 NEXT_PUBLIC_BACKEND_URL 로 override (default: localhost:8001).
+ */
+const BACKEND_DIRECT =
+  (typeof window !== "undefined" && (window as any).__BACKEND_URL__) ||
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  "http://localhost:8001";
+const SSE_BASE = `${BACKEND_DIRECT}/api/section3`;
 const BASE = "/api/section3";
 
 export interface ChatBody {
@@ -163,16 +173,16 @@ export interface DataImpactBody {
 }
 
 export function chat(body: ChatBody, onEvent: (ev: StreamEvent) => void, signal?: AbortSignal) {
-  return streamSSE(`${BASE}/chat`, body, onEvent, signal);
+  return streamSSE(`${SSE_BASE}/chat`, body, onEvent, signal);
 }
 export function runSandbox(body: SandboxBody, onEvent: (ev: StreamEvent) => void, signal?: AbortSignal) {
-  return streamSSE(`${BASE}/sandbox/run`, body, onEvent, signal);
+  return streamSSE(`${SSE_BASE}/sandbox/run`, body, onEvent, signal);
 }
 export function runCodeImpact(body: CodeImpactBody, onEvent: (ev: StreamEvent) => void, signal?: AbortSignal) {
-  return streamSSE(`${BASE}/code-impact`, body, onEvent, signal);
+  return streamSSE(`${SSE_BASE}/code-impact`, body, onEvent, signal);
 }
 export function runDataImpact(body: DataImpactBody, onEvent: (ev: StreamEvent) => void, signal?: AbortSignal) {
-  return streamSSE(`${BASE}/data-impact`, body, onEvent, signal);
+  return streamSSE(`${SSE_BASE}/data-impact`, body, onEvent, signal);
 }
 
 export async function getStats(): Promise<{ nodes: Record<string, number>; relations: Record<string, number>; totals?: Record<string, number> }> {
