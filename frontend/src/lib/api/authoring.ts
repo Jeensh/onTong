@@ -111,10 +111,96 @@ export interface ExtractedGenericClass {
   class_docstring?: string | null;
 }
 
-/** Discriminated union — branch on `.kind`. Downstream capabilities
- *  (hypothesis/interview/...) currently require ExtractedJpo; UI gates
- *  those buttons when kind === "generic" (Phase B-8). */
-export type ExtractedClass = ExtractedJpo | ExtractedGenericClass;
+// ── Service extraction — Phase C-1a ──────────────────────────────────
+
+export interface ServiceDependency {
+  field_name: string;
+  type_simple: string;
+  injection_style: "field" | "constructor" | "setter" | "unknown";
+  is_repository: boolean;
+}
+
+export interface ServiceMethod {
+  name: string;
+  params: string[];
+  return_type: string;
+  annotations: string[];
+  javadoc_first_line?: string | null;
+  is_transactional: boolean;
+}
+
+export interface RestEndpoint {
+  http_method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "ANY";
+  path: string;
+  handler_method: string;
+}
+
+export interface ExtractedService {
+  kind: "service";
+  package: string;
+  class_name: string;
+  class_annotations: string[];
+  dependencies: ServiceDependency[];
+  exposed_methods: ServiceMethod[];
+  transaction_boundary_methods: string[];
+  rest_endpoints: RestEndpoint[];
+  publishes_events: string[];
+  class_docstring?: string | null;
+}
+
+// ── Action extraction — Phase C-1b (method-level, separate endpoint) ──
+
+export interface ActionParam {
+  name: string;
+  type_simple: string;
+  domain_meaning_hint?: string | null;
+}
+
+export interface Callee {
+  receiver_type: string;
+  method_name: string;
+  is_repository_call: boolean;
+  is_external_call: boolean;
+}
+
+export interface SideEffect {
+  op:
+    | "db_write"
+    | "db_read"
+    | "external_call"
+    | "event_publish"
+    | "log_only"
+    | "in_memory_only";
+  target_hint: string;
+}
+
+export interface AnchorHint {
+  locator: string;
+  line?: number | null;
+  note?: string | null;
+}
+
+export interface ExtractedAction {
+  kind: "action";
+  enclosing_class_fqn: string;
+  method_name: string;
+  params: ActionParam[];
+  return_type: string;
+  return_meaning_hint?: string | null;
+  method_annotations: string[];
+  javadoc?: string | null;
+  callees: Callee[];
+  side_effects: SideEffect[];
+  br_refs: string[];
+  anchors_hint: AnchorHint[];
+  is_idempotent_guess?: boolean | null;
+}
+
+/** Class-level discriminated union — branch on `.kind`. ExtractedAction is
+ *  NOT included because Action is method-scoped and invoked through a
+ *  separate endpoint (UI: pick method from a class first). Downstream
+ *  capabilities currently require ExtractedJpo; UI gates accordingly. */
+export type ExtractedClass = ExtractedJpo | ExtractedService | ExtractedGenericClass;
 
 export type DomainRole =
   | "equipment"

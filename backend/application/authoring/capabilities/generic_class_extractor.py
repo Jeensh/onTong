@@ -221,12 +221,17 @@ from typing import Annotated, Union  # noqa: E402
 
 from pydantic import Field  # noqa: E402
 
-# Phase B union (Phase C will extend with ExtractedService / ExtractedAction).
-# Pydantic v2 discriminated union — `kind` field tags the variant. Use this
-# as the response type in API routes that hand back extraction output so
-# the frontend can branch cleanly without sniffing fields.
+# Phase B/C union — `kind` field tags the variant. Use this as the response
+# type in API routes that hand back extraction output so the frontend can
+# branch cleanly without sniffing fields.
+# Phase C adds ExtractedService; ExtractedAction is method-level and uses a
+# separate endpoint (not the auto-dispatcher), so it's not part of this union.
+from backend.application.authoring.capabilities.service_extractor import (  # noqa: E402
+    ExtractedService,
+)
+
 ExtractedClass = Annotated[
-    Union[ExtractedJpo, ExtractedGenericClass],
+    Union[ExtractedJpo, ExtractedService, ExtractedGenericClass],
     Field(discriminator="kind"),
 ]
 
@@ -243,10 +248,26 @@ _ENTITY_ANNOTATION_RE = _re.compile(
     r"@(?:(?:javax|jakarta)\.persistence\.)?Entity\b"
 )
 
+# Spring service-layer class-level annotations. `@Component` is the broadest
+# (per plan Q5: "@Component → Service 카테고리에 포함") — covers custom
+# stereotypes too. Order doesn't matter because the regex is OR-ed.
+_SERVICE_ANNOTATION_RE = _re.compile(
+    r"@(?:(?:org\.springframework\.stereotype\.|"
+    r"org\.springframework\.web\.bind\.annotation\.)?"
+    r"(?:Service|RestController|Controller|Component|Repository|Configuration))\b"
+)
+
 
 def is_jpa_entity_source(content: str) -> bool:
     """True if the Java source carries an @Entity annotation."""
     return bool(_ENTITY_ANNOTATION_RE.search(content))
+
+
+def is_service_layer_source(content: str) -> bool:
+    """True if the source carries a Spring service-layer class annotation
+    (@Service / @RestController / @Controller / @Component / @Repository /
+    @Configuration)."""
+    return bool(_SERVICE_ANNOTATION_RE.search(content))
 
 
 async def extract_from_file(
@@ -256,22 +277,37 @@ async def extract_from_file(
     session_id: str,
     turn_no: int,
     event_pump: ToolEventPump | None = None,
-) -> "ExtractedJpo | ExtractedGenericClass":
-    """Pick JPO or Generic extractor based on @Entity presence in the source.
+) -> "ExtractedJpo | ExtractedService | ExtractedGenericClass":
+    """Dispatch one Java file to the right extractor.
 
-    Phase B addition — replaces calling `extract_jpo_from_file` directly
-    everywhere. Existing callers that hand-pick the JPO path keep working;
-    new code should call this dispatcher so non-Entity classes don't
-    silently get parsed by the JPA-specific prompt.
+    Priority order:
+      1. `@Entity` → JPO extractor (full JPA schema, hypothesis pipeline).
+      2. `@Service`/`@RestController`/`@Controller`/`@Component`/... → Service
+         extractor (dependency-graph aware, HARD tier).
+      3. Anything else → Generic outline (STANDARD tier).
+
+    Action extraction (method-level) uses a separate dedicated endpoint —
+    it's not part of the class-level dispatcher because the user has to
+    pick a specific method, not a whole class.
     """
     if is_jpa_entity_source(content):
-        # Local import to keep this module's top-level imports lean and to
-        # avoid loading the JPO agent infrastructure when only the generic
-        # path is needed.
+        # Local import keeps top-level imports lean and avoids loading the
+        # JPO agent infrastructure when only generic/service paths are used.
         from backend.application.authoring.capabilities.code_extractor import (
             extract_jpo_from_file,
         )
         return await extract_jpo_from_file(
+            path,
+            content,
+            session_id=session_id,
+            turn_no=turn_no,
+            event_pump=event_pump,
+        )
+    if is_service_layer_source(content):
+        from backend.application.authoring.capabilities.service_extractor import (
+            extract_service_from_file,
+        )
+        return await extract_service_from_file(
             path,
             content,
             session_id=session_id,

@@ -35,6 +35,7 @@ import type {
   ExtractedClass,
   ExtractedGenericClass,
   ExtractedJpo,
+  ExtractedService,
   ComprehensiveArchive,
   GapAnalysis,
   InterviewBatch,
@@ -782,6 +783,7 @@ function ChatPayload({ m }: { m: ChatMessage }) {
 
 function ExtractedView({ extracted }: { extracted: ExtractedClass }) {
   if (extracted.kind === "jpo") return <JpoExtractedView jpo={extracted} />;
+  if (extracted.kind === "service") return <ServiceExtractedView s={extracted} />;
   return <GenericExtractedView c={extracted} />;
 }
 
@@ -797,6 +799,33 @@ function JpoExtractedView({ jpo }: { jpo: ExtractedJpo }) {
       <div className="text-[11px] text-muted-foreground">
         PK {jpo.pk_columns.length}축 · 컬럼 {jpo.regular_columns.length}개
         {jpo.pk_class && <> · PK class: <code>{jpo.pk_class}</code></>}
+      </div>
+    </div>
+  );
+}
+
+function ServiceExtractedView({ s }: { s: ExtractedService }) {
+  const primary = s.class_annotations.find((a) =>
+    /^@(RestController|Controller|Service|Repository|Component|Configuration)\b/.test(a),
+  );
+  const label = primary ? primary.replace(/\(.*$/, "") : "@Component";
+  const depCount = s.dependencies.length;
+  const repoCount = s.dependencies.filter((d) => d.is_repository).length;
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-0.5">
+        Spring Service {label}
+      </div>
+      <div className="font-semibold text-violet-400 mb-1">{s.class_name}</div>
+      <div className="text-[11px] text-muted-foreground">
+        deps {depCount}개{repoCount > 0 && <> (그중 Repository {repoCount})</>} ·
+        exposed {s.exposed_methods.length} method{s.exposed_methods.length === 1 ? "" : "s"} ·
+        tx 경계 {s.transaction_boundary_methods.length}
+        {s.rest_endpoints.length > 0 && <> · REST {s.rest_endpoints.length}</>}
+        {s.publishes_events.length > 0 && <> · events {s.publishes_events.length}</>}
+      </div>
+      <div className="text-[10px] text-amber-300/80 mt-1">
+        ⓘ 추출만 완료 — Service hypothesis / 인터뷰는 Phase C-2 에서 지원
       </div>
     </div>
   );
