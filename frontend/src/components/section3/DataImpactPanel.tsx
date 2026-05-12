@@ -1,23 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Database, Loader2, Play, RotateCcw, Layers } from "lucide-react";
+import { Database, Loader2, Play, RotateCcw, Layers, MessageSquare } from "lucide-react";
 import { runDataImpact, type StreamEvent, type AgentFinalPayload } from "@/lib/section3/api";
 import { StreamTimeline } from "./rich/StreamTimeline";
 import { RichResultCard } from "./rich/RichResultCard";
 
-const STANDARD_PRESETS = ["SC030", "SC160", "SC370"];
-const TABLE_PRESETS = ["TB_C40_050SC030", "TB_C40_050SC160", "TB_C40_050SC370"];
-const ORDER_PRESETS = ["order_001", "order_002"];
-
 export function DataImpactPanel() {
   const [targetKind, setTargetKind] = useState<"table" | "standard_value" | "order">("standard_value");
-  const [targetId, setTargetId] = useState("SC160");
+  const [targetId, setTargetId] = useState("");
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [finalPayload, setFinalPayload] = useState<AgentFinalPayload | null>(null);
   const [running, setRunning] = useState(false);
-
-  const presets = targetKind === "standard_value" ? STANDARD_PRESETS : targetKind === "table" ? TABLE_PRESETS : ORDER_PRESETS;
 
   const submit = async () => {
     if (running || !targetId.trim()) return;
@@ -82,20 +76,16 @@ export function DataImpactPanel() {
               <input
                 value={targetId}
                 onChange={(e) => setTargetId(e.target.value)}
-                placeholder={targetKind === "standard_value" ? "SC160" : targetKind === "table" ? "TB_C40_050SC160" : "order_001"}
+                placeholder={targetKind === "standard_value" ? "기준값 코드" : targetKind === "table" ? "테이블 이름" : "주문 id"}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono focus:border-primary outline-none"
               />
-              <div className="flex flex-wrap gap-1 mt-1.5">
-                {presets.map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setTargetId(p)}
-                    className={`text-[10px] px-2 py-0.5 rounded-full border font-mono ${targetId === p ? "border-amber-500 bg-amber-50 text-amber-700" : "border-border bg-muted text-muted-foreground"}`}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
+              <p className="text-[10px] text-muted-foreground mt-1.5 flex items-start gap-1">
+                <MessageSquare size={11} className="flex-shrink-0 mt-0.5" />
+                <span>
+                  id 카탈로그가 modeling 측에 아직 미구현 (요청 #② 진행 중).
+                  지금은 <b>온톨로지 브릿지 agent</b> 에서 자연어로 검색 (예: "<i>기준값 목록 보여줘</i>") → 발견된 id 를 여기 붙여넣기.
+                </span>
+              </p>
             </div>
 
             <div className="flex gap-2">

@@ -43,7 +43,7 @@ class SandboxRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     target_kind: Literal["step", "method", "class"] = "step"
-    target_id: str  # e.g. "1" (step number), "calculateThickness" (method)
+    target_id: str  # 사용자 입력 — modeling API 가 식별할 수 있는 id (Step 번호 / method 이름 / 등)
     case_types: list[Literal["normal", "boundary", "error"]] = Field(
         default_factory=lambda: ["normal", "boundary", "error"]
     )

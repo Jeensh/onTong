@@ -73,7 +73,7 @@ class BridgeAgent(BaseAgent):
             if not target_id or kind not in ("step", "method", "class"):
                 # parameter 부족 — modeling missing_info 형식으로 사용자에게 되묻기
                 yield self.need_more_info({
-                    "reason": "어떤 step 을 시뮬할지 명시 필요 (예: 'Step 1', 'thickness')",
+                    "reason": "어떤 step 을 시뮬할지 명시 필요 (Step 번호 또는 method 이름)",
                     "questions": [{
                         "field": "target",
                         "question": "어느 step / method 를 시뮬할까요?",

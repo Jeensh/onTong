@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Beaker, Loader2, Play, RotateCcw, Sparkles } from "lucide-react";
-import { runSandbox, type StreamEvent, type AgentFinalPayload } from "@/lib/section3/api";
+import { runSandbox, getStats, type StreamEvent, type AgentFinalPayload } from "@/lib/section3/api";
 import { StreamTimeline } from "./rich/StreamTimeline";
 import { RichResultCard } from "./rich/RichResultCard";
 
@@ -12,19 +12,22 @@ const CASE_TYPES: Array<{ id: "normal" | "boundary" | "error"; label: string; em
   { id: "error", label: "오류", emoji: "❌", tone: "bg-red-100 text-red-700 border-red-400" },
 ];
 
-const STEP_PRESETS = [
-  { id: "1", label: "Step 1 — 두께 계산" },
-  { id: "2", label: "Step 2 — 1차 폭범위" },
-  { id: "3", label: "Step 3 — 1차 길이범위" },
-  { id: "4", label: "Step 4 — 1차 단중범위" },
-  { id: "5", label: "Step 5 — 2차 단중 하한" },
-  { id: "7", label: "Step 7 — 분할수" },
-  { id: "8", label: "Step 8 — 매수/목표단중" },
-];
-
 export function SandboxPanel() {
   const [targetKind, setTargetKind] = useState<"step" | "method" | "class">("step");
-  const [targetId, setTargetId] = useState("1");
+  const [targetId, setTargetId] = useState("");
+  const [stepCount, setStepCount] = useState<number>(0);
+
+  // modeling.graph_stats 응답으로 Step 개수 동적 가져옴 (하드코딩 0건)
+  useEffect(() => {
+    getStats()
+      .then((s) => setStepCount(s.nodes?.Step ?? 0))
+      .catch(() => setStepCount(0));
+  }, []);
+
+  const stepPresets = Array.from({ length: stepCount }, (_, i) => ({
+    id: String(i + 1),
+    label: `Step ${i + 1}`,
+  }));
   const [selected, setSelected] = useState<Array<"normal" | "boundary" | "error">>(["normal", "boundary", "error"]);
   const [runAfter, setRunAfter] = useState(true);
   const [events, setEvents] = useState<StreamEvent[]>([]);
@@ -95,12 +98,12 @@ export function SandboxPanel() {
               <input
                 value={targetId}
                 onChange={(e) => setTargetId(e.target.value)}
-                placeholder={targetKind === "step" ? "Step 번호 (예: 1)" : "id"}
+                placeholder={targetKind === "step" ? (stepCount ? `1 ~ ${stepCount}` : "Step 번호") : "id"}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono focus:border-primary outline-none"
               />
-              {targetKind === "step" && (
+              {targetKind === "step" && stepPresets.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1.5">
-                  {STEP_PRESETS.map((s) => (
+                  {stepPresets.map((s) => (
                     <button
                       key={s.id}
                       onClick={() => setTargetId(s.id)}
@@ -109,6 +112,9 @@ export function SandboxPanel() {
                       {s.label}
                     </button>
                   ))}
+                  <span className="text-[9px] text-muted-foreground self-center ml-1">
+                    (modeling 의 graph_stats 응답에서 동적 생성)
+                  </span>
                 </div>
               )}
             </div>

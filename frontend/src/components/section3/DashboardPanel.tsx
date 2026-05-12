@@ -105,22 +105,22 @@ export function DashboardPanel({ onJump }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <QuickCard
               title="자연어 질문 (브릿지 chat)"
-              desc="실수율은 어디서 계산되나? / Method 바꾸면? — chat 으로 의도 분석"
+              desc="용어/위치/영향을 자연어로 — modeling 에 의도 분류 후 라우팅"
               onClick={() => onJump?.("bridge")}
             />
             <QuickCard
               title="샌드박스 — Step 시뮬"
-              desc="modeling 이 만든 test_case + LLM 합성 Python 격리 실행"
+              desc="modeling.simulate → 자동 test_case + LLM 합성 Python 격리 실행"
               onClick={() => onJump?.("sandbox")}
             />
             <QuickCard
               title="영향도 분석 — 코드 변경"
-              desc="Method / Class 변경 시 어느 Step 깨지나"
+              desc="Method / Class / Column 변경 시 영향 Step + 위험도 (Cypher 기반)"
               onClick={() => onJump?.("code-impact")}
             />
             <QuickCard
               title="데이터 변경 분석"
-              desc="SC 기준값 / Table / 주문 변경 영향"
+              desc="Standard / Table / Order 변경 시 영향 Step + Method (Cypher 기반)"
               onClick={() => onJump?.("data-impact")}
             />
           </div>

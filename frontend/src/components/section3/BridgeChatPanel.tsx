@@ -15,7 +15,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Send, Loader2, MessageSquare, Sparkles, Lightbulb, User, Bot, Trash2 } from "lucide-react";
-import { chat, type StreamEvent, type AgentFinalPayload } from "@/lib/section3/api";
+import { chat, getStats, termSearch, type StreamEvent, type AgentFinalPayload } from "@/lib/section3/api";
 import { StreamTimeline } from "./rich/StreamTimeline";
 import { RichResultCard } from "./rich/RichResultCard";
 
@@ -30,12 +30,13 @@ interface ChatTurn {
   needsMoreInfo?: boolean;
 }
 
-const SAMPLE_PROMPTS = [
-  "실수율 어디서 계산되나요?",
-  "calculateThickness 메서드 바꾸면 뭐가 영향받아?",
-  "Step 1 시뮬레이션 해줘",
-  "SC160 기준값 바꾸면?",
-  "주문 처리할 때 어떤 step 들이 실행되나?",
+/** 도메인 어휘 0건의 generic 안내 — 어떤 ontology 든 적용 가능한 패턴. */
+const GENERIC_PATTERNS = [
+  { label: "용어 검색", template: "ontology 에 등록된 용어 중 ___ 비슷한 것 찾아줘" },
+  { label: "method 영향 분석", template: "___ method 를 바꾸면 무엇이 영향받아?" },
+  { label: "기준값 영향 분석", template: "기준값 ___ 을(를) 바꾸면 어디가 영향받아?" },
+  { label: "Step 시뮬", template: "Step ___ 의 테스트 케이스를 만들어줘" },
+  { label: "위치 찾기", template: "___ 은(는) 어디서 계산되나요?" },
 ];
 
 export function BridgeChatPanel() {
@@ -44,9 +45,15 @@ export function BridgeChatPanel() {
   const [running, setRunning] = useState(false);
   const [activeEvents, setActiveEvents] = useState<StreamEvent[]>([]);
   const [expandedTurn, setExpandedTurn] = useState<number | null>(null);
+  const [stats, setStats] = useState<Record<string, number> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(0);
+
+  useEffect(() => {
+    // modeling.graph_stats 로 노드 카운트 동적 가져옴
+    getStats().then((s) => setStats(s.nodes)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -152,7 +159,7 @@ export function BridgeChatPanel() {
 
       {/* ── Body ─────────────────────────────────────── */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
-        {turns.length === 0 && <EmptyState onPick={submit} />}
+        {turns.length === 0 && <EmptyState onPick={submit} stats={stats} />}
 
         {turns.map((t) => (
           <TurnView
@@ -198,25 +205,40 @@ export function BridgeChatPanel() {
 
 // ─── empty state ────────────────────────────────────
 
-function EmptyState({ onPick }: { onPick: (q: string) => void }) {
+function EmptyState({ onPick, stats }: { onPick: (q: string) => void; stats: Record<string, number> | null }) {
+  // 동적 카운트 — modeling.graph_stats 응답 그대로 (하드코딩 0건)
+  const statsLine = stats
+    ? Object.entries(stats)
+        .filter(([, c]) => c > 0)
+        .map(([k, c]) => `${c} ${k}`)
+        .join(" · ")
+    : "loading...";
+
   return (
     <div className="max-w-2xl mx-auto py-12 text-center">
       <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
         <MessageSquare size={28} className="text-primary" />
       </div>
       <h3 className="text-lg font-semibold mb-2">무엇을 도와드릴까요?</h3>
-      <p className="text-sm text-muted-foreground mb-6">
-        ontology 에 등록된 <b>198 method · 14 Table · 14 Standard · 12 Step · 19 Term</b> 에 자연어로 질문하세요.
+      <p className="text-sm text-muted-foreground mb-1">
+        ontology 에 자연어로 질문하세요.
       </p>
+      <p className="text-[11px] text-muted-foreground mb-6 font-mono">
+        현재 등록: <b>{statsLine}</b>
+      </p>
+      <div className="text-[11px] text-muted-foreground mb-2">💡 패턴 예시 (밑줄 자리에 원하는 용어/식별자 입력)</div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-xl mx-auto">
-        {SAMPLE_PROMPTS.map((p, i) => (
+        {GENERIC_PATTERNS.map((p, i) => (
           <button
             key={i}
-            onClick={() => onPick(p)}
+            onClick={() => onPick(p.template)}
             className="text-left text-[12px] rounded-lg border border-border bg-card hover:border-primary/40 hover:bg-muted/40 p-3 transition-all flex items-start gap-2"
           >
             <Lightbulb size={14} className="text-primary mt-0.5 flex-shrink-0" />
-            <span>{p}</span>
+            <div>
+              <div className="text-[10px] font-semibold text-primary">{p.label}</div>
+              <div className="text-[11px] text-foreground/80 mt-0.5">{p.template}</div>
+            </div>
           </button>
         ))}
       </div>

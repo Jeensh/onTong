@@ -1,23 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Flame, Loader2, Play, RotateCcw, Code2 } from "lucide-react";
+import { Flame, Loader2, Play, RotateCcw, Code2, MessageSquare } from "lucide-react";
 import { runCodeImpact, type StreamEvent, type AgentFinalPayload } from "@/lib/section3/api";
 import { StreamTimeline } from "./rich/StreamTimeline";
 import { RichResultCard } from "./rich/RichResultCard";
 
-const METHOD_PRESETS = [
-  "calculateThickness",
-  "calculatePrimaryWidthRange",
-  "calculatePrimaryLengthRange",
-  "calculateSplitCount",
-  "calculateUnitCountAndTargetWeight",
-  "calculateTargetWidth",
-];
-
 export function CodeImpactPanel() {
   const [targetKind, setTargetKind] = useState<"method" | "class" | "column">("method");
-  const [targetId, setTargetId] = useState("calculateThickness");
+  const [targetId, setTargetId] = useState("");
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [finalPayload, setFinalPayload] = useState<AgentFinalPayload | null>(null);
   const [running, setRunning] = useState(false);
@@ -77,22 +68,16 @@ export function CodeImpactPanel() {
               <input
                 value={targetId}
                 onChange={(e) => setTargetId(e.target.value)}
-                placeholder="예: calculateThickness"
+                placeholder={targetKind === "method" ? "method 이름 (자연어로 검색하려면 → 브릿지 chat)" : `${targetKind} id`}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono focus:border-primary outline-none"
               />
-              {targetKind === "method" && (
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  {METHOD_PRESETS.map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => setTargetId(m)}
-                      className={`text-[10px] px-2 py-0.5 rounded-full border font-mono ${targetId === m ? "border-orange-500 bg-orange-50 text-orange-700" : "border-border bg-muted text-muted-foreground"}`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <p className="text-[10px] text-muted-foreground mt-1.5 flex items-start gap-1">
+                <MessageSquare size={11} className="flex-shrink-0 mt-0.5" />
+                <span>
+                  id 모르면 <b>온톨로지 브릿지 agent</b> 에서 자연어로 검색
+                  → 검색 결과의 method 이름을 그대로 여기 붙여넣으면 됩니다.
+                </span>
+              </p>
             </div>
 
             <div className="flex gap-2">
