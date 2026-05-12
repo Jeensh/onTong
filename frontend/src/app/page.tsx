@@ -16,9 +16,10 @@ import { useWorkspaceStore } from "@/lib/workspace/useWorkspaceStore";
 import { SectionNav } from "@/components/sections/SectionNav";
 import { ModelingSection } from "@/components/sections/ModelingSection";
 import { useUrlSync } from "@/components/sections/modeling/useUrlSync";
-import { SimulationSection } from "@/components/simulation/SimulationSection";
+import { Section3Section } from "@/components/section3/Section3Section";
 // 2026-05-02 C6 Phase 1: Modeling Workbench React 구현 시작.
-// 2026-05-10: Simulation 섹션 jyu 통합.
+// 2026-05-12: Section 3 zero 재개편 — 4 agent (bridge chat / sandbox / code-impact / data-impact)
+// modeling API 응답 baseline. backend/section3/ + components/section3/ 신설.
 import { FolderTree, Sparkles, PanelRightClose, FileText, MessageSquare } from "lucide-react";
 
 function readBool(key: string, fallback: boolean): boolean {
@@ -301,7 +302,7 @@ export default function Home() {
         ))}
 
         {activeSection === "modeling" && <ModelingSection />}
-        {activeSection === "simulation" && <SimulationSection />}
+        {activeSection === "simulation" && <Section3Section />}
       </div>
 
       {/* Floating popout AI window */}

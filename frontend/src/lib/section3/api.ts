@@ -1,0 +1,189 @@
+/**
+ * Section 3 — backend API client.
+ *
+ * 모든 agent endpoint 는 SSE (text/event-stream) 스트리밍. fetch + ReadableStream 으로
+ * event 단위 파싱.
+ */
+
+export type StreamEvent =
+  | { type: "thinking"; payload: { message: string }; timestamp: string }
+  | { type: "intent_classification"; payload: IntentClassificationPayload; timestamp: string }
+  | { type: "modeling_call"; payload: { intent: string; parameters: Record<string, unknown> }; timestamp: string }
+  | { type: "modeling_result"; payload: { response: ModelingResponse }; timestamp: string }
+  | { type: "layer_scan"; payload: { layer: string; items: Array<Record<string, unknown>> }; timestamp: string }
+  | { type: "code_gen"; payload: { source: string }; timestamp: string }
+  | { type: "sandbox_run"; payload: { message: string }; timestamp: string }
+  | { type: "sandbox_result"; payload: { result: SandboxCaseResult[] }; timestamp: string }
+  | { type: "final"; payload: AgentFinalPayload; timestamp: string }
+  | { type: "error"; payload: { message: string; [k: string]: unknown }; timestamp: string }
+  | { type: "need_more_info"; payload: { missing_info: MissingInfo }; timestamp: string };
+
+export interface IntentClassificationPayload {
+  modeling_intent: "impact_analysis" | "simulate" | "explain";
+  parameters: Record<string, unknown>;
+  confidence: number;
+  reasoning: string;
+  suggested_followups: string[];
+}
+
+export interface ModelingResponse {
+  request_id: string;
+  status: string;
+  confidence?: number;
+  result?: Record<string, unknown> | null;
+  missing_info?: MissingInfo | null;
+  timestamp?: string;
+}
+
+export interface MissingInfo {
+  reason: string;
+  questions: Array<{
+    field: string;
+    question: string;
+    input_type: "text" | "select" | "number" | "boolean";
+    options?: Array<{ id: string; label: string }>;
+    default_value?: unknown;
+  }>;
+}
+
+export interface SandboxCaseResult {
+  case_id: string;
+  case_type: "normal" | "boundary" | "error";
+  input: Record<string, unknown>;
+  expected_output: Record<string, unknown> | null;
+  execution: {
+    ok: boolean;
+    result: Record<string, unknown> | null;
+    stdout: string;
+    stderr: string;
+    elapsed_sec: number;
+    error: string | null;
+    returncode: number;
+  };
+  matched_expected: boolean | null;
+}
+
+export interface AgentFinalPayload {
+  ok: boolean;
+  summary: string;
+  modeling_response?: ModelingResponse | null;
+  generated_python?: string | null;
+  sandbox_result?: {
+    cases: SandboxCaseResult[];
+    ok_count: number;
+    matched_count: number;
+  } | null;
+  visualization?: {
+    nodes?: Array<{ id: string; label: string; group: string }>;
+    edges?: Array<{ from: string; to: string; label?: string }>;
+    cypher?: string;
+  } | null;
+  error?: string | null;
+}
+
+// ─── SSE consumer ───────────────────────────────────────────
+
+/** POST + SSE 응답 파싱. event 단위로 콜백. */
+export async function streamSSE(
+  url: string,
+  body: unknown,
+  onEvent: (ev: StreamEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!resp.ok || !resp.body) {
+    throw new Error(`SSE fetch failed: ${resp.status} ${await resp.text()}`);
+  }
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+
+    // SSE 는 `\n\n` 으로 event 구분
+    let idx;
+    while ((idx = buf.indexOf("\n\n")) >= 0) {
+      const chunk = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      const ev = parseSSEChunk(chunk);
+      if (ev) onEvent(ev);
+    }
+  }
+}
+
+function parseSSEChunk(chunk: string): StreamEvent | null {
+  const lines = chunk.split("\n");
+  let dataLine = "";
+  for (const ln of lines) {
+    if (ln.startsWith("data:")) {
+      dataLine = ln.slice(5).trim();
+    }
+  }
+  if (!dataLine) return null;
+  try {
+    return JSON.parse(dataLine) as StreamEvent;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Endpoint wrappers ──────────────────────────────────────
+
+const BASE = "/api/section3";
+
+export interface ChatBody {
+  message: string;
+  history?: Array<{ role: "user" | "assistant" | "system"; content: string; timestamp?: string }>;
+  session_id?: string;
+}
+
+export interface SandboxBody {
+  target_kind: "step" | "method" | "class";
+  target_id: string;
+  case_types?: Array<"normal" | "boundary" | "error">;
+  run_after_generate?: boolean;
+}
+
+export interface CodeImpactBody {
+  target_kind: "method" | "class" | "column";
+  target_id: string;
+}
+
+export interface DataImpactBody {
+  target_kind: "table" | "standard_value" | "order";
+  target_id: string;
+}
+
+export function chat(body: ChatBody, onEvent: (ev: StreamEvent) => void, signal?: AbortSignal) {
+  return streamSSE(`${BASE}/chat`, body, onEvent, signal);
+}
+export function runSandbox(body: SandboxBody, onEvent: (ev: StreamEvent) => void, signal?: AbortSignal) {
+  return streamSSE(`${BASE}/sandbox/run`, body, onEvent, signal);
+}
+export function runCodeImpact(body: CodeImpactBody, onEvent: (ev: StreamEvent) => void, signal?: AbortSignal) {
+  return streamSSE(`${BASE}/code-impact`, body, onEvent, signal);
+}
+export function runDataImpact(body: DataImpactBody, onEvent: (ev: StreamEvent) => void, signal?: AbortSignal) {
+  return streamSSE(`${BASE}/data-impact`, body, onEvent, signal);
+}
+
+export async function getStats(): Promise<{ nodes: Record<string, number>; relations: Record<string, number>; totals?: Record<string, number> }> {
+  const r = await fetch(`${BASE}/stats`);
+  if (!r.ok) throw new Error(`stats: ${r.status}`);
+  return r.json();
+}
+
+export async function termSearch(q: string): Promise<Array<{ id: string; name: string; english?: string; category?: string; description?: string }>> {
+  const r = await fetch(`${BASE}/term-search?q=${encodeURIComponent(q)}`);
+  if (!r.ok) throw new Error(`term-search: ${r.status}`);
+  const body = await r.json();
+  return body.items ?? [];
+}
