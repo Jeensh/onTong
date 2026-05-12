@@ -11,29 +11,31 @@
  */
 
 import { useEffect, useState } from "react";
-import { MessageSquare, Beaker, Flame, Database, Zap } from "lucide-react";
+import { MessageSquare, Beaker, Flame, Database, Zap, Activity } from "lucide-react";
 import { BridgeChatPanel } from "./BridgeChatPanel";
 import { SandboxPanel } from "./SandboxPanel";
 import { CodeImpactPanel } from "./CodeImpactPanel";
 import { DataImpactPanel } from "./DataImpactPanel";
+import { DashboardPanel } from "./DashboardPanel";
 
-type View = "bridge" | "sandbox" | "code-impact" | "data-impact";
+type View = "dashboard" | "bridge" | "sandbox" | "code-impact" | "data-impact";
 
 const NAV: Array<{ id: View; label: string; icon: React.ReactNode; description: string }> = [
+  { id: "dashboard", label: "대시보드", icon: <Activity size={16} />, description: "ontology 통계 + 빠른 진입" },
   { id: "bridge", label: "온톨로지 브릿지 agent", icon: <MessageSquare size={16} />, description: "자연어 chat — 의도 분석 + 4 기능 orchestration" },
   { id: "sandbox", label: "샌드박스", icon: <Beaker size={16} />, description: "테스트 데이터 생성 + 안전 가상 실행" },
   { id: "code-impact", label: "영향도 분석", icon: <Flame size={16} />, description: "코드 변경 (method/class)" },
   { id: "data-impact", label: "데이터 변경 분석", icon: <Database size={16} />, description: "기준 (Standard) / Table / 주문" },
 ];
 
-const VALID: View[] = ["bridge", "sandbox", "code-impact", "data-impact"];
+const VALID: View[] = ["dashboard", "bridge", "sandbox", "code-impact", "data-impact"];
 
 function readInitial(): View {
-  if (typeof window === "undefined") return "bridge";
+  if (typeof window === "undefined") return "dashboard";
   const params = new URLSearchParams(window.location.search);
   const v = params.get("view");
   if (v && (VALID as string[]).includes(v)) return v as View;
-  return "bridge";
+  return "dashboard";
 }
 
 export function Section3Section() {
@@ -89,6 +91,7 @@ export function Section3Section() {
 
       {/* Main panel */}
       <div className="flex-1 overflow-hidden">
+        {active === "dashboard" && <DashboardPanel onJump={(v) => setActive(v)} />}
         {active === "bridge" && <BridgeChatPanel />}
         {active === "sandbox" && <SandboxPanel />}
         {active === "code-impact" && <CodeImpactPanel />}

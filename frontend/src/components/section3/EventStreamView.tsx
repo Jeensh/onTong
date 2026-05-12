@@ -5,10 +5,10 @@
  * 4 nav 의 panel 들이 공통으로 사용.
  */
 
-import { useMemo } from "react";
 import type { StreamEvent } from "@/lib/section3/api";
 import { ChevronDown, ChevronRight, Layers, Brain, Server, Code2, Play, CheckCircle2, AlertCircle, HelpCircle } from "lucide-react";
 import { useState } from "react";
+import { OntologyGraphSVG } from "./OntologyGraphSVG";
 
 const EVENT_META: Record<string, { label: string; tone: string; icon: React.ReactNode }> = {
   thinking: { label: "사고 중", tone: "border-slate-300 bg-slate-50 text-slate-700", icon: <Brain size={14} /> },
@@ -138,18 +138,28 @@ function EventBody({ event }: { event: StreamEvent }) {
       );
     case "final":
       return (
-        <div className="space-y-2">
-          <div className="font-semibold">{event.payload.summary}</div>
-          {event.payload.visualization?.cypher && (
-            <details>
-              <summary className="cursor-pointer text-muted-foreground">▶ Cypher 쿼리 (modeling 이 실행한 것)</summary>
-              <pre className="mt-1 bg-background border rounded p-2 overflow-x-auto text-[10px]">{event.payload.visualization.cypher}</pre>
-            </details>
-          )}
+        <div className="space-y-3">
+          <div className="text-sm font-semibold text-foreground bg-primary/10 rounded p-2 border border-primary/20">
+            ✅ {event.payload.summary}
+          </div>
           {event.payload.visualization?.nodes && event.payload.visualization.nodes.length > 0 && (
+            <div>
+              <div className="text-[11px] font-semibold text-muted-foreground mb-1 uppercase tracking-wide">
+                🗺 Ontology Graph — {event.payload.visualization.nodes.length} nodes · {event.payload.visualization.edges?.length ?? 0} edges
+              </div>
+              <OntologyGraphSVG
+                nodes={event.payload.visualization.nodes}
+                edges={event.payload.visualization.edges ?? []}
+                cypher={event.payload.visualization.cypher}
+              />
+            </div>
+          )}
+          {event.payload.generated_python && (
             <details>
-              <summary className="cursor-pointer text-muted-foreground">▶ ontology nodes ({event.payload.visualization.nodes.length}) + edges ({event.payload.visualization.edges?.length ?? 0})</summary>
-              <pre className="mt-1 bg-background border rounded p-2 overflow-x-auto text-[10px] max-h-60">{JSON.stringify({ nodes: event.payload.visualization.nodes, edges: event.payload.visualization.edges }, null, 2)}</pre>
+              <summary className="cursor-pointer text-muted-foreground text-[11px] font-medium">▶ 합성된 Python 코드</summary>
+              <pre className="mt-1 bg-slate-900 text-slate-100 rounded p-2 overflow-x-auto text-[10px]">
+                <code>{event.payload.generated_python}</code>
+              </pre>
             </details>
           )}
         </div>

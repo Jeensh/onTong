@@ -14,6 +14,7 @@ interface ChatTurn {
   role: "user" | "assistant";
   content: string;
   events?: StreamEvent[];
+  followups?: string[];
 }
 
 export function BridgeChatPanel() {
@@ -28,29 +29,31 @@ export function BridgeChatPanel() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [turns, activeEvents]);
 
-  const submit = async () => {
-    if (!input.trim() || running) return;
-    const userMsg = input.trim();
-    setInput("");
+  const submit = async (override?: string) => {
+    const text = (override ?? input).trim();
+    if (!text || running) return;
+    if (!override) setInput("");
     setRunning(true);
     setActiveEvents([]);
 
-    const newTurns = [...turns, { role: "user" as const, content: userMsg }];
+    const newTurns = [...turns, { role: "user" as const, content: text }];
     setTurns(newTurns);
 
     abortRef.current = new AbortController();
     const collected: StreamEvent[] = [];
     let finalSummary = "";
+    let followups: string[] = [];
 
     try {
       await chat(
         {
-          message: userMsg,
+          message: text,
           history: newTurns.slice(0, -1).map((t) => ({ role: t.role, content: t.content })),
         },
         (ev) => {
           collected.push(ev);
           setActiveEvents([...collected]);
+          if (ev.type === "intent_classification") followups = ev.payload.suggested_followups ?? [];
           if (ev.type === "final") finalSummary = ev.payload.summary;
           if (ev.type === "error") finalSummary = "⚠ " + ev.payload.message;
           if (ev.type === "need_more_info") finalSummary = "ℹ " + ev.payload.missing_info.reason;
@@ -61,7 +64,7 @@ export function BridgeChatPanel() {
       finalSummary = `요청 실패: ${e instanceof Error ? e.message : String(e)}`;
     }
 
-    setTurns((prev) => [...prev, { role: "assistant", content: finalSummary || "(응답 없음)", events: collected }]);
+    setTurns((prev) => [...prev, { role: "assistant", content: finalSummary || "(응답 없음)", events: collected, followups }]);
     setActiveEvents([]);
     setRunning(false);
   };
@@ -87,16 +90,33 @@ export function BridgeChatPanel() {
           </div>
         )}
         {turns.map((t, i) => (
-          <div key={i} className={`flex ${t.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[80%] ${t.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"} rounded-lg px-4 py-2`}>
-              <div className="text-sm">{t.content}</div>
-              {t.events && t.events.length > 0 && (
-                <details className="mt-2">
-                  <summary className="cursor-pointer text-[11px] opacity-70 hover:opacity-100">▶ trace ({t.events.length} events)</summary>
-                  <div className="mt-2"><EventStreamView events={t.events} /></div>
-                </details>
-              )}
+          <div key={i}>
+            <div className={`flex ${t.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[85%] ${t.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"} rounded-lg px-4 py-2`}>
+                <div className="text-sm">{t.content}</div>
+                {t.events && t.events.length > 0 && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-[11px] opacity-70 hover:opacity-100">▶ trace ({t.events.length} events)</summary>
+                    <div className="mt-2"><EventStreamView events={t.events} /></div>
+                  </details>
+                )}
+              </div>
             </div>
+            {t.role === "assistant" && t.followups && t.followups.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2 ml-2">
+                <span className="text-[10px] text-muted-foreground self-center">💡 다음 질문:</span>
+                {t.followups.map((q, j) => (
+                  <button
+                    key={j}
+                    onClick={() => submit(q)}
+                    disabled={running}
+                    className="text-[11px] px-2.5 py-1 rounded-full border border-primary/30 bg-primary/5 hover:bg-primary/15 text-primary disabled:opacity-50"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ))}
         {activeEvents.length > 0 && (
@@ -120,7 +140,7 @@ export function BridgeChatPanel() {
             className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
           />
           <button
-            onClick={submit}
+            onClick={() => submit()}
             disabled={running || !input.trim()}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
           >
