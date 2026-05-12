@@ -107,7 +107,7 @@ export function RichResultCard({ result, highlightMethod }: Props) {
 
       {/* ── ontology graph ───────────────────────────────── */}
       {result.visualization?.nodes && result.visualization.nodes.length > 0 && (
-        <Section title="🗺 Ontology Graph" subtitle={`${result.visualization.nodes.length} nodes · ${result.visualization.edges?.length ?? 0} edges`}>
+        <Section title="🗺 Ontology Graph" subtitle={`${result.visualization.nodes.length} nodes · ${result.visualization.edges?.length ?? 0} edges`} delay={0.05}>
           <OntologyGraphSVG
             nodes={result.visualization.nodes}
             edges={result.visualization.edges ?? []}
@@ -118,7 +118,7 @@ export function RichResultCard({ result, highlightMethod }: Props) {
 
       {/* ── 코드 파일 트리 ───────────────────────────────── */}
       {(sourceLocations.length > 0 || directMethods.length > 0) && (
-        <Section title="📁 스캔된 코드 위치">
+        <Section title="📁 스캔된 코드 위치" delay={0.15}>
           <FileTreeView
             sources={sourceLocations}
             methods={directMethods}
@@ -129,7 +129,7 @@ export function RichResultCard({ result, highlightMethod }: Props) {
 
       {/* ── 영향 받는 Step / process / data 테이블 ────── */}
       {(affectedSteps.length > 0 || downstreamSteps.length > 0 || processLocations.length > 0) && (
-        <Section title="🛤 영향 받는 Step">
+        <Section title="🛤 영향 받는 Step" delay={0.25}>
           {affectedSteps.length > 0 && (
             <div className="mb-2">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">직접 영향 (Direct)</div>
@@ -153,14 +153,14 @@ export function RichResultCard({ result, highlightMethod }: Props) {
 
       {/* ── 데이터 위치 ──────────────────────────────────── */}
       {dataLocations.length > 0 && (
-        <Section title="🗄 데이터 위치">
+        <Section title="🗄 데이터 위치" delay={0.35}>
           <DataTable rows={dataLocations} preferredColumns={["table_name", "standard_code", "schema_name"]} />
         </Section>
       )}
 
       {/* ── 테스트 케이스 (simulate) ────────────────────── */}
       {testCases.length > 0 && (
-        <Section title="🧪 생성된 테스트 케이스" subtitle={`normal/boundary/error 케이스 ${testCases.length}건`}>
+        <Section title="🧪 생성된 테스트 케이스" subtitle={`normal/boundary/error 케이스 ${testCases.length}건`} delay={0.45}>
           <DataTable
             rows={testCases}
             preferredColumns={["case_id", "case_type", "input", "expected_output", "description"]}
@@ -182,7 +182,7 @@ export function RichResultCard({ result, highlightMethod }: Props) {
 
       {/* ── sandbox 실행 결과 ──────────────────────────── */}
       {sandboxCases.length > 0 && (
-        <Section title="▶ Sandbox 실행 결과" subtitle={`${result.sandbox_result?.ok_count}/${sandboxCases.length} 성공 · ${result.sandbox_result?.matched_count} expected 일치`}>
+        <Section title="▶ Sandbox 실행 결과" subtitle={`${result.sandbox_result?.ok_count}/${sandboxCases.length} 성공 · ${result.sandbox_result?.matched_count} expected 일치`} delay={0.55}>
           <DataTable
             rows={sandboxCases.map((c) => ({
               case_id: c.case_id,
@@ -212,7 +212,7 @@ export function RichResultCard({ result, highlightMethod }: Props) {
 
       {/* ── 데이터 의존성 chips ───────────────────────── */}
       {dataDeps.length > 0 && (
-        <Section title="📦 Data dependencies">
+        <Section title="📦 Data dependencies" delay={0.65}>
           <div className="flex flex-wrap gap-1.5">
             {dataDeps.map((d, i) => (
               <span key={i} className="inline-flex items-center gap-1 rounded bg-orange-100 text-orange-800 border border-orange-300 px-2 py-0.5 text-[11px] font-mono">
@@ -226,14 +226,14 @@ export function RichResultCard({ result, highlightMethod }: Props) {
 
       {/* ── 합성 Python 코드 ─────────────────────────── */}
       {result.generated_python && (
-        <Section title="🐍 합성된 Python 코드" subtitle="modeling 응답 메타만으로 LLM 이 합성 (slab-design 참조 0건)">
+        <Section title="🐍 합성된 Python 코드" subtitle="modeling 응답 메타만으로 LLM 이 합성 (slab-design 참조 0건)" delay={0.75}>
           <CodeBlock code={result.generated_python} language="python" filename="generated.py" />
         </Section>
       )}
 
       {/* ── Cypher ───────────────────────────────────── */}
       {result.visualization?.cypher && (
-        <Section title="🔎 Cypher (modeling 이 실행)">
+        <Section title="🔎 Cypher (modeling 이 실행)" delay={0.85}>
           <CodeBlock code={result.visualization.cypher} language="cypher" maxHeight={200} showLineNumbers={false} />
         </Section>
       )}
@@ -241,9 +241,9 @@ export function RichResultCard({ result, highlightMethod }: Props) {
   );
 }
 
-function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+function Section({ title, subtitle, children, delay = 0 }: { title: string; subtitle?: string; children: React.ReactNode; delay?: number }) {
   return (
-    <div>
+    <div className="section3-anim-section" style={{ animationDelay: `${delay}s` }}>
       <div className="flex items-baseline gap-2 mb-1.5">
         <Network size={11} className="text-primary" />
         <h4 className="text-[12px] font-bold text-foreground">{title}</h4>

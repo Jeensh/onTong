@@ -386,3 +386,33 @@
 .wiki-link:hover {
   background-color: color-mix(in oklch, var(--primary) 20%, transparent);
 }
+/* ─── Section 3 — Stream / RichResult 등장 애니메이션 ───────── */
+@keyframes section3-slide-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes section3-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes section3-dot-pop {
+  0%   { opacity: 0; transform: scale(0.3); }
+  60%  { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes section3-typing-dots {
+  0%, 60%, 100% { opacity: 0.2; transform: translateY(0); }
+  30%          { opacity: 1;   transform: translateY(-3px); }
+}
+.section3-anim-row {
+  animation: section3-slide-up 0.32s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.section3-anim-dot {
+  animation: section3-dot-pop 0.32s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.section3-anim-section {
+  animation: section3-slide-up 0.42s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.section3-typing-dot {
+  animation: section3-typing-dots 1.4s ease-in-out infinite;
+}

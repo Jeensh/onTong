@@ -334,19 +334,43 @@ function TurnView({ turn, expanded, onToggleExpand, onFollowup, running }: {
 
 // ─── active streaming card ──────────────────────────
 
+const PHASE_LABEL: Record<string, string> = {
+  thinking: "사고 중",
+  intent_classification: "의도 분석",
+  modeling_call: "modeling API 호출",
+  modeling_result: "응답 수신",
+  layer_scan: "Layer 스캔",
+  code_gen: "Python 합성",
+  sandbox_run: "Sandbox 실행",
+  sandbox_result: "결과 수집",
+  final: "완료",
+  error: "오류",
+  need_more_info: "추가 정보 필요",
+};
+
 function ActiveStreamCard({ events }: { events: StreamEvent[] }) {
   const last = events[events.length - 1];
+  const phase = last?.type ? PHASE_LABEL[last.type] ?? last.type : "—";
   return (
     <div className="flex gap-2 items-start">
       <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-primary/60 text-primary-foreground flex items-center justify-center flex-shrink-0 animate-pulse">
         <Bot size={14} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="rounded-2xl rounded-tl-sm bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/20 p-3">
-          <div className="flex items-center gap-2 text-[11px] text-primary mb-2">
-            <Loader2 size={12} className="animate-spin" />
-            <span className="font-semibold">처리 중...</span>
-            <span className="text-muted-foreground">현재 단계: {last?.type ?? "—"}</span>
+        <div className="rounded-2xl rounded-tl-sm bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/20 p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-[12px] mb-3">
+            <Loader2 size={14} className="animate-spin text-primary" />
+            <span className="font-bold text-primary">처리 중</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-primary/80 font-medium">{phase}</span>
+            <span className="inline-flex gap-0.5 ml-1">
+              <span className="w-1 h-1 rounded-full bg-primary section3-typing-dot" style={{ animationDelay: "0s" }} />
+              <span className="w-1 h-1 rounded-full bg-primary section3-typing-dot" style={{ animationDelay: "0.2s" }} />
+              <span className="w-1 h-1 rounded-full bg-primary section3-typing-dot" style={{ animationDelay: "0.4s" }} />
+            </span>
+            <span className="ml-auto text-[10px] text-muted-foreground">
+              {events.length}개 단계 완료
+            </span>
           </div>
           <StreamTimeline events={events} active />
         </div>

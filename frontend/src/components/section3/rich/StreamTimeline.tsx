@@ -49,6 +49,12 @@ export function StreamTimeline({ events, active = false }: Props) {
           const isActive = active && isLast && ev.type !== "final" && ev.type !== "error" && ev.type !== "need_more_info";
           return <TimelineRow key={i} event={ev} index={i} active={isActive} />;
         })}
+        {/* typing 표시 — 마지막 event 가 final/error 가 아닐 때만 다음 phase 가 오고 있음을 시사 */}
+        {active && events.length > 0 && (() => {
+          const last = events[events.length - 1];
+          if (last.type === "final" || last.type === "error" || last.type === "need_more_info") return null;
+          return <TypingIndicator />;
+        })()}
       </div>
     </div>
   );
@@ -62,9 +68,11 @@ function TimelineRow({ event, index, active }: { event: StreamEvent; index: numb
   );
 
   return (
-    <div className="relative pl-9">
+    <div className="relative pl-9 section3-anim-row" style={{ animationDelay: `${Math.min(index * 0.02, 0.1)}s` }}>
       {/* dot */}
-      <div className={`absolute left-0 top-1 w-6 h-6 rounded-full flex items-center justify-center text-white ${meta.tone} ${active ? `ring-4 ${meta.ringTone} animate-pulse` : "ring-2 ring-background"}`}>
+      <div
+        className={`absolute left-0 top-1 w-6 h-6 rounded-full flex items-center justify-center text-white section3-anim-dot ${meta.tone} ${active ? `ring-4 ${meta.ringTone} animate-pulse` : "ring-2 ring-background"}`}
+      >
         {meta.icon}
       </div>
 
@@ -80,10 +88,27 @@ function TimelineRow({ event, index, active }: { event: StreamEvent; index: numb
           {active && <span className="text-[9px] text-primary animate-pulse">●</span>}
         </button>
         {open && hasBody && (
-          <div className="border-t border-border bg-muted/30 p-3">
+          <div className="border-t border-border bg-muted/30 p-3 section3-anim-section">
             <EventBody event={event} />
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** 마지막 event 다음에 떠 있는 "다음 phase 오는 중" 점멸 indicator. */
+function TypingIndicator() {
+  return (
+    <div className="relative pl-9 section3-anim-row">
+      <div className="absolute left-0 top-1 w-6 h-6 rounded-full bg-muted border-2 border-dashed border-primary/40 flex items-center justify-center" />
+      <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-muted/40 border border-border rounded-lg">
+        <span className="text-[11px] text-muted-foreground">다음 단계</span>
+        <span className="inline-flex gap-0.5">
+          <span className="w-1 h-1 rounded-full bg-primary/70 section3-typing-dot" style={{ animationDelay: "0s" }} />
+          <span className="w-1 h-1 rounded-full bg-primary/70 section3-typing-dot" style={{ animationDelay: "0.2s" }} />
+          <span className="w-1 h-1 rounded-full bg-primary/70 section3-typing-dot" style={{ animationDelay: "0.4s" }} />
+        </span>
       </div>
     </div>
   );
