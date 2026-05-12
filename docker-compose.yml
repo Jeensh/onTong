@@ -112,31 +112,19 @@ services:
   # Neo4j - Graph Database for Section 2 Modeling
   neo4j:
     image: neo4j:5-community
-    container_name: ontong-neo4j
     ports:
       - "7474:7474"
       - "7687:7687"
     environment:
-      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-ontong_password_2026}
-      - NEO4J_PLUGINS=["apoc"]
-      - NEO4J_dbms_memory_heap_initial__size=512m
-      - NEO4J_dbms_memory_heap_max__size=2G
-      - NEO4J_dbms_memory_pagecache_size=512m
-      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-ontong_password_2026}
+      NEO4J_PLUGINS: '["apoc"]'
     volumes:
       - neo4j_data:/data
-      - neo4j_logs:/logs
-      - ./backend/modeling/ontology/schema/imports:/var/lib/neo4j/import
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      test: ["CMD", "neo4j", "status"]
       interval: 10s
       timeout: 5s
       retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 3G
     restart: unless-stopped
 
   # ChromaDB - Vector Database for RAG
@@ -182,24 +170,6 @@ services:
     profiles:
       - monitoring
 
-  # PostgreSQL — Section 3 (Simulation) 마스터 데이터 + 주문 (slab-design JPA 미러)
-  simulation-postgres:
-    image: postgres:16-alpine
-    container_name: ontong-simulation-postgres
-    environment:
-      POSTGRES_USER: ${SIM_DB_USER:-simulation}
-      POSTGRES_PASSWORD: ${SIM_DB_PASSWORD:-simulation_dev}
-      POSTGRES_DB: ${SIM_DB_NAME:-simulation}
-    volumes:
-      - simulation_postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5434:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${SIM_DB_USER:-simulation}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # Langfuse - LLM Monitoring & Observability (optional)
   langfuse:
     image: langfuse/langfuse:latest
@@ -227,9 +197,7 @@ volumes:
   chroma_data:
   redis_data:
   neo4j_data:
-  neo4j_logs:
   postgres_data:
-  simulation_postgres_data:
   backend_logs:
 
 networks:
