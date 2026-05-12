@@ -25,20 +25,21 @@
 | B-3 prompt | ✅ | `d0c2f19` |
 | B-4 API + SSE | ✅ | `f1c58fc` |
 | B-5 TS types | ✅ | `23f4d14` |
-| B-6 store rename | ⏸ pending | — |
-| B-7 ExtractedView branch | ⏸ pending | — |
-| B-8 disable downstream | ⏸ pending | — |
-| B-9 SelectionBanner copy | ⏸ pending | — |
+| B-6 store rename | ✅ | `42c22c2` |
+| B-7 ExtractedView branch | ✅ | `42c22c2` |
+| B-8 disable downstream | ✅ | `42c22c2` |
+| B-9 SelectionBanner copy | ✅ | `42c22c2` |
 
-**Backend 준비 완료**: `/extract` 와 `/extract/stream` 엔드포인트가 `ExtractedClass` discriminated union 반환. @Entity 클래스는 그대로 JPO 추출, 외 클래스는 새 lightweight Generic 추출. LLM 까지 동작.
+**Phase B 완료** (2026-05-13). End-to-end 동작:
+- 사용자가 @Entity 클래스 선택 → 기존 JPO 풀 pipeline (hypothesis/interview/options/.../confirm)
+- 사용자가 @Service / @Controller / POJO 선택 → 새 Generic 추출 후 "추출만 완료, downstream 은 Phase C 에서" 안내
+- 백엔드 replay 는 `jpo` 필드명 유지 (Phase C 에서 자연스럽게 통합), frontend store 는 boundary translation 2 줄로 흡수
 
-**Frontend 상태**: TS types 추가됨. 하지만 store 의 `jpo` 필드 + AuthoringMode 의 `s.jpo` 13곳 + downstream button gating (hypothesis 등) 미완. 현재 빌드 통과하지만 사용자가 non-@Entity 클래스 선택 시 cast 실패로 runtime error 발생 가능 — B-6/B-7/B-8 까지 가야 안전.
+**Q3 결정 채택**: option (a) full rename + translation layer. 적용 결과 frontend 의미 정합 (`s.extracted` 가 정확히 ExtractedClass 를 가리킴), backend 무변경, Phase C 때 자연스럽게 backend 도 정리 예정.
 
-**다음 세션 첫 작업**: B-6. 다음 옵션 중 결정 필요:
-- (a) Full rename `jpo → extracted` in store + AuthoringMode, backend replay `r.current.jpo` 는 translation layer 로 흡수 (`extracted: r.current.jpo`)
-- (b) 타입만 `ExtractedClass | null` 로 바꾸고 변수명은 `jpo` 유지 (안전하지만 semantic mismatch)
-
-Q3 합의는 (a) 이지만 backend replay 의존성 발견했으므로 재확인 권장.
+**다음 세션**: Phase C 진입. 다음 결정 필요:
+- C-1 부터 시작? 아니면 다른 우선순위 작업이 있나?
+- Service / Action 둘 다 같이? 아니면 Service 먼저?
 
 ---
 
