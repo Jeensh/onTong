@@ -38,6 +38,35 @@
 
 ---
 
+## ★ NEW — Build/Rebuild HTTP API 신설 (적재 자동화)
+
+**우선순위**: 🟡 개선 (운영 UX)
+**발견 일자**: 2026-05-12 (사용자 검증 흐름 중)
+
+**현재 상황**:
+- `/api/modeling/ontology/*` 는 **read-only** (query / search / stats)
+- ontology 적재는 **Python 모듈 직접 실행** 필요 (HTTP API 없음):
+  ```
+  python -m backend.modeling.ontology.builders.layer1_business
+  python -m backend.modeling.ontology.builders.layer2_process
+  python -m backend.modeling.ontology.builders.layer3_code
+  python -m backend.modeling.ontology.builders.bridges
+  ```
+- 사용자가 Neo4j volume 을 비우면 Section 3 가 "헛방" 응답 — 적재가 사용자/운영자의 별도 step
+
+**요청**:
+- 옵션 A: `POST /api/modeling/ontology/rebuild` — body 로 `{"layers": ["1","2","3","bridges"]}` 받아 builder 들 sync/async 실행. async 면 SSE 로 progress.
+- 옵션 B: backend startup lifespan 에서 `Neo4j 가 비어있으면 자동 build` (개발 환경 한정 toggle)
+
+**Section 3 측 영향**:
+- 옵션 A 만 있어도 Section 3 가 "데이터 비어있으면 자동으로 rebuild 호출" 같은 UX 가능
+- 사용자 검증 흐름 (volume 삭제 → 재기동 → API 호출 → 결과 확인) 이 한 줄로 단축
+
+**우회 (현재)**:
+- 사용자가 직접 4 builder Python 모듈 실행
+
+---
+
 ## ③ `explain` 의 keyword alias / partial match 강화
 
 **우선순위**: 🟡 개선
