@@ -66,24 +66,11 @@ from backend.modeling.api import queue_actions_api
 from backend.modeling.api import recommend_api
 from backend.modeling.api import repo_import as repo_import_api
 from backend.modeling.persistence.database import bootstrap_database
-# Section 3 — simulation routers (plug-in)
-# spec 03 Run lifecycle (STEP 3b-6) — /api/simulation/runs 의 canonical owner.
-# scenarios_router 의 /runs/{id} (옛 simulation-storage) 와 path 충돌 — spec_router
-# 가 우선이도록 먼저 import + include.
-from backend.simulation.api.spec_router import router as spec_router
-from backend.simulation.api.slab_agent import router as slab_agent_router
-from backend.simulation.api.agents_router import router as agents_router
-from backend.simulation.api.scenarios_router import router as scenarios_router
-from backend.simulation.api.jobs_router import router as jobs_router
-from backend.simulation.api.bridge_router import router as bridge_router
-from backend.simulation.api.transpile_router import router as transpile_router
-from backend.simulation.api.auto_pr_router import router as auto_pr_router
-from backend.simulation.api.seed_router import router as seed_router
-from backend.simulation.api.differential_router import router as differential_router
-# Section 3 — dual ontology source 상태 보고 (STEP 3d-E6, 2026-05-10)
-from backend.simulation.api.ontology_sources_router import router as ontology_sources_router
-# Section 3 — ontology evidence trace (STEP 3f-2, 2026-05-10)
-from backend.simulation.api.ontology_evidence_router import router as ontology_evidence_router
+# 2026-05-12 (Phase 1): Section 3 agent 의 단일 진입점. POST /api/modeling/ontology/query
+# (intent: impact_analysis / simulate / explain) + GET /graph/stats + /term/search.
+from backend.modeling.ontology.api.ontology_router import router as modeling_ontology_query_router
+# Section 3 (simulation) — 2026-05-12 zero 재개편. 옛 simulation router 모두 삭제.
+# 새 구현은 backend/section3/ 에 들어갈 예정 (Phase 2~).
 
 setup_logging(
     level=settings.log_level,
@@ -475,23 +462,10 @@ app.include_router(perspective_api.router)
 app.include_router(queue_actions_api.router)
 # Authoring AI (2026-05-05 — B.5 prototype)
 app.include_router(authoring_api.router)
-# Section 3 — simulation routers (2026-05-10)
-# spec_router 먼저 — /api/simulation/runs 의 spec 03 우선권.
-# scenarios_router 의 옛 /runs/{id} (simulation-storage tag) 와 path 충돌 시 spec_router 가 win.
-app.include_router(spec_router)
-app.include_router(slab_agent_router)
-app.include_router(agents_router)
-app.include_router(scenarios_router)
-app.include_router(jobs_router)
-app.include_router(bridge_router)
-app.include_router(transpile_router)
-app.include_router(auto_pr_router)
-app.include_router(seed_router)
-app.include_router(differential_router)
-# Section 3 — dual ontology source 상태 (STEP 3d-E6)
-app.include_router(ontology_sources_router)
-# Section 3 — ontology evidence (STEP 3f-2)
-app.include_router(ontology_evidence_router)
+# Section 3 (simulation) — 2026-05-12 zero 재개편. 옛 simulation router 모두 삭제.
+# 새 router 는 Phase 2 에서 backend/section3/ 신설 후 등록.
+# Phase 1 (2026-05-12): modeling 의 ontology query router 등록 — Section 3 agent 의 단일 진입점.
+app.include_router(modeling_ontology_query_router)
 
 
 # Global exception handler
