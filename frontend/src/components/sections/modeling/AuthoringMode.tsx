@@ -32,6 +32,8 @@ import type {
   AuthoringSession,
   ConfirmResponse,
   EntityHypothesis,
+  ExtractedClass,
+  ExtractedGenericClass,
   ExtractedJpo,
   ComprehensiveArchive,
   GapAnalysis,
@@ -55,7 +57,7 @@ export function AuthoringMode() {
   const turnNo = useAuthoring((s) => s.turnNo);
   const resumeSession = useAuthoring((s) => s.resumeSession);
   const completedEntities = useAuthoring((s) => s.completedEntities);
-  const currentJpo = useAuthoring((s) => s.jpo);
+  const currentExtracted = useAuthoring((s) => s.extracted);
 
   // P1a-B: if URL contains ?authoring_session=<id>, auto-resume.
   useEffect(() => {
@@ -89,7 +91,7 @@ export function AuthoringMode() {
                 <span>turn {turnNo}</span>
                 <span>
                   entity {completedEntities.length}
-                  {currentJpo ? ` (+1 진행)` : ""}
+                  {currentExtracted ? ` (+1 진행)` : ""}
                 </span>
                 <span>cost ${costUsd.toFixed(4)}</span>
                 {loading && <span className="text-primary">⏳ 진행 중...</span>}
@@ -112,11 +114,11 @@ export function AuthoringMode() {
 
 function SelectionBanner() {
   const session = useAuthoring((s) => s.session);
-  const jpo = useAuthoring((s) => s.jpo);
+  const extracted = useAuthoring((s) => s.extracted);
   const selectedFqn = useWorkbench((s) => s.selectedCodeTypeFqn);
 
   // 가설/인터뷰가 시작된 후엔 banner 안 보이게 — 답변 영역에 집중.
-  if (jpo) return null;
+  if (extracted) return null;
 
   const simpleName = selectedFqn ? selectedFqn.split(".").pop() : null;
   const pkg = selectedFqn ? selectedFqn.replace(/\.[^.]+$/, "") : null;
@@ -132,14 +134,14 @@ function SelectionBanner() {
   if (!selectedFqn) {
     return (
       <div className="px-3 py-2.5 border-b border-amber-400/40 bg-amber-400/5 text-[11.5px] text-amber-300">
-        <div className="font-semibold mb-0.5">📂 좌측에서 JPA Entity 클래스 (<code>@Entity</code>) 선택</div>
+        <div className="font-semibold mb-0.5">📂 좌측에서 Java 클래스 선택</div>
         <div className="text-amber-300/80">
           좌측 패키지 트리 → 패키지 클릭 → <strong>하단 inventory 패널</strong>에서 클래스 클릭.
           <br />
           (선택 없이 ① 코드 추출 시 bundled <code>HrSpecJpo</code> (JPA Entity 데모) 사용)
         </div>
         <div className="text-[10px] text-amber-300/60 mt-1">
-          현재 단계: JPA Entity 추출 · 다음 단계: Service / Action 확장 (roadmap)
+          <code>@Entity</code> = 가설/인터뷰까지 풀 pipeline · 외 클래스 (<code>@Service</code>/<code>@Controller</code>/POJO) = 추출만, hypothesis 는 Phase C 에서 확장
         </div>
       </div>
     );
@@ -163,7 +165,7 @@ function SelectionBanner() {
 
 function Toolbar() {
   const session = useAuthoring((s) => s.session);
-  const jpo = useAuthoring((s) => s.jpo);
+  const extracted = useAuthoring((s) => s.extracted);
   const hypothesis = useAuthoring((s) => s.hypothesis);
   const batch = useAuthoring((s) => s.batch);
   const answers = useAuthoring((s) => s.answers);
@@ -223,16 +225,26 @@ function Toolbar() {
         size="sm"
         variant="outline"
         onClick={onExtract}
-        disabled={loading || !session || !!jpo}
+        disabled={loading || !session || !!extracted}
         title={
           selectedSimpleName
-            ? `JPA Entity 선택: ${selectedSimpleName}`
-            : "좌측 트리에서 JPA Entity 클래스 선택 (없으면 bundled HrSpec 데모). Service/Action 은 roadmap."
+            ? `클래스 선택: ${selectedSimpleName} (자동 분기 — @Entity 면 JPA 풀 pipeline, 외 클래스면 추출만)`
+            : "좌측 트리에서 Java 클래스 선택 (없으면 bundled HrSpec JPA 데모). @Entity 만 가설/인터뷰까지 진행 — 외 클래스는 추출만, Phase C 에서 확장."
         }
       >
         ① 코드 추출{selectedSimpleName && ` (${selectedSimpleName})`}
       </Button>
-      <Button size="sm" variant="outline" onClick={runHypothesize} disabled={loading || !jpo || !!hypothesis}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={runHypothesize}
+        disabled={loading || !extracted || extracted.kind !== "jpo" || !!hypothesis}
+        title={
+          extracted && extracted.kind !== "jpo"
+            ? "Hypothesis 는 JPA Entity 만 지원 (Service/Action 은 roadmap)"
+            : undefined
+        }
+      >
         ② 가설
       </Button>
       <Button size="sm" variant="outline" onClick={runInterview} disabled={loading || !hypothesis || !!batch}>
@@ -285,11 +297,11 @@ function Toolbar() {
 function ComprehensiveArchiveButton() {
   const runComprehensiveArchive = useAuthoring((s) => s.runComprehensiveArchive);
   const completedEntities = useAuthoring((s) => s.completedEntities);
-  const jpo = useAuthoring((s) => s.jpo);
+  const extracted = useAuthoring((s) => s.extracted);
   const loading = useAuthoring((s) => s.loading);
   const activeRepoId = useWorkbench((s) => s.activeRepoId);
 
-  const total = completedEntities.length + (jpo ? 1 : 0);
+  const total = completedEntities.length + (extracted ? 1 : 0);
   if (total < 1) return null;
   // Encourage multi-entity use; meaningful from 2+ entities.
   const ready = total >= 2;
@@ -464,13 +476,13 @@ function CopySessionUrlButton() {
 function NextEntityButton() {
   const startNextEntity = useAuthoring((s) => s.startNextEntity);
   const pickNextEntity = useAuthoring((s) => s.pickNextEntity);
-  const jpo = useAuthoring((s) => s.jpo);
+  const extracted = useAuthoring((s) => s.extracted);
   const archive = useAuthoring((s) => s.archive);
   const persistedFqns = useAuthoring((s) => s.persistedFqns);
   const loading = useAuthoring((s) => s.loading);
   const activeRepoId = useWorkbench((s) => s.activeRepoId);
 
-  if (!jpo) return null;
+  if (!extracted) return null;
   // Encourage post-archive transition; greyed earlier so the user feels
   // the natural sequence (archive → next entity).
   const ready = !!archive || persistedFqns.length > 0;
@@ -738,7 +750,7 @@ function ChatPayload({ m }: { m: ChatMessage }) {
     case "error":
       return <div className="whitespace-pre-wrap">{String(m.payload)}</div>;
     case "extracted":
-      return <ExtractedView jpo={m.payload as ExtractedJpo} />;
+      return <ExtractedView extracted={m.payload as ExtractedClass} />;
     case "hypothesis":
       return <HypothesisView h={m.payload as EntityHypothesis} />;
     case "interview":
@@ -768,7 +780,12 @@ function ChatPayload({ m }: { m: ChatMessage }) {
 
 // ── Per-kind chat renderers (compact — full detail lives in preview) ─────
 
-function ExtractedView({ jpo }: { jpo: ExtractedJpo }) {
+function ExtractedView({ extracted }: { extracted: ExtractedClass }) {
+  if (extracted.kind === "jpo") return <JpoExtractedView jpo={extracted} />;
+  return <GenericExtractedView c={extracted} />;
+}
+
+function JpoExtractedView({ jpo }: { jpo: ExtractedJpo }) {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-0.5">
@@ -780,6 +797,32 @@ function ExtractedView({ jpo }: { jpo: ExtractedJpo }) {
       <div className="text-[11px] text-muted-foreground">
         PK {jpo.pk_columns.length}축 · 컬럼 {jpo.regular_columns.length}개
         {jpo.pk_class && <> · PK class: <code>{jpo.pk_class}</code></>}
+      </div>
+    </div>
+  );
+}
+
+function GenericExtractedView({ c }: { c: ExtractedGenericClass }) {
+  // Pick the most informative class-level annotation for the caplabel.
+  // Falls back to "Java 클래스" when nothing distinctive is present (POJO).
+  const primary = c.class_annotations.find((a) =>
+    /^@(Service|RestController|Controller|Component|Repository|Configuration)\b/.test(a),
+  );
+  const label = primary ? primary.replace(/\(.*$/, "") : "Java 클래스";
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-0.5">
+        {label}
+      </div>
+      <div className="font-semibold text-violet-400 mb-1">{c.class_name}</div>
+      <div className="text-[11px] text-muted-foreground">
+        methods {c.methods_outline.length}개 · fields {c.fields_outline.length}개
+        {c.class_annotations.length > 0 && (
+          <> · annotations: {c.class_annotations.slice(0, 3).join(", ")}{c.class_annotations.length > 3 && " …"}</>
+        )}
+      </div>
+      <div className="text-[10px] text-amber-300/80 mt-1">
+        ⓘ 추출만 완료 — 가설 / 인터뷰 등 downstream 은 JPA Entity 만 지원 (Phase C 에서 확장 예정)
       </div>
     </div>
   );
@@ -1404,12 +1447,12 @@ function CompletedEntitiesPreview() {
       <ol className="space-y-1">
         {completedEntities.map((c, i) => (
           <li
-            key={`${c.jpo.class_name}-${c.completedAt}`}
+            key={`${c.extracted.class_name}-${c.completedAt}`}
             className="border-l-2 border-violet-400/60 pl-2 py-1 text-[11.5px]"
           >
             <div className="flex items-center justify-between gap-2">
               <strong className="text-violet-300">
-                {i + 1}. {c.jpo.class_name}
+                {i + 1}. {c.extracted.class_name}
               </strong>
               <span className="text-[10px] text-muted-foreground">
                 {new Date(c.completedAt).toLocaleTimeString("ko-KR", {

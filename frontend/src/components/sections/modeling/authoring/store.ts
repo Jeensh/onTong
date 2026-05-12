@@ -16,6 +16,7 @@ import {
   type ArchiveDocument,
   type AuthoringSession,
   type EntityHypothesis,
+  type ExtractedClass,
   type ExtractedJpo,
   type GapAnalysis,
   type InterviewBatch,
@@ -96,7 +97,10 @@ export interface ActiveToolTrace {
  *  Pushed when the user clicks "다음 Entity". `messages` / `costUsd` /
  *  `turnNo` are session-level, not per-entity, so they live elsewhere. */
 export interface CompletedEntityCycle {
-  jpo: ExtractedJpo;
+  /** Extracted code outline — JPA Entity (kind="jpo", full schema) or
+   *  Generic (kind="generic", outline only). Phase B rename: this used to
+   *  be `jpo: ExtractedJpo` when only JPA Entity was supported. */
+  extracted: ExtractedClass;
   hypothesis: EntityHypothesis | null;
   acceptedOption: OntologyOption | null;
   names: NamingDecision | null;
@@ -118,7 +122,11 @@ export interface AuthoringState {
   costUsd: number;
 
   // Capability accumulators (each set by the corresponding action)
-  jpo: ExtractedJpo | null;
+  /** Most-recent extract output. Either ExtractedJpo (kind="jpo") for
+   *  @Entity classes — feeds the full hypothesis/interview/options pipeline —
+   *  or ExtractedGenericClass (kind="generic") which gates downstream
+   *  capabilities (Phase B-8). Phase B rename: was `jpo: ExtractedJpo | null`. */
+  extracted: ExtractedClass | null;
   hypothesis: EntityHypothesis | null;
   batch: InterviewBatch | null;
   answers: AbsorbedAnswers | null;
@@ -301,7 +309,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
   error: null,
   costUsd: 0,
 
-  jpo: null,
+  extracted: null,
   hypothesis: null,
   batch: null,
   answers: null,
@@ -324,7 +332,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       loading: false,
       error: null,
       costUsd: 0,
-      jpo: null,
+      extracted: null,
       hypothesis: null,
       batch: null,
       answers: null,
@@ -377,8 +385,8 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         "extract",
         authoringApi.extractStream(sess.id, req),
       );
-      const out = trace.output as ExtractedJpo;
-      set(() => ({ jpo: out, turnNo: turn }));
+      const out = trace.output as ExtractedClass;
+      set(() => ({ extracted: out, turnNo: turn }));
       pushMessage(set, "assistant", "extracted", out, {
         toolTrace: trace.completed,
       });
@@ -388,15 +396,21 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
 
   runHypothesize: async () => {
     await withLoading(set, async () => {
-      const { jpo, session } = get();
-      if (!session || !jpo) throw new Error("Run extract first.");
+      const { extracted, session } = get();
+      if (!session || !extracted) throw new Error("Run extract first.");
+      if (extracted.kind !== "jpo") {
+        // Phase B-8 will gate the toolbar button; this is the runtime guard.
+        throw new Error(
+          "Hypothesis 는 현재 JPA Entity 만 지원합니다. Service/Action 은 Phase C 에서 추가됩니다.",
+        );
+      }
       const turn = get().turnNo + 1;
       const trace = await consumeStream(
         set,
         "hypothesize",
         authoringApi.hypothesizeStream(session.id, {
           turn_no: turn,
-          extracted_jpo: jpo,
+          extracted_jpo: extracted,
         }),
       );
       const out = trace.output as EntityHypothesis;
@@ -419,8 +433,13 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
     // resetting downstream state so the user can re-run options/gaps/naming
     // against the new hypothesis without confusion.
     await withLoading(set, async () => {
-      const { jpo, session, answers } = get();
-      if (!session || !jpo) throw new Error("Run extract first.");
+      const { extracted, session, answers } = get();
+      if (!session || !extracted) throw new Error("Run extract first.");
+      if (extracted.kind !== "jpo") {
+        throw new Error(
+          "Hypothesis refresh 는 현재 JPA Entity 만 지원합니다.",
+        );
+      }
       pushMessage(
         set,
         "user",
@@ -435,7 +454,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         "hypothesize",
         authoringApi.hypothesizeStream(session.id, {
           turn_no: turn,
-          extracted_jpo: jpo,
+          extracted_jpo: extracted,
         }),
       );
       const out = trace.output as EntityHypothesis;
@@ -597,9 +616,12 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
 
   runGaps: async () => {
     await withLoading(set, async () => {
-      const { jpo, hypothesis, answers, session } = get();
-      if (!session || !jpo || !hypothesis || !answers)
-        throw new Error("Need jpo + hypothesis + answers before gaps.");
+      const { extracted, hypothesis, answers, session } = get();
+      if (!session || !extracted || !hypothesis || !answers)
+        throw new Error("Need extracted + hypothesis + answers before gaps.");
+      if (extracted.kind !== "jpo") {
+        throw new Error("Gaps 는 현재 JPA Entity 만 지원합니다.");
+      }
       const turn = get().turnNo + 1;
 
       const trace = await consumeStream(
@@ -607,7 +629,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         "gaps",
         authoringApi.gapsStream(session.id, {
           turn_no: turn,
-          extracted_jpo: jpo,
+          extracted_jpo: extracted,
           hypothesis,
           answers,
         }),
@@ -663,12 +685,12 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
     // capability state. Session, messages, turnNo, costUsd, and
     // completedEntities itself are kept (session-level state).
     const s = get();
-    if (!s.jpo) {
+    if (!s.extracted) {
       // Nothing to capture (no entity processed yet) — ignore.
       return;
     }
     const cycle: CompletedEntityCycle = {
-      jpo: s.jpo,
+      extracted: s.extracted,
       hypothesis: s.hypothesis,
       acceptedOption: s.acceptedOption,
       names: s.names,
@@ -683,7 +705,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       completedEntities: [...s.completedEntities, cycle],
       turnNo: turn,
       // Reset per-entity state
-      jpo: null,
+      extracted: null,
       hypothesis: null,
       batch: null,
       answers: null,
@@ -707,7 +729,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       set,
       "system",
       "info",
-      `✓ ${cycle.jpo.class_name} 마무리 — 다음 JPO 추천 받는 중...`,
+      `✓ ${cycle.extracted.class_name} 마무리 — 다음 Entity 추천 받는 중...`,
     );
   },
 
@@ -717,9 +739,14 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
     // structured artifacts.
     await withLoading(set, async () => {
       const r = await authoringApi.replay(sessionId);
+      // Backend keeps the legacy "jpo" field name in replay payloads (Phase B
+      // boundary translation; Phase C will unify when backend gains Service /
+      // Action schemas). Frontend store uses `extracted: ExtractedClass`
+      // throughout — cast at the boundary, default to kind="jpo" so older
+      // payloads without the discriminator still deserialize correctly.
       const cycles: CompletedEntityCycle[] = r.completed_entities.map(
         (c) => ({
-          jpo: c.jpo as ExtractedJpo,
+          extracted: c.jpo as ExtractedClass,
           hypothesis: c.hypothesis,
           acceptedOption: c.accepted_option,
           names: c.names,
@@ -736,8 +763,8 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         loading: false,
         error: null,
         costUsd: r.cost_total_usd,
-        // Current cycle artifacts
-        jpo: r.current.jpo,
+        // Current cycle artifacts — translate backend `jpo` → store `extracted`.
+        extracted: (r.current.jpo as ExtractedClass | null) ?? null,
         hypothesis: r.current.hypothesis,
         batch: r.current.batch,
         answers: r.current.answers,
@@ -757,7 +784,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         set,
         "system",
         "info",
-        `↻ 세션 ${sessionId.slice(0, 8)}… 이어서 진행 (완료 ${cycles.length} entity, 현재 ${r.current.jpo ? r.current.jpo.class_name : "(없음)"})`,
+        `↻ 세션 ${sessionId.slice(0, 8)}… 이어서 진행 (완료 ${cycles.length} entity, 현재 ${r.current.jpo ? (r.current.jpo as ExtractedClass).class_name : "(없음)"})`,
       );
       // P3 polish: replay history into chat as a compact summary so the
       // user sees what was done before the reload. Skipping full per-cap
@@ -772,15 +799,16 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
           set,
           "system",
           "info",
-          `· ${c.jpo.class_name} → ${c.hypothesis?.candidate_term_korean ?? "(미정)"} / ${accepted}${persisted}`,
+          `· ${c.extracted.class_name} → ${c.hypothesis?.candidate_term_korean ?? "(미정)"} / ${accepted}${persisted}`,
         );
       }
       if (r.current.jpo) {
+        const cur = r.current.jpo as ExtractedClass;
         pushMessage(
           set,
           "system",
           "info",
-          `· 현재 진행 중: ${r.current.jpo.class_name}${r.current.hypothesis ? ` / 가설 = ${r.current.hypothesis.candidate_term_korean}` : ""}`,
+          `· 현재 진행 중: ${cur.class_name}${r.current.hypothesis ? ` / 가설 = ${r.current.hypothesis.candidate_term_korean}` : ""}`,
         );
       }
     });
@@ -797,11 +825,11 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       // Completed cycles first
       for (const c of s.completedEntities) {
         entities.push({
-          class_name: c.jpo.class_name,
-          package: c.jpo.package,
+          class_name: c.extracted.class_name,
+          package: c.extracted.package,
           candidate_term_korean: c.hypothesis?.candidate_term_korean ?? "(미정)",
           candidate_term_english:
-            c.hypothesis?.candidate_term_english ?? c.jpo.class_name,
+            c.hypothesis?.candidate_term_english ?? c.extracted.class_name,
           domain_role: c.hypothesis?.domain_role ?? "unknown",
           accepted_option_name: c.acceptedOption?.name ?? null,
           accepted_option_alignment: c.acceptedOption?.domain_alignment ?? null,
@@ -816,13 +844,13 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         });
       }
       // Then current in-progress (if at least extracted)
-      if (s.jpo) {
+      if (s.extracted) {
         entities.push({
-          class_name: s.jpo.class_name,
-          package: s.jpo.package,
+          class_name: s.extracted.class_name,
+          package: s.extracted.package,
           candidate_term_korean: s.hypothesis?.candidate_term_korean ?? "(미정)",
           candidate_term_english:
-            s.hypothesis?.candidate_term_english ?? s.jpo.class_name,
+            s.hypothesis?.candidate_term_english ?? s.extracted.class_name,
           domain_role: s.hypothesis?.domain_role ?? "unknown",
           accepted_option_name: s.acceptedOption?.name ?? null,
           accepted_option_alignment: s.acceptedOption?.domain_alignment ?? null,
@@ -860,8 +888,8 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       if (!s.session) throw new Error("No session.");
       const completed_entity_fqns: string[] = s.completedEntities
         .map((c) => {
-          const pkg = c.jpo.package;
-          const cls = c.jpo.class_name;
+          const pkg = c.extracted.package;
+          const cls = c.extracted.class_name;
           return pkg ? `${pkg}.${cls}` : cls;
         })
         .filter((fqn) => fqn.length > 0);
@@ -901,9 +929,9 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         throw new Error("Accept an option before pattern check.");
       const turn = get().turnNo + 1;
       const priors: PriorEntitySnapshot[] = completedEntities.map((c) => ({
-        class_name: c.jpo.class_name,
+        class_name: c.extracted.class_name,
         candidate_term_korean: c.hypothesis?.candidate_term_korean ?? "(미정)",
-        candidate_term_english: c.hypothesis?.candidate_term_english ?? c.jpo.class_name,
+        candidate_term_english: c.hypothesis?.candidate_term_english ?? c.extracted.class_name,
         domain_role: c.hypothesis?.domain_role ?? "unknown",
         accepted_option_name: c.acceptedOption?.name ?? null,
         accepted_option_structure: c.acceptedOption?.structure_sketch ?? null,
@@ -1011,7 +1039,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
     // every downstream stage so the user re-progresses cleanly. This is the
     // "사용자 정정 → AI 재검토" cascading pattern from Round 5.
     await withLoading(set, async () => {
-      const { jpo, hypothesis, batch, answers, acceptedOption, session } = get();
+      const { extracted, hypothesis, batch, answers, acceptedOption, session } = get();
       if (!session) throw new Error("No session.");
 
       const tag = comment?.trim()
@@ -1022,13 +1050,18 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       const turn = get().turnNo + 1;
 
       if (stage === "hypothesis") {
-        if (!jpo) throw new Error("jpo required");
+        if (!extracted) throw new Error("extracted required");
+        if (extracted.kind !== "jpo") {
+          throw new Error(
+            "Hypothesis rerun 은 현재 JPA Entity 만 지원합니다.",
+          );
+        }
         const trace = await consumeStream(
           set,
           "hypothesize",
           authoringApi.hypothesizeStream(session.id, {
             turn_no: turn,
-            extracted_jpo: jpo,
+            extracted_jpo: extracted,
             user_comment: comment,
           }),
         );
