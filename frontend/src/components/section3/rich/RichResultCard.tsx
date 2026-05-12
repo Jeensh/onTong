@@ -1,0 +1,255 @@
+"use client";
+
+/**
+ * agent 의 final.payload (또는 modeling_result.response.result) 를 받아
+ * 자동으로 가장 적절한 rich 표시를 선택.
+ *
+ * 표시 우선순위:
+ * 1. summary 강조 헤더 (risk_level 있으면 badge)
+ * 2. ontology graph (visualization.nodes/edges)
+ * 3. file tree (source_locations / direct_impact.methods)
+ * 4. data tables (process_locations / downstream_steps / data_locations / test_cases)
+ * 5. matched terms / standards / variables chips
+ * 6. cypher / 합성 Python (접힘)
+ */
+
+import { AlertTriangle, CheckCircle2, Network, Sigma } from "lucide-react";
+import { OntologyGraphSVG } from "../OntologyGraphSVG";
+import { DataTable } from "./DataTable";
+import { FileTreeView } from "./FileTreeView";
+import { CodeBlock } from "./CodeBlock";
+
+interface Props {
+  /** AgentFinalPayload — final event 의 payload (호환을 위해 loose 한 any 사용) */
+  result?: any;
+  /** 강조할 method (예: 변경 대상) */
+  highlightMethod?: string;
+}
+
+const RISK_TONE: Record<string, string> = {
+  HIGH: "bg-red-100 text-red-700 border-red-300",
+  MEDIUM: "bg-amber-100 text-amber-700 border-amber-300",
+  LOW: "bg-emerald-100 text-emerald-700 border-emerald-300",
+  UNKNOWN: "bg-muted text-muted-foreground border-border",
+};
+
+export function RichResultCard({ result, highlightMethod }: Props) {
+  if (!result) return null;
+  const mResult = (result.modeling_response?.result ?? {}) as Record<string, any>;
+  const summary = result.summary ?? mResult.summary ?? "";
+  const confidence = result.modeling_response?.confidence;
+  const riskLevel = mResult.risk_level as string | undefined;
+  const riskFactors = (mResult.risk_factors ?? []) as string[];
+  const directMethods = (mResult.direct_impact?.methods ?? []) as Array<Record<string, any>>;
+  const affectedSteps = (mResult.direct_impact?.affected_steps ?? []) as Array<Record<string, any>>;
+  const downstreamSteps = (mResult.indirect_impact?.downstream_steps ?? []) as Array<Record<string, any>>;
+  const sourceLocations = (mResult.source_locations ?? []) as Array<Record<string, any>>;
+  const processLocations = (mResult.process_locations ?? []) as Array<Record<string, any>>;
+  const dataLocations = (mResult.data_locations ?? []) as Array<Record<string, any>>;
+  const matchedTerms = (mResult.matched_terms ?? []) as Array<Record<string, any>>;
+  const testCases = (mResult.test_cases ?? []) as Array<Record<string, any>>;
+  const dataDeps = (mResult.data_dependencies ?? []) as string[];
+  const sandboxCases = (result.sandbox_result?.cases ?? []) as Array<Record<string, any>>;
+
+  return (
+    <div className="space-y-4">
+      {/* ── Header — summary + risk badge ───────────────── */}
+      <div className="rounded-xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-card to-card p-4">
+        <div className="flex items-start gap-3">
+          {result.ok !== false ? (
+            <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+              <CheckCircle2 size={18} />
+            </div>
+          ) : (
+            <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-red-100 text-red-700 flex items-center justify-center">
+              <AlertTriangle size={18} />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              {riskLevel && (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${RISK_TONE[riskLevel] || RISK_TONE.UNKNOWN}`}>
+                  {riskLevel}
+                </span>
+              )}
+              {typeof confidence === "number" && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-muted border border-border">
+                  conf {confidence.toFixed(2)}
+                </span>
+              )}
+            </div>
+            <div className="text-sm font-semibold text-foreground mt-1 break-words">{summary}</div>
+            {riskFactors.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {riskFactors.map((f, i) => (
+                  <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">{f}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* matched terms */}
+        {matchedTerms.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-border/50">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1.5">매칭 용어</div>
+            <div className="flex flex-wrap gap-1.5">
+              {matchedTerms.map((t, i) => (
+                <span key={i} className="inline-flex items-center gap-1 rounded-full bg-pink-100 text-pink-800 border border-pink-300 px-2 py-0.5 text-[11px]">
+                  <strong>{t.korean ?? t.name}</strong>
+                  {t.english && <span className="opacity-70 text-[10px]">({t.english})</span>}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── ontology graph ───────────────────────────────── */}
+      {result.visualization?.nodes && result.visualization.nodes.length > 0 && (
+        <Section title="🗺 Ontology Graph" subtitle={`${result.visualization.nodes.length} nodes · ${result.visualization.edges?.length ?? 0} edges`}>
+          <OntologyGraphSVG
+            nodes={result.visualization.nodes}
+            edges={result.visualization.edges ?? []}
+            cypher={result.visualization.cypher}
+          />
+        </Section>
+      )}
+
+      {/* ── 코드 파일 트리 ───────────────────────────────── */}
+      {(sourceLocations.length > 0 || directMethods.length > 0) && (
+        <Section title="📁 스캔된 코드 위치">
+          <FileTreeView
+            sources={sourceLocations}
+            methods={directMethods}
+            highlightMethod={highlightMethod}
+          />
+        </Section>
+      )}
+
+      {/* ── 영향 받는 Step / process / data 테이블 ────── */}
+      {(affectedSteps.length > 0 || downstreamSteps.length > 0 || processLocations.length > 0) && (
+        <Section title="🛤 영향 받는 Step">
+          {affectedSteps.length > 0 && (
+            <div className="mb-2">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">직접 영향 (Direct)</div>
+              <DataTable rows={affectedSteps} preferredColumns={["step_number", "korean_name"]} />
+            </div>
+          )}
+          {downstreamSteps.length > 0 && (
+            <div className="mb-2">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">다운스트림 (Indirect)</div>
+              <DataTable rows={downstreamSteps} preferredColumns={["step_number", "korean_name"]} />
+            </div>
+          )}
+          {processLocations.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">프로세스 위치</div>
+              <DataTable rows={processLocations} preferredColumns={["step_number", "korean_name", "roles"]} />
+            </div>
+          )}
+        </Section>
+      )}
+
+      {/* ── 데이터 위치 ──────────────────────────────────── */}
+      {dataLocations.length > 0 && (
+        <Section title="🗄 데이터 위치">
+          <DataTable rows={dataLocations} preferredColumns={["table_name", "standard_code", "schema_name"]} />
+        </Section>
+      )}
+
+      {/* ── 테스트 케이스 (simulate) ────────────────────── */}
+      {testCases.length > 0 && (
+        <Section title="🧪 생성된 테스트 케이스" subtitle={`normal/boundary/error 케이스 ${testCases.length}건`}>
+          <DataTable
+            rows={testCases}
+            preferredColumns={["case_id", "case_type", "input", "expected_output", "description"]}
+            renderCell={{
+              case_type: (v) => {
+                const tone: Record<string, string> = {
+                  normal: "bg-emerald-100 text-emerald-700",
+                  boundary: "bg-amber-100 text-amber-700",
+                  error: "bg-red-100 text-red-700",
+                };
+                return <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${tone[String(v)] || "bg-muted"}`}>{String(v)}</span>;
+              },
+              input: (v) => <code className="text-[10px]">{JSON.stringify(v)}</code>,
+              expected_output: (v) => <code className="text-[10px]">{JSON.stringify(v)}</code>,
+            }}
+          />
+        </Section>
+      )}
+
+      {/* ── sandbox 실행 결과 ──────────────────────────── */}
+      {sandboxCases.length > 0 && (
+        <Section title="▶ Sandbox 실행 결과" subtitle={`${result.sandbox_result?.ok_count}/${sandboxCases.length} 성공 · ${result.sandbox_result?.matched_count} expected 일치`}>
+          <DataTable
+            rows={sandboxCases.map((c) => ({
+              case_id: c.case_id,
+              case_type: c.case_type,
+              ok: c.execution?.ok,
+              result: c.execution?.result,
+              matched: c.matched_expected,
+              elapsed_sec: c.execution?.elapsed_sec,
+              error: c.execution?.error,
+            }))}
+            preferredColumns={["case_id", "case_type", "ok", "matched", "result", "elapsed_sec", "error"]}
+            renderCell={{
+              case_type: (v) => {
+                const tone: Record<string, string> = {
+                  normal: "bg-emerald-100 text-emerald-700",
+                  boundary: "bg-amber-100 text-amber-700",
+                  error: "bg-red-100 text-red-700",
+                };
+                return <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${tone[String(v)] || "bg-muted"}`}>{String(v)}</span>;
+              },
+              ok: (v) => v ? <span className="text-emerald-600">✓</span> : <span className="text-red-600">✗</span>,
+              matched: (v) => v === null || v === undefined ? <span className="text-muted-foreground">—</span> : v ? <span className="text-emerald-600">✓</span> : <span className="text-amber-600">≠</span>,
+            }}
+          />
+        </Section>
+      )}
+
+      {/* ── 데이터 의존성 chips ───────────────────────── */}
+      {dataDeps.length > 0 && (
+        <Section title="📦 Data dependencies">
+          <div className="flex flex-wrap gap-1.5">
+            {dataDeps.map((d, i) => (
+              <span key={i} className="inline-flex items-center gap-1 rounded bg-orange-100 text-orange-800 border border-orange-300 px-2 py-0.5 text-[11px] font-mono">
+                <Sigma size={10} />
+                {d}
+              </span>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* ── 합성 Python 코드 ─────────────────────────── */}
+      {result.generated_python && (
+        <Section title="🐍 합성된 Python 코드" subtitle="modeling 응답 메타만으로 LLM 이 합성 (slab-design 참조 0건)">
+          <CodeBlock code={result.generated_python} language="python" filename="generated.py" />
+        </Section>
+      )}
+
+      {/* ── Cypher ───────────────────────────────────── */}
+      {result.visualization?.cypher && (
+        <Section title="🔎 Cypher (modeling 이 실행)">
+          <CodeBlock code={result.visualization.cypher} language="cypher" maxHeight={200} showLineNumbers={false} />
+        </Section>
+      )}
+    </div>
+  );
+}
+
+function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="flex items-baseline gap-2 mb-1.5">
+        <Network size={11} className="text-primary" />
+        <h4 className="text-[12px] font-bold text-foreground">{title}</h4>
+        {subtitle && <span className="text-[10px] text-muted-foreground">— {subtitle}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
