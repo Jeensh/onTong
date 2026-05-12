@@ -29,6 +29,23 @@
 | B-7 ExtractedView branch | ✅ | `42c22c2` |
 | B-8 disable downstream | ✅ | `42c22c2` |
 | B-9 SelectionBanner copy | ✅ | `42c22c2` |
+| C-1a Service extractor | ✅ | `52292b2` |
+| C-1b Action schema | ✅ | `52292b2` |
+| C-1c TS types | ✅ | `52292b2` |
+| C-1d ExtractedView Service branch | ✅ | `52292b2` |
+| C-2a ServiceHypothesis | ✅ | `04e1de7` |
+| C-2b ActionHypothesis | ✅ | `04e1de7` |
+| C-2c hypothesis dispatcher | ✅ | `04e1de7` |
+| C-2d /hypothesize endpoint | ✅ | `0483c5e` |
+| C-2e Frontend runHypothesize | ✅ | `0483c5e` |
+| C-2f HypothesisView branch | ✅ | `0483c5e` |
+
+**Phase C-2 완료** (2026-05-13). 사용자는 @Entity / @Service / @Controller 클래스를 선택해서 ② 가설 까지 갈 수 있음:
+- @Entity → EntityHypothesis (기존 + downstream pipeline 그대로)
+- @Service / @Component / @RestController → ServiceHypothesis 카드 표시. 인터뷰/옵션/갭 등 downstream 은 Phase C-3 에서 wire-up 예정. 가설 결과는 chat 에 표시되고 store 의 hypothesis 필드에는 entity 만 저장.
+- Action 은 method-level 이라 UI 진입점 (C-4) 필요 → 현재는 backend 만 준비.
+
+**다음 세션**: Phase C-3 — interview/options/gaps/pattern/archive/naming 의 kind-aware 분기. 가장 큰 변화는 interview 프롬프트 — 질문 종류가 entity / service / action 별로 다름.
 
 **Phase B 완료** (2026-05-13). End-to-end 동작:
 - 사용자가 @Entity 클래스 선택 → 기존 JPO 풀 pipeline (hypothesis/interview/options/.../confirm)
