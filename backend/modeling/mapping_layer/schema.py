@@ -235,3 +235,5 @@ class AnchorBinding(BaseModel):
     confirmed: bool = False
     rationale: str = ""
     repo_id: str = ""
+    # 2026-05-10: anchor 가 가리키는 source code line 번호 (1-indexed). NULL = 미할당.
+    line: int | None = None

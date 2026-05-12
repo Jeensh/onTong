@@ -1,0 +1,39 @@
+{
+  "variables": [
+    {"id": "var_thickness", "name": "Thickness", "korean_name": "두께", "type": "integer", "unit": "mm", "valid_range": "[200, 310]"},
+    {"id": "var_target_width", "name": "TargetWidth", "korean_name": "목표폭", "type": "integer", "unit": "mm", "valid_range": "[750, 1650]"},
+    {"id": "var_hr_target_width", "name": "HRTargetWidth", "korean_name": "열연목표폭", "type": "integer", "unit": "mm"},
+    {"id": "var_primary_width_range", "name": "PrimaryWidthRange", "korean_name": "1차 폭범위", "type": "range", "unit": "mm"},
+    {"id": "var_secondary_width_range", "name": "SecondaryWidthRange", "korean_name": "2차 폭범위", "type": "range", "unit": "mm"},
+    {"id": "var_target_length", "name": "TargetLength", "korean_name": "목표길이", "type": "integer", "unit": "mm"},
+    {"id": "var_slab_weight", "name": "SlabWeight", "korean_name": "Slab단중", "type": "integer", "unit": "kg"},
+    {"id": "var_split_count", "name": "SplitCount", "korean_name": "분할수", "type": "integer", "unit": "ea"},
+    {"id": "var_yield_rate", "name": "YieldRate", "korean_name": "실수율", "type": "float", "unit": "ratio", "valid_range": "[0.8, 1.0]"},
+    {"id": "var_edging_capability", "name": "EdgingCapability", "korean_name": "Edging능력", "type": "range", "unit": "mm"}
+  ],
+  "step_inputs": {
+    "1": ["var_thickness"],
+    "2": ["var_hr_target_width", "var_edging_capability"],
+    "4": ["var_thickness", "var_target_width", "var_target_length"],
+    "7": ["var_slab_weight", "var_yield_rate"],
+    "8": ["var_split_count", "var_yield_rate"],
+    "10": ["var_slab_weight"],
+    "12": ["var_slab_weight"]
+  },
+  "step_outputs": {
+    "1": ["var_thickness"],
+    "2": ["var_primary_width_range"],
+    "5": ["var_slab_weight"],
+    "6": ["var_slab_weight"],
+    "7": ["var_split_count"],
+    "10": ["var_secondary_width_range"],
+    "12": ["var_target_width"]
+  },
+  "standard_constrains": [
+    {"standard": "SC070", "variable": "var_primary_width_range"},
+    {"standard": "SC080", "variable": "var_slab_weight"},
+    {"standard": "SC090", "variable": "var_slab_weight"},
+    {"standard": "SC290", "variable": "var_slab_weight"},
+    {"standard": "SC100", "variable": "var_slab_weight"}
+  ]
+}

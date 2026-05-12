@@ -1,0 +1,19 @@
+{
+  "term_to_step": [
+    {"term": "term_thickness", "step_number": 1, "role": "output"},
+    {"term": "term_edging", "step_number": 2, "role": "internal"},
+    {"term": "term_hr_target_width", "step_number": 2, "role": "input"},
+    {"term": "term_dg320", "step_number": 2, "role": "error_trigger"},
+    {"term": "term_slab_weight", "step_number": 5, "role": "output"},
+    {"term": "term_slab_weight", "step_number": 6, "role": "output"},
+    {"term": "term_split_count", "step_number": 7, "role": "output"},
+    {"term": "term_yield_rate", "step_number": 7, "role": "input"},
+    {"term": "term_split_count", "step_number": 8, "role": "internal"},
+    {"term": "term_yield_rate", "step_number": 8, "role": "input"},
+    {"term": "term_design_policy", "step_number": 8, "role": "internal"},
+    {"term": "term_target_weight", "step_number": 8, "role": "output"},
+    {"term": "term_target_width", "step_number": 12, "role": "output"},
+    {"term": "term_edging", "step_number": 13, "role": "internal"},
+    {"term": "term_3pass", "step_number": 13, "role": "internal"}
+  ]
+}

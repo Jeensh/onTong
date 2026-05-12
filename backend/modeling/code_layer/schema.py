@@ -77,16 +77,22 @@ class CallAnalysisSource(StrEnum):
     합성:
     - STATIC_UNRESOLVED   : 위 분류에 안 맞는 모호 (사용자 큐)
     - USER_CONFIRMED      : 사용자가 명시 confirm 한 결과
+
+    Noise filter (2026-05-10 batch cleanup 단계 도입):
+    - AUTO_FILTERED_STDLIB         : java.util / java.lang / 표준 라이브러리 호출 — 도메인 무관
+    - AUTO_FILTERED_STREAM_OPTIONAL: stream().map() / Optional.of() 같은 fluent chain — 분석 무관
     """
-    SINGLE_IMPL        = "single_impl"
-    INSTANCEOF_GUARD   = "instanceof_guard"
-    ANNOTATION         = "annotation"
-    FACTORY_BRANCH     = "factory_branch"
-    GENERIC_BOUND      = "generic_bound"
-    STRATEGY_MAP       = "strategy_map"
-    REFLECTION         = "reflection"
-    STATIC_UNRESOLVED  = "static_unresolved"
-    USER_CONFIRMED     = "user_confirmed"
+    SINGLE_IMPL                    = "single_impl"
+    INSTANCEOF_GUARD               = "instanceof_guard"
+    ANNOTATION                     = "annotation"
+    FACTORY_BRANCH                 = "factory_branch"
+    GENERIC_BOUND                  = "generic_bound"
+    STRATEGY_MAP                   = "strategy_map"
+    REFLECTION                     = "reflection"
+    STATIC_UNRESOLVED              = "static_unresolved"
+    USER_CONFIRMED                 = "user_confirmed"
+    AUTO_FILTERED_STDLIB           = "auto_filtered_stdlib"
+    AUTO_FILTERED_STREAM_OPTIONAL  = "auto_filtered_stream_optional"
 
 
 # ---------------------------------------------------------------------------

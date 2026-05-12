@@ -163,6 +163,7 @@ def _ab_to_row(ab: AnchorBinding) -> AnchorBindingRow:
         confirmed=ab.confirmed,
         rationale=ab.rationale,
         repo_id=ab.repo_id,
+        line=ab.line,
     )
 
 
@@ -178,6 +179,7 @@ def _row_to_ab(row: AnchorBindingRow) -> AnchorBinding:
         confirmed=row.confirmed,
         rationale=row.rationale,
         repo_id=row.repo_id,
+        line=row.line,
     )
 
 
