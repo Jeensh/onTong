@@ -132,11 +132,14 @@ function SelectionBanner() {
   if (!selectedFqn) {
     return (
       <div className="px-3 py-2.5 border-b border-amber-400/40 bg-amber-400/5 text-[11.5px] text-amber-300">
-        <div className="font-semibold mb-0.5">📂 좌측에서 JPO 클래스 선택</div>
+        <div className="font-semibold mb-0.5">📂 좌측에서 JPA Entity 클래스 (<code>@Entity</code>) 선택</div>
         <div className="text-amber-300/80">
           좌측 패키지 트리 → 패키지 클릭 → <strong>하단 inventory 패널</strong>에서 클래스 클릭.
           <br />
-          (선택 없이 ① 코드 추출 시 bundled <code>HrSpecJpo</code> 사용 — demo 모드)
+          (선택 없이 ① 코드 추출 시 bundled <code>HrSpecJpo</code> (JPA Entity 데모) 사용)
+        </div>
+        <div className="text-[10px] text-amber-300/60 mt-1">
+          현재 단계: JPA Entity 추출 · 다음 단계: Service / Action 확장 (roadmap)
         </div>
       </div>
     );
@@ -223,8 +226,8 @@ function Toolbar() {
         disabled={loading || !session || !!jpo}
         title={
           selectedSimpleName
-            ? `좌측 트리 선택: ${selectedSimpleName}`
-            : "좌측 트리에서 클래스 선택 (없으면 bundled HrSpec)"
+            ? `JPA Entity 선택: ${selectedSimpleName}`
+            : "좌측 트리에서 JPA Entity 클래스 선택 (없으면 bundled HrSpec 데모). Service/Action 은 roadmap."
         }
       >
         ① 코드 추출{selectedSimpleName && ` (${selectedSimpleName})`}
@@ -492,8 +495,8 @@ function NextEntityButton() {
       disabled={loading}
       title={
         ready
-          ? "현재 entity 마무리 + 다음 JPO 자동 추천"
-          : "Archive/Confirm 후 권장 — 클릭 시 history 저장 + 다음 JPO 추천"
+          ? "현재 entity 마무리 + 다음 JPA Entity 자동 추천 (Service/Action 은 roadmap)"
+          : "Archive/Confirm 후 권장 — 클릭 시 history 저장 + 다음 JPA Entity 추천"
       }
       className={cn(
         "border-violet-400 text-violet-400 hover:bg-violet-400/10",
@@ -537,7 +540,7 @@ function LiveToolTraceCard({ trace }: { trace: { stage: string | null; currentTo
       case "options": return "옵션 제시";
       case "gaps": return "갭 탐지";
       case "pattern": return "패턴 검사";
-      case "next_entity": return "다음 JPO 추천";
+      case "next_entity": return "다음 JPA Entity 추천";
       default: return "분석";
     }
   })();
@@ -768,6 +771,9 @@ function ChatPayload({ m }: { m: ChatMessage }) {
 function ExtractedView({ jpo }: { jpo: ExtractedJpo }) {
   return (
     <div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-0.5">
+        JPA Entity
+      </div>
       <div className="font-semibold text-violet-400 mb-1">
         {jpo.class_name} → {jpo.table_name}
       </div>
@@ -1123,7 +1129,7 @@ function NextEntityView({ r }: { r: NextEntityRecommendation }) {
   return (
     <div>
       <div className="font-semibold mb-1">
-        🔮 다음 JPO 추천 ({r.candidates.length})
+        🔮 다음 JPA Entity 추천 ({r.candidates.length})
       </div>
       <div className="text-[11.5px] text-muted-foreground mb-1.5">
         {r.summary_korean}
@@ -1156,7 +1162,7 @@ function NextEntityView({ r }: { r: NextEntityRecommendation }) {
                 onClick={() => runExtract({ fqn: c.fqn, repoId: activeRepoId })}
                 title={c.fqn}
               >
-                ① 이 JPO 로 시작
+                ① 이 Entity 로 시작
               </Button>
             </li>
           );
