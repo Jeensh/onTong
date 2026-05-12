@@ -28,6 +28,7 @@ import { useWorkbench } from "./store";
 import { authoringApi } from "@/lib/api/authoring";
 import type {
   AbsorbedAnswers,
+  ActionHypothesis,
   ArchiveDocument,
   AuthoringSession,
   ConfirmResponse,
@@ -38,6 +39,7 @@ import type {
   ExtractedService,
   ComprehensiveArchive,
   GapAnalysis,
+  Hypothesis,
   InterviewBatch,
   NamingDecision,
   NextEntityRecommendation,
@@ -45,6 +47,7 @@ import type {
   OntologyOption,
   OptionTable,
   PatternCheck,
+  ServiceHypothesis,
 } from "@/lib/api/authoring";
 
 const DEFAULT_REPO_ID = "smoke-slab";
@@ -239,11 +242,13 @@ function Toolbar() {
         size="sm"
         variant="outline"
         onClick={runHypothesize}
-        disabled={loading || !extracted || extracted.kind !== "jpo" || !!hypothesis}
+        disabled={loading || !extracted || extracted.kind === "generic" || !!hypothesis}
         title={
-          extracted && extracted.kind !== "jpo"
-            ? "Hypothesis 는 JPA Entity 만 지원 (Service/Action 은 roadmap)"
-            : undefined
+          extracted && extracted.kind === "generic"
+            ? "Generic 클래스는 hypothesis 미지원 — JPA Entity / Service 클래스 선택"
+            : extracted && extracted.kind === "service"
+              ? "Service hypothesis (Phase C-2) — 다운스트림 인터뷰/옵션은 JPA 전용 (Phase C-3)"
+              : undefined
         }
       >
         ② 가설
@@ -753,7 +758,7 @@ function ChatPayload({ m }: { m: ChatMessage }) {
     case "extracted":
       return <ExtractedView extracted={m.payload as ExtractedClass} />;
     case "hypothesis":
-      return <HypothesisView h={m.payload as EntityHypothesis} />;
+      return <HypothesisDispatcher h={m.payload as Hypothesis} />;
     case "interview":
       return <InterviewView batch={m.payload as InterviewBatch} />;
     case "absorbed":
@@ -857,6 +862,12 @@ function GenericExtractedView({ c }: { c: ExtractedGenericClass }) {
   );
 }
 
+function HypothesisDispatcher({ h }: { h: Hypothesis }) {
+  if (h.kind === "entity") return <HypothesisView h={h} />;
+  if (h.kind === "service") return <ServiceHypothesisView h={h} />;
+  return <ActionHypothesisView h={h} />;
+}
+
 function HypothesisView({ h }: { h: EntityHypothesis }) {
   return (
     <div>
@@ -871,6 +882,69 @@ function HypothesisView({ h }: { h: EntityHypothesis }) {
       {h.concerns.length > 0 && (
         <div className="text-[11px] text-rose-400 mt-1">⚠ {h.concerns[0]}</div>
       )}
+    </div>
+  );
+}
+
+function ServiceHypothesisView({ h }: { h: ServiceHypothesis }) {
+  return (
+    <div>
+      <div className="font-semibold mb-1">
+        🧩 Service 가설: <span className="text-violet-400">{h.candidate_capability_korean}</span>
+        <code className="ml-2 text-[11px] font-mono text-muted-foreground">{h.candidate_capability_english}</code>
+        <span className="ml-2 text-[10px] px-1.5 py-px rounded-full border border-sky-400 text-sky-400 bg-sky-400/10">
+          {h.service_role}
+        </span>
+        <span className="ml-2 text-[10px] px-1.5 py-px rounded-full border border-amber-400 text-amber-400 bg-amber-400/10">
+          conf {h.confidence.toFixed(2)}
+        </span>
+      </div>
+      <div className="text-[11.5px] text-muted-foreground">{h.responsibility_summary}</div>
+      {h.write_boundary_summary && (
+        <div className="text-[11px] text-amber-300/90 mt-1">✍ {h.write_boundary_summary}</div>
+      )}
+      {h.key_use_cases.length > 0 && (
+        <div className="text-[11px] text-muted-foreground mt-1">
+          핵심 use-case: {h.key_use_cases.map((u) => u.method_name).join(", ")}
+        </div>
+      )}
+      {h.concerns.length > 0 && (
+        <div className="text-[11px] text-rose-400 mt-1">⚠ {h.concerns[0]}</div>
+      )}
+      <div className="text-[10px] text-amber-300/70 mt-1">
+        ⓘ Service hypothesis 까지 land — 인터뷰/옵션/갭 등 downstream 은 Phase C-3 예정
+      </div>
+    </div>
+  );
+}
+
+function ActionHypothesisView({ h }: { h: ActionHypothesis }) {
+  return (
+    <div>
+      <div className="font-semibold mb-1">
+        ⚡ Action 가설: <span className="text-violet-400">{h.domain_verb_korean}</span>
+        <code className="ml-2 text-[11px] font-mono text-muted-foreground">{h.domain_verb_english}</code>
+        <span className="ml-2 text-[10px] px-1.5 py-px rounded-full border border-orange-400 text-orange-400 bg-orange-400/10">
+          {h.action_kind_guess}
+        </span>
+        <span className="ml-2 text-[10px] px-1.5 py-px rounded-full border border-amber-400 text-amber-400 bg-amber-400/10">
+          conf {h.confidence.toFixed(2)}
+        </span>
+      </div>
+      {h.output_meaning_korean && (
+        <div className="text-[11.5px] text-muted-foreground">→ {h.output_meaning_korean}</div>
+      )}
+      {h.br_candidates.length > 0 && (
+        <div className="text-[11px] text-rose-300 mt-1">
+          BR 후보 {h.br_candidates.length}개 (예: {h.br_candidates[0].statement_korean})
+        </div>
+      )}
+      {h.concerns.length > 0 && (
+        <div className="text-[11px] text-rose-400 mt-1">⚠ {h.concerns[0]}</div>
+      )}
+      <div className="text-[10px] text-amber-300/70 mt-1">
+        ⓘ Action hypothesis 까지 land — 인터뷰/BR 확정 등 downstream 은 Phase C-3 예정
+      </div>
     </div>
   );
 }

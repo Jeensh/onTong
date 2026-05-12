@@ -42,11 +42,11 @@ Confirm:
 from __future__ import annotations
 
 import logging
-from typing import Literal
+from typing import Annotated, Literal, Union
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from backend.application.agent_tools import ToolEventPump, sse_format
 from backend.application.authoring import cost as cost_mod
@@ -72,11 +72,17 @@ from backend.application.authoring.capabilities.generic_class_extractor import (
     ExtractedGenericClass,
     extract_from_file,
 )
+from backend.application.authoring.capabilities.action_extractor import ExtractedAction
 from backend.application.authoring.capabilities.gap_detector import GapAnalysis, detect_gaps
 from backend.application.authoring.capabilities.hypothesis import (
+    ActionHypothesis,
     EntityHypothesis,
+    Hypothesis,
+    ServiceHypothesis,
     propose_entity_hypothesis,
+    propose_hypothesis,
 )
+from backend.application.authoring.capabilities.service_extractor import ExtractedService
 from backend.application.authoring.capabilities.interview import (
     InterviewBatch,
     design_interview,
@@ -446,28 +452,69 @@ async def extract_stream_endpoint(session_id: str, req: ExtractRequest):
 
 class HypothesizeRequest(BaseModel):
     turn_no: int
-    extracted_jpo: ExtractedJpo
+    # Accept the discriminated union directly. `extracted_jpo` is kept as an
+    # alias for back-compat with existing frontend code that always sent a
+    # JPO; new code should send the union via `extracted`. Validator below
+    # normalises.
+    extracted: Annotated[
+        Union[ExtractedJpo, ExtractedService, ExtractedAction] | None,
+        Field(discriminator="kind"),
+    ] = None
+    extracted_jpo: ExtractedJpo | None = None  # deprecated alias
     user_comment: str | None = None  # F3: ✏ 수정 from frontend card
 
+    @model_validator(mode="after")
+    def _coalesce_extracted(self) -> "HypothesizeRequest":
+        if self.extracted is None and self.extracted_jpo is not None:
+            self.extracted = self.extracted_jpo
+        if self.extracted is None:
+            raise ValueError(
+                "HypothesizeRequest requires either `extracted` (union) or "
+                "`extracted_jpo` (legacy alias)"
+            )
+        return self
 
-@router.post("/sessions/{session_id}/hypothesize", response_model=EntityHypothesis)
+
+def _hypothesis_decision_summary(out: Hypothesis) -> tuple[str | None, str]:
+    """(entity_id, step_label) pair for _record_decision — kind-aware."""
+    if isinstance(out, EntityHypothesis):
+        return (
+            out.candidate_term_english,
+            f"가설 ({out.candidate_term_korean} / {out.candidate_term_english})",
+        )
+    if isinstance(out, ServiceHypothesis):
+        return (
+            out.candidate_capability_english,
+            f"Service 가설 ({out.candidate_capability_korean} / {out.candidate_capability_english})",
+        )
+    if isinstance(out, ActionHypothesis):
+        return (
+            out.domain_verb_english,
+            f"Action 가설 ({out.domain_verb_korean} / {out.domain_verb_english})",
+        )
+    return (None, "가설")
+
+
+@router.post("/sessions/{session_id}/hypothesize", response_model=Hypothesis)
 async def hypothesize_endpoint(
     session_id: str, req: HypothesizeRequest
-) -> EntityHypothesis:
+) -> Hypothesis:
     _require_session(session_id)
-    out = await propose_entity_hypothesis(
-        req.extracted_jpo,
+    assert req.extracted is not None  # validator guarantees
+    out = await propose_hypothesis(
+        req.extracted,
         session_id=session_id,
         turn_no=req.turn_no,
         user_comment=req.user_comment,
     )
+    entity_id, step_label = _hypothesis_decision_summary(out)
     _record_decision(
         session_id=session_id,
         turn_no=req.turn_no,
         kind="hypothesis_seeded",
         payload={"capability": "hypothesis", "result": out.model_dump()},
-        entity_id=out.candidate_term_english,
-        step_label=f"가설 ({out.candidate_term_korean} / {out.candidate_term_english})",
+        entity_id=entity_id,
+        step_label=step_label,
     )
     return out
 
@@ -475,15 +522,18 @@ async def hypothesize_endpoint(
 @router.post("/sessions/{session_id}/hypothesize/stream")
 async def hypothesize_stream_endpoint(session_id: str, req: HypothesizeRequest):
     """SSE variant of /hypothesize — graph-aware: streams ontology / sibling /
-    inheritance lookups while the agent builds its first-cut hypothesis."""
+    inheritance lookups while the agent builds its first-cut hypothesis.
+    Kind-aware: routes to entity / service / action hypothesis per
+    req.extracted.kind."""
     _require_session(session_id)
+    assert req.extracted is not None  # validator guarantees
     pump = ToolEventPump()
 
     async def event_stream():
         final_output: dict | None = None
         async for ev in pump.bridge(
-            propose_entity_hypothesis(
-                req.extracted_jpo,
+            propose_hypothesis(
+                req.extracted,
                 session_id=session_id,
                 turn_no=req.turn_no,
                 user_comment=req.user_comment,
@@ -494,16 +544,17 @@ async def hypothesize_stream_endpoint(session_id: str, req: HypothesizeRequest):
             if ev.get("type") == "done":
                 final_output = ev.get("output")
         if final_output:
+            # Re-validate so we can hand a typed instance to the summary helper.
+            from pydantic import TypeAdapter as _TA
+            parsed = _TA(Hypothesis).validate_python(final_output)
+            entity_id, step_label = _hypothesis_decision_summary(parsed)
             _record_decision(
                 session_id=session_id,
                 turn_no=req.turn_no,
                 kind="hypothesis_seeded",
                 payload={"capability": "hypothesis", "result": final_output},
-                entity_id=final_output.get("candidate_term_english"),
-                step_label=(
-                    f"가설 ({final_output.get('candidate_term_korean', '?')} / "
-                    f"{final_output.get('candidate_term_english', '?')})"
-                ),
+                entity_id=entity_id,
+                step_label=step_label,
             )
 
     return StreamingResponse(

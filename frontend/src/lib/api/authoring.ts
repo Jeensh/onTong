@@ -217,6 +217,8 @@ export interface ColumnNote {
 }
 
 export interface EntityHypothesis {
+  /** Phase C-2 discriminator. */
+  kind: "entity";
   candidate_term_korean: string;
   candidate_term_english: string;
   domain_role: DomainRole;
@@ -228,6 +230,82 @@ export interface EntityHypothesis {
   assumptions: string[];
   concerns: string[];
 }
+
+// ── Service hypothesis — Phase C-2 ───────────────────────────────────
+
+export type ServiceDomainRole =
+  | "orchestrator"
+  | "rest_facade"
+  | "domain_service"
+  | "data_access"
+  | "event_consumer"
+  | "scheduled_job"
+  | "infrastructure_adapter"
+  | "unknown";
+
+export interface CollaboratorNote {
+  dependency: string;
+  interpreted_role: string;
+}
+
+export interface ServiceUseCase {
+  method_name: string;
+  summary_korean: string;
+  triggers?: string | null;
+}
+
+export interface ServiceHypothesis {
+  kind: "service";
+  candidate_capability_korean: string;
+  candidate_capability_english: string;
+  service_role: ServiceDomainRole;
+  responsibility_summary: string;
+  collaborator_notes: CollaboratorNote[];
+  write_boundary_summary?: string | null;
+  key_use_cases: ServiceUseCase[];
+  domain_questions: string[];
+  confidence: number;
+  assumptions: string[];
+  concerns: string[];
+}
+
+// ── Action hypothesis — Phase C-2 ────────────────────────────────────
+
+export type ActionKindGuess =
+  | "pure_function"
+  | "effectful"
+  | "workflow"
+  | "unknown";
+
+export interface ActionParamMeaning {
+  param_name: string;
+  interpreted_meaning_korean: string;
+}
+
+export interface ActionBrCandidate {
+  statement_korean: string;
+  severity_guess: "hard" | "soft" | "unknown";
+  anchor_locator_hint?: string | null;
+}
+
+export interface ActionHypothesis {
+  kind: "action";
+  domain_verb_korean: string;
+  domain_verb_english: string;
+  action_kind_guess: ActionKindGuess;
+  input_meanings: ActionParamMeaning[];
+  output_meaning_korean?: string | null;
+  preconditions_korean: string[];
+  postconditions_korean: string[];
+  br_candidates: ActionBrCandidate[];
+  domain_questions: string[];
+  confidence: number;
+  assumptions: string[];
+  concerns: string[];
+}
+
+/** Discriminated union over the 3 hypothesis variants. */
+export type Hypothesis = EntityHypothesis | ServiceHypothesis | ActionHypothesis;
 
 export type Importance = "critical" | "standard" | "optional";
 
@@ -711,8 +789,14 @@ export const authoringApi = {
   },
   hypothesize(
     id: string,
-    req: { turn_no: number; extracted_jpo: ExtractedJpo; user_comment?: string },
-  ): Promise<EntityHypothesis> {
+    req: {
+      turn_no: number;
+      /** Phase C-2: accepts ExtractedJpo, ExtractedService, or ExtractedAction.
+       *  Backend dispatches to the matching hypothesis prompt by .kind. */
+      extracted: ExtractedJpo | ExtractedService | ExtractedAction;
+      user_comment?: string;
+    },
+  ): Promise<Hypothesis> {
     return http("POST", `/sessions/${id}/hypothesize`, req);
   },
   interview(
@@ -797,7 +881,7 @@ export const authoringApi = {
     id: string,
     req: {
       turn_no: number;
-      extracted_jpo: ExtractedJpo;
+      extracted: ExtractedJpo | ExtractedService | ExtractedAction;
       user_comment?: string;
     },
     signal?: AbortSignal,

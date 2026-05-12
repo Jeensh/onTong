@@ -19,6 +19,7 @@ import {
   type ExtractedClass,
   type ExtractedJpo,
   type GapAnalysis,
+  type Hypothesis,
   type InterviewBatch,
   type NamingDecision,
   type ComprehensiveArchive,
@@ -398,10 +399,12 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
     await withLoading(set, async () => {
       const { extracted, session } = get();
       if (!session || !extracted) throw new Error("Run extract first.");
-      if (extracted.kind !== "jpo") {
-        // Phase B-8 will gate the toolbar button; this is the runtime guard.
+      // Phase C-2: hypothesis dispatcher accepts jpo / service / action.
+      // ExtractedGenericClass (kind="generic") has no hypothesis prompt yet —
+      // the toolbar gate prevents it from reaching this code path.
+      if (extracted.kind === "generic") {
         throw new Error(
-          "Hypothesis 는 현재 JPA Entity 만 지원합니다. Service/Action 은 Phase C 에서 추가됩니다.",
+          "Generic 클래스 hypothesis 는 미지원 — JPA Entity 또는 Service / Action 클래스를 선택하세요.",
         );
       }
       const turn = get().turnNo + 1;
@@ -410,11 +413,20 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         "hypothesize",
         authoringApi.hypothesizeStream(session.id, {
           turn_no: turn,
-          extracted_jpo: extracted,
+          extracted,
         }),
       );
-      const out = trace.output as EntityHypothesis;
-      set(() => ({ hypothesis: out, turnNo: turn }));
+      const out = trace.output as Hypothesis;
+      // Phase C-2 boundary: the store's `hypothesis` field still types as
+      // EntityHypothesis because downstream caps (interview/gaps/options)
+      // are JPO-only until Phase C-3. Service/Action hypotheses display in
+      // chat but don't trigger downstream — preserves current pipeline
+      // semantics while letting users exercise the new hypothesis surface.
+      if (out.kind === "entity") {
+        set(() => ({ hypothesis: out, turnNo: turn }));
+      } else {
+        set(() => ({ turnNo: turn }));
+      }
       pushMessage(set, "assistant", "hypothesis", out, {
         toolTrace: trace.completed,
       });
@@ -435,10 +447,8 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
     await withLoading(set, async () => {
       const { extracted, session, answers } = get();
       if (!session || !extracted) throw new Error("Run extract first.");
-      if (extracted.kind !== "jpo") {
-        throw new Error(
-          "Hypothesis refresh 는 현재 JPA Entity 만 지원합니다.",
-        );
+      if (extracted.kind === "generic") {
+        throw new Error("Generic 클래스 hypothesis 는 미지원.");
       }
       pushMessage(
         set,
@@ -454,12 +464,14 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         "hypothesize",
         authoringApi.hypothesizeStream(session.id, {
           turn_no: turn,
-          extracted_jpo: extracted,
+          extracted,
         }),
       );
-      const out = trace.output as EntityHypothesis;
+      const out = trace.output as Hypothesis;
+      // See runHypothesize — narrow to EntityHypothesis for the store field.
+      const narrowedHypothesis = out.kind === "entity" ? out : get().hypothesis;
       set(() => ({
-        hypothesis: out,
+        hypothesis: narrowedHypothesis,
         turnNo: turn,
         // Clear everything downstream of hypothesis so the user can re-run.
         optionTable: null,
@@ -1051,24 +1063,24 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
 
       if (stage === "hypothesis") {
         if (!extracted) throw new Error("extracted required");
-        if (extracted.kind !== "jpo") {
-          throw new Error(
-            "Hypothesis rerun 은 현재 JPA Entity 만 지원합니다.",
-          );
+        if (extracted.kind === "generic") {
+          throw new Error("Generic 클래스 hypothesis rerun 은 미지원.");
         }
         const trace = await consumeStream(
           set,
           "hypothesize",
           authoringApi.hypothesizeStream(session.id, {
             turn_no: turn,
-            extracted_jpo: extracted,
+            extracted,
             user_comment: comment,
           }),
         );
-        const out = trace.output as EntityHypothesis;
+        const out = trace.output as Hypothesis;
+        // Narrow for store (downstream caps still JPO-only in Phase C-2).
+        const narrowed = out.kind === "entity" ? out : hypothesis;
         // Clear everything downstream of hypothesis.
         set(() => ({
-          hypothesis: out,
+          hypothesis: narrowed,
           turnNo: turn,
           batch: null,
           answers: null,
