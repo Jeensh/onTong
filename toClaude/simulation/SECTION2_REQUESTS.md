@@ -24,15 +24,16 @@
 ## ② `table` / `standard_value` 의 실제 id 카탈로그 endpoint
 
 **우선순위**: 🔴 블로커 (UX)
-**현재**:
-- `GET /api/modeling/ontology/graph/stats` → Table: 14 / Standard: 14 카운트만 노출
-- `impact_analysis(table, "CAST_SPEC")` 호출 시 "대상 미존재" 반환 — 실 id 가 뭔지 알 길 없음
-**요청**: 다음 중 하나
-- (a) `GET /api/modeling/ontology/tables` → `list[{id, name, schema_name, ...}]`
-- (b) `GET /api/modeling/ontology/standards` → `list[{id, code, ...}]`
-- 또는 (c) `impact_analysis` 가 "대상 미존재" 시 후보 id list 같이 반환
-**사유 (Section 3 측)**: 사용자가 "데이터 변경 분석" 메뉴에서 어떤 table/standard 가 있는지 select / autocomplete 해야 함.
-**우회 (Section 3 현재)**: `explain` intent 자연어로 검색해서 우회 (`data_locations` 에 table_name 반환되긴 함).
+**상세 문서**: 👉 [`SECTION2_REQUEST_02_id_catalog.md`](./SECTION2_REQUEST_02_id_catalog.md) (API 명세 / Acceptance Criteria / 구현 힌트 / 예시 응답 포함)
+
+**한 줄 요약**: `/query (impact_analysis)` 의 `target.id` 후보 카탈로그가 없어 사용자가 어떤 id 가 있는지 모름.
+
+**요청 (권장)**:
+- `GET /api/modeling/ontology/tables`
+- `GET /api/modeling/ontology/standards`
+- `GET /api/modeling/ontology/orders`
+
+→ 상세 문서 참조.
 **발견 일자**: 2026-05-12 Phase 1
 
 ---
