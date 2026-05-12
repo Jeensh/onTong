@@ -72,6 +72,10 @@ export interface CodeColumn {
 }
 
 export interface ExtractedJpo {
+  /** Discriminator added in Phase B. Older payloads without this field
+   *  deserialize as JPO on the backend (default value), so frontend can
+   *  treat missing kind as "jpo" for back-compat. */
+  kind: "jpo";
   package: string;
   class_name: string;
   table_name: string;
@@ -80,6 +84,37 @@ export interface ExtractedJpo {
   regular_columns: CodeColumn[];
   class_docstring?: string | null;
 }
+
+// ── Generic (non-Entity) extraction — Phase B ────────────────────────
+
+export interface MethodSig {
+  name: string;
+  params: string[];             // ["type name", ...]
+  return_type: string;
+  annotations: string[];        // ["@Transactional", ...]
+  javadoc_first_line?: string | null;
+}
+
+export interface FieldSig {
+  name: string;
+  java_type: string;
+  annotations: string[];        // ["@Autowired", ...]
+}
+
+export interface ExtractedGenericClass {
+  kind: "generic";
+  package: string;
+  class_name: string;
+  class_annotations: string[];  // ["@Service", "@RestController", ...]
+  methods_outline: MethodSig[];
+  fields_outline: FieldSig[];
+  class_docstring?: string | null;
+}
+
+/** Discriminated union — branch on `.kind`. Downstream capabilities
+ *  (hypothesis/interview/...) currently require ExtractedJpo; UI gates
+ *  those buttons when kind === "generic" (Phase B-8). */
+export type ExtractedClass = ExtractedJpo | ExtractedGenericClass;
 
 export type DomainRole =
   | "equipment"
@@ -581,9 +616,11 @@ export const authoringApi = {
       fqn?: string;
       repo_id?: string;
     },
-  ): Promise<ExtractedJpo> {
+  ): Promise<ExtractedClass> {
     // Either supply (file_path + file_content) inline, or (fqn + repo_id) and
-    // the backend resolves source_file from CodeTypeRow on its own.
+    // the backend resolves source_file from CodeTypeRow on its own. Backend
+    // dispatcher picks JPO (kind="jpo") for @Entity classes, Generic
+    // (kind="generic") for everything else.
     return http("POST", `/sessions/${id}/extract`, req);
   },
   hypothesize(
