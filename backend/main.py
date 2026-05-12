@@ -69,6 +69,9 @@ from backend.modeling.persistence.database import bootstrap_database
 # 2026-05-12 (Phase 1): Section 3 agent 의 단일 진입점. POST /api/modeling/ontology/query
 # (intent: impact_analysis / simulate / explain) + GET /graph/stats + /term/search.
 from backend.modeling.ontology.api.ontology_router import router as modeling_ontology_query_router
+# 2026-05-12 (Phase 2): Section 3 4 agent (bridge chat / sandbox / code-impact / data-impact).
+# 모든 agent 는 위 /api/modeling/ontology/* 만 호출 (Neo4j 직접 의존 0건).
+from backend.section3.api.router import router as section3_router
 # Section 3 (simulation) — 2026-05-12 zero 재개편. 옛 simulation router 모두 삭제.
 # 새 구현은 backend/section3/ 에 들어갈 예정 (Phase 2~).
 
@@ -466,6 +469,8 @@ app.include_router(authoring_api.router)
 # 새 router 는 Phase 2 에서 backend/section3/ 신설 후 등록.
 # Phase 1 (2026-05-12): modeling 의 ontology query router 등록 — Section 3 agent 의 단일 진입점.
 app.include_router(modeling_ontology_query_router)
+# Phase 2 (2026-05-12): Section 3 4 agent — /api/section3/* (chat / sandbox / code-impact / data-impact).
+app.include_router(section3_router)
 
 
 # Global exception handler
