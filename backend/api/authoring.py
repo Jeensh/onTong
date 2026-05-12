@@ -67,6 +67,11 @@ from backend.application.authoring.capabilities.code_extractor import (
     ExtractedJpo,
     extract_jpo_from_file,
 )
+from backend.application.authoring.capabilities.generic_class_extractor import (
+    ExtractedClass,
+    ExtractedGenericClass,
+    extract_from_file,
+)
 from backend.application.authoring.capabilities.gap_detector import GapAnalysis, detect_gaps
 from backend.application.authoring.capabilities.hypothesis import (
     EntityHypothesis,
@@ -335,8 +340,15 @@ def _resolve_source_from_fqn(fqn: str, repo_id: str | None) -> tuple[str, str]:
     )
 
 
-@router.post("/sessions/{session_id}/extract", response_model=ExtractedJpo)
-async def extract_endpoint(session_id: str, req: ExtractRequest) -> ExtractedJpo:
+@router.post("/sessions/{session_id}/extract", response_model=ExtractedClass)
+async def extract_endpoint(
+    session_id: str, req: ExtractRequest
+) -> ExtractedJpo | ExtractedGenericClass:
+    """Extract one Java file. Dispatcher (extract_from_file) picks the JPO
+    schema for @Entity classes and the lightweight Generic outline schema
+    for everything else. Response carries `kind` discriminator so the
+    frontend can branch UI without sniffing fields.
+    """
     _require_session(session_id)
 
     # Resolve content: either explicit file_content, or look up by fqn.
@@ -350,7 +362,7 @@ async def extract_endpoint(session_id: str, req: ExtractRequest) -> ExtractedJpo
             detail="must provide either (file_path + file_content) or fqn",
         )
 
-    out = await extract_jpo_from_file(
+    out = await extract_from_file(
         path,
         content,
         session_id=session_id,
@@ -375,8 +387,10 @@ async def extract_endpoint(session_id: str, req: ExtractRequest) -> ExtractedJpo
 @router.post("/sessions/{session_id}/extract/stream")
 async def extract_stream_endpoint(session_id: str, req: ExtractRequest):
     """SSE variant of /extract — emits tool_call_* events while the extractor
-    looks up sibling JPOs / parent classes, then a `done` event with the
-    structured ExtractedJpo."""
+    looks up sibling classes / parent types, then a `done` event with the
+    structured payload. The payload's `kind` field is "jpo" for @Entity
+    classes (full JPO schema) or "generic" for everything else
+    (lightweight outline)."""
     _require_session(session_id)
 
     if req.file_content is not None and req.file_path is not None:
@@ -394,7 +408,7 @@ async def extract_stream_endpoint(session_id: str, req: ExtractRequest):
     async def event_stream():
         final_output: dict | None = None
         async for ev in pump.bridge(
-            extract_jpo_from_file(
+            extract_from_file(
                 path,
                 content,
                 session_id=session_id,
