@@ -28,13 +28,18 @@ import { useWorkbench } from "./store";
 import { authoringApi } from "@/lib/api/authoring";
 import type {
   AbsorbedAnswers,
+  ActionHypothesis,
   ArchiveDocument,
   AuthoringSession,
   ConfirmResponse,
   EntityHypothesis,
+  ExtractedClass,
+  ExtractedGenericClass,
   ExtractedJpo,
+  ExtractedService,
   ComprehensiveArchive,
   GapAnalysis,
+  Hypothesis,
   InterviewBatch,
   NamingDecision,
   NextEntityRecommendation,
@@ -42,6 +47,7 @@ import type {
   OntologyOption,
   OptionTable,
   PatternCheck,
+  ServiceHypothesis,
 } from "@/lib/api/authoring";
 
 const DEFAULT_REPO_ID = "smoke-slab";
@@ -55,7 +61,7 @@ export function AuthoringMode() {
   const turnNo = useAuthoring((s) => s.turnNo);
   const resumeSession = useAuthoring((s) => s.resumeSession);
   const completedEntities = useAuthoring((s) => s.completedEntities);
-  const currentJpo = useAuthoring((s) => s.jpo);
+  const currentExtracted = useAuthoring((s) => s.extracted);
 
   // P1a-B: if URL contains ?authoring_session=<id>, auto-resume.
   useEffect(() => {
@@ -89,7 +95,7 @@ export function AuthoringMode() {
                 <span>turn {turnNo}</span>
                 <span>
                   entity {completedEntities.length}
-                  {currentJpo ? ` (+1 진행)` : ""}
+                  {currentExtracted ? ` (+1 진행)` : ""}
                 </span>
                 <span>cost ${costUsd.toFixed(4)}</span>
                 {loading && <span className="text-primary">⏳ 진행 중...</span>}
@@ -112,11 +118,11 @@ export function AuthoringMode() {
 
 function SelectionBanner() {
   const session = useAuthoring((s) => s.session);
-  const jpo = useAuthoring((s) => s.jpo);
+  const extracted = useAuthoring((s) => s.extracted);
   const selectedFqn = useWorkbench((s) => s.selectedCodeTypeFqn);
 
   // 가설/인터뷰가 시작된 후엔 banner 안 보이게 — 답변 영역에 집중.
-  if (jpo) return null;
+  if (extracted) return null;
 
   const simpleName = selectedFqn ? selectedFqn.split(".").pop() : null;
   const pkg = selectedFqn ? selectedFqn.replace(/\.[^.]+$/, "") : null;
@@ -132,11 +138,14 @@ function SelectionBanner() {
   if (!selectedFqn) {
     return (
       <div className="px-3 py-2.5 border-b border-amber-400/40 bg-amber-400/5 text-[11.5px] text-amber-300">
-        <div className="font-semibold mb-0.5">📂 좌측에서 JPO 클래스 선택</div>
+        <div className="font-semibold mb-0.5">📂 좌측에서 Java 클래스 선택</div>
         <div className="text-amber-300/80">
           좌측 패키지 트리 → 패키지 클릭 → <strong>하단 inventory 패널</strong>에서 클래스 클릭.
           <br />
-          (선택 없이 ① 코드 추출 시 bundled <code>HrSpecJpo</code> 사용 — demo 모드)
+          (선택 없이 ① 코드 추출 시 bundled <code>HrSpecJpo</code> (JPA Entity 데모) 사용)
+        </div>
+        <div className="text-[10px] text-amber-300/60 mt-1">
+          <code>@Entity</code> = 가설/인터뷰까지 풀 pipeline · 외 클래스 (<code>@Service</code>/<code>@Controller</code>/POJO) = 추출만, hypothesis 는 Phase C 에서 확장
         </div>
       </div>
     );
@@ -160,7 +169,7 @@ function SelectionBanner() {
 
 function Toolbar() {
   const session = useAuthoring((s) => s.session);
-  const jpo = useAuthoring((s) => s.jpo);
+  const extracted = useAuthoring((s) => s.extracted);
   const hypothesis = useAuthoring((s) => s.hypothesis);
   const batch = useAuthoring((s) => s.batch);
   const answers = useAuthoring((s) => s.answers);
@@ -220,33 +229,79 @@ function Toolbar() {
         size="sm"
         variant="outline"
         onClick={onExtract}
-        disabled={loading || !session || !!jpo}
+        disabled={loading || !session || !!extracted}
         title={
           selectedSimpleName
-            ? `좌측 트리 선택: ${selectedSimpleName}`
-            : "좌측 트리에서 클래스 선택 (없으면 bundled HrSpec)"
+            ? `클래스 선택: ${selectedSimpleName} (자동 분기 — @Entity 면 JPA 풀 pipeline, 외 클래스면 추출만)`
+            : "좌측 트리에서 Java 클래스 선택 (없으면 bundled HrSpec JPA 데모). @Entity 만 가설/인터뷰까지 진행 — 외 클래스는 추출만, Phase C 에서 확장."
         }
       >
         ① 코드 추출{selectedSimpleName && ` (${selectedSimpleName})`}
       </Button>
-      <Button size="sm" variant="outline" onClick={runHypothesize} disabled={loading || !jpo || !!hypothesis}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={runHypothesize}
+        disabled={loading || !extracted || extracted.kind === "generic" || !!hypothesis}
+        title={
+          extracted && extracted.kind === "generic"
+            ? "Generic 클래스는 hypothesis 미지원 — JPA Entity / Service 클래스 선택"
+            : extracted && extracted.kind === "service"
+              ? "Service hypothesis (Phase C-2) — 인터뷰까지 진행 가능 (C-3a). 옵션/갭/명명/archive 는 Entity 전용 (C-3 후속)"
+              : undefined
+        }
+      >
         ② 가설
       </Button>
-      <Button size="sm" variant="outline" onClick={runInterview} disabled={loading || !hypothesis || !!batch}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={runInterview}
+        disabled={loading || !hypothesis || !!batch}
+        title={
+          hypothesis && hypothesis.kind !== "entity"
+            ? `${hypothesis.kind === "service" ? "Service" : "Action"} 인터뷰 (Phase C-3a) — 5~7 짧은 한국어 질문 생성`
+            : undefined
+        }
+      >
         ③ 인터뷰
       </Button>
-      <Button size="sm" variant="outline" onClick={runOptions} disabled={loading || !answers || !!acceptedOption}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={runOptions}
+        disabled={loading || !answers || !!acceptedOption || (hypothesis?.kind !== "entity")}
+        title={
+          hypothesis && hypothesis.kind !== "entity"
+            ? "⑤ 옵션은 Entity 가설 전용 (Phase C-3 후속에서 Service/Action 확장 예정)"
+            : undefined
+        }
+      >
         ⑤ 옵션
       </Button>
-      <Button size="sm" variant="outline" onClick={runGaps} disabled={loading || !answers}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={runGaps}
+        disabled={loading || !answers || (hypothesis?.kind !== "entity")}
+        title={
+          hypothesis && hypothesis.kind !== "entity"
+            ? "⑥ 갭은 Entity 가설 전용 (Phase C-3 후속에서 Service/Action 확장 예정)"
+            : undefined
+        }
+      >
         ⑥ 갭
       </Button>
       <Button
         size="sm"
         variant="outline"
         onClick={runPatternCheck}
-        disabled={loading || !acceptedOptionForToolbar}
-        title="cap 7 — 기존 ontology 패턴과의 정합성 검사"
+        disabled={loading || !acceptedOptionForToolbar || (hypothesis?.kind !== "entity")}
+        title={
+          hypothesis && hypothesis.kind !== "entity"
+            ? "⑦ 패턴은 Entity 가설 전용 (Phase C-3 후속에서 Service/Action 확장 예정)"
+            : "cap 7 — 기존 ontology 패턴과의 정합성 검사"
+        }
       >
         ⑦ 패턴
       </Button>
@@ -259,15 +314,30 @@ function Toolbar() {
       >
         ⑩ 다음 단계
       </Button>
-      <Button size="sm" variant="outline" onClick={runArchive} disabled={loading || !names || !!archive}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={runArchive}
+        disabled={loading || !names || !!archive || (hypothesis?.kind !== "entity")}
+        title={
+          hypothesis && hypothesis.kind !== "entity"
+            ? "⑨ Archive 는 Entity 가설 전용 (Phase C-3 후속에서 Service/Action 확장 예정)"
+            : undefined
+        }
+      >
         ⑨ Archive
       </Button>
       <Button
         size="sm"
         variant="outline"
         onClick={() => runConfirm(DEFAULT_REPO_ID, "scm")}
-        disabled={loading || !names || persistedFqns.length > 0}
+        disabled={loading || !names || persistedFqns.length > 0 || (hypothesis?.kind !== "entity")}
         className="border-emerald-400 text-emerald-400 hover:bg-emerald-400/10"
+        title={
+          hypothesis && hypothesis.kind !== "entity"
+            ? "✓ Confirm 은 Entity 가설 전용 (Phase C-3 후속에서 Service/Action 확장 예정)"
+            : undefined
+        }
       >
         ✓ Confirm
       </Button>
@@ -282,11 +352,11 @@ function Toolbar() {
 function ComprehensiveArchiveButton() {
   const runComprehensiveArchive = useAuthoring((s) => s.runComprehensiveArchive);
   const completedEntities = useAuthoring((s) => s.completedEntities);
-  const jpo = useAuthoring((s) => s.jpo);
+  const extracted = useAuthoring((s) => s.extracted);
   const loading = useAuthoring((s) => s.loading);
   const activeRepoId = useWorkbench((s) => s.activeRepoId);
 
-  const total = completedEntities.length + (jpo ? 1 : 0);
+  const total = completedEntities.length + (extracted ? 1 : 0);
   if (total < 1) return null;
   // Encourage multi-entity use; meaningful from 2+ entities.
   const ready = total >= 2;
@@ -461,13 +531,13 @@ function CopySessionUrlButton() {
 function NextEntityButton() {
   const startNextEntity = useAuthoring((s) => s.startNextEntity);
   const pickNextEntity = useAuthoring((s) => s.pickNextEntity);
-  const jpo = useAuthoring((s) => s.jpo);
+  const extracted = useAuthoring((s) => s.extracted);
   const archive = useAuthoring((s) => s.archive);
   const persistedFqns = useAuthoring((s) => s.persistedFqns);
   const loading = useAuthoring((s) => s.loading);
   const activeRepoId = useWorkbench((s) => s.activeRepoId);
 
-  if (!jpo) return null;
+  if (!extracted) return null;
   // Encourage post-archive transition; greyed earlier so the user feels
   // the natural sequence (archive → next entity).
   const ready = !!archive || persistedFqns.length > 0;
@@ -492,8 +562,8 @@ function NextEntityButton() {
       disabled={loading}
       title={
         ready
-          ? "현재 entity 마무리 + 다음 JPO 자동 추천"
-          : "Archive/Confirm 후 권장 — 클릭 시 history 저장 + 다음 JPO 추천"
+          ? "현재 entity 마무리 + 다음 JPA Entity 자동 추천 (Service/Action 은 roadmap)"
+          : "Archive/Confirm 후 권장 — 클릭 시 history 저장 + 다음 JPA Entity 추천"
       }
       className={cn(
         "border-violet-400 text-violet-400 hover:bg-violet-400/10",
@@ -537,7 +607,7 @@ function LiveToolTraceCard({ trace }: { trace: { stage: string | null; currentTo
       case "options": return "옵션 제시";
       case "gaps": return "갭 탐지";
       case "pattern": return "패턴 검사";
-      case "next_entity": return "다음 JPO 추천";
+      case "next_entity": return "다음 JPA Entity 추천";
       default: return "분석";
     }
   })();
@@ -735,9 +805,9 @@ function ChatPayload({ m }: { m: ChatMessage }) {
     case "error":
       return <div className="whitespace-pre-wrap">{String(m.payload)}</div>;
     case "extracted":
-      return <ExtractedView jpo={m.payload as ExtractedJpo} />;
+      return <ExtractedView extracted={m.payload as ExtractedClass} />;
     case "hypothesis":
-      return <HypothesisView h={m.payload as EntityHypothesis} />;
+      return <HypothesisDispatcher h={m.payload as Hypothesis} />;
     case "interview":
       return <InterviewView batch={m.payload as InterviewBatch} />;
     case "absorbed":
@@ -765,9 +835,18 @@ function ChatPayload({ m }: { m: ChatMessage }) {
 
 // ── Per-kind chat renderers (compact — full detail lives in preview) ─────
 
-function ExtractedView({ jpo }: { jpo: ExtractedJpo }) {
+function ExtractedView({ extracted }: { extracted: ExtractedClass }) {
+  if (extracted.kind === "jpo") return <JpoExtractedView jpo={extracted} />;
+  if (extracted.kind === "service") return <ServiceExtractedView s={extracted} />;
+  return <GenericExtractedView c={extracted} />;
+}
+
+function JpoExtractedView({ jpo }: { jpo: ExtractedJpo }) {
   return (
     <div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-0.5">
+        JPA Entity
+      </div>
       <div className="font-semibold text-violet-400 mb-1">
         {jpo.class_name} → {jpo.table_name}
       </div>
@@ -777,6 +856,65 @@ function ExtractedView({ jpo }: { jpo: ExtractedJpo }) {
       </div>
     </div>
   );
+}
+
+function ServiceExtractedView({ s }: { s: ExtractedService }) {
+  const primary = s.class_annotations.find((a) =>
+    /^@(RestController|Controller|Service|Repository|Component|Configuration)\b/.test(a),
+  );
+  const label = primary ? primary.replace(/\(.*$/, "") : "@Component";
+  const depCount = s.dependencies.length;
+  const repoCount = s.dependencies.filter((d) => d.is_repository).length;
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-0.5">
+        Spring Service {label}
+      </div>
+      <div className="font-semibold text-violet-400 mb-1">{s.class_name}</div>
+      <div className="text-[11px] text-muted-foreground">
+        deps {depCount}개{repoCount > 0 && <> (그중 Repository {repoCount})</>} ·
+        exposed {s.exposed_methods.length} method{s.exposed_methods.length === 1 ? "" : "s"} ·
+        tx 경계 {s.transaction_boundary_methods.length}
+        {s.rest_endpoints.length > 0 && <> · REST {s.rest_endpoints.length}</>}
+        {s.publishes_events.length > 0 && <> · events {s.publishes_events.length}</>}
+      </div>
+      <div className="text-[10px] text-amber-300/80 mt-1">
+        ⓘ 추출만 완료 — Service hypothesis / 인터뷰는 Phase C-2 에서 지원
+      </div>
+    </div>
+  );
+}
+
+function GenericExtractedView({ c }: { c: ExtractedGenericClass }) {
+  // Pick the most informative class-level annotation for the caplabel.
+  // Falls back to "Java 클래스" when nothing distinctive is present (POJO).
+  const primary = c.class_annotations.find((a) =>
+    /^@(Service|RestController|Controller|Component|Repository|Configuration)\b/.test(a),
+  );
+  const label = primary ? primary.replace(/\(.*$/, "") : "Java 클래스";
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-0.5">
+        {label}
+      </div>
+      <div className="font-semibold text-violet-400 mb-1">{c.class_name}</div>
+      <div className="text-[11px] text-muted-foreground">
+        methods {c.methods_outline.length}개 · fields {c.fields_outline.length}개
+        {c.class_annotations.length > 0 && (
+          <> · annotations: {c.class_annotations.slice(0, 3).join(", ")}{c.class_annotations.length > 3 && " …"}</>
+        )}
+      </div>
+      <div className="text-[10px] text-amber-300/80 mt-1">
+        ⓘ 추출만 완료 — 가설 / 인터뷰 등 downstream 은 JPA Entity 만 지원 (Phase C 에서 확장 예정)
+      </div>
+    </div>
+  );
+}
+
+function HypothesisDispatcher({ h }: { h: Hypothesis }) {
+  if (h.kind === "entity") return <HypothesisView h={h} />;
+  if (h.kind === "service") return <ServiceHypothesisView h={h} />;
+  return <ActionHypothesisView h={h} />;
 }
 
 function HypothesisView({ h }: { h: EntityHypothesis }) {
@@ -793,6 +931,69 @@ function HypothesisView({ h }: { h: EntityHypothesis }) {
       {h.concerns.length > 0 && (
         <div className="text-[11px] text-rose-400 mt-1">⚠ {h.concerns[0]}</div>
       )}
+    </div>
+  );
+}
+
+function ServiceHypothesisView({ h }: { h: ServiceHypothesis }) {
+  return (
+    <div>
+      <div className="font-semibold mb-1">
+        🧩 Service 가설: <span className="text-violet-400">{h.candidate_capability_korean}</span>
+        <code className="ml-2 text-[11px] font-mono text-muted-foreground">{h.candidate_capability_english}</code>
+        <span className="ml-2 text-[10px] px-1.5 py-px rounded-full border border-sky-400 text-sky-400 bg-sky-400/10">
+          {h.service_role}
+        </span>
+        <span className="ml-2 text-[10px] px-1.5 py-px rounded-full border border-amber-400 text-amber-400 bg-amber-400/10">
+          conf {h.confidence.toFixed(2)}
+        </span>
+      </div>
+      <div className="text-[11.5px] text-muted-foreground">{h.responsibility_summary}</div>
+      {h.write_boundary_summary && (
+        <div className="text-[11px] text-amber-300/90 mt-1">✍ {h.write_boundary_summary}</div>
+      )}
+      {h.key_use_cases.length > 0 && (
+        <div className="text-[11px] text-muted-foreground mt-1">
+          핵심 use-case: {h.key_use_cases.map((u) => u.method_name).join(", ")}
+        </div>
+      )}
+      {h.concerns.length > 0 && (
+        <div className="text-[11px] text-rose-400 mt-1">⚠ {h.concerns[0]}</div>
+      )}
+      <div className="text-[10px] text-amber-300/70 mt-1">
+        ⓘ Service hypothesis + 인터뷰 지원 (Phase C-3a) — 옵션/갭/명명/archive 는 후속
+      </div>
+    </div>
+  );
+}
+
+function ActionHypothesisView({ h }: { h: ActionHypothesis }) {
+  return (
+    <div>
+      <div className="font-semibold mb-1">
+        ⚡ Action 가설: <span className="text-violet-400">{h.domain_verb_korean}</span>
+        <code className="ml-2 text-[11px] font-mono text-muted-foreground">{h.domain_verb_english}</code>
+        <span className="ml-2 text-[10px] px-1.5 py-px rounded-full border border-orange-400 text-orange-400 bg-orange-400/10">
+          {h.action_kind_guess}
+        </span>
+        <span className="ml-2 text-[10px] px-1.5 py-px rounded-full border border-amber-400 text-amber-400 bg-amber-400/10">
+          conf {h.confidence.toFixed(2)}
+        </span>
+      </div>
+      {h.output_meaning_korean && (
+        <div className="text-[11.5px] text-muted-foreground">→ {h.output_meaning_korean}</div>
+      )}
+      {h.br_candidates.length > 0 && (
+        <div className="text-[11px] text-rose-300 mt-1">
+          BR 후보 {h.br_candidates.length}개 (예: {h.br_candidates[0].statement_korean})
+        </div>
+      )}
+      {h.concerns.length > 0 && (
+        <div className="text-[11px] text-rose-400 mt-1">⚠ {h.concerns[0]}</div>
+      )}
+      <div className="text-[10px] text-amber-300/70 mt-1">
+        ⓘ Action hypothesis + 인터뷰 지원 (Phase C-3a) — BR 확정/옵션 등 downstream 은 후속
+      </div>
     </div>
   );
 }
@@ -1123,7 +1324,7 @@ function NextEntityView({ r }: { r: NextEntityRecommendation }) {
   return (
     <div>
       <div className="font-semibold mb-1">
-        🔮 다음 JPO 추천 ({r.candidates.length})
+        🔮 다음 JPA Entity 추천 ({r.candidates.length})
       </div>
       <div className="text-[11.5px] text-muted-foreground mb-1.5">
         {r.summary_korean}
@@ -1156,7 +1357,7 @@ function NextEntityView({ r }: { r: NextEntityRecommendation }) {
                 onClick={() => runExtract({ fqn: c.fqn, repoId: activeRepoId })}
                 title={c.fqn}
               >
-                ① 이 JPO 로 시작
+                ① 이 Entity 로 시작
               </Button>
             </li>
           );
@@ -1398,12 +1599,12 @@ function CompletedEntitiesPreview() {
       <ol className="space-y-1">
         {completedEntities.map((c, i) => (
           <li
-            key={`${c.jpo.class_name}-${c.completedAt}`}
+            key={`${c.extracted.class_name}-${c.completedAt}`}
             className="border-l-2 border-violet-400/60 pl-2 py-1 text-[11.5px]"
           >
             <div className="flex items-center justify-between gap-2">
               <strong className="text-violet-300">
-                {i + 1}. {c.jpo.class_name}
+                {i + 1}. {c.extracted.class_name}
               </strong>
               <span className="text-[10px] text-muted-foreground">
                 {new Date(c.completedAt).toLocaleTimeString("ko-KR", {
@@ -1416,7 +1617,7 @@ function CompletedEntitiesPreview() {
               {c.acceptedOption ? (
                 <>★ {c.acceptedOption.name}</>
               ) : c.hypothesis ? (
-                <>가설: {c.hypothesis.candidate_term_korean}</>
+                <>가설: {_hypothesisDisplayFields(c.hypothesis).korean}</>
               ) : (
                 <>(미완)</>
               )}
@@ -1497,6 +1698,36 @@ function ArchivePreview({ archive }: { archive: ArchiveDocument }) {
   );
 }
 
+function _hypothesisDisplayFields(h: Hypothesis): {
+  korean: string;
+  english: string;
+  role: string;
+  summary: string;
+} {
+  if (h.kind === "entity") {
+    return {
+      korean: h.candidate_term_korean,
+      english: h.candidate_term_english,
+      role: h.domain_role,
+      summary: h.pk_role_summary,
+    };
+  }
+  if (h.kind === "service") {
+    return {
+      korean: h.candidate_capability_korean,
+      english: h.candidate_capability_english,
+      role: h.service_role,
+      summary: h.responsibility_summary,
+    };
+  }
+  return {
+    korean: h.domain_verb_korean,
+    english: h.domain_verb_english,
+    role: h.action_kind_guess,
+    summary: h.output_meaning_korean ?? "",
+  };
+}
+
 function HypothesisCard() {
   // P2-B: refresh button + contradiction indicator. The button re-runs cap 2
   // and clears downstream artifacts so the user can iterate cleanly.
@@ -1512,14 +1743,15 @@ function HypothesisCard() {
   // Heuristic contradiction count from absorbed answers' contradicts list.
   const contradictionCount = answers?.contradictions.length ?? 0;
   const hasAnswers = !!answers;
+  const display = _hypothesisDisplayFields(hypothesis);
 
   return (
     <div>
       <div className="flex items-start justify-between gap-2 mb-1">
         <div className="flex-1">
-          <div className="text-[14px] font-semibold">{hypothesis.candidate_term_korean}</div>
+          <div className="text-[14px] font-semibold">{display.korean}</div>
           <code className="text-[11px] font-mono text-muted-foreground">
-            {hypothesis.candidate_term_english}
+            {display.english}
           </code>
         </div>
         {hasAnswers && (
@@ -1545,10 +1777,12 @@ function HypothesisCard() {
         </div>
       )}
       <div className="text-[11px] text-muted-foreground mt-1">
-        role: <strong>{hypothesis.domain_role}</strong> · confidence:{" "}
+        role: <strong>{display.role}</strong> · confidence:{" "}
         {hypothesis.confidence.toFixed(2)}
       </div>
-      <div className="text-[11.5px] mt-2">{hypothesis.pk_role_summary}</div>
+      {display.summary && (
+        <div className="text-[11.5px] mt-2">{display.summary}</div>
+      )}
     </div>
   );
 }

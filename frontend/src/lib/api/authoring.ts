@@ -72,6 +72,10 @@ export interface CodeColumn {
 }
 
 export interface ExtractedJpo {
+  /** Discriminator added in Phase B. Older payloads without this field
+   *  deserialize as JPO on the backend (default value), so frontend can
+   *  treat missing kind as "jpo" for back-compat. */
+  kind: "jpo";
   package: string;
   class_name: string;
   table_name: string;
@@ -80,6 +84,123 @@ export interface ExtractedJpo {
   regular_columns: CodeColumn[];
   class_docstring?: string | null;
 }
+
+// ── Generic (non-Entity) extraction — Phase B ────────────────────────
+
+export interface MethodSig {
+  name: string;
+  params: string[];             // ["type name", ...]
+  return_type: string;
+  annotations: string[];        // ["@Transactional", ...]
+  javadoc_first_line?: string | null;
+}
+
+export interface FieldSig {
+  name: string;
+  java_type: string;
+  annotations: string[];        // ["@Autowired", ...]
+}
+
+export interface ExtractedGenericClass {
+  kind: "generic";
+  package: string;
+  class_name: string;
+  class_annotations: string[];  // ["@Service", "@RestController", ...]
+  methods_outline: MethodSig[];
+  fields_outline: FieldSig[];
+  class_docstring?: string | null;
+}
+
+// ── Service extraction — Phase C-1a ──────────────────────────────────
+
+export interface ServiceDependency {
+  field_name: string;
+  type_simple: string;
+  injection_style: "field" | "constructor" | "setter" | "unknown";
+  is_repository: boolean;
+}
+
+export interface ServiceMethod {
+  name: string;
+  params: string[];
+  return_type: string;
+  annotations: string[];
+  javadoc_first_line?: string | null;
+  is_transactional: boolean;
+}
+
+export interface RestEndpoint {
+  http_method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "ANY";
+  path: string;
+  handler_method: string;
+}
+
+export interface ExtractedService {
+  kind: "service";
+  package: string;
+  class_name: string;
+  class_annotations: string[];
+  dependencies: ServiceDependency[];
+  exposed_methods: ServiceMethod[];
+  transaction_boundary_methods: string[];
+  rest_endpoints: RestEndpoint[];
+  publishes_events: string[];
+  class_docstring?: string | null;
+}
+
+// ── Action extraction — Phase C-1b (method-level, separate endpoint) ──
+
+export interface ActionParam {
+  name: string;
+  type_simple: string;
+  domain_meaning_hint?: string | null;
+}
+
+export interface Callee {
+  receiver_type: string;
+  method_name: string;
+  is_repository_call: boolean;
+  is_external_call: boolean;
+}
+
+export interface SideEffect {
+  op:
+    | "db_write"
+    | "db_read"
+    | "external_call"
+    | "event_publish"
+    | "log_only"
+    | "in_memory_only";
+  target_hint: string;
+}
+
+export interface AnchorHint {
+  locator: string;
+  line?: number | null;
+  note?: string | null;
+}
+
+export interface ExtractedAction {
+  kind: "action";
+  enclosing_class_fqn: string;
+  method_name: string;
+  params: ActionParam[];
+  return_type: string;
+  return_meaning_hint?: string | null;
+  method_annotations: string[];
+  javadoc?: string | null;
+  callees: Callee[];
+  side_effects: SideEffect[];
+  br_refs: string[];
+  anchors_hint: AnchorHint[];
+  is_idempotent_guess?: boolean | null;
+}
+
+/** Class-level discriminated union — branch on `.kind`. ExtractedAction is
+ *  NOT included because Action is method-scoped and invoked through a
+ *  separate endpoint (UI: pick method from a class first). Downstream
+ *  capabilities currently require ExtractedJpo; UI gates accordingly. */
+export type ExtractedClass = ExtractedJpo | ExtractedService | ExtractedGenericClass;
 
 export type DomainRole =
   | "equipment"
@@ -96,6 +217,8 @@ export interface ColumnNote {
 }
 
 export interface EntityHypothesis {
+  /** Phase C-2 discriminator. */
+  kind: "entity";
   candidate_term_korean: string;
   candidate_term_english: string;
   domain_role: DomainRole;
@@ -107,6 +230,82 @@ export interface EntityHypothesis {
   assumptions: string[];
   concerns: string[];
 }
+
+// ── Service hypothesis — Phase C-2 ───────────────────────────────────
+
+export type ServiceDomainRole =
+  | "orchestrator"
+  | "rest_facade"
+  | "domain_service"
+  | "data_access"
+  | "event_consumer"
+  | "scheduled_job"
+  | "infrastructure_adapter"
+  | "unknown";
+
+export interface CollaboratorNote {
+  dependency: string;
+  interpreted_role: string;
+}
+
+export interface ServiceUseCase {
+  method_name: string;
+  summary_korean: string;
+  triggers?: string | null;
+}
+
+export interface ServiceHypothesis {
+  kind: "service";
+  candidate_capability_korean: string;
+  candidate_capability_english: string;
+  service_role: ServiceDomainRole;
+  responsibility_summary: string;
+  collaborator_notes: CollaboratorNote[];
+  write_boundary_summary?: string | null;
+  key_use_cases: ServiceUseCase[];
+  domain_questions: string[];
+  confidence: number;
+  assumptions: string[];
+  concerns: string[];
+}
+
+// ── Action hypothesis — Phase C-2 ────────────────────────────────────
+
+export type ActionKindGuess =
+  | "pure_function"
+  | "effectful"
+  | "workflow"
+  | "unknown";
+
+export interface ActionParamMeaning {
+  param_name: string;
+  interpreted_meaning_korean: string;
+}
+
+export interface ActionBrCandidate {
+  statement_korean: string;
+  severity_guess: "hard" | "soft" | "unknown";
+  anchor_locator_hint?: string | null;
+}
+
+export interface ActionHypothesis {
+  kind: "action";
+  domain_verb_korean: string;
+  domain_verb_english: string;
+  action_kind_guess: ActionKindGuess;
+  input_meanings: ActionParamMeaning[];
+  output_meaning_korean?: string | null;
+  preconditions_korean: string[];
+  postconditions_korean: string[];
+  br_candidates: ActionBrCandidate[];
+  domain_questions: string[];
+  confidence: number;
+  assumptions: string[];
+  concerns: string[];
+}
+
+/** Discriminated union over the 3 hypothesis variants. */
+export type Hypothesis = EntityHypothesis | ServiceHypothesis | ActionHypothesis;
 
 export type Importance = "critical" | "standard" | "optional";
 
@@ -581,20 +780,28 @@ export const authoringApi = {
       fqn?: string;
       repo_id?: string;
     },
-  ): Promise<ExtractedJpo> {
+  ): Promise<ExtractedClass> {
     // Either supply (file_path + file_content) inline, or (fqn + repo_id) and
-    // the backend resolves source_file from CodeTypeRow on its own.
+    // the backend resolves source_file from CodeTypeRow on its own. Backend
+    // dispatcher picks JPO (kind="jpo") for @Entity classes, Generic
+    // (kind="generic") for everything else.
     return http("POST", `/sessions/${id}/extract`, req);
   },
   hypothesize(
     id: string,
-    req: { turn_no: number; extracted_jpo: ExtractedJpo; user_comment?: string },
-  ): Promise<EntityHypothesis> {
+    req: {
+      turn_no: number;
+      /** Phase C-2: accepts ExtractedJpo, ExtractedService, or ExtractedAction.
+       *  Backend dispatches to the matching hypothesis prompt by .kind. */
+      extracted: ExtractedJpo | ExtractedService | ExtractedAction;
+      user_comment?: string;
+    },
+  ): Promise<Hypothesis> {
     return http("POST", `/sessions/${id}/hypothesize`, req);
   },
   interview(
     id: string,
-    req: { turn_no: number; hypothesis: EntityHypothesis; user_comment?: string },
+    req: { turn_no: number; hypothesis: Hypothesis; user_comment?: string },
   ): Promise<InterviewBatch> {
     return http("POST", `/sessions/${id}/interview`, req);
   },
@@ -674,7 +881,7 @@ export const authoringApi = {
     id: string,
     req: {
       turn_no: number;
-      extracted_jpo: ExtractedJpo;
+      extracted: ExtractedJpo | ExtractedService | ExtractedAction;
       user_comment?: string;
     },
     signal?: AbortSignal,
