@@ -1,0 +1,27 @@
+[plugin]
+name = "v2-slab-design"
+version = "0.1.0"
+description = "onTong slab manufacturing twin plugin (post-Phase-α rewrite, Track A2)"
+
+[recommendation]
+default_provider = "claude"
+default_model = "claude-opus-4-7"
+allowed_providers = ["claude", "openai", "gemini"]
+max_retries = 3
+
+[extensions]
+dispatchers = []    # v2 minimal — Case 1-2 만 사용, framework core 의 8 dispatch_kind 로 충분
+annotations = []
+aop = []
+bytecode = []
+
+[schema]
+source = "jpa_annotation"   # JPA annotation 기반 schema extraction
+
+[fixtures]
+ids = ["S1", "S2", "S3", "S4", "S5"]
+
+[contracts]
+domain_exception = "AlgorithmException"
+numeric_convention = "decimal64_halfeven"
+domain_namespace_class = "SdConstants"

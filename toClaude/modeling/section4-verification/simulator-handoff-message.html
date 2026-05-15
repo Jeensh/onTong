@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>onTong · Section 4 → Section 3 시뮬레이션 인계</title>
+<style>
+  :root {
+    --bg:        #fafaf7;
+    --fg:        #1a1a1a;
+    --muted:     #6c6c6c;
+    --line:      #e5e3dc;
+    --accent1:   #d9531e;  /* orange */
+    --accent2:   #2f8f5d;  /* green  */
+    --accent3:   #4858a8;  /* indigo */
+    --warn:      #b8761a;
+    --code-bg:   #2b2b2b;
+    --code-fg:   #f5f3ec;
+    --kbd-bg:    #ffffff;
+    --kbd-fg:    #333;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Noto Sans KR", "Segoe UI", sans-serif;
+    line-height: 1.55;
+    margin: 0;
+    padding: 28px 24px 80px;
+    max-width: 980px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  header.hero {
+    border-left: 6px solid var(--accent1);
+    padding: 12px 18px;
+    background: linear-gradient(90deg, rgba(217,83,30,0.06), transparent);
+    margin-bottom: 32px;
+  }
+  header.hero h1 {
+    font-size: 24px;
+    margin: 0 0 6px;
+  }
+  header.hero .sub {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0;
+  }
+
+  section { margin: 28px 0 36px; }
+  h2 {
+    font-size: 20px;
+    border-bottom: 2px solid var(--line);
+    padding-bottom: 6px;
+    margin: 0 0 14px;
+  }
+  h2 .num {
+    display: inline-block;
+    background: var(--accent3);
+    color: white;
+    font-size: 13px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin-right: 8px;
+    vertical-align: 3px;
+  }
+  h3 { font-size: 16px; margin: 18px 0 8px; }
+
+  /* badges */
+  .badge {
+    display: inline-block;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 6px;
+    font-weight: 600;
+  }
+  .badge.ok      { background: var(--accent2); color: white; }
+  .badge.warn    { background: var(--warn);    color: white; }
+  .badge.info    { background: var(--accent3); color: white; }
+
+  /* tables */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 14px;
+    margin: 8px 0 12px;
+  }
+  th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th { background: #f0eee6; font-weight: 600; }
+  td code { font-size: 12.5px; }
+
+  /* code block */
+  pre {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: 14px 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 8px 0 12px;
+    position: relative;
+  }
+  pre code { color: inherit; background: transparent; padding: 0; }
+  code {
+    background: rgba(0,0,0,0.06);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: "SF Mono", "Menlo", "Consolas", monospace;
+    font-size: 12.5px;
+  }
+  /* copy button */
+  .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    background: rgba(255,255,255,0.12);
+    color: var(--code-fg);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .copy-btn:hover { background: rgba(255,255,255,0.22); }
+  .copy-btn.copied { background: var(--accent2); border-color: var(--accent2); }
+
+  /* card */
+  .card {
+    background: white;
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--accent3);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 10px 0;
+  }
+  .card.green  { border-left-color: var(--accent2); }
+  .card.orange { border-left-color: var(--accent1); }
+  .card.warn   { border-left-color: var(--warn);    background: #fdf7e9; }
+  .card h4 { margin: 0 0 6px; font-size: 15px; }
+  .card p, .card ul { margin: 4px 0; font-size: 14px; }
+  .card ul { padding-left: 22px; }
+
+  /* link */
+  a { color: var(--accent3); text-decoration: none; border-bottom: 1px dashed var(--accent3); }
+  a:hover { color: var(--accent1); border-bottom-style: solid; }
+
+  /* lead */
+  .lead {
+    background: white;
+    padding: 14px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    margin: 4px 0 16px;
+    font-size: 14.5px;
+  }
+  .lead strong { color: var(--accent1); }
+
+  /* footer */
+  footer {
+    margin-top: 60px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12.5px;
+    text-align: center;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 12px 0 16px;
+  }
+  .stat-card {
+    background: white;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .stat-card .num {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent3);
+  }
+  .stat-card.green .num  { color: var(--accent2); }
+  .stat-card.orange .num { color: var(--accent1); }
+  .stat-card .lbl {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  ol.steps { padding-left: 22px; }
+  ol.steps > li { margin: 10px 0; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>onTong · Section 4 → Section 3 시뮬레이션 인계 <span class="badge ok">PUSH 완료</span></h1>
+  <p class="sub">
+    sim_v2 검증 framework + handoff 패키지를 시뮬레이션 담당자에게 인계.
+    이 페이지 하나로 <strong>무엇을 / 어디서 / 어떻게</strong> 받는지 모두 확인 가능.
+    작성: 2026-05-16
+  </p>
+</header>
+
+<div class="lead">
+  <strong>한 줄 요약 —</strong>
+  GitHub branch <code>section4-handoff-clean</code> 을 checkout 하면
+  <code>backend/sim_v2/</code> (8 모듈 + 42 demo + 1,892 tests),
+  <code>toClaude/modeling/section4-verification/section3_handoff/</code> (README + recipe 5개 + API reference 7개 + 인터랙티브 HTML),
+  그리고 <code>data/slab-v2-handoff.db</code> (slab-design-real-v2 production data, 3.4 MB) 가 모두 들어 있음.
+  본인 클로드 코드에 §5 의 메시지를 붙여넣으면 작업 시작.
+</div>
+
+<div class="stats">
+  <div class="stat-card green"><div class="num">8 / 8</div>
+    <div class="lbl">알려진 한계 close</div></div>
+  <div class="stat-card green"><div class="num">1,892</div>
+    <div class="lbl">pytest passed</div></div>
+  <div class="stat-card orange"><div class="num">6 / 11</div>
+    <div class="lbl">production action PASS</div></div>
+  <div class="stat-card orange"><div class="num">9 / 10</div>
+    <div class="lbl">한국어 search hit</div></div>
+</div>
+
+<!-- ──────────────────────────────────────────────────────────────────── -->
+<section id="what">
+<h2><span class="num">1</span>무엇을 전달드립니다 (산출물 4 묶음)</h2>
+
+<div class="card green">
+  <h4>① <code>backend/sim_v2/</code> — sim_v2 verification framework <span class="badge ok">코드</span></h4>
+  <ul>
+    <li><strong>8 모듈</strong>: W59 in-process exec · W71 fixture 합성 · W72 invariant · W73 baseline · W74 stub injection · W75 idiom rewrite · W77 한국어 검색 · W78 hybrid tier</li>
+    <li><strong>42 UC demo</strong>: UC1~UC42 (각 자산이 production DB 에서 동작하는 시연 코드)</li>
+    <li><strong>1,892 pytest</strong>: <code>.venv/bin/python -m pytest backend/sim_v2/</code> 로 즉시 회귀 확인</li>
+    <li><strong>3-system plugin</strong>: slab-design-real-v2 + Banking + Broadleaf 동일 framework 위에서 검증</li>
+  </ul>
+</div>
+
+<div class="card orange">
+  <h4>② <code>section3_handoff/</code> — handoff 패키지 <span class="badge warn">문서 + recipe</span></h4>
+  <p>위치: <code>toClaude/modeling/section4-verification/section3_handoff/</code></p>
+  <ul>
+    <li><code>README.md</code> — navigation hub. <strong>§8 시뮬레이션 담당자 onboarding 가이드 (이 페이지의 상세 버전)</strong></li>
+    <li><code>for-humans.html</code> — 사람 (담당자) 용 인터랙티브 요약 (9 sections, before/after, 4 tier ASCII diagram)</li>
+    <li><code>gap-analysis.md</code> — Section 3 의 8 한계 → sim_v2 자산 1:1 매핑 표</li>
+    <li><code>api-reference/</code> — W59 / W71 / W72 / W73 / W74 / W75 / W77+W78 7 모듈 한국어 API</li>
+    <li><code>usage-recipes/recipe-1 ~ 5</code> — 즉시 실행 가능한 Python recipe (production DB 동작 확인됨)</li>
+    <li><code>transpiler-bridge.md</code> — 본인 transpiler.py ↔ sim_v2 translator 매핑 옵션</li>
+    <li><code>screenshots/</code> — UC36 capstone + simulation-viewer 7 탭</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h4>③ <code>sim-redesign/</code> — 아키텍처 결정 기록 <span class="badge info">참조</span></h4>
+  <p>위치: <code>toClaude/modeling/section4-verification/sim-redesign/</code></p>
+  <ul>
+    <li><strong>ADR-001 ~ 013</strong> — Python twin / 2-Engine substrate / 4-layer schema / LLM defenses / polymorphic dispatch / annotation processing / AOP / bytecode / phase alpha discard / 3-system selection / LLM-agnostic recommendation / extensibility</li>
+    <li><strong>spec.md / DECISIONS-CONFIRMED.md</strong> — 결정 근거 + 시뮬레이션 담당자가 본인 엔진을 같은 패턴으로 진화시킬 수 있도록 자산화된 내용</li>
+    <li><strong>BANKING-DESIGN / BROADLEAF-ONBOARDING</strong> — 다른 시스템 plugin 으로 어떻게 가능했는지 사례</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h4>④ 인터랙티브 HTML 자료 <span class="badge info">브라우저</span></h4>
+  <ul>
+    <li><code>section4-verification/section3_handoff/for-humans.html</code> — 사람용 종합 페이지</li>
+    <li><code>section4-verification/section3_handoff/landing.html</code> — landing page 톤 (orange/green)</li>
+    <li><code>section4-verification/simulation-viewer.html</code> — UC36+37+38+39 interactive 결과 viewer (7 탭)</li>
+    <li><code>section4-verification/b-level-capstone-summary.html</code> — B-level capstone 결과</li>
+    <li><code>section4-verification/sim-v2-v2-final-goal-summary.html</code> — UC36 v2 최종 목표 시각화</li>
+  </ul>
+</div>
+
+<div class="card green">
+  <h4>⑤ <code>data/slab-v2-handoff.db</code> — slab-design-real-v2 production data <span class="badge ok">3.4 MB · 자동 선택</span></h4>
+  <p>모든 demo (UC40 / UC41 / UC42) 와 recipe-5 가 이 DB 를 자동으로 잡아씁니다 (절대 경로 hardcoding 제거, env var 우선 + path resolver fallback). 별도 setup 불필요.</p>
+  <p>resolution order (<code>backend/sim_v2/demos/uc10_production_inspector/run.py</code> 의 <code>_resolve_db_path</code>):</p>
+  <ul>
+    <li>① <code>SIM_V2_DB_PATH</code> 환경 변수 (있으면 그거)</li>
+    <li>② <code>data/ontology.db</code> — slab-design-real-v2 가 포함된 경우만 (modeling dev 측의 full DB)</li>
+    <li>③ <code>data/slab-v2-handoff.db</code> ★ — 시뮬레이션 측이 받는 v2-only DB</li>
+  </ul>
+  <p>시뮬레이션 환경에는 ②가 (있어도 v2 가 없으므로) skip 되고 자동으로 ③ 선택. checkout 후 그냥 demo 실행하면 됨.</p>
+</div>
+</section>
+
+
+<!-- ──────────────────────────────────────────────────────────────────── -->
+<section id="where">
+<h2><span class="num">2</span>어디서 받습니까 — GitHub branch</h2>
+
+<table>
+  <tr><th style="width: 26%;">항목</th><th>값</th></tr>
+  <tr><td>Repo</td><td><a href="https://github.com/Jeensh/onTong" target="_blank">https://github.com/Jeensh/onTong</a></td></tr>
+  <tr><td>Branch</td><td><code>section4-handoff-clean</code></td></tr>
+  <tr><td>Branch URL</td><td><a href="https://github.com/Jeensh/onTong/tree/section4-handoff-clean" target="_blank">https://github.com/Jeensh/onTong/tree/section4-handoff-clean</a></td></tr>
+  <tr><td>Base</td><td><code>main</code> (clean, 우리 두 commit 만 얹음)</td></tr>
+  <tr><td>Commit 1</td><td><code>feat(sim_v2): W1-W78 verification framework + 3-system plugin substrate</code></td></tr>
+  <tr><td>Commit 2</td><td><code>docs(section4): Section 3 handoff package + sim-redesign ADRs</code></td></tr>
+</table>
+
+<div class="card warn">
+  <h4>⚠ 다른 branch (<code>section4-verification</code>) 와 헷갈리지 마세요</h4>
+  <p><code>section4-verification</code> 은 모델링 세션의 작업 브랜치라 modeling authoring 작업이 섞여 있음. 시뮬레이션 담당자에게 필요한 것은 <code>section4-handoff-clean</code> 단 하나. main 기반 + 2 commits 로 깔끔.</p>
+</div>
+</section>
+
+
+<!-- ──────────────────────────────────────────────────────────────────── -->
+<section id="howget">
+<h2><span class="num">3</span>어떻게 받습니까 — 4 단계</h2>
+
+<ol class="steps">
+  <li>
+    <strong>Clone / checkout (shallow 권장 — 빠르고 가벼움)</strong>
+    <pre><button class="copy-btn" data-copy="pull">copy</button><code id="pull"># 신규 worktree 면 shallow clone (history 안 받음, branch tip 만)
+git clone --depth 1 --branch section4-handoff-clean \
+  https://github.com/Jeensh/onTong.git onTong
+cd onTong
+
+# 이미 onTong repo 가 있으면:
+# git fetch origin section4-handoff-clean --depth 1
+# git checkout section4-handoff-clean</code></pre>
+    <p style="font-size: 12.5px; color: var(--muted); margin-top: 4px;">
+      💡 normal clone 도 동작하지만 main 의 history 에 큰 binary (81 MB jar 등)
+      가 있어서 무거움. <code>--depth 1</code> 사용 시 branch tip 만 — 즉시 시작.
+    </p>
+  </li>
+
+  <li>
+    <strong>환경 setup + 회귀 확인</strong>
+    <pre><button class="copy-btn" data-copy="setup">copy</button><code id="setup">python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# production DB 확인 — slab-v2-handoff.db (3.4 MB) 가 들어 있음
+ls -lh data/slab-v2-handoff.db
+
+# sim_v2 회귀
+.venv/bin/python -m pytest backend/sim_v2/ -q
+# 시뮬레이션 환경에서는 multi-repo production test 일부 skip,
+# 핵심 unit + slab-v2 관련 test 는 모두 PASS</code></pre>
+  </li>
+
+  <li>
+    <strong>5 분 동작 검증 (4 demo)</strong>
+    <pre><button class="copy-btn" data-copy="demo">copy</button><code id="demo"># W77 한국어 검색 — 9/10 hit
+.venv/bin/python -m backend.sim_v2.demos.uc41_korean_term_search.run
+
+# W78 hybrid tier — typo + 비표준 음역 close
+.venv/bin/python -m backend.sim_v2.demos.uc42_hybrid_korean_search.run
+
+# W74 stub injection — production 6/11 PASS
+.venv/bin/python -m backend.sim_v2.demos.uc40_stub_injected_behavioral.run
+
+# 사람용 인터랙티브 요약 (브라우저)
+open toClaude/modeling/section4-verification/section3_handoff/for-humans.html</code></pre>
+  </li>
+
+  <li>
+    <strong>본인 클로드 코드에 §5 메시지 붙여넣기</strong> → 작업 시작
+  </li>
+</ol>
+</section>
+
+
+<!-- ──────────────────────────────────────────────────────────────────── -->
+<section id="claude-msg">
+<h2><span class="num">5</span>본인 클로드 코드에게 전달할 첫 메시지</h2>
+
+<p>본인 worktree 에서 클로드 코드 세션을 띄운 후, 첫 메시지로 아래를 그대로 붙여넣으면 됩니다. <strong>copy 버튼</strong> 누르면 클립보드에 복사.</p>
+
+<pre><button class="copy-btn" data-copy="claude-msg">copy</button><code id="claude-msg">이 onTong repo 의 시뮬레이션 (Section 3) 담당이다.
+Section 4 가 sim_v2 자산을 toClaude/modeling/section4-verification/section3_handoff/
+아래에 정리해줬다. 다음 순서대로 읽고 시작하자:
+
+1) section3_handoff/README.md          ← §8 onboarding 가이드부터
+2) section3_handoff/for-humans.html    ← 사람용 인터랙티브 요약
+3) section3_handoff/gap-analysis.md    ← 8 한계 → sim_v2 자산 1:1 매핑
+4) section3_handoff/api-reference/     ← W59~W78 한국어 API
+5) section3_handoff/usage-recipes/     ← recipe-1~5 (모두 실행 확인됨)
+
+핵심 자산 (8 모듈):
+- W59 in-process safe exec (sandbox 대체)
+- W71 deterministic fixture 합성 (LLM 합성 대체)
+- W72 baseline-free invariant 진단
+- W73 Java baseline 부착 layer
+- W74 sandbox stub 자동 derive (anchor + AST + entity)
+- W75 50+ Java idiom 자동 rewrite
+- W77 한국어 4 컬럼 통합 검색
+- W78 hybrid tier (transliteration + fuzzy + LLM assist)
+
+production 실측 (slab-design-real-v2):
+- 0/11 → 6/11 actions PASS (UC40)
+- 9/10 한국어 query hit (UC41)
+- typo + 비표준 음역 모두 close (UC42)
+
+권장 첫 작업: recipe-4 의 full pipeline 을 본인 sandbox_agent.py 에 통합.
+그 다음 recipe-5 의 W77+W78 검색을 bridge_agent.py 에 통합.
+
+영역 규칙:
+- 본인 영역: toClaude/simulation/ (없으면 생성), backend/section3/
+- read-only: toClaude/modeling/section4-verification/, backend/sim_v2/
+- 수정 금지: toClaude/_shared/, toClaude/wiki/</code></pre>
+</section>
+
+
+<!-- ──────────────────────────────────────────────────────────────────── -->
+<section id="sprints">
+<h2><span class="num">6</span>권장 작업 순서 (sprint 단위)</h2>
+
+<table>
+  <tr>
+    <th>Sprint</th>
+    <th>작업</th>
+    <th>대상 파일 (담당자 측)</th>
+    <th>기대 결과</th>
+  </tr>
+  <tr>
+    <td>1 ★</td>
+    <td>recipe-4 full pipeline 통합</td>
+    <td><code>sandbox_agent.py</code></td>
+    <td><code>cumulativeProductivity</code> 12/12 PASS, production 6/11 actions PASS</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td>recipe-2 baseline 검증 통합</td>
+    <td><code>sandbox_agent.py</code></td>
+    <td>sandbox 결과 표에 <code>expected</code> 컬럼 추가</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td>recipe-3 invariant 진단 surface</td>
+    <td><code>bridge_agent.py</code> chat 분기</td>
+    <td><code>[LOW] fallback</code> 자리에 actionable 정보</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td>recipe-5 W77+W78 검색 통합</td>
+    <td><code>bridge_agent.py</code> chat 입력</td>
+    <td>"엣징"/"edgign"/"에징" 모두 cross-match</td>
+  </tr>
+  <tr>
+    <td>5 (opt)</td>
+    <td>transpiler-bridge §3 옵션 B</td>
+    <td><code>transpiler.py</code></td>
+    <td>코드 70% 감소 + 71 핸들러 자동 획득</td>
+  </tr>
+</table>
+</section>
+
+
+<!-- ──────────────────────────────────────────────────────────────────── -->
+<section id="rules">
+<h2><span class="num">7</span>영역 규칙 (수정 / 참조 / 금지)</h2>
+
+<table>
+  <tr><th style="width: 30%;">영역</th><th>권한</th></tr>
+  <tr>
+    <td><code>toClaude/simulation/</code> (없으면 신규 생성), <code>backend/section3/</code></td>
+    <td><span class="badge ok">본인 작업 영역 — 자유 수정</span></td>
+  </tr>
+  <tr>
+    <td><code>toClaude/modeling/section4-verification/</code>, <code>backend/sim_v2/</code>, <code>section3_landing/</code></td>
+    <td><span class="badge info">read-only 참조</span></td>
+  </tr>
+  <tr>
+    <td><code>toClaude/_shared/</code> (사용자 승인 필요), <code>toClaude/wiki/</code></td>
+    <td><span class="badge warn">수정 금지</span></td>
+  </tr>
+</table>
+</section>
+
+
+<!-- ──────────────────────────────────────────────────────────────────── -->
+<section id="stuck">
+<h2><span class="num">8</span>막혔을 때 — 대응표</h2>
+
+<table>
+  <tr><th style="width: 38%;">증상</th><th>가서 볼 곳</th></tr>
+  <tr>
+    <td>sim_v2 자산이 import 안 됨</td>
+    <td>§3 step 2 의 <code>pytest backend/sim_v2/</code> 가 통과하는지부터 확인</td>
+  </tr>
+  <tr>
+    <td>anchor / stub 자동 derive 가 부족</td>
+    <td><code>api-reference/W74-sandbox-stubs.md</code> §4 "직접 stub 추가" 패턴</td>
+  </tr>
+  <tr>
+    <td>Java idiom 이 still NameError</td>
+    <td><code>api-reference/W75-idiom-rewriter.md</code> §3 에 빠진 idiom 보고 (PR 환영)</td>
+  </tr>
+  <tr>
+    <td>한국어 query 가 0 hit</td>
+    <td><code>api-reference/W77-korean-term-resolver.md</code> §3.5 tier 확인, fuzzy/LLM 켜기</td>
+  </tr>
+  <tr>
+    <td>본인 도메인 한↔영 단어가 빠짐</td>
+    <td><code>register_transliteration(kr, en)</code> runtime 추가</td>
+  </tr>
+  <tr>
+    <td>recipe 가 production DB 없다고 skip</td>
+    <td><code>data/slab-v2-handoff.db</code> 가 checkout 시 있어야 함. 없으면 git pull 다시. 또는 <code>SIM_V2_DB_PATH</code> env var 로 명시</td>
+  </tr>
+</table>
+</section>
+
+
+<!-- ──────────────────────────────────────────────────────────────────── -->
+<section id="contact">
+<h2><span class="num">9</span>인계 측 (Section 4 / 모델링) 연락</h2>
+
+<p>이 패키지에 대한 질문 / 추가 요청은 모델링 세션에게:</p>
+
+<table>
+  <tr><th style="width: 26%;">상황</th><th>대응</th></tr>
+  <tr>
+    <td>자료의 어떤 부분이 모호함</td>
+    <td>해당 파일 경로 + 라인 인용해서 모델링 세션에 질문. <code>for-humans.html</code> 의 input 박스 패턴 활용 가능</td>
+  </tr>
+  <tr>
+    <td>새 한↔영 단어 도메인 단어 보강 필요</td>
+    <td><code>backend/sim_v2/core/search/transliteration.py</code> 의 <code>_KR_TO_EN</code> 표에 PR. modeling 세션 리뷰</td>
+  </tr>
+  <tr>
+    <td>새 Java idiom 보강 필요</td>
+    <td><code>backend/sim_v2/core/synthesizer/idiom_rewriter.py</code> 의 3 tier 매핑에 PR</td>
+  </tr>
+  <tr>
+    <td>새 stub 패턴 발견</td>
+    <td><code>backend/sim_v2/core/verification/sandbox_stubs.py</code> 의 <code>build_stub_namespace</code> 보강 PR</td>
+  </tr>
+</table>
+</section>
+
+
+<footer>
+  onTong · Section 4 (sim_v2) → Section 3 (Simulation) handoff message ·
+  2026-05-16 · branch <code>section4-handoff-clean</code> @ Jeensh/onTong
+</footer>
+
+<script>
+  // copy-to-clipboard
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-copy');
+      const target = document.getElementById(id);
+      if (!target) return;
+      try {
+        await navigator.clipboard.writeText(target.innerText);
+        const orig = btn.textContent;
+        btn.textContent = 'copied ✓';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = orig;
+          btn.classList.remove('copied');
+        }, 1400);
+      } catch (e) {
+        btn.textContent = 'copy 실패';
+      }
+    });
+  });
+</script>
+</body>
+</html>

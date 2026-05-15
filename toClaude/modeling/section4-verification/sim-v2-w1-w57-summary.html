@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>sim_v2 W1–W57 총정리 — Two-Engine Plugin Framework</title>
+<style>
+  :root {
+    --bg: #0f1116;
+    --panel: #161a23;
+    --panel-2: #1d2230;
+    --border: #2a3145;
+    --text: #e4e8f0;
+    --text-dim: #9aa3b8;
+    --accent: #5ec1ff;
+    --accent-2: #7df0a3;
+    --warn: #ffb86b;
+    --danger: #ff7a90;
+    --code-bg: #0a0d14;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 48px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Pretendard", sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.55;
+  }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  h2 {
+    font-size: 21px; margin: 32px 0 12px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    color: var(--accent);
+  }
+  h3 { font-size: 16px; margin: 20px 0 8px; color: var(--text); }
+  p, li { color: var(--text); }
+  .subtitle { color: var(--text-dim); margin-bottom: 24px; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px 20px; margin: 12px 0;
+  }
+  .panel.warn { border-left: 3px solid var(--warn); }
+  .panel.ok   { border-left: 3px solid var(--accent-2); }
+  .panel.bad  { border-left: 3px solid var(--danger); }
+  .metric-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin: 16px 0;
+  }
+  .metric {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 16px;
+  }
+  .metric .label { font-size: 12px; color: var(--text-dim); letter-spacing: 0.04em; text-transform: uppercase; }
+  .metric .value { font-size: 22px; font-weight: 600; color: var(--accent); margin-top: 4px; }
+  .metric .delta { font-size: 12px; color: var(--accent-2); margin-top: 2px; }
+  table {
+    width: 100%; border-collapse: collapse; margin: 8px 0 16px;
+    font-size: 13px;
+  }
+  th, td {
+    padding: 8px 10px; border-bottom: 1px solid var(--border);
+    text-align: left; vertical-align: top;
+  }
+  th { color: var(--text-dim); font-weight: 500; font-size: 12px; }
+  tr:hover td { background: var(--panel-2); }
+  code, pre {
+    font-family: "JetBrains Mono", "SF Mono", Menlo, monospace;
+    font-size: 12.5px;
+  }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 3px; color: var(--accent-2); }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px 14px; overflow-x: auto;
+    margin: 8px 0;
+  }
+  pre code { background: transparent; padding: 0; color: var(--text); }
+  .tag {
+    display: inline-block; padding: 1px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 500; margin-right: 4px;
+  }
+  .tag.ok   { background: rgba(125,240,163,0.15); color: var(--accent-2); }
+  .tag.bad  { background: rgba(255,122,144,0.15); color: var(--danger); }
+  .tag.warn { background: rgba(255,184,107,0.15); color: var(--warn); }
+  .tag.info { background: rgba(94,193,255,0.15); color: var(--accent); }
+  .toc {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 22px; margin: 16px 0 32px;
+  }
+  .toc a { color: var(--text-dim); text-decoration: none; }
+  .toc a:hover { color: var(--accent); }
+  .step-arrow { color: var(--text-dim); margin: 0 6px; }
+  .findings { color: var(--warn); font-weight: 500; }
+  .verified  { color: var(--accent-2); font-weight: 500; }
+  blockquote {
+    border-left: 3px solid var(--accent); margin: 8px 0; padding: 4px 14px;
+    color: var(--text-dim); background: var(--panel-2);
+    border-radius: 0 6px 6px 0;
+  }
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+</style>
+</head>
+<body>
+
+<h1>sim_v2 W1–W57 총정리</h1>
+<p class="subtitle">Two-Engine Plugin Framework — Section 4 (sim_v2) 작업 결과. 2026-05-15 기준.</p>
+
+<div class="metric-grid">
+  <div class="metric"><div class="label">누적 sprint</div><div class="value">W1–W57</div><div class="delta">57 sprint</div></div>
+  <div class="metric"><div class="label">backend/sim_v2 tests</div><div class="value">1,242</div><div class="delta">+3 skipped</div></div>
+  <div class="metric"><div class="label">Production demo (UC)</div><div class="value">23</div><div class="delta">UC1–UC23</div></div>
+  <div class="metric"><div class="label">Translator coverage</div><div class="value">100%</div><div class="delta">39,282 methods</div></div>
+</div>
+
+<div class="toc">
+  <strong>목차</strong>
+  &nbsp;·&nbsp; <a href="#overview">① 한눈에 보기</a>
+  &nbsp;·&nbsp; <a href="#stack">② Layered Verification Stack</a>
+  &nbsp;·&nbsp; <a href="#example-w57">③ W57 예시</a>
+  &nbsp;·&nbsp; <a href="#example-w55">④ W55/UC22 예시</a>
+  &nbsp;·&nbsp; <a href="#example-w52">⑤ W52/UC20 예시</a>
+  &nbsp;·&nbsp; <a href="#example-w53">⑥ W53/UC21 예시</a>
+  &nbsp;·&nbsp; <a href="#loops">⑦ Self-improvement 두 loop</a>
+  &nbsp;·&nbsp; <a href="#metrics">⑧ 정량 지표</a>
+  &nbsp;·&nbsp; <a href="#next">⑨ 다음 후보</a>
+</div>
+
+<!-- ───────────────────────────────────────────────────────────────────── -->
+<h2 id="overview">① 한눈에 보기</h2>
+<div class="panel ok">
+  <p style="margin:0;">
+    <strong>Section 4 sim_v2 는 Java→Python twin 의 <span class="verified">production-grade 검증 인프라</span> 완비.</strong>
+    deterministic 한 <strong>4-차원 verification stack</strong> (존재 → param shape → primitive return → object_ref return) 위에서
+    실제 production 데이터 (`data/ontology.db`) 의 drift 를 surface 하고 actionable recommendation 까지 생성.
+    framework 가 자기 결함도 측정해서 두 번의 self-improvement loop 를 자체 close out.
+  </p>
+</div>
+
+<table>
+  <tr><th>지표</th><th>현재</th><th>의미</th></tr>
+  <tr><td>backend/sim_v2 테스트</td><td><span class="verified">1,242 PASS + 3 SKIPPED</span></td><td>회귀 안정성</td></tr>
+  <tr><td>Production method translator coverage</td><td><span class="verified">100%</span> (39,282/39,282)</td><td>Java→Python 변환 누락 없음</td></tr>
+  <tr><td>Production cross-layer mappings</td><td>7,826 rows</td><td>UC12-13 의 schema↔code bridge</td></tr>
+  <tr><td>Verification gates 운영</td><td>5 (W47/W49/W52/W53/W56-W57)</td><td>각 차원별 deterministic check</td></tr>
+  <tr><td>Demo 개수 (UC)</td><td>23 (UC1–UC23)</td><td>모두 production data 위에서 실행</td></tr>
+  <tr><td>ADR (결정 기록)</td><td>13</td><td>아키텍처 의사결정 추적</td></tr>
+  <tr><td>3-system parity</td><td><span class="verified">v2 + Broadleaf + Banking</span></td><td>동일 pipeline, plugin 단위 격리</td></tr>
+</table>
+
+<!-- ───────────────────────────────────────────────────────────────────── -->
+<h2 id="stack">② Layered Verification Stack — Action ↔ Java Method 의 모든 surface</h2>
+
+<p>액션 (Section 2 가 작성한 비즈니스 정의) 과 실제 Java 메서드 사이의 일치를 4-차원에서 deterministic 하게 검증.
+어느 차원에서 drift 가 발생해도 framework 가 자동으로 신호로 변환.</p>
+
+<table>
+  <tr><th>Gate</th><th>차원</th><th>대표 status</th><th>Demo</th><th>Production finding</th></tr>
+  <tr>
+    <td><code>W47</code></td>
+    <td>method 존재 + translatable</td>
+    <td><span class="tag ok">VERIFIED</span> <span class="tag bad">METHOD_NOT_FOUND</span></td>
+    <td>UC17</td>
+    <td>slab-design 94.7% verified</td>
+  </tr>
+  <tr>
+    <td><code>W52</code></td>
+    <td>param 이름 + arity</td>
+    <td><span class="tag ok">VERIFIED</span> <span class="tag bad">NAME_MISMATCH</span> <span class="tag bad">ARITY_MISMATCH</span></td>
+    <td>UC20</td>
+    <td>v2 의 3 NAME_MISMATCH (productCd 계열)</td>
+  </tr>
+  <tr>
+    <td><code>W56</code></td>
+    <td>primitive return 호환</td>
+    <td><span class="tag ok">VERIFIED</span> <span class="tag bad">PRIMITIVE_MISMATCH</span> <span class="tag warn">VOID_MISMATCH</span></td>
+    <td>UC23</td>
+    <td>8 PRIMITIVE_MISMATCH (string vs domain class)</td>
+  </tr>
+  <tr>
+    <td><code>W57</code></td>
+    <td>object_ref (term) return</td>
+    <td><span class="tag ok">VERIFIED</span> <span class="tag bad">OBJECT_REF_MISMATCH</span> <span class="tag warn">OBJECT_REF_UNRESOLVED</span></td>
+    <td>UC23</td>
+    <td>1 arity drift (단건 vs <code>List&lt;&gt;</code>)</td>
+  </tr>
+</table>
+
+<p style="margin-top: 16px;">
+  추가로 <strong>aggregate health rollup (W53/UC21)</strong>: 위 모든 gate 의 결과를 단일 health-score 로 집계.
+  framework 가 ship/no-ship 판단에 쓸 수 있는 threshold 0.80 의 단일 API.
+</p>
+
+<!-- ───────────────────────────────────────────────────────────────────── -->
+<h2 id="example-w57">③ W57 예시 — Term Resolver 가 OBJECT_REF gap 을 close out</h2>
+
+<p>W56 이 close 시점에서 6건의 <code>OBJECT_REF_SKIPPED</code> 가 남아 있었음.
+액션이 <code>object_ref</code> 출력을 선언했을 때, 해당 term 이 가리키는 실제 Java 클래스를 아직 모르기 때문.
+W57 은 <code>business_terms.description</code> 안의 <code>「자동 추천 — &lt;Java FQN&gt;」</code> stash 형식
+(W45 의 method 측 패턴과 sister) 을 파싱해 deterministic 하게 해소.</p>
+
+<h3>예시 1: 5/6 자동 VERIFIED — <code>find_group</code></h3>
+<pre><code>// Section 2 가 stash 한 형식
+business_terms.description = "자동 추천 — com.example.slabdesign.store.sd.std.domain.entity.EdgingGroupEntity"
+business_terms.aliases_json = ["EdgingGroupEntity"]
+
+// action.output_json
+{"type":"object_ref", "object_ref_term":"term.scm.edging_group"}
+
+// 실제 Java method
+EdgingService.findGroup(...).return_type = "EdgingGroupEntity"
+
+// W57 의 resolver 작동
+TermJavaResolution(
+  java_fqn = "com.example.slabdesign.store.sd.std.domain.entity.EdgingGroupEntity",
+  aliases  = ("EdgingGroupEntity",)
+)
+candidates = ("EdgingGroupEntity", "com.example...EdgingGroupEntity")
+
+// method_return "EdgingGroupEntity" ∈ candidates → VERIFIED ✓</code></pre>
+
+<h3>예시 2: 1/6 real arity drift — <code>extract_designable_orders</code></h3>
+<div class="panel bad">
+  <p style="margin:0;">
+    <strong>액션은 단건 <code>Order</code> 반환을 선언했지만 실제 메서드는 <code>List&lt;SDOrderEntity&gt;</code> 반환.</strong>
+    Section 2 의 authoring 결과와 실제 코드 사이의 의미 있는 drift — 컬렉션/단건 arity 가 어긋남.
+    이런 신호는 LLM 추론 없이 W57 의 deterministic 해소만으로 surface.
+  </p>
+</div>
+<pre><code>// term.scm.order.order
+business_terms.description = "자동 추천 — com.example.slabdesign.store.sd.working.domain.entity.SDOrderEntity"
+business_terms.aliases_json = ["Order", "SDOrderEntity"]
+
+// action.output_json
+{"type":"object_ref", "object_ref_term":"term.scm.order.order"}
+
+// 실제 Java method
+SdOrderService.extractDesignableOrders(...).return_type = "List&lt;SDOrderEntity&gt;"
+
+// W57 의 비교
+candidates = ("SDOrderEntity", "Order", "com.example...SDOrderEntity")
+method_return_simple = simple_name_of(_strip_generics("List&lt;SDOrderEntity&gt;")) = "List"
+"List" ∉ candidates → OBJECT_REF_MISMATCH ✗
+
+// → Section 2 의 actionable backlog 입력:
+// action.scm.order.extract_designable_orders 의 output 을 list-typed term 으로 lift</code></pre>
+
+<h3>UC23 효과 — VERIFIED rate 가 55.3% → 68.4% (+13.1pp)</h3>
+<div class="metric-grid">
+  <div class="metric"><div class="label">W56 종료시</div><div class="value">21/38</div><div class="delta">55.3% verified</div></div>
+  <div class="metric"><div class="label">W57 종료시</div><div class="value">26/38</div><div class="delta" style="color: var(--accent-2);">68.4% verified (+13.1pp)</div></div>
+  <div class="metric"><div class="label">OBJECT_REF_SKIPPED</div><div class="value">6 → 0</div><div class="delta">resolver 가 전건 처리</div></div>
+  <div class="metric"><div class="label">새로 발견된 drift</div><div class="value">1</div><div class="delta">arity mismatch</div></div>
+</div>
+
+<!-- ───────────────────────────────────────────────────────────────────── -->
+<h2 id="example-w55">④ W55/UC22 예시 — Detect→Fix Loop 의 Param 측 Close</h2>
+
+<p>W52 가 NAME_MISMATCH 를 <em>감지</em>, W55 가 그것을 <em>구체적 fix step</em> 으로 변환.
+"코드는 ground truth" 원칙으로 action declaration 측을 method 에 align.</p>
+
+<pre><code>// W52 가 surface 한 drift (slab-design-real-v2)
+ParamSignatureVerification(
+  action_fqn       = "action.scm.product.batch_design",
+  code_method_fqn  = "com.example.slabdesign.SdDriver.batchDesign(String,String)",
+  status           = "NAME_MISMATCH",
+  diverging_positions = [
+    (pos=3, action_name="productTypeCd", method_name="productCd"),
+    (pos=4, action_name="prodKindCd",    method_name="productCd"),
+  ]
+)
+
+// W55 가 변환한 RemediationStep
+RemediationStep(
+  kind            = "RENAME_ACTION_PARAM",
+  action_fqn      = "action.scm.product.batch_design",
+  code_method_fqn = "com.example.slabdesign.SdDriver.batchDesign(String,String)",
+  param_position  = 3,
+  current_name    = "productTypeCd",
+  expected_name   = "productCd",
+  recommendation  = "Rename action param at position 3: 'productTypeCd' → 'productCd'",
+  rationale       = "Method signature is authoritative (code is ground truth)"
+)
+// 같은 형태로 #4 (prodKindCd → productCd) 도 1 step
+
+// UC22 실행: slab-design-real-v2 → 3 RENAME_ACTION_PARAM step (모두 → productCd)</code></pre>
+
+<p>이 step 들이 Section 2 의 next-iteration backlog 의 정량 입력. 같은 패턴이 schema 측에도 적용됨 (UC18: drift → PostgreSQL DDL).</p>
+
+<!-- ───────────────────────────────────────────────────────────────────── -->
+<h2 id="example-w52">⑤ W52/UC20 예시 — Param Signature Drift Detection</h2>
+
+<pre><code>// action.params_json (Section 2 의 authoring 결과)
+[
+  {"name":"orderId",       "type":"string"},
+  {"name":"plantCode",     "type":"string"},
+  {"name":"productTypeCd", "type":"string"}  // ← drift
+]
+
+// code_methods.params_json (실제 Java method signature)
+[
+  {"name":"orderId",   "type":"String"},
+  {"name":"plantCode", "type":"String"},
+  {"name":"productCd", "type":"String"}      // ← 권위
+]
+
+// W52 verifier output
+ParamSignatureVerification(
+  action_fqn = "action.scm.product.batch_design",
+  status     = "NAME_MISMATCH",
+  arity_ok   = True,                          // size 동일 → arity OK
+  diverging_positions = [(3, "productTypeCd", "productCd")]
+)</code></pre>
+
+<!-- ───────────────────────────────────────────────────────────────────── -->
+<h2 id="example-w53">⑥ W53/UC21 예시 — Aggregate Framework Health</h2>
+
+<p>4 verification gate 의 결과를 단일 health-score 로 집계. ship/no-ship 의사결정용 단일 API.</p>
+
+<pre><code>HealthReport(
+  threshold       = 0.80,
+  overall_passing = True,
+  gates           = (
+    GateResult(name="action_method",   verified_rate=0.947, ok=True),   # W47
+    GateResult(name="idiom_coverage",  verified_rate=1.000, ok=True),   # W49+W54
+    GateResult(name="param_signature", verified_rate=0.921, ok=True),   # W52
+    GateResult(name="return_type",     verified_rate=0.684, ok=False),  # W56+W57
+  )
+)
+// 한 gate (W56 return-type) 가 threshold 미달 → ship 차단 신호
+// 하지만 W57 가 close out 한 후엔 ↑ 0.684 가 안정 상태로 묶임 (PRIMITIVE_MISMATCH 측은
+//  별도 sprint 가 LLM-based refinement 또는 schema lift 로 처리 예정)</code></pre>
+
+<!-- ───────────────────────────────────────────────────────────────────── -->
+<h2 id="loops">⑦ Self-Improvement Loop — Framework 가 자기 결함을 close out 한 두 번의 시연</h2>
+
+<div class="panel">
+  <h3 style="margin-top:0">Loop #1 (W49 → W50 → W51): bigdecimal `.add` false positive</h3>
+  <p style="margin:0;">
+    W49 의 idiom verifier 가 production 코드에서 발견한 false positive 를 W50 가 root-cause 분석,
+    W51 가 unambiguous method dispatch 추가로 close out. idiom coverage 100% 달성.
+  </p>
+  <pre style="margin: 8px 0 0;"><code>before: `result.add(x)` 가 무조건 bigdecimal_arith 매칭 → 실제로는 list.add()
+after:  `.add` 를 모호하므로 패턴에서 제거 + receiver type-aware dispatch 도입
+        (W51 의 `_UNAMBIGUOUS_BIGDECIMAL_METHODS = {subtract, multiply, divide, remainder}`)</code></pre>
+</div>
+
+<div class="panel" style="margin-top: 12px;">
+  <h3 style="margin-top:0">Loop #2 (W53 → W54): substring match + List.of() translator gap</h3>
+  <p style="margin:0;">
+    W53 의 aggregate health rollup 이 v2 의 idiom 측 finding 두 가지를 노출:
+    (1) try-with-resources regex 가 <code>recordRetry(</code> / <code>tryStep(</code> 까지 매칭 (substring 매치 버그),
+    (2) <code>List.of()</code> 같은 collection factory 가 translator 에 매핑 누락.
+  </p>
+  <pre style="margin: 8px 0 0;"><code>before: regex `try\s*\(` 가 `tryStep(` 매칭 (false positive)
+after:  `\btry\s*\(` 의 word boundary 추가 + List.of/Set.of/Map.of → Python literal 매핑</code></pre>
+</div>
+
+<p style="margin-top: 16px;">
+  두 loop 모두 framework 가 surface → triage → refine → re-measure 4 단계를 거쳐 자체 close out.
+  <strong>"verification gates 가 발견한 결함은 verification gates 가 닫는다"</strong> 의 운영 가능성을 시연.
+</p>
+
+<!-- ───────────────────────────────────────────────────────────────────── -->
+<h2 id="metrics">⑧ 정량 지표</h2>
+
+<table>
+  <tr><th>Sprint 묶음</th><th>범위</th><th>주요 성과</th></tr>
+  <tr>
+    <td><code>W1–W26</code></td>
+    <td>Framework Core + Capstone</td>
+    <td>G1–G4 gate 모두 close, 3-system parity 확보, Capstone 단일 flow 시연</td>
+  </tr>
+  <tr>
+    <td><code>W27–W46</code></td>
+    <td>Production Wiring (UC10–16)</td>
+    <td>실제 ontology.db 위에서 5-layer 동작. 100% translator coverage 달성</td>
+  </tr>
+  <tr>
+    <td><code>W47–W57</code></td>
+    <td>Layered Verification Stack (UC17–23)</td>
+    <td>4-차원 verification + detect→fix 양측 close + self-improvement loop 2회</td>
+  </tr>
+</table>
+
+<h3>회귀 테스트 추이</h3>
+<table>
+  <tr><th>시점</th><th>테스트 수</th><th>증분</th></tr>
+  <tr><td>W39 종료</td><td>853 PASS</td><td>baseline</td></tr>
+  <tr><td>W55 종료</td><td>1,183 PASS</td><td>+330</td></tr>
+  <tr><td>W56 종료</td><td>1,209 PASS</td><td>+26 (verifier + UC23)</td></tr>
+  <tr><td>W57 종료</td><td><strong>1,242 PASS</strong></td><td>+33 (resolver + UC23 extension)</td></tr>
+</table>
+
+<h3>Production action↔method 검증 결과 (slab-design-real, 38 action)</h3>
+<table>
+  <tr><th>Status</th><th>건수</th><th>해설</th></tr>
+  <tr><td><span class="tag ok">VERIFIED</span></td><td>26 (68.4%)</td><td>primitive + object_ref 모두 일치</td></tr>
+  <tr><td><span class="tag bad">PRIMITIVE_MISMATCH</span></td><td>8</td><td><code>string</code> 선언 vs <code>ProductCategory</code>/<code>List&lt;String&gt;</code>/<code>BigDecimal</code> 등 반환</td></tr>
+  <tr><td><span class="tag bad">OBJECT_REF_MISMATCH</span></td><td>1</td><td><code>extract_designable_orders</code>: 단건 Order vs <code>List&lt;SDOrderEntity&gt;</code></td></tr>
+  <tr><td><span class="tag warn">IMPLICIT_OUTPUT</span></td><td>1</td><td>action 이 output 미선언이지만 method 가 값 반환</td></tr>
+  <tr><td><span class="tag info">NO_RECOMMENDATION</span></td><td>2</td><td>action 에 자동 추천 method FQN 없음</td></tr>
+</table>
+
+<!-- ───────────────────────────────────────────────────────────────────── -->
+<h2 id="next">⑨ 다음 후보 (사용자 결정 사항)</h2>
+
+<ul>
+  <li>
+    <strong>LLM-based refinement</strong> — verification 이 surface 한 8건 PRIMITIVE_MISMATCH 에 대해
+    LLM 이 fix proposal (예: action.output 을 <code>ProductCategory</code> term 으로 lift)을 자동 생성.
+    G3 의 production 적용 path.
+  </li>
+  <li>
+    <strong>CI hook (regression-only)</strong> — verification stack 을 CI 에 wire 해서
+    "drift 가 새로 생긴 사례" 만 surface. Section 2 의 새 authoring 결과를 사전에 검증.
+  </li>
+  <li>
+    <strong>새 verification capability</strong> — exception agreement (try/catch 흐름),
+    annotation parity (@Transactional, @Override 등), behavior-level twin (입력/출력 행렬 비교).
+  </li>
+  <li>
+    <strong>schema↔domain synthesis</strong> — schema 의 새 column 에서 domain term 을 propose,
+    또는 domain term 의 새 field 에서 schema migration 을 propose (양방향).
+  </li>
+</ul>
+
+<hr>
+
+<p class="subtitle" style="margin-top: 24px;">
+  생성: 2026-05-15 · 작업 범위: backend/sim_v2 + toClaude/modeling/section4-verification ·
+  Commit 미실행 (사용자 명시 요청 전 push 금지)
+</p>
+
+</body>
+</html>

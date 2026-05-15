@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Anchored Twin Synthesizer — 자체 검토 + 사용 시나리오</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+      "Noto Sans KR", sans-serif;
+    line-height: 1.6; color: #1f2937; max-width: 1200px;
+    margin: 0 auto; padding: 32px 24px 80px; background: #fafafa;
+  }
+  h1 { font-size: 28px; margin: 0 0 8px; color: #111827; }
+  h2 { font-size: 22px; margin: 48px 0 12px; padding-bottom: 8px;
+       border-bottom: 2px solid #e5e7eb; color: #111827; }
+  h3 { font-size: 17px; margin: 24px 0 8px; color: #1f2937; }
+  h4 { font-size: 13px; margin: 12px 0 6px; color: #4b5563;
+       text-transform: uppercase; letter-spacing: 0.05em; }
+  .lead { color: #6b7280; font-size: 15px; margin-bottom: 32px; }
+  .panel { background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+           padding: 20px 24px; margin: 16px 0; }
+  .panel.critique { border-left: 4px solid #ea580c; }
+  .panel.uc1 { border-left: 4px solid #2563eb; }
+  .panel.uc2 { border-left: 4px solid #16a34a; background: #f0fdf4; }
+  .panel.uc3 { border-left: 4px solid #db2777; }
+  .panel.synth { border-left: 4px solid #9333ea; background: #faf5ff; }
+  .panel.warn { background: #fff7ed; border-color: #fdba74; }
+  .panel.info { background: #eff6ff; border-color: #93c5fd; }
+  pre { background: #1f2937; color: #e5e7eb; padding: 14px 18px;
+        border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.55;
+        font-family: "SF Mono", Menlo, Monaco, Consolas, monospace; margin: 8px 0; }
+  pre.lang::before {
+    content: attr(data-lang); display: inline-block; background: #374151;
+    color: #9ca3af; font-size: 10px; padding: 2px 6px; border-radius: 3px;
+    margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  pre .kw { color: #c084fc; }
+  pre .str { color: #fca5a5; }
+  pre .fn { color: #93c5fd; }
+  pre .num { color: #fbbf24; }
+  pre .comment { color: #6b7280; font-style: italic; }
+  pre .changed { background: rgba(251, 191, 36, 0.18); padding: 1px 4px; border-radius: 3px; }
+  pre .added { background: rgba(34, 197, 94, 0.18); padding: 1px 4px; border-radius: 3px; }
+  pre .removed { background: rgba(239, 68, 68, 0.18); padding: 1px 4px; border-radius: 3px;
+                 text-decoration: line-through; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 12px 0; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin: 12px 0; }
+  .col { background: white; border: 1px solid #e5e7eb; border-radius: 6px;
+         padding: 12px 16px; }
+  .col h4 { margin-top: 0; }
+  .label { display: inline-block; padding: 2px 8px; border-radius: 999px;
+           font-size: 11px; font-weight: 700; margin-left: 6px;
+           text-transform: uppercase; letter-spacing: 0.05em; }
+  .label.direct { background: #fee2e2; color: #991b1b; }
+  .label.propagate { background: #fed7aa; color: #9a3412; }
+  .label.unaffected { background: #d1fae5; color: #065f46; }
+  .label.weak { background: #fce7f3; color: #9d174d; }
+  .label.medium { background: #fef3c7; color: #92400e; }
+  .label.strong { background: #fee2e2; color: #991b1b; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; background: white;
+          font-size: 14px; }
+  th, td { border: 1px solid #e5e7eb; padding: 10px 12px; text-align: left;
+           vertical-align: top; }
+  th { background: #f3f4f6; font-weight: 600; }
+  td.ok { color: #16a34a; font-weight: 700; text-align: center; }
+  td.no { color: #dc2626; font-weight: 700; text-align: center; }
+  td.partial { color: #d97706; font-weight: 700; text-align: center; }
+  .diagram { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px;
+             padding: 16px 20px; margin: 16px 0;
+             font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+             line-height: 1.6; white-space: pre; overflow-x: auto; color: #1e293b; }
+  .callout { background: #fef3c7; border-left: 4px solid #f59e0b;
+             padding: 12px 16px; margin: 16px 0; border-radius: 4px; font-size: 14px; }
+  .tldr { background: #eff6ff; border-left: 4px solid #3b82f6;
+          padding: 14px 18px; margin: 16px 0; border-radius: 4px; font-size: 14px; }
+  .severity { display: inline-block; padding: 2px 8px; border-radius: 4px;
+              font-size: 11px; font-weight: 700; margin-left: 8px; }
+  .severity.high { background: #fee2e2; color: #991b1b; }
+  .severity.med { background: #fef3c7; color: #92400e; }
+  .severity.low { background: #dcfce7; color: #166534; }
+  .flow-step {
+    display: inline-block; padding: 6px 12px; background: white;
+    border: 2px solid #cbd5e1; border-radius: 6px; margin: 4px 8px 4px 0;
+    font-family: "SF Mono", monospace; font-size: 12px;
+  }
+  .flow-step.active { border-color: #2563eb; background: #eff6ff; }
+  .flow-step.diff { border-color: #dc2626; background: #fee2e2; }
+  .action-card {
+    background: white; border: 1px solid #e5e7eb; border-radius: 6px;
+    padding: 10px 14px; margin: 6px 0; font-size: 13px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .action-card.direct { border-left: 4px solid #dc2626; background: #fef2f2; }
+  .action-card.propagate { border-left: 4px solid #ea580c; background: #fff7ed; }
+  .action-card.unaffected { border-left: 4px solid #16a34a; background: #f0fdf4; }
+  .arrow { color: #6b7280; margin: 0 8px; }
+</style>
+</head>
+<body>
+
+<h1>Anchored Twin Synthesizer — 자체 검토 + 사용 시나리오 <span class="label" style="background:#f3e8ff; color:#6b21a8;">WALKTHROUGH</span></h1>
+<p class="lead">
+  종합 설계안 (<code>DESIGN-SYNTHESIS.html</code>) 자체 비판 + 3 use case 구체 실행 예시.<br>
+  사용자가 판단 가능하도록 실제 v2 코드/데이터 기반으로 흐름을 따라갑니다.
+</p>
+
+<div class="tldr">
+  <strong>이 문서의 위치</strong> — 종합 설계가 추상적이었을 수 있습니다. 이 문서는 (1) 설계의 약점을 honest 하게 노출하고, (2) 풀 시연 + 영향 분석 + R5 비교 세 use case 의 실제 실행 흐름을 보여줍니다. 사용자 결정: <strong>"이 설계가 진짜로 작동할 만한가?"</strong> 판단 보조.
+</div>
+
+<h2>1. Self-Critique — 종합 설계의 honest weakness 8가지</h2>
+
+<p>4 perspective 종합 후 떠오른 빈틈을 스스로 검토합니다. 각 빈틈 옆 <span class="severity high">HIGH</span>/<span class="severity med">MED</span>/<span class="severity low">LOW</span> 는 영향도.</p>
+
+<div class="panel critique">
+  <h3>W1. Layer 1 ↔ Layer 2 경계의 fuzzy 영역 <span class="severity high">HIGH</span></h3>
+  <p><strong>문제</strong>: 단일 Java statement 가 multi-line (예: <code>SdThicknessAction.java L57-60</code> 의 <code>castSpecService.lookup(...)</code> 4 줄) 일 때, anchor 가 L57 만 가리키지만 statement 는 L57-60 까지 cover. Layer 1 emitter 가 statement 전체 처리해야 하는가, 시작 line 만 처리하는가?</p>
+  <p><strong>완화</strong>: Layer 1 emitter 는 <strong>anchor 가 가리키는 AST 노드 전체</strong> 를 처리 (line 만이 아닌 sub-tree 단위). 합성기는 AST 노드의 line range 와 anchor.line 을 join — anchor 가 노드 시작 line 안에 들어가면 그 노드 전체가 Layer 1 으로. 미세 boundary 는 추후 ADR-003 의 dispatch table.</p>
+</div>
+
+<div class="panel critique">
+  <h3>W2. Registry 의 52 신규 entry 누가 작성하는가 <span class="severity high">HIGH</span></h3>
+  <p><strong>문제</strong>: 현 27 카드 → 79 slot 의 1:1 registry 로 확장하려면 52개 신규 entry 작성 필요. 사람이 작성 시 α 의 inter-agent 문제 재발 위험.</p>
+  <p><strong>완화</strong>: (1) Contract smoke test (E-1 확장) 가 매 entry 추가 시 강제 → 작성자가 누구든 contract 위반은 즉시 fail. (2) LLM 보조 작성 + 사람 review + smoke test 통과 후 commit (작성 자체는 빠름, 검증이 gate). (3) 38 single-anchor slot 은 cross-validation 부재 — 카드 1장 × 1 anchor 의 신뢰도 낮음을 인정하고 <strong>single-anchor 카드는 high-confidence 요구</strong> 정책.</p>
+</div>
+
+<div class="panel critique">
+  <h3>W3. Contract version bump 비용 <span class="severity med">MED</span></h3>
+  <p><strong>문제</strong>: <code>BigDecimal.multiply()</code> Protocol 시그니처 변경 시 모든 registry entry 의 emit 코드 영향. 79 entry × 검토 = 운영 부담.</p>
+  <p><strong>완화</strong>: <strong>backward-compatible 변경만 minor bump</strong> (Protocol 에 method 추가 OK, 기존 method 변경 X). Breaking change 는 major bump + 모든 entry migration 필수. Contract 는 SemVer 적용.</p>
+</div>
+
+<div class="panel critique">
+  <h3>W4. Layer 2 도 contract 의존 (Layer 1 만의 책임이 아님) <span class="severity med">MED</span></h3>
+  <p><strong>문제</strong>: 947 un-anchored method 도 <code>BigDecimal</code>, <code>AlgorithmException</code> 등 사용. AST walker (Layer 2) 가 <code>new BigDecimal("100")</code> 만나면 Python 으로 <code>BigDecimal("100")</code> 으로 emit — contract 위반 시 똑같이 fail.</p>
+  <p><strong>완화</strong>: <strong>Contract 는 합성기 전체의 first-class artifact</strong> 임을 명시. Layer 1 = template-based contract use, Layer 2 = AST-rule-based contract use. 둘 다 contract 통한 import. Smoke test 가 두 layer 모두 cover.</p>
+</div>
+
+<div class="panel critique">
+  <h3>W5. Section 2 ontology transition state 미정의 <span class="severity med">MED</span></h3>
+  <p><strong>문제</strong>: 현 ontology 38/985 anchored. Gap A (2 abstract action) 미해결. 합성기가 이 상태에서 동작 가능한가?</p>
+  <p><strong>완화</strong>: (1) Layer 2 fallback 으로 anchor 없는 method 도 literal Python 생성 (부분 ontology 도 동작). (2) Gap A 의 abstract action 은 <code>NotImplementedError(SIGNATURE_LOCKED)</code> stub + gap-report.json 명시 → orchestrator 가 호출 시 명시적 fail. (3) Section 2 의 <strong>minimum quality gate</strong> 정의 필요 — 별도 ADR-004 후속.</p>
+</div>
+
+<div class="panel critique">
+  <h3>W6. Performance — 985 method re-synth latency <span class="severity low">LOW</span></h3>
+  <p><strong>문제</strong>: 매 Java edit 마다 전체 재합성? Tree-sitter parse + ontology query + render = 추정 method 당 ~5ms. 985 × 5ms ≈ 5s. R5 cycle 의 매 step 에 발생.</p>
+  <p><strong>완화</strong>: <strong>Incremental synthesis</strong> — 변경된 Java file 만 재합성 (대부분 R5 case). 단 ontology revision change 시는 full re-synth (드물게 발생). Cache key = <code>(java_file_hash, ontology_revision, registry_version)</code>.</p>
+</div>
+
+<div class="panel critique">
+  <h3>W7. Stub 의 진짜 Java 동작 동등성 검증 어려움 <span class="severity high">HIGH</span></h3>
+  <p><strong>문제</strong>: <code>@Transactional</code> rollback stub 의 session journal 이 진짜 JTA 와 정확히 같은가? <code>LocalDateTime</code> stub 의 clock injection 이 timezone/precision 까지 동일한가? Stub 의 silent 미동등이 R3 violation 으로 직결.</p>
+  <p><strong>완화</strong>: (1) Stub 별 <strong>behavioral parity test</strong> — Java 단순 시나리오 (트랜잭션 rollback, 시간 정확성) 를 Python stub 로도 실행해 결과 비교. (2) Golden fixture 의 stub-exercising 시나리오 추가 (현 S1-S5 는 happy path 만 — failure / time-sensitive S6-S8 추가). (3) <strong>R3 의 tolerance 정책 명시</strong> — 100% bit-identical 이 아닌, "non-deterministic field (timestamp, sequence) 제외 + BigDecimal 은 string equality" 로 R3 의 의미 좁힘 (Skeptic E-2 인정).</p>
+</div>
+
+<div class="panel critique">
+  <h3>W8. Impact analysis (영향 분석) 가 1급 use case 인가 <span class="severity high">HIGH</span></h3>
+  <p><strong>문제</strong>: 사용자가 추가한 use case ("품종 바꾸면 어디 영향?") 는 R5 의 변형 — input 변경에 따른 trace 영향 분석. 종합 설계가 이걸 지원하지만 사용자 surface (CLI / Web / Notebook) 미정. 1급 use case 면 surface design 도 spec 에 포함되어야.</p>
+  <p><strong>완화</strong>: <strong>"Twin Runner" 의 CLI/API 가 R5 + Impact 둘 다 지원</strong>. 다음 use case 2 에서 구체화. 사용자 결정: impact analysis 가 spec 의 1급 시민인가? 종합 설계가 자연스럽게 지원하므로 yes 라고 가정하고 진행.</p>
+</div>
+
+<h2>2. Use Case 1 — 풀 시연 (36 action byte-identical run)</h2>
+
+<div class="panel uc1">
+  <h3>시나리오</h3>
+  <p>Section 2 가 v2 ontology 완비. Section 4 합성기가 36 action 의 Python 모두 생성. Driver 가 SDOrderEntity 1개 (S1 fixture) 입력으로 design pipeline 실행. Java golden trace 와 byte-identical 일치 확인.</p>
+
+  <h3>실행 흐름</h3>
+
+<div class="diagram">
+[STEP 1] Section 2 ontology 추출
+  $ python scripts/import_code_raw.py --repo slab-design-real-v2
+  → 985 code_methods, 38 actions, 163 anchor_bindings, 36 type_realizations (22 confirmed)
+  → data/ontology.db updated
+
+[STEP 2] 합성기 실행
+  $ python -m backend.modeling.sim_verify.synthesizer \
+      --repo slab-design-real-v2 \
+      --out backend/modeling/sim_verify/generated/slab-design-real-v2/
+  → 36 Python action 클래스 + 1 orchestrator (SdDesigner) 생성
+  → 5 facade + 6 stub imported from runtime
+  → gap-report.json: 2 SIGNATURE_LOCKED (Gap A), 14 unconfirmed type_realizations (Gap C)
+
+[STEP 3] Twin runner — S1 fixture 입력
+  $ python -m backend.modeling.sim_verify.runner \
+      --twin generated/slab-design-real-v2/ \
+      --input toClaude/.../golden/S1.json \
+      --output runs/S1.python.json
+  → SdDriver.batchDesign(...) → 36 action 순차 실행 (with retry loop)
+  → TraceCollector 가 18-20 anchor trace entry 적재
+  → SlabDesignResult 출력
+
+[STEP 4] Oracle differ — Java golden 과 비교
+  $ python scripts/section4_oracle_diff.py \
+      --java toClaude/.../golden/S1.json \
+      --python runs/S1.python.json \
+      --tolerance bit-identical
+  → diff report: 0 differences in slabResults (R3 ✓)
+  → diff report: 0 differences in trace[].input/output (R4 ✓)
+  → PASS
+</div>
+
+  <h3>결과 surface (CLI)</h3>
+
+<pre class="lang" data-lang="text">$ python -m sim_verify.runner --suite full
+[1/5] S1 (thickness=230, normal)            ✓ PASS  (trace match: 18/18 entries)
+[2/5] S2 (thickness=230, double retry)      ✓ PASS  (trace match: 20/20 entries)
+[3/5] S3 (thickness=230, wider/heavier)     ✓ PASS  (trace match: 20/20 entries)
+[4/5] S4 (validation failure DG004)         ✓ PASS  (trace match: 1/1 entries)
+[5/5] S5 (thickness=230, narrowest)         ✓ PASS  (trace match: 18/18 entries)
+
+Twin verification: 5/5 fixtures PASS, 77/77 trace entries byte-identical.
+Gap report: 14 unconfirmed type_realizations (Gap C residual), 2 SIGNATURE_LOCKED actions (Gap A).
+</pre>
+
+  <h3>이 use case 가 답하는 것</h3>
+  <ul>
+    <li><strong>R3</strong>: ✓ 5 fixture 모두 byte-identical</li>
+    <li><strong>R4</strong>: ✓ 77 trace entry 모두 same anchor sequence + 동일 input/output snapshot</li>
+    <li><strong>R1</strong>: ✓ ontology DB 가 precondition (synthesizer 가 38 action 모두 사용)</li>
+    <li><strong>R2</strong>: gap-report.json 이 Gap A/C 명시 표면화</li>
+  </ul>
+
+  <p style="font-size:13px; color:#6b7280">참고: 위 5/5 PASS 는 ontology 완비 + 합성기 + facade/stub 모두 정상 동작 가정의 <strong>설계 목표</strong>. 실제 첫 implementation 시 일부 fixture 에서 미세 diff 나올 가능성 — 이 diff 가 합성기/facade/stub 의 어느 layer 에 있는지 oracle differ 가 surface.</p>
+</div>
+
+<h2>3. Use Case 2 — 영향 분석 ("품종 바꾸면 어디 영향?")</h2>
+
+<div class="panel uc2">
+  <h3>시나리오</h3>
+  <p>사용자 query: <strong>"productCd 를 'SCM' (탄소강) 에서 'ALLOY' (합금강) 으로 바꾸면 어디 영향?"</strong></p>
+
+  <p>실제 v2 코드 grep 결과 — productCd 는 5+ action 에서 직접 lookup key 로 사용:</p>
+
+  <table>
+    <thead>
+      <tr><th>Action (직접 영향)</th><th>위치</th><th>사용 방식</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>SdThicknessAction</code></td><td>L58, L60</td><td>CAST_SPEC lookup 의 6번째 key</td></tr>
+      <tr><td><code>SdWidthRangeAction</code></td><td>L67, L75, L88</td><td>HR_SPEC, CUSTOMER_STD, EDGING_GROUP lookup</td></tr>
+      <tr><td><code>SdLengthRangeAction</code></td><td>L59, L64</td><td>HR_SPEC, CUSTOMER_STD lookup</td></tr>
+      <tr><td><code>SdSecondWgtLowAction</code></td><td>L47, L59</td><td>HR_MIN_WGT, CUSTOMER_STD lookup</td></tr>
+      <tr><td><code>SdProductClassifier</code></td><td>L26</td><td>품종 분류 (carbon/alloy/stainless)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Twin Runner 가 처리하는 방식</h3>
+
+<div class="diagram">
+[STEP 1] 사용자가 두 input 준비
+  Input A:  SDOrderEntity(orderNo="ORD001", cmpCd="K", orgCd="1",
+                          productCd=<span style="color:#dc2626; font-weight:bold;">"SCM"</span>, gradeCd="...", customerCd="...")
+  Input B:  SDOrderEntity(orderNo="ORD001", cmpCd="K", orgCd="1",
+                          productCd=<span style="color:#dc2626; font-weight:bold;">"ALLOY"</span>, gradeCd="...", customerCd="...")
+  (productCd 만 다름, 나머지 동일)
+
+[STEP 2] Twin runner 가 두 input 으로 design 실행
+  $ python -m sim_verify.runner impact \
+      --twin generated/v2/ \
+      --base inputA.json \
+      --variant inputB.json \
+      --output impact-report.json
+
+  Runner 동작:
+    designer.design(InputA, trace=TraceA)  → 18 anchor traces
+    designer.design(InputB, trace=TraceB)  → 18 anchor traces
+
+[STEP 3] Trace Differ 가 두 trace 비교 (per-action / per-anchor)
+  - 직접 영향: input.productCd 가 다른 anchor 식별
+  - 전파 영향: input.* 의 derived field (slabThickness 등) 가 다른 anchor
+  - 영향 없음: 두 trace 가 동일한 anchor
+
+[STEP 4] 영향 분석 report 생성 (semantic, 코드 diff 아님)
+</div>
+
+  <h3>실제 trace diff (예시 JSON)</h3>
+
+<pre class="lang" data-lang="json">{
+  "query": "productCd 'SCM' vs 'ALLOY'",
+  "direct_impact": [
+    {
+      "action": "action.scm.thickness_실행",
+      "anchor": {"slot": "body.service_lookup", "line": 57},
+      "diff": {
+        "input": {
+          "product_cd": {"A": <span class="changed">"SCM"</span>, "B": <span class="changed">"ALLOY"</span>}
+        },
+        "output": {
+          "spec.slab_thickness": {"A": <span class="changed">230.0</span>, "B": <span class="changed">250.0</span>}
+        }
+      },
+      "reason": "productCd 가 CAST_SPEC lookup 의 직접 key — lookup 결과 다름"
+    },
+    {
+      "action": "action.scm.width_range_실행",
+      "anchor": {"slot": "body.service_lookup", "line": 65},
+      "diff": {
+        "input": {"product_cd": {"A": "SCM", "B": "ALLOY"}},
+        "output": {"hr_spec.width_high": {"A": <span class="changed">2150</span>, "B": <span class="changed">2080</span>}}
+      },
+      "reason": "HR_SPEC lookup 의 직접 key"
+    }
+  ],
+  "propagation_impact": [
+    {
+      "action": "action.scm.slab.slab_wgt_recalc_실행",
+      "anchor": {"slot": "body.compute", "line": 38},
+      "diff": {
+        "input": {
+          "slab.slab_thickness": {"A": 230.0, "B": 250.0},
+          "slab.slab_width": {"A": 1840, "B": 1920}
+        },
+        "output": {
+          "slab.slab_wgt": {"A": <span class="changed">13288.0</span>, "B": <span class="changed">14802.5</span>}
+        }
+      },
+      "reason": "직접 입력 동일 (productCd 무관) — 전파된 slab_thickness/slab_width 변경 영향"
+    }
+  ],
+  "unaffected": [
+    {
+      "action": "action.scm.order.정합성_검증",
+      "reason": "input snapshot 동일 (productCd 미사용)"
+    }
+  ],
+  "summary": {
+    "total_actions_run": 18,
+    "directly_affected": 5,
+    "propagation_affected": 11,
+    "unaffected": 2
+  }
+}
+</pre>
+
+  <h3>사용자 surface — 시각적 표현 (가상 UI)</h3>
+
+  <div style="font-family: monospace; font-size: 13px; background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px;">
+    <strong>품종 변경 영향 분석 — productCd: SCM → ALLOY</strong>
+    <br><br>
+    <strong>직접 영향 받는 action <span class="label direct">DIRECT</span></strong>
+    <div class="action-card direct">
+      <div>① <code>action.scm.thickness_실행</code> — CAST_SPEC lookup key</div>
+      <div>L57 <span class="arrow">→</span> output.slabThickness: 230 → 250</div>
+    </div>
+    <div class="action-card direct">
+      <div>② <code>action.scm.width_range_실행</code> — HR_SPEC + EDGING_GROUP key</div>
+      <div>L65, L75, L88 <span class="arrow">→</span> hrSpec/widthHigh 다름</div>
+    </div>
+    <div class="action-card direct">
+      <div>③ <code>action.scm.length_range_실행</code> — HR_SPEC + CUSTOMER_STD key</div>
+      <div>L57, L64 <span class="arrow">→</span> lengthHigh/Low 다름</div>
+    </div>
+    <div class="action-card direct">
+      <div>④ <code>action.scm.second_wgt_low_실행</code> — HR_MIN_WGT + CUSTOMER_STD key</div>
+      <div>L47, L59 <span class="arrow">→</span> minWgt 다름</div>
+    </div>
+    <div class="action-card direct">
+      <div>⑤ <code>action.scm.product.classifier</code> — 품종 분류 분기</div>
+      <div>L26 <span class="arrow">→</span> classification: CARBON → ALLOY</div>
+    </div>
+
+    <br>
+    <strong>전파 영향 (직접 입력은 동일, downstream 값 다름) <span class="label propagate">PROPAGATE</span></strong>
+    <div class="action-card propagate">
+      <div>⑥ <code>action.scm.slab.slab_wgt_recalc_실행</code></div>
+      <div>입력 slab.slabThickness/Width 가 위에서 propagated</div>
+    </div>
+    <div class="action-card propagate">
+      <div>⑦ <code>action.scm.split_range_실행</code></div>
+      <div>weight 범위 변경으로 split 분기 다를 수 있음</div>
+    </div>
+    <div class="action-card propagate">
+      <div>⑧ <code>action.scm.first_weight_실행</code></div>
+      <div>upper bound 가 변동 input 에 의존</div>
+    </div>
+    <div style="padding: 8px; color: #6b7280; font-style: italic;">... 11 actions total ...</div>
+
+    <br>
+    <strong>영향 없음 <span class="label unaffected">UNAFFECTED</span></strong>
+    <div class="action-card unaffected">
+      <div>⑰ <code>action.scm.order.정합성_검증</code> — productCd 미참조</div>
+    </div>
+    <div class="action-card unaffected">
+      <div>⑱ <code>action.scm.batch_design__driver</code> — orchestrator 만, 데이터 무관</div>
+    </div>
+
+    <br>
+    <strong>최종 output 변화</strong>
+    <table style="font-size: 13px;">
+      <tr><th>Field</th><th>A (SCM)</th><th>B (ALLOY)</th><th>변화율</th></tr>
+      <tr><td>slabThickness</td><td>230.0</td><td>250.0</td><td>+8.7%</td></tr>
+      <tr><td>slabWidth</td><td>1840</td><td>1920</td><td>+4.3%</td></tr>
+      <tr><td>slabLength</td><td>11916</td><td>11248</td><td>−5.6%</td></tr>
+      <tr><td>slabWgt</td><td>13288.0</td><td>14802.5</td><td>+11.4%</td></tr>
+      <tr><td>splitCount</td><td>1</td><td>2</td><td>변화 (1 → 2 split)</td></tr>
+    </table>
+  </div>
+
+  <h3>이 use case 가 답하는 것</h3>
+  <ul>
+    <li><strong>"풀 시연" 의 확장 정의</strong>: 36 action 모두 byte-identical 시연 + <strong>사용자 query 기반 partial 시연</strong> 둘 다 가능</li>
+    <li><strong>R5 의 input 변형 case</strong>: Java source 가 같아도 input 만 변경하면 trace diff 가 영향 분석. R5 의 mechanism 이 이미 이 case 를 cover</li>
+    <li><strong>Section 2 ontology 의 활용</strong>: 직접 영향 식별은 anchor.target_slot + business_term mapping 으로 결정 가능 ("이 anchor 가 productCd term 을 lookup key 로 사용")</li>
+    <li><strong>전파 영향</strong>: trace input snapshot diff 자동 계산 → 명시적 dependency graph 불필요</li>
+  </ul>
+
+  <p style="font-size:13px; color:#6b7280"><strong>Note</strong>: 위 수치는 design example. 실제 영향은 ontology 의 LookupDataSource 데이터에 의존. 합성기는 mechanism 만 제공.</p>
+</div>
+
+<h2>4. Use Case 3 — R5 (Q3 a 확인: per-action semantic trace diff)</h2>
+
+<div class="panel uc3">
+  <h3>시나리오</h3>
+  <p>Java v2 → v2' 수정. <code>SdThicknessAction.java L70</code> 의 출력 로직 변경 (예: <code>spec.getSlabThickness()</code> 에 +5 offset 추가).</p>
+
+  <h3>실행 흐름</h3>
+
+<div class="diagram">
+[STEP 1] Java 수정
+  $ git checkout -b v2-prime
+  $ vim sample-repos/slab-design-real_v2/.../SdThicknessAction.java
+    # L70 변경: slab.setSlabThickness(spec.getSlabThickness().add(BigDecimal("5")))
+
+[STEP 2] Section 2 ontology 재추출
+  $ python scripts/import_code_raw.py --repo slab-design-real-v2-prime
+  → code_methods 의 L70 line drift 검출 (Anchor L70 의 anchor_locator hash 변경)
+  → modeling UI 가 anchor 재확정 요청 (user confirm)
+
+[STEP 3] 합성기 재실행
+  $ python -m sim_verify.synthesizer --repo slab-design-real-v2-prime --out generated/v2_prime/
+  → 36 action 중 1개 (SdThicknessAction) Python 변경
+  → 나머지 35 action 의 Python 은 byte-identical (idempotent 검증)
+
+[STEP 4] 두 twin 실행 + diff
+  $ python -m sim_verify.runner compare \
+      --twin-a generated/v2/ \
+      --twin-b generated/v2_prime/ \
+      --fixture S1.json
+  → TraceA, TraceB 수집 후 per-action semantic diff
+</div>
+
+  <h3>R5 diff report 형식 (Q3 a 적용)</h3>
+
+<pre class="lang" data-lang="markdown"># R5 diff report — v2 → v2' (commit dcdf251 → HEAD)
+
+## Java diff
+```diff
+SdThicknessAction.java L70:
+- slab.setSlabThickness(spec.getSlabThickness());
++ slab.setSlabThickness(spec.getSlabThickness().add(new BigDecimal("5")));
+```
+
+## Python diff (참고 — 본 분석의 1차 surface 아님)
+```diff
+generated/.../sd_thickness_action.py L40:
+-     slab.slab_thickness = spec.slab_thickness
++     slab.slab_thickness = spec.slab_thickness.add(BigDecimal("5"))
+```
+파일 36개 중 1개만 변경 (synthesizer determinism 증명).
+
+## **Per-action semantic trace diff** (1순위 surface)
+
+### Action 1: `action.scm.thickness_실행` <span class="label medium">CHANGED</span>
+- Anchor L70 (slot: body.set_output)
+  - <span class="changed">output.slab.slab_thickness: 230.0 → 235.0</span> (+5.0)
+- 다른 anchor (L43, L47, L52, L57) 변화 없음
+
+### Action 2: `action.scm.width_range_실행` <span class="label medium">CHANGED (propagation)</span>
+- Anchor L65 (slot: body.service_lookup)
+  - input.slab.slab_thickness: 230.0 → 235.0 (propagated)
+- 영향: hrTgtWidth 계산이 thickness 사용 → output.firstWidthHigh: 1250.0 → 1245.0
+
+### Action 3-15: 10 actions <span class="label medium">CHANGED (propagation)</span>
+... slab_thickness 의존하는 모든 downstream ...
+
+### Action 16-18: 3 actions <span class="label unaffected">UNAFFECTED</span>
+- order 정합성 검증, batch driver — thickness 무관
+
+## Output 차이 (S1 fixture)
+- slabThickness: 230.0 → 235.0
+- slabWidth: 1840 → 1872 (propagated)
+- slabLength: 11916 → 11675 (propagated)
+- slabWgt: 13288.0 → 13862.4 (propagated)
+- splitCount: 1 → 1 (영향 없음 — 임계 미돌파)
+
+## 사람 읽기 요약
+> SdThicknessAction L70 한 줄 변경이 13 action 에 cascade.
+> 가장 큰 변화: slabWgt +4.3%. splitCount 는 안정 (현 fixture 기준).
+</pre>
+
+  <h3>Q3 a 가 다른 옵션 대비 좋은 이유</h3>
+  <ul>
+    <li><strong>Text diff 의 noise 회피</strong>: 9k Python LOC 의 text diff 는 1줄 변경에도 reformat noise 가능. Semantic diff 는 의미 단위 (anchor) 로 묶여서 noise 없음</li>
+    <li><strong>Cascade 가시화</strong>: 단일 line 변경이 cascading 영향이 있는지 즉시 식별. 사람이 "왜 X 가 변했지?" 추적 가능</li>
+    <li><strong>Action 단위 grouping</strong>: 13 action × 18 trace = 234 event 인데, action 별로 묶여서 13 cards 로 표현. 정보 밀도 적정</li>
+    <li><strong>Java diff + Python diff + trace diff 3-tier</strong>: Java diff = "왜", Python diff = "synthesizer 결정성 증명", trace diff = "행동 변화". 각자 다른 질문 답</li>
+  </ul>
+</div>
+
+<h2>5. 합성기 자체의 self-test (M10 적용)</h2>
+
+<div class="panel synth">
+  <p>합성기가 옳다는 것을 어떻게 검증할까? α 의 E-1 smoke test 를 contract layer 에 확장:</p>
+
+<pre class="lang" data-lang="python"><span class="comment"># tests/verification/test_synthesizer_contract.py</span>
+
+<span class="kw">def</span> <span class="fn">test_all_protocols_implemented_by_runtime</span>():
+    <span class="str">"""Every Protocol method must exist in runtime with matching signature."""</span>
+    <span class="kw">from</span> backend.modeling.sim_verify <span class="kw">import</span> contracts, runtime
+    <span class="kw">for</span> protocol_name <span class="kw">in</span> contracts.__all__:
+        protocol = <span class="fn">getattr</span>(contracts, protocol_name)
+        impl = <span class="fn">getattr</span>(runtime, protocol_name, <span class="kw">None</span>)
+        <span class="kw">assert</span> impl <span class="kw">is</span> <span class="kw">not</span> <span class="kw">None</span>, <span class="str">f"{protocol_name} not in runtime"</span>
+        <span class="kw">for</span> method_name <span class="kw">in</span> <span class="fn">dir</span>(protocol):
+            <span class="kw">if</span> method_name.<span class="fn">startswith</span>(<span class="str">'_'</span>): <span class="kw">continue</span>
+            <span class="kw">assert</span> <span class="fn">hasattr</span>(impl, method_name), \
+                <span class="str">f"{protocol_name}.{method_name} missing in runtime"</span>
+            <span class="comment"># 시그니처 비교</span>
+            proto_sig = inspect.<span class="fn">signature</span>(<span class="fn">getattr</span>(protocol, method_name))
+            impl_sig = inspect.<span class="fn">signature</span>(<span class="fn">getattr</span>(impl, method_name))
+            <span class="kw">assert</span> proto_sig == impl_sig, <span class="str">f"{method_name} signature mismatch"</span>
+
+<span class="kw">def</span> <span class="fn">test_synthesizer_idempotent</span>():
+    <span class="str">"""Re-synthesis on unchanged inputs produces byte-identical Python."""</span>
+    out1 = <span class="fn">synthesize</span>(<span class="str">"action.scm.thickness_실행"</span>, <span class="str">"slab-design-real-v2"</span>)
+    out2 = <span class="fn">synthesize</span>(<span class="str">"action.scm.thickness_실행"</span>, <span class="str">"slab-design-real-v2"</span>)
+    <span class="kw">assert</span> out1 == out2
+
+<span class="kw">def</span> <span class="fn">test_registry_covers_all_slots</span>():
+    <span class="str">"""Every distinct target_slot in DB has a registry entry."""</span>
+    db_slots = db.<span class="fn">distinct_target_slots</span>(<span class="str">"slab-design-real-v2"</span>)  <span class="comment"># 79</span>
+    registry_slots = <span class="fn">set</span>(REGISTRY.<span class="fn">keys</span>())
+    missing = db_slots - registry_slots
+    <span class="kw">assert</span> <span class="kw">not</span> missing, <span class="str">f"slots without registry entry: {missing}"</span>
+
+<span class="kw">def</span> <span class="fn">test_facade_behavioral_parity_bigdecimal</span>():
+    <span class="str">"""Facade BigDecimal class behaves like Java BigDecimal on key edge cases."""</span>
+    <span class="kw">assert</span> <span class="fn">str</span>(<span class="fn">BigDecimal</span>(<span class="str">"0.95"</span>).<span class="fn">multiply</span>(<span class="fn">BigDecimal</span>(<span class="str">"3"</span>))) == <span class="str">"2.85"</span>
+    <span class="comment"># Java BigDecimal.valueOf(0.95).multiply(3) = "2.85"</span>
+    <span class="kw">assert</span> <span class="fn">BigDecimal</span>(<span class="str">"1.0"</span>).<span class="fn">compare_to</span>(<span class="fn">BigDecimal</span>(<span class="str">"1.00"</span>)) == <span class="num">0</span>
+    <span class="comment"># Java compareTo = 0 (equal numeric value, different scale)</span>
+    <span class="comment"># Note: Java .equals() would return false; we use .compare_to throughout</span>
+</pre>
+
+  <p>이 4 test 가 CI 의 gate. 모두 통과해야 합성기 동작 인정.</p>
+</div>
+
+<h2>6. Honest Limitations (M11 인정)</h2>
+
+<table>
+  <thead>
+    <tr><th>한계</th><th>대응</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Reflection-based dynamic loading</strong> (Class.forName 등)</td>
+      <td>v2 에는 미사용 확인. 등장 시 SIGNATURE_LOCKED + 명시 stub</td>
+    </tr>
+    <tr>
+      <td><strong>@Async / Reactive (CompletableFuture)</strong></td>
+      <td>현 v2 미사용. 미래 등장 시 단일 thread 로 폐기 (synchronous 변환)</td>
+    </tr>
+    <tr>
+      <td><strong>새 Java pattern (switch expression 등)</strong></td>
+      <td>Layer 2 의 UnsupportedJavaNode error 로 fail. 사람이 visitor rule 추가</td>
+    </tr>
+    <tr>
+      <td><strong>100% bit-identical R3 보장 어려운 영역</strong></td>
+      <td><code>LocalDateTime.now()</code> (injected clock 으로 fixed), <code>AtomicLong</code> (singleton), Java <code>BigDecimal.equals</code> (compare_to 만 사용 정책). R3 의 tolerance 명시</td>
+    </tr>
+    <tr>
+      <td><strong>합성기 자체의 bug</strong></td>
+      <td>self-test 4종 + contract smoke. 그러나 unknown unknowns 는 fixture coverage 에 의존 — 5 fixture 외 추가 fixture 작성 권장</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>7. 최종 사용자 결정 — 권장 다음 행동</h2>
+
+<div class="panel info">
+  <h3>이제 결정해 주실 것</h3>
+  <table>
+    <thead>
+      <tr><th>질문</th><th>이 walkthrough 가 보여준 것</th><th>결정</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>종합 설계 (Anchored Twin Synthesizer) 채택?</td>
+        <td>2-layer 합성 + contract + 8 weakness 명시 + 3 use case 실행 흐름</td>
+        <td><strong>승인 / 일부 수정 / 거부</strong></td>
+      </tr>
+      <tr>
+        <td>"풀 시연" 정의 (확인)</td>
+        <td>UC1 (36 action byte-identical) + UC2 (사용자 query partial 시연) <strong>둘 다 지원</strong> — 사용자 의도와 부합</td>
+        <td><strong>확정?</strong></td>
+      </tr>
+      <tr>
+        <td>R5 surface (Q3 a 확인)</td>
+        <td>UC3 — per-action semantic trace diff 가 1순위. Java diff + Python diff 는 보조</td>
+        <td><strong>확정?</strong></td>
+      </tr>
+      <tr>
+        <td>Impact analysis (UC2) 가 1급 use case?</td>
+        <td>합성기 mechanism 으로 자연 지원. CLI/API surface 가 spec 에 포함되어야 함</td>
+        <td><strong>1급 / 부가 / 나중</strong></td>
+      </tr>
+      <tr>
+        <td>W7 (stub 의 behavioral parity) 의 R3 tolerance 정책</td>
+        <td>100% bit-identical 어려운 영역 (timestamp, sequence) 의 exclusion list 필요</td>
+        <td><strong>tolerance 명시 동의?</strong></td>
+      </tr>
+      <tr>
+        <td>다음 세션 (별도)</td>
+        <td>spec 문서 + ADR-002 (Twin Scope) + ADR-003 (Synthesizer-Runtime Contract) + ADR-004 (Section 2 minimum quality gate)</td>
+        <td><strong>이대로 진행?</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top: 16px;"><strong>다음 세션 시작 시점</strong>: 이 5-6개 결정 받으면 spec 작성 세션으로 인계. Spec 자체 작성은 ~1-2 hour 예상. Implementation plan 은 spec 검토 후 또 별도 세션.</p>
+</div>
+
+<p style="margin-top:48px; padding-top:16px; border-top:1px solid #e5e7eb; color:#9ca3af; font-size:12px;">
+  Anchored Twin Synthesizer — Self-Review + Walkthrough · 2026-05-12 · Section 4 sim-redesign 세션<br>
+  연관: <code>DESIGN-SYNTHESIS.html</code> (1차 종합), <code>ADR-001-python-twin.md</code>,
+  <code>explorations/{1,2,3,4}-*.md</code>, <code>anchor-gaps.md</code>
+</p>
+
+</body>
+</html>

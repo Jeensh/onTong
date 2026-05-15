@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Sim-Redesign 종합 설계안 — Anchored Twin Synthesizer</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+      "Noto Sans KR", sans-serif;
+    line-height: 1.6;
+    color: #1f2937;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+    background: #fafafa;
+  }
+  h1 { font-size: 28px; margin: 0 0 8px; color: #111827; }
+  h2 { font-size: 22px; margin: 48px 0 12px; padding-bottom: 8px;
+       border-bottom: 2px solid #e5e7eb; color: #111827; }
+  h3 { font-size: 17px; margin: 24px 0 8px; color: #1f2937; }
+  h4 { font-size: 13px; margin: 12px 0 6px; color: #4b5563;
+       text-transform: uppercase; letter-spacing: 0.05em; }
+  .lead { color: #6b7280; font-size: 15px; margin-bottom: 32px; }
+  .panel { background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+           padding: 20px 24px; margin: 16px 0; }
+  .panel.purist { border-left: 4px solid #2563eb; }
+  .panel.literal { border-left: 4px solid #db2777; }
+  .panel.alpha   { border-left: 4px solid #16a34a; }
+  .panel.skeptic { border-left: 4px solid #ea580c; }
+  .panel.synth   { border-left: 4px solid #9333ea; background: #faf5ff; }
+  .panel.info    { background: #eff6ff; border-color: #93c5fd; }
+  pre { background: #1f2937; color: #e5e7eb; padding: 14px 18px;
+        border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.55;
+        font-family: "SF Mono", Menlo, Monaco, Consolas, monospace; margin: 8px 0; }
+  pre.lang::before {
+    content: attr(data-lang); display: inline-block; background: #374151;
+    color: #9ca3af; font-size: 10px; padding: 2px 6px; border-radius: 3px;
+    margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  pre .kw { color: #c084fc; }
+  pre .str { color: #fca5a5; }
+  pre .fn { color: #93c5fd; }
+  pre .num { color: #fbbf24; }
+  pre .comment { color: #6b7280; font-style: italic; }
+  pre .anc { background: rgba(34, 197, 94, 0.18); padding: 1px 4px; border-radius: 3px; }
+  pre .slot { color: #34d399; font-weight: 600; }
+  pre .unclear { color: #f59e0b; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 12px 0; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin: 12px 0; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin: 12px 0; }
+  .col { background: white; border: 1px solid #e5e7eb; border-radius: 6px;
+         padding: 12px 16px; }
+  .col h4 { margin-top: 0; }
+  .label { display: inline-block; padding: 2px 8px; border-radius: 999px;
+           font-size: 11px; font-weight: 700; margin-left: 6px;
+           text-transform: uppercase; letter-spacing: 0.05em; }
+  .label.A { background: #dbeafe; color: #1e40af; }
+  .label.B { background: #fce7f3; color: #9d174d; }
+  .label.C { background: #dcfce7; color: #166534; }
+  .label.S { background: #ffedd5; color: #9a3412; }
+  .label.synth { background: #f3e8ff; color: #6b21a8; }
+  .label.rec { background: #fef3c7; color: #92400e; margin-left: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; background: white;
+          font-size: 14px; }
+  th, td { border: 1px solid #e5e7eb; padding: 10px 12px; text-align: left;
+           vertical-align: top; }
+  th { background: #f3f4f6; font-weight: 600; }
+  td.ok { color: #16a34a; font-weight: 700; }
+  td.no { color: #dc2626; font-weight: 700; }
+  td.partial { color: #d97706; font-weight: 700; }
+  .diagram { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px;
+             padding: 16px 20px; margin: 16px 0;
+             font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+             line-height: 1.6; white-space: pre; overflow-x: auto; color: #1e293b; }
+  .callout { background: #fef3c7; border-left: 4px solid #f59e0b;
+             padding: 12px 16px; margin: 16px 0; border-radius: 4px; font-size: 14px; }
+  .tldr { background: #eff6ff; border-left: 4px solid #3b82f6;
+          padding: 14px 18px; margin: 16px 0; border-radius: 4px; font-size: 14px; }
+  .rec-banner {
+    background: linear-gradient(90deg, #f3e8ff, #ede9fe);
+    border: 2px solid #9333ea;
+    border-radius: 8px;
+    padding: 14px 20px;
+    margin: 20px 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #6b21a8;
+  }
+  .mandate {
+    background: #fff7ed; border: 1px solid #fdba74; border-radius: 6px;
+    padding: 10px 14px; margin: 8px 0; font-size: 14px;
+  }
+  .mandate strong { color: #9a3412; }
+  .quote { border-left: 3px solid #94a3b8; padding-left: 16px;
+           color: #475569; font-style: italic; margin: 12px 0; }
+  .anchor-pill { display: inline-block; background: #dcfce7; color: #166534;
+                 padding: 2px 8px; border-radius: 4px;
+                 font-family: "SF Mono", monospace; font-size: 11px;
+                 margin-right: 4px; margin-bottom: 2px; }
+  .filelink { color: #2563eb; font-family: "SF Mono", monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>Sim-Redesign 종합 설계안 <span class="label synth">DESIGN v1</span></h1>
+<p class="lead">
+  4 perspective 병렬 탐색 (automation purist / minimal twin / Phase α reuse / skeptic) 결과 종합.<br>
+  3 design proposal 의 강점 통합 + skeptic 의 11 mandate 흡수 → 단일 권장 설계안 + 사용자 결정 요청.
+</p>
+
+<div class="rec-banner">
+  권장: <strong>Anchored Twin Synthesizer</strong> — 2-layer 결정론적 합성기 (slot-keyed template registry + AST-walk fallback) + 명시적 twin scope boundary + 합성기↔runtime typed contract
+</div>
+
+<div class="tldr">
+  <strong>이 문서의 위치</strong> — ADR-001 (Python = Java twin) 이후 macro exploration 의 종합. 다음 단계: 사용자가 권장안 승인 후 spec 문서 작성 → 별도 세션에서 implementation plan. 4 exploration 의 full text 는 <code>explorations/1~4.md</code>.
+</div>
+
+<h2>1. 4 perspective 한눈에 보기</h2>
+
+<div class="grid-2">
+  <div class="panel purist">
+    <h3>① Automation Purist <span class="label A">A</span></h3>
+    <p><strong>핵심</strong>: Synthesizer 가 translation rule + runtime selection 을 paired registry 로 own. Registry entry 는 runtime 심볼을 직접 import → runtime API 변경 시 synthesizer startup 에서 ImportError. KNOWN_DIVERGENCE by construction 방지.</p>
+    <p><strong>강점</strong>: 합성기 단일 결정점, runtime drift 즉시 검출, R4 = compile-time property</p>
+    <p><strong>약점</strong>: 79 distinct slot 전체 registry entry 필요, literal-translation fallback 의 brittleness</p>
+    <p style="font-size:12px"><span class="filelink">explorations/1-automation-purist.md</span> (1988 words)</p>
+  </div>
+
+  <div class="panel literal">
+    <h3>② Minimal Twin <span class="label B">B</span></h3>
+    <p><strong>핵심</strong>: 결정론적 AST visitor 가 statement-by-statement 변환. Idiom card 폐기 — AST 가 이미 인코딩한 것을 재서술하는 것이라 α 의 drift 가 발생. Ontology = 사후 검증 (AnchorAuditor).</p>
+    <p><strong>강점</strong>: 최단 코드 경로 (visitor ~1500 LOC), "코드 ground truth" 원칙과 자연 정합, idiom drift 원천 차단</p>
+    <p><strong>약점</strong>: R1 (ontology=precondition) 위반, JPA repository interface body 없음 → special-case 필요</p>
+    <p style="font-size:12px"><span class="filelink">explorations/2-minimal-twin.md</span> (1958 words)</p>
+  </div>
+
+  <div class="panel alpha">
+    <h3>③ Phase α Reuse <span class="label C">C</span></h3>
+    <p><strong>핵심</strong>: 27 카드 + runtime + oracle + 5 fixture + smoke test 5 가지 자산 재활용. 5 facade class (~110 LOC) 로 KNOWN_DIVERGENCE 닫고 카드를 synthesizer 의 internal registry 로 rebrand.</p>
+    <p><strong>강점</strong>: α work (수십 시간) 보존, 카드 content 는 옳았음 (framing 만 잘못), 56 slot 중 hot 10 즉시 cover</p>
+    <p><strong>약점</strong>: 79 slot 중 27 카드 = 34% coverage, 38 single-anchor slot 의 cross-validation 부재 (Gap F)</p>
+    <p style="font-size:12px"><span class="filelink">explorations/3-alpha-reuse.md</span> (2035 words)</p>
+  </div>
+
+  <div class="panel skeptic">
+    <h3>④ Skeptic <span class="label S">S</span></h3>
+    <p><strong>핵심</strong>: A/B/C 모두 "twin 가능한 영역" 으로 시야 좁힘. 실제 v2 는 985 method × Spring DI / JPA / @Transactional / AtomicLong / LocalDateTime / Jackson 모두 사용. α 의 실패는 API typo 가 아닌 inter-agent contract 부재.</p>
+    <p><strong>최강의 한 줄</strong>: <em>"divergence 를 cards-vs-runtime 에서 synthesizer-vs-runtime 으로 옮기는 것은 contract 가 first-class 가 되지 않는 한 진전이 아니다"</em></p>
+    <p><strong>11 mandate</strong> 제시 — 모든 합성 안이 답해야 함</p>
+    <p style="font-size:12px"><span class="filelink">explorations/4-skeptic.md</span> (2094 words)</p>
+  </div>
+</div>
+
+<h2>2. 합의점 — A/B/C 가 모두 동의하는 것</h2>
+
+<table>
+  <thead>
+    <tr><th>항목</th><th>합의 내용</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>합성기 본질</td><td><strong>Deterministic pipeline</strong> (LLM 아님). 같은 입력 → 같은 Python bytes</td></tr>
+    <tr><td>입력 자료</td><td><strong>ontology DB + Java AST</strong>. 사람 편집 산출물 입력 없음</td></tr>
+    <tr><td>Gap 표면화</td><td><strong><code># UNCLEAR</code> 인라인 주석 + 별도 gap report</strong> (json/md)</td></tr>
+    <tr><td>R5 workflow</td><td>Java v2 → v2' → ontology 재추출 → 합성기 재실행 → 두 Python 실행 → diff</td></tr>
+    <tr><td>Twin compliance</td><td>Python 파일은 모두 <code># DO NOT EDIT</code> banner + git CI 가 사람 편집 차단</td></tr>
+    <tr><td>R3 (output)</td><td>oracle differ (Phase α 산출물) 이 final result 비교</td></tr>
+    <tr><td>Section 2 의존</td><td>Section 2 ontology 가 완비도 prerequisite. 합성기는 consumer</td></tr>
+  </tbody>
+</table>
+
+<h2>3. 차이점 — 어디서 분기하는가</h2>
+
+<table>
+  <thead>
+    <tr><th>축</th><th>A (purist)</th><th>B (literal)</th><th>C (α reuse)</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Translation rule 소스</strong></td>
+      <td>Synthesizer 내부 registry (79 slot 1:1)</td>
+      <td>없음 — AST visitor 의 mechanical rule table</td>
+      <td>27 카드 (markdown, rebrand)</td>
+    </tr>
+    <tr>
+      <td><strong>Ontology 역할</strong></td>
+      <td>Primary input</td>
+      <td>Auxiliary (post-translation check)</td>
+      <td>Primary input (카드 lookup + 검증)</td>
+    </tr>
+    <tr>
+      <td><strong>Idiom card 운명</strong></td>
+      <td>Internal registry (사람용 markdown 폐기)</td>
+      <td>Obsolete (AST 가 인코딩한 것 재서술)</td>
+      <td>Synthesizer input registry (markdown 유지)</td>
+    </tr>
+    <tr>
+      <td><strong>Runtime 측 변경</strong></td>
+      <td>Registry-paired symbol (functional API 유지)</td>
+      <td>Facade verbatim-match Java API (BigDecimal 클래스 등)</td>
+      <td>5 facade class 추가 (~110 LOC)</td>
+    </tr>
+    <tr>
+      <td><strong>Un-anchored method (947개)</strong></td>
+      <td>Literal-translation fallback (brittle 인정)</td>
+      <td>Primary mechanism — 모두 AST walk</td>
+      <td>명시 안 함 (37+ 카드 추가 필요)</td>
+    </tr>
+    <tr>
+      <td><strong>R4 보장</strong></td>
+      <td>By construction (deterministic synthesis)</td>
+      <td>By construction (AST order 보존)</td>
+      <td>By verification (anchor trace + golden compare)</td>
+    </tr>
+    <tr>
+      <td><strong>KNOWN_DIVERGENCE 방지</strong></td>
+      <td>Paired registry → synthesizer startup error</td>
+      <td>Facade verbatim-match → 선택 여지 X</td>
+      <td>5 facade 즉시 close, contract 명시 안 함</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>4. Skeptic 의 11 mandate — 모든 설계가 답해야 할 것</h2>
+
+<p>Skeptic 은 design proposal 하지 않음. 대신 A/B/C 가 답하지 못하는 빈틈을 catalog 화. 종합 설계가 이걸 모두 흡수해야 함.</p>
+
+<div class="mandate"><strong>M1. Twin scope 명시</strong> — 어떤 Java 기능이 in/out? (BigDecimal/control flow IN, Spring DI/JPA/@Transactional/LocalDateTime 명시적 stub 설계)</div>
+<div class="mandate"><strong>M2. Synthesizer↔runtime API contract reify</strong> — typed Protocol, doctest per symbol, version pin. α 의 실제 실패가 이 contract 부재였음</div>
+<div class="mandate"><strong>M3. R5 diff granularity 결정</strong> — 9k LOC text diff 는 unreadable. Semantic (per-action trace) diff 가 default 여야</div>
+<div class="mandate"><strong>M4. 947 un-anchored method 처리</strong> — twin auto-synthesizes (B-style) / ontology 확장 / hybrid 중 선택</div>
+<div class="mandate"><strong>M5. Determinism mechanism pin</strong> — LLM 사용 시 prompt drift 발생. Pure rule-based 시 single-anchor 38 slot 대처법</div>
+<div class="mandate"><strong>M6. Gap 표면 via ontology 만</strong> — verification_level/confidence/anchor presence 의 결정론적 함수. LLM judgment 금지 (R2 가 falsifiable 하지 않게 됨)</div>
+<div class="mandate"><strong>M7. "풀 시연" 정의 사용자 확인</strong> — "36 actions 모두 byte-identical" vs "happy-path demo" 다른 scope</div>
+<div class="mandate"><strong>M8. <code>LocalDateTime.now()</code> / <code>AtomicLong</code> / <code>@Transactional</code> / JPA derived query 명시적 처리</strong> — 각각 R3 의 silent failure 원인</div>
+<div class="mandate"><strong>M9. Git artifact volume 계획</strong> — ~9k Python LOC regen per Java edit. version-pin / gitignore + external / content-address 중 선택</div>
+<div class="mandate"><strong>M10. Smoke-test contract 먼저 작성</strong> — α 의 E-1 은 divergence 발견 후에 추가됨. 다음 반복은 두 번째 artifact 작성 전 smoke test 부터</div>
+<div class="mandate"><strong>M11. KNOWN_DIVERGENCE root cause = inter-agent contract 부재</strong> — A: 부분 방지, B: 방지 못함, C: 방지 못함. 모두 explicit contract layer 필요</div>
+
+<h2>5. 권장 종합 설계 — "Anchored Twin Synthesizer"</h2>
+
+<div class="panel synth">
+  <p><strong>One sentence</strong>: 결정론적 2-layer 합성기 + 명시적 twin scope boundary + 합성기↔runtime typed contract. 즉, <strong>A 의 paired registry + B 의 AST fallback + C 의 카드 content + Skeptic 의 contract first-class</strong>.</p>
+</div>
+
+<h3>Architecture</h3>
+
+<div class="diagram">
+                Section 2 ontology DB                Java AST (tree-sitter)
+                ─────────────────────                ──────────────────────
+                actions / realizations               sample-repos/v2/*.java
+                anchor_bindings / type_realiz.       (in scope: control flow,
+                code_methods / business_rules        arithmetic, repos, services)
+                            │                                  │
+                            └─────────┬────────────────────────┘
+                                      ▼
+            ┌──────────── Synthesizer (deterministic pipeline) ─────────────┐
+            │                                                                │
+            │  ┌── Layer 1 ── Slot-keyed Template Registry ──────┐           │
+            │  │   79 slot × (java_pattern, py_emitter, runtime_imports)  │
+            │  │   (현 27 카드 = hot 10 slot. 신규 52 slot 추가 작업)     │
+            │  └──────────────────────────────────────────────────┘           │
+            │                       │                                          │
+            │  ┌── Layer 2 ── AST-walk Literal Translator ───────┐           │
+            │  │   anchor 없는 statement: ~50 mechanical rule table       │
+            │  │   947 un-anchored method 도 모두 처리                  │
+            │  └──────────────────────────────────────────────────┘           │
+            │                       │                                          │
+            │  ┌── Twin Scope Boundary ───────────────────────────┐           │
+            │  │   in: BigDecimal arith, repo call, service call, AlgEx │
+            │  │   out (stub): Spring DI, JPA, @Transactional,         │
+            │  │              LocalDateTime, AtomicLong, Jackson       │
+            │  └──────────────────────────────────────────────────┘           │
+            │                       │                                          │
+            │  ┌── Gap Surfacer (deterministic, from ontology) ──┐           │
+            │  │   verification_level / confidence / confirmed     │
+            │  │   → # UNCLEAR comments + gap-report.json          │
+            │  └──────────────────────────────────────────────────┘           │
+            │                       │                                          │
+            └───────────────────────┼──────────────────────────────────────────┘
+                                    ▼
+            backend/modeling/sim_verify/generated/&lt;repo_id&gt;/*.py
+                                    │
+            ┌── Synthesizer ↔ Runtime Contract (typed Protocol + smoke test) ──┐
+            │   class BigDecimal(Protocol): def multiply(self, other) -> ...  │
+            │   class AlgorithmException(Protocol): error_code: str ...       │
+            │   class LookupDataSource(Protocol): def find_first(...) -> ...  │
+            │   smoke: test that each Protocol matches runtime implementation │
+            └──────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+            backend/modeling/sim_verify/runtime/
+              + facades/ (BigDecimal class, MathContext, RoundingMode,
+                          SdConstants, ValidationResult — from C)
+              + stubs/ (clock, atomic_seq, transaction, jpa_inmem — from Skeptic M8)
+                                    │
+                                    ▼
+                            twin runner → trace.json
+                                    │
+                                    ▼
+            oracle_differ (semantic per-action trace diff — from M3)
+              ├── twin v2 vs twin v2'  (R5)
+              └── twin v2 vs Java v2 golden (R3 검증)
+</div>
+
+<h3>핵심 설계 요소 5가지</h3>
+
+<div class="panel">
+  <h4>1. 2-layer Translation (A + B 통합)</h4>
+  <ul>
+    <li><strong>Layer 1 — Slot-keyed Template Registry</strong>: <code>{target_slot: (java_pattern, py_emitter, runtime_imports)}</code>. 79 slot 모두 entry 필요. 현 27 카드 (hot 10 slot) 가 starting point — content reuse, framing reframe.</li>
+    <li><strong>Layer 2 — AST-walk Literal Translator</strong>: anchor 없는 statement / un-anchored method 의 fallback. ~50 mechanical rule (B 의 table).</li>
+    <li><strong>분기</strong>: 합성 시 statement 의 line 이 anchor_binding 에 매칭되면 Layer 1, 아니면 Layer 2.</li>
+  </ul>
+</div>
+
+<div class="panel">
+  <h4>2. Twin Scope Boundary (M1 + M8)</h4>
+  <table>
+    <thead><tr><th>Java 기능</th><th>Twin 처리</th><th>Stub 위치</th></tr></thead>
+    <tbody>
+      <tr><td>BigDecimal 산술</td><td class="ok">In scope</td><td>facade (C 의 5개)</td></tr>
+      <tr><td>Control flow (if/for/while/try)</td><td class="ok">In scope</td><td>AST visitor 직접</td></tr>
+      <tr><td>Service call (constructor-injected)</td><td class="ok">In scope</td><td>orchestrator 의 manual DI</td></tr>
+      <tr><td>LookupDataSource 조회</td><td class="ok">In scope</td><td>runtime/lookup_source.py</td></tr>
+      <tr><td>AlgorithmException</td><td class="ok">In scope</td><td>runtime/algorithm_exception.py</td></tr>
+      <tr><td>Spring DI (@Autowired/@Component)</td><td class="partial">Stub</td><td>orchestrator 수동 wiring</td></tr>
+      <tr><td>JPA derived query</td><td class="partial">Stub</td><td>runtime/stubs/jpa_inmem.py</td></tr>
+      <tr><td>@Transactional rollback</td><td class="partial">Stub</td><td>runtime/stubs/transaction.py (session journal)</td></tr>
+      <tr><td>LocalDateTime.now()</td><td class="partial">Stub</td><td>runtime/stubs/clock.py (injected)</td></tr>
+      <tr><td>AtomicLong sequence</td><td class="partial">Stub</td><td>runtime/stubs/atomic_seq.py (singleton)</td></tr>
+      <tr><td>Jackson camelCase</td><td class="partial">Stub</td><td>verbatim per-field serializer</td></tr>
+      <tr><td>@Async / reactive</td><td class="no">Out</td><td>SIGNATURE_LOCKED 처리</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:13px; color:#6b7280">Boundary 는 별도 <strong>ADR-002</strong> 로 명시 — 새 Java 기능 등장 시 in/out/stub 결정이 ADR amendment 로</p>
+</div>
+
+<div class="panel">
+  <h4>3. Synthesizer↔Runtime typed Contract (M2 + M11)</h4>
+<pre class="lang" data-lang="python"><span class="comment"># backend/modeling/sim_verify/contracts/__init__.py</span>
+<span class="kw">from</span> typing <span class="kw">import</span> Protocol
+
+<span class="kw">class</span> <span class="fn">BigDecimal</span>(Protocol):
+    <span class="kw">def</span> <span class="fn">multiply</span>(<span class="kw">self</span>, other: <span class="str">"BigDecimal"</span>) -> <span class="str">"BigDecimal"</span>: ...
+    <span class="kw">def</span> <span class="fn">divide</span>(<span class="kw">self</span>, other: <span class="str">"BigDecimal"</span>,
+               mc: <span class="str">"MathContext"</span>) -> <span class="str">"BigDecimal"</span>: ...
+    <span class="kw">def</span> <span class="fn">set_scale</span>(<span class="kw">self</span>, scale: <span class="kw">int</span>,
+                  mode: <span class="str">"RoundingMode"</span>) -> <span class="str">"BigDecimal"</span>: ...
+    <span class="kw">def</span> <span class="fn">compare_to</span>(<span class="kw">self</span>, other: <span class="str">"BigDecimal"</span>) -> <span class="kw">int</span>: ...
+
+<span class="kw">class</span> <span class="fn">AlgorithmException</span>(Protocol):
+    error_code: <span class="kw">str</span>
+    step_no: <span class="kw">int</span>
+    step_name: <span class="kw">str</span>
+    message: <span class="kw">str</span>
+
+<span class="kw">class</span> <span class="fn">LookupDataSource</span>(Protocol):
+    <span class="kw">def</span> <span class="fn">find_first</span>(<span class="kw">self</span>, **keys) -> Any | <span class="kw">None</span>: ...
+</pre>
+  <ul>
+    <li><strong>Synthesizer registry 는 contract 만 import</strong>. Runtime 구현은 contract 만족만 보장</li>
+    <li><strong>Smoke test (확장 Phase α E-1)</strong>: <code>test_runtime_implements_all_contracts.py</code> — 각 Protocol 의 모든 method 가 runtime 에 존재 + 시그니처 일치</li>
+    <li><strong>Version pin</strong>: contract 변경 시 <code>contracts/__version__</code> bump. Synthesizer 는 자신이 require 한 contract version 명시 → mismatch 시 startup fail</li>
+  </ul>
+  <p><strong>이게 α 실패 prevention 의 핵심</strong>. 카드/runtime drift 가 다시 발생하지 않으려면 둘이 implicit 으로 동기화되는 게 아니라 contract 가 둘 사이에 first-class artifact 로 있어야 함.</p>
+</div>
+
+<div class="panel">
+  <h4>4. Gap Surface — 결정론적 (M6)</h4>
+<pre class="lang" data-lang="python"><span class="kw">def</span> <span class="fn">gap_marker</span>(action: ActionRow, anchor: AnchorRow | <span class="kw">None</span>,
+               type_realiz: TypeRealization | <span class="kw">None</span>) -> <span class="kw">str</span> | <span class="kw">None</span>:
+    <span class="comment"># LLM 없음. ontology 행 상태의 pure 함수.</span>
+    <span class="kw">if</span> action.verification_level == <span class="str">"signature_locked"</span>:
+        <span class="kw">return</span> <span class="str">"# UNCLEAR: SIGNATURE_LOCKED — body 추정"</span>
+    <span class="kw">if</span> anchor <span class="kw">is</span> <span class="kw">None</span>:
+        <span class="kw">return</span> <span class="str">f"# UNCLEAR: 이 statement 는 anchor 없음 — 처리과정 보장 X"</span>
+    <span class="kw">if</span> anchor.confidence &lt; <span class="num">0.85</span>:
+        <span class="kw">return</span> <span class="str">f"# UNCLEAR: anchor confidence {anchor.confidence} (낮음)"</span>
+    <span class="kw">if</span> type_realiz <span class="kw">and</span> <span class="kw">not</span> type_realiz.confirmed:
+        <span class="kw">return</span> (<span class="str">f"# UNCLEAR: type_realization {type_realiz.code_type} → "</span>
+                <span class="str">f"{type_realiz.term_fqn} (source={type_realiz.source}, "</span>
+                <span class="str">f"conf={type_realiz.confidence}, 미확인)"</span>)
+    <span class="kw">return</span> <span class="kw">None</span>   <span class="comment"># gap 없음</span>
+</pre>
+  <p>R2 ("빈틈 자각") 는 ontology row 의 결정론적 함수. LLM judgment 없음 → falsifiable + 재현 가능.</p>
+</div>
+
+<div class="panel">
+  <h4>5. R5 의 Semantic Trace Diff (M3)</h4>
+  <p>9k LOC text diff 는 reading 불가. 대신 per-action / per-anchor trace event diff:</p>
+<pre class="lang" data-lang="markdown"># R5 diff report: v2 → v2'
+
+## Java diff
+SdThicknessAction.java L70 변경 (slabThickness 결정 로직 추가)
+
+## Affected actions (trace 차이)
+- action.scm.thickness_실행
+  - L70 body.set_output: v2 가 spec.slabThickness, v2' 가 spec.adjustedThickness
+
+## Output diff (S1 fixture)
+- slab.slabThickness: v2 = 230.0, v2' = 245.0
+- (다른 필드 변동 없음 — propagation 분석: split_count 영향 X)
+
+## Affected downstream actions (none)
+</pre>
+  <p>합성기가 만든 anchor trace + oracle differ 의 trace 비교 기능 (Phase α 산출물 확장).</p>
+</div>
+
+<h2>6. Concrete worked example — SdThicknessAction.execute()</h2>
+
+<p>5 anchor (L43, L47, L52, L57, L70) 의 Python 합성 결과 (Layer 1 + Layer 2 분기 명시):</p>
+
+<pre class="lang" data-lang="python"><span class="comment"># AUTO-GENERATED from ontology revision 8c9ebd9 + Java AST.</span>
+<span class="comment"># DO NOT EDIT — pre-commit hook regenerates this file.</span>
+<span class="kw">from</span> backend.modeling.sim_verify.runtime <span class="kw">import</span> (
+    AlgorithmException, SdErrorCode, SdConstants, TraceCollector,
+)
+<span class="kw">from</span> backend.modeling.sim_verify.contracts <span class="kw">import</span> (
+    CastSpecService, PlantMappingService,    <span class="comment"># Protocol</span>
+)
+
+STEP_NO, STEP_NAME = <span class="num">1</span>, <span class="str">"SLAB_THICKNESS"</span>
+
+
+<span class="kw">class</span> <span class="fn">SdThicknessAction</span>:
+    <span class="comment"># synthesizer: type_realization for SDOrderEntity confirmed=1 ✓</span>
+    <span class="comment"># synthesizer: type_realization for SDSlabEntity   confirmed=1 ✓</span>
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="kw">self</span>, cast_spec_service: CastSpecService,
+                 plant_mapping: PlantMappingService):
+        <span class="kw">self</span>.cast_spec_service = cast_spec_service
+        <span class="kw">self</span>.plant_mapping = plant_mapping
+
+    <span class="kw">def</span> <span class="fn">execute</span>(<span class="kw">self</span>, order, slab, _trace: TraceCollector | <span class="kw">None</span>=<span class="kw">None</span>):
+        _trace = _trace <span class="kw">or</span> TraceCollector.<span class="fn">noop</span>()
+        confirmed = order.confirmed_plant_cd                  <span class="comment"># L42 → Layer 2 (no anchor)</span>
+
+        <span class="kw">with</span> _trace.<span class="fn">anchor</span>(<span class="str">"atomic.confirmed_plant_cd.invalid_check"</span>, line=<span class="num">43</span>):
+            <span class="kw">if</span> confirmed <span class="kw">is</span> <span class="kw">None</span> <span class="kw">or</span> <span class="kw">not</span> confirmed:    <span class="anc">  <span class="comment"># L43 → Layer 1 (slot P22)</span></span>
+                <span class="kw">raise</span> <span class="kw">self</span>.<span class="fn">_fail</span>(<span class="str">"확정통과공장코드 미설정"</span>)
+
+        sm_char = confirmed[<span class="num">0</span>]                              <span class="comment"># L46 → Layer 2 (no anchor)</span>
+        <span class="kw">with</span> _trace.<span class="fn">anchor</span>(<span class="str">"atomic.confirmed_plant_cd.activation_check"</span>, line=<span class="num">47</span>):
+            <span class="kw">if</span> sm_char == SdConstants.INACTIVE_PROCESS:   <span class="anc">  <span class="comment"># L47 → Layer 1 (slot P22)</span></span>
+                <span class="kw">raise</span> <span class="kw">self</span>.<span class="fn">_fail</span>(<span class="str">"제강 공장 비활성 (확통[0] = ' ')"</span>)
+        sm_cd = <span class="fn">str</span>(sm_char)                               <span class="comment"># L50 → Layer 2</span>
+
+        <span class="kw">with</span> _trace.<span class="fn">anchor</span>(<span class="str">"body.service_lookup"</span>, line=<span class="num">52</span>):
+            mapping = <span class="kw">self</span>.plant_mapping.<span class="fn">get_mapping</span>(sm_cd)  <span class="anc"><span class="comment"># L52 → Layer 1 (P12)</span></span>
+            <span class="kw">if</span> mapping <span class="kw">is</span> <span class="kw">None</span>:
+                <span class="kw">raise</span> <span class="kw">self</span>.<span class="fn">_fail</span>(<span class="str">f"PlantMapping 미정의 for smCd={sm_cd}"</span>)
+
+        <span class="kw">with</span> _trace.<span class="fn">anchor</span>(<span class="str">"body.service_lookup"</span>, line=<span class="num">57</span>):
+            spec = <span class="kw">self</span>.cast_spec_service.<span class="fn">lookup</span>(           <span class="anc"><span class="comment"># L57 → Layer 1 (P12)</span></span>
+                cmp_cd=order.cmp_cd, org_cd=order.org_cd,
+                sm_cd=sm_cd, cast_cd=mapping.cast_cd,
+                machine_cd=mapping.machine_cd,
+                product_cd=order.product_cd)
+            <span class="kw">if</span> spec <span class="kw">is</span> <span class="kw">None</span>:
+                <span class="kw">raise</span> <span class="kw">self</span>.<span class="fn">_fail</span>(<span class="str">f"CAST_SPEC 미존재..."</span>)
+            <span class="kw">if</span> spec.slab_thickness <span class="kw">is</span> <span class="kw">None</span>:        <span class="comment"># L66 → Layer 2 (no anchor)</span>
+                <span class="kw">raise</span> <span class="kw">self</span>.<span class="fn">_fail</span>(<span class="str">"CAST_SPEC.SLAB_THICKNESS NULL"</span>)
+
+        <span class="kw">with</span> _trace.<span class="fn">anchor</span>(<span class="str">"body.set_output"</span>, line=<span class="num">70</span>):
+            slab.slab_thickness = spec.slab_thickness         <span class="anc"><span class="comment"># L70 → Layer 1 (P02)</span></span>
+
+    <span class="kw">def</span> <span class="fn">_fail</span>(<span class="kw">self</span>, message: <span class="kw">str</span>) -> AlgorithmException:        <span class="comment"># L73 → Layer 2</span>
+        <span class="kw">return</span> <span class="fn">AlgorithmException</span>(STEP_NO, STEP_NAME,
+            SdErrorCode.ALG_CAST_SPEC_NOT_FOUND, message)
+</pre>
+
+<p style="font-size:13px; color:#6b7280"><strong>주목</strong>: anchor 있는 line 은 Layer 1 (registry template render), 없는 line 은 Layer 2 (AST literal). <code>with _trace.anchor(...)</code> wrapper 가 5 anchor 모두에 자동 박힘. Spring <code>@Autowired</code>/<code>@Component</code> 는 stub 처리 (orchestrator 가 수동 wiring). <code>SdConstants.INACTIVE_PROCESS</code> 는 facade 의 namespace class 로 처리.</p>
+
+<h2>7. R1-R5 만족 — 종합 설계 기준</h2>
+
+<table>
+  <thead>
+    <tr><th>요구사항</th><th>Mechanism</th><th>Evidence</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>R1</strong> ontology precondition</td>
+      <td>합성기가 ontology DB 를 primary input 으로 사용 + Layer 1 의 slot lookup 이 ontology 기반</td>
+      <td>SESSION-RESUME §2, anchor_bindings 163 rows</td>
+    </tr>
+    <tr>
+      <td><strong>R2</strong> gap awareness</td>
+      <td>Gap surfacer (결정론적 함수) → <code># UNCLEAR</code> + gap-report.json + .gaps.md</td>
+      <td>5번 panel</td>
+    </tr>
+    <tr>
+      <td><strong>R3</strong> bit-equal output</td>
+      <td>BigDecimal facade (HALF_EVEN, DECIMAL64) + clock stub (LocalDateTime) + AtomicLong singleton + JPA inmem adapter</td>
+      <td>Twin Scope Boundary table (M1+M8)</td>
+    </tr>
+    <tr>
+      <td><strong>R4</strong> same processing</td>
+      <td>By construction: deterministic 합성 → 같은 step sequence emit. Plus anchor trace 가 runtime 검증</td>
+      <td>Layer 1 + 2 의 결정성</td>
+    </tr>
+    <tr>
+      <td><strong>R5</strong> before/after compare</td>
+      <td>Java diff + Python text diff + semantic trace diff (per-action). 3-tier surface</td>
+      <td>5번 panel R5 의 diff report</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>8. KNOWN_DIVERGENCE 5종 방지</h2>
+
+<p>α 의 실제 root cause = inter-agent contract 부재. 종합 설계가 <strong>contract layer</strong> 를 1급 시민으로 도입 → 5종 미스매치 mechanism 차원에서 제거:</p>
+
+<table>
+  <thead>
+    <tr><th>α 미스매치</th><th>종합 설계 처리</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>BigDecimal (class vs <code>bd()</code> factory)</td><td><code>BigDecimal</code> Protocol 정의. Facade 가 구현. Synthesizer registry 는 Protocol 만 import → runtime API 변경 시 smoke test fail</td></tr>
+    <tr><td>MathContext (enum vs <code>DECIMAL64_*</code> consts)</td><td><code>MathContext</code> Protocol 의 단일 형태. Facade 가 enum 으로 노출</td></tr>
+    <tr><td>RoundingMode (enum vs <code>decimal.ROUND_*</code>)</td><td><code>RoundingMode</code> Protocol. Facade 가 enum 으로 통일</td></tr>
+    <tr><td>SdConstants (namespace vs <code>POS_SM</code>)</td><td><code>SdConstants</code> namespace class facade. Synthesizer 는 namespace 형태로만 emit</td></tr>
+    <tr><td>ValidationResult (dataclass vs 없음)</td><td>Java <code>record ValidationResult</code> → Python <code>@dataclass</code>. Java AST 의 record 인식이 Gap D-3 해결 후 자동</td></tr>
+  </tbody>
+</table>
+
+<h2>9. Honest weaknesses (M11 흡수)</h2>
+
+<ul>
+  <li><strong>Twin scope 가 ~80% 임을 인정</strong> — <code>@Async</code>, 복잡한 Spring boot config, reflection 기반 코드 등은 명시적 stub 또는 SIGNATURE_LOCKED 처리. ADR-002 에서 명시</li>
+  <li><strong>Registry maintenance</strong> — 79 slot 의 entry 모두 작성 필요 (현 27 카드). ~52 신규 slot 작업. 단 one-time 비용</li>
+  <li><strong>Section 2 ontology 완비 의존</strong> — Gap A 의 2 추상 action 은 Section 2 가 21 concrete realization 추가 필요. 합성기가 해결 못함</li>
+  <li><strong>합성기 자체가 새 codebase (~2000 LOC)</strong> — Layer 1 + Layer 2 + contract + gap surfacer + 5 stub. Phase α 의 ≈ 50 시간 작업과 동등 수준 추가</li>
+  <li><strong>Tree-sitter 의 결정성 의존</strong> — parser 버전 변경 시 AST 변할 수 있음. Version pin 필수</li>
+  <li><strong>"풀 시연" 정의에 따라 scope 변동</strong> — M7 (사용자 확인 필요)</li>
+</ul>
+
+<h2>10. 사용자 결정 — 권장 다음 행동</h2>
+
+<div class="panel info">
+  <h3>의사 결정 트리</h3>
+  <ol>
+    <li><strong>종합 설계안 (Anchored Twin Synthesizer) 승인?</strong>
+      <ul>
+        <li>Yes → 단계 2 로</li>
+        <li>No, 다른 방향 → 어느 perspective 가 매력적인지 알려주세요 (또는 Other)</li>
+      </ul>
+    </li>
+    <li><strong>M7 정의: "풀 시연" 의 의미는?</strong>
+      <ul>
+        <li>(a) 36 action 모두 byte-identical → scope 대 (현 안)</li>
+        <li>(b) 21-step orchestrator + happy path S1-S5 → scope 중</li>
+        <li>(c) 사용자가 직접 선택한 action 만 → scope 가변</li>
+      </ul>
+    </li>
+    <li><strong>R5 "수정 전후 비교" 의 1순위 surface 는?</strong>
+      <ul>
+        <li>(a) Per-action semantic trace diff (현 안)</li>
+        <li>(b) Output diff 만 (단순)</li>
+        <li>(c) Python source diff 도 포함</li>
+      </ul>
+    </li>
+    <li><strong>승인 후 다음 단계 (별도 세션):</strong>
+      <ul>
+        <li>spec 문서 작성 (<code>docs/superpowers/specs/2026-05-XX-sim-redesign-spec.md</code>)</li>
+        <li>ADR-002 (Twin Scope Boundary) + ADR-003 (Synthesizer-Runtime Contract) 작성</li>
+        <li><code>/to-prd</code> 로 PRD 발행 (선택)</li>
+        <li><code>/handoff</code> 로 implementation plan 세션 인계</li>
+      </ul>
+    </li>
+  </ol>
+</div>
+
+<h2>11. Alternative — 종합 설계 채택 안 할 시</h2>
+
+<table>
+  <thead><tr><th>선택</th><th>의미</th><th>다음 작업</th></tr></thead>
+  <tbody>
+    <tr><td>Synthesis (권장)</td><td>Anchored Twin Synthesizer 채택</td><td>spec + ADR 002/003 작성 → handoff</td></tr>
+    <tr><td>A 단독</td><td>Synthesizer-owned registry only. Layer 2 fallback 없음</td><td>A 의 limitation 수용 + scope 좁힘 (anchor 있는 action 만)</td></tr>
+    <tr><td>B 단독</td><td>AST walk 만, ontology auxiliary. Registry 없음</td><td>R1 weakened, M6 (gap from ontology) 약화</td></tr>
+    <tr><td>C 단독</td><td>27 카드 + 5 facade. Synthesizer-runtime contract 명시 안 함</td><td>α failure mode 재발 위험 수용</td></tr>
+    <tr><td>Other</td><td>위 4종 외 방향</td><td>사용자 의견 받아 재탐색</td></tr>
+  </tbody>
+</table>
+
+<p style="margin-top:48px; padding-top:16px; border-top:1px solid #e5e7eb; color:#9ca3af; font-size:12px;">
+  Sim-Redesign 종합 설계안 v1 · 2026-05-12 · Section 4 sim-redesign 세션<br>
+  Source: <code>explorations/1-automation-purist.md</code>, <code>2-minimal-twin.md</code>,
+  <code>3-alpha-reuse.md</code>, <code>4-skeptic.md</code><br>
+  관련: <code>ADR-001-python-twin.md</code>, <code>SESSION-RESUME.md</code>,
+  <code>anchor-gaps.md</code>, <code>Q1-trace-granularity.html</code> (역사적 reference)
+</p>
+
+</body>
+</html>

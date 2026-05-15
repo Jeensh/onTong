@@ -1,0 +1,28 @@
+[plugin]
+name = "banking"
+version = "0.1.0"
+description = "Banking loan origination 가상 system plugin (Track B3 — controlled meta-programming stress test, ADR-011 + BANKING-DESIGN.md)"
+
+[recommendation]
+default_provider = "claude"
+default_model = "claude-opus-4-7"
+allowed_providers = ["claude", "openai", "gemini"]
+max_retries = 3
+
+[extensions]
+# BANKING-DESIGN.md §10 — 4 plugin extension (ADR-013 §3 의 banking row)
+dispatchers = ["banking.drools_kbase_lookup"]
+annotations = ["banking.compensable"]
+aop = ["banking.tenant_context", "banking.audit"]
+bytecode = ["banking.bpmn_dynamic_class"]
+
+[schema]
+source = "jpa_annotation"
+
+[fixtures]
+ids = ["BK1", "BK2", "BK3", "BK4", "BK5"]
+
+[contracts]
+domain_exception = "BankingException"
+numeric_convention = "currency_decimal64_halfeven"
+domain_namespace_class = "BankingConstants"

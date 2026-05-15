@@ -6,6 +6,18 @@
 
 ---
 
+## 2026-05-13 (Authoring Phase C-3a/b/c)
+
+사용자 요청 (연속): Authoring 모드 JPO-only 한계 → JPA/Service/Action 풀 지원 확장.
+
+- [x] Phase C-3a — Service/Action `*_interview.md` 프롬프트 + `design_interview_dispatcher` 추가, `/authoring/interview` 가 Hypothesis union 디스패치.
+- [x] Phase C-3a — frontend store `hypothesis` 를 Hypothesis union 으로 확장, `_entityOrThrow` / `_hypothesisDisplayFields` 헬퍼 도입.
+- [x] Phase C-3b — toolbar ③ 인터뷰 모든 kind 허용. ⑤/⑥/⑦/⑨/✓ 는 entity-only 게이트 + 한국어 툴팁.
+- [x] Phase C-3b — HypothesisCard / CompletedEntitiesPreview universal display (kind-aware).
+- [ ] Phase C-3c — options/gaps/pattern/archive/naming 의 service/action 본격 지원 (별도 세션, 현재는 deferred).
+
+---
+
 ## 2026-05-01 (온톨로지 방식 재검토 — Action 도입 논의)
 
 사용자 요청: "메서드 자체를 Action 으로 매핑해야 하지 않을까?" — 팔란티어 온톨로지와의
@@ -4418,3 +4430,33 @@ R4 leftover 중 가장 작은 폴리싱 — 그래프 노드 hover 시 floating 
 - ✅ /loop 다음 wakeup 23:24 예약됨 — 발사되면 idle ping, 별도 작업 없음. 사용자가 명시적으로 끄지 않는 한 계속.
 
 세션 종료. 다음 세션 시작 시 위 자료들로 즉시 픽업 가능.
+
+---
+
+## 2026-05-16 (Section 4 sim_v2 W77 + W78 마무리 + Section 3 handoff 패키지 완성) [x] 완료
+
+Section 3 시뮬레이션 담당자에게 sim_v2 자산을 인계하는 작업 마무리.
+
+### W77 + W78 한국어 검색 layer (보완 개념)
+
+- [x] **W77 KoreanTermResolver** — `backend/sim_v2/core/search/korean_term_resolver.py`. ontology 의 `business_terms.aliases_json` 을 *대체하지 않고 fully exploit*. label / aliases / description / fqn **4 컬럼 통합 token index**. UC41 실측 9/10 hit (90%).
+- [x] **W78 hybrid tier** — 동일 파일에 4 tier 통합. Tier 2 한↔영 정적 매핑 (`transliteration.py`, ~50 매핑), Tier 3 difflib edit-distance fallback, Tier 4 caller-supplied LLM callback. typo "edgign" / 비표준 음역 "에징" 모두 close. UC42 production demo + 14 unit test 통과.
+- [x] **public API**: `resolve(query, *, use_transliteration=True, use_fuzzy=True, llm_assist=None)`. 본인 LLM 한 줄 plug-in.
+
+### Section 3 handoff 패키지 v4 — `toClaude/modeling/section4-verification/section3_handoff/`
+
+- [x] `README.md` — navigation hub. §0~7 + **신규 §8 시뮬레이션 담당자 onboarding 가이드** (pull / venv / first-run / 본인 클로드 코드 첫 메시지 / sprint 단위 작업 순서 / 막힘 대응표).
+- [x] `for-humans.html` — 사람용 인터랙티브 페이지. ⑧ 한국어 검색 카드 + § F 아키텍처 카드에 W78 hybrid tier 시각화 (4 tier ASCII diagram).
+- [x] `api-reference/W77-korean-term-resolver.md` — W78 통합 버전 (§3.5 hybrid tier API + tier 별 production 실측 표).
+- [x] `usage-recipes/recipe-5-korean-term-search.py` — typo (Tier 3) + 비표준 음역 (Tier 4) 시연 추가, production DB 동작 확인.
+- [x] `gap-analysis.md` — 한계 #2 를 W77 + W78 통합 close 로 표기, "한 줄 결론" 표에 W78 추가.
+
+### 회귀 / 실측
+
+- [x] sim_v2 전체 회귀: **1,892 passed, 3 skipped** (W77 27 + W78 14 추가, 회귀 0).
+- [x] UC42 production demo: T1~T4 close rate 측정 (T3 1/2, T4 1/1).
+
+### 다음 세션 / 다음 담당자
+
+- 시뮬레이션 담당자 → `toClaude/modeling/section4-verification/section3_handoff/README.md` §8 가이드로 시작. 클로드 코드 첫 메시지 템플릿 포함.
+- 모델링 세션은 별도 (handoff 작업 종료).

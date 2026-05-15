@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>v2 Final Goal — Two-Engine Framework Closed Loop 100%</title>
+<style>
+  :root {
+    --bg: #0f1116; --panel: #161a23; --panel-2: #1d2230;
+    --border: #2a3145; --text: #e4e8f0; --text-dim: #9aa3b8;
+    --accent: #5ec1ff; --accent-2: #7df0a3; --warn: #ffb86b;
+    --danger: #ff7a90; --code-bg: #0a0d14;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px 48px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Pretendard", sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.55; }
+  h1 { font-size: 30px; margin: 0 0 4px; }
+  h2 { font-size: 22px; margin: 36px 0 12px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border); color: var(--accent); }
+  h3 { font-size: 16px; margin: 22px 0 8px; }
+  .subtitle { color: var(--text-dim); margin-bottom: 24px; }
+  .hero {
+    background: linear-gradient(135deg, rgba(125,240,163,0.15), rgba(94,193,255,0.1));
+    border: 1px solid var(--accent-2); border-radius: 12px;
+    padding: 24px 28px; margin: 16px 0 28px;
+  }
+  .hero .headline { font-size: 28px; font-weight: 600; color: var(--accent-2); margin: 0; }
+  .hero .sub { font-size: 14px; color: var(--text-dim); margin-top: 8px; }
+  .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+  .metric { background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 16px; }
+  .metric .label { font-size: 12px; color: var(--text-dim);
+    letter-spacing: 0.04em; text-transform: uppercase; }
+  .metric .value { font-size: 22px; font-weight: 600; color: var(--accent); margin-top: 4px; }
+  .metric.success .value { color: var(--accent-2); }
+  .metric .delta { font-size: 12px; color: var(--accent-2); margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 13px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--border);
+    text-align: left; vertical-align: top; }
+  th { color: var(--text-dim); font-weight: 500; font-size: 12px; }
+  tr:hover td { background: var(--panel-2); }
+  code, pre { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; font-size: 12.5px; }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 3px; color: var(--accent-2); }
+  pre { background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px 14px; overflow-x: auto; margin: 8px 0; }
+  pre code { background: transparent; padding: 0; color: var(--text); }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 500; margin-right: 4px; }
+  .tag.ok { background: rgba(125,240,163,0.15); color: var(--accent-2); }
+  .tag.bad { background: rgba(255,122,144,0.15); color: var(--danger); }
+  .tag.warn { background: rgba(255,184,107,0.15); color: var(--warn); }
+  .tag.info { background: rgba(94,193,255,0.15); color: var(--accent); }
+  .panel { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px 20px; margin: 12px 0; }
+  .panel.ok { border-left: 3px solid var(--accent-2); }
+  .panel.warn { border-left: 3px solid var(--warn); }
+  .arrow { color: var(--text-dim); margin: 0 6px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+  .axis-row { display: flex; align-items: center; padding: 6px 0;
+    border-bottom: 1px dashed var(--border); }
+  .axis-row .label { width: 220px; color: var(--text-dim); font-size: 13px; }
+  .axis-row .value { flex: 1; }
+  .bar { display: inline-block; vertical-align: middle;
+    height: 12px; background: var(--accent-2); border-radius: 2px; }
+  .bar.warn { background: var(--warn); }
+  .bar.bad { background: var(--danger); }
+</style>
+</head>
+<body>
+
+<h1>v2 Final-Goal Capstone</h1>
+<p class="subtitle">slab-design-real-v2 가 Two-Engine framework 의 모든 axis closed-loop 통과 후 fully clean state 도달. 2026-05-15 기준.</p>
+
+<div class="hero">
+  <div class="headline">🎯 v2 FULLY CLEAN — 100% 도달</div>
+  <div class="sub">
+    Baseline 23 findings → Simulated <strong>0 findings</strong> (after framework's 30 MERGED proposals).
+    Verification Engine 의 모든 finding 이 deterministic remediation + Integrator lifecycle 로 close-out.
+    ADR-001 ("Python = Java 의 실행 인프라 우회 twin") 의 최대 약속 실증.
+  </div>
+</div>
+
+<div class="metric-grid">
+  <div class="metric success"><div class="label">Reduction</div><div class="value">100%</div><div class="delta">23 → 0 findings</div></div>
+  <div class="metric"><div class="label">Sprints</div><div class="value">W1–W70</div><div class="delta">70 sprints</div></div>
+  <div class="metric"><div class="label">Tests</div><div class="value">1,663</div><div class="delta">+3 skipped</div></div>
+  <div class="metric"><div class="label">Demos (UC)</div><div class="value">36</div><div class="delta">UC1–UC36</div></div>
+</div>
+
+<!-- ───────────────────────────────────────────────────────────────────── -->
+<h2>① v2 가 baseline 에서 출발</h2>
+
+<p>v1 (<code>slab-design-real</code>) 의 23 documentation gap 을 그대로 상속 + v2 자체의 NAME_MISMATCH 3건 추가:</p>
+
+<div class="metric-grid">
+  <div class="metric"><div class="label">Total actions</div><div class="value">38</div></div>
+  <div class="metric"><div class="label">Total findings</div><div class="value">23</div><div class="delta" style="color: var(--warn);">drift from clean</div></div>
+  <div class="metric"><div class="label">v1 inherited</div><div class="value">20</div></div>
+  <div class="metric"><div class="label">v2-specific</div><div class="value">3</div><div class="delta" style="color: var(--danger);">productCd renames</div></div>
+</div>
+
+<h3>Baseline 23 findings 분포</h3>
+<table>
+  <tr><th>Gate</th><th>v2 findings</th><th>해설</th></tr>
+  <tr><td>action_method (W47)</td><td>0</td><td>모든 action 의 method exists</td></tr>
+  <tr><td>param_signature (W52)</td><td>3</td><td>v2-specific NAME_MISMATCH (find_group / cumulative_productivity / lookup_or_default 의 productTypeCd/prodKindCd → productCd)</td></tr>
+  <tr><td>return_type (W56/W57)</td><td>10</td><td>8 PRIMITIVE_MISMATCH + 1 OBJECT_REF_MISMATCH + 1 IMPLICIT_OUTPUT</td></tr>
+  <tr><td>exception (W63)</td><td>10</td><td>9× AlgorithmException + 1× IllegalStateException UNDECLARED</td></tr>
+  <tr><td><em>annotation (W66)</em></td><td><em>—</em></td><td>annotation findings 는 snapshot 4 gate 에 미포함 (effects_json 측면)</td></tr>
+</table>
+
+<!-- ───────────────────────────────────────────────────────────────────── -->
+<h2>② Framework 가 모든 axis 에 closed-loop 적용</h2>
+
+<p>UC27/UC28 (term) + UC34 (effect) + UC35 (structural) + UC36 (capstone) 가 모두 같은 패턴:
+<strong>Detect → Remediate → Submit → Oracle → Review → Merge → Revision</strong>.</p>
+
+<table>
+  <tr><th>Axis</th><th>Pipeline</th><th>Sprint</th><th>v2 input</th><th>MERGED</th><th>DRAFT</th><th>REJECTED</th></tr>
+  <tr>
+    <td>Effect (exception + annotation)</td>
+    <td><code>effect_proposal_pipeline.py</code></td>
+    <td>W68</td>
+    <td>16 step</td>
+    <td><strong>15</strong></td>
+    <td>1 (rest_endpoint needs_detail)</td>
+    <td>0</td>
+  </tr>
+  <tr>
+    <td>Structural (param + return-type)</td>
+    <td><code>structural_proposal_pipeline.py</code></td>
+    <td>W69</td>
+    <td>13 step</td>
+    <td><strong>9</strong></td>
+    <td>4 (PROPOSE_NEW_TERM — cascade 처리)</td>
+    <td>0</td>
+  </tr>
+  <tr>
+    <td>Term</td>
+    <td><code>term_proposal_pipeline.py</code></td>
+    <td>W62</td>
+    <td>2 unique class</td>
+    <td><strong>2</strong> (ProductCategory + BatchResult)</td>
+    <td>0</td>
+    <td>0</td>
+  </tr>
+  <tr>
+    <td><strong>합계</strong></td>
+    <td></td>
+    <td></td>
+    <td><strong>31</strong></td>
+    <td><strong>26 direct + 4 cascade</strong></td>
+    <td>1</td>
+    <td>0</td>
+  </tr>
+</table>
+
+<h3>Term-axis cascade (간접 unblock)</h3>
+<div class="panel ok">
+  <p style="margin:0;">
+    PROPOSE_NEW_TERM 4건은 deterministic 으로 MERGE 불가능 (term 이 아직 없음). 하지만 term-axis 가
+    <code>ProductCategory</code> + <code>BatchResult</code> 2 unique class 를 MERGE 하면 → 그 term 을 reference 하는 4 PROPOSE_NEW_TERM
+    return-type case 가 자동으로 LIFT_TO_OBJECT_REF 로 변환 가능. <strong>한 axis 의 MERGE 가 다른 axis 의 finding 까지 close out</strong>
+    — cross-axis cascade.
+  </p>
+</div>
+
+<pre><code>// Term axis MERGE
+ProductCategory → term.scm.product.product_category   ✓
+BatchResult     → term.scm.driver.batch_result        ✓
+
+// 위 2 MERGE 가 unblock 한 structural axis findings
+action.scm.product.분류                       (string → ProductCategory)  ✓ unblocked
+action.scm.product.classify_by_product_code  (string → ProductCategory)  ✓ unblocked
+action.scm.batch_design                       (string → BatchResult)      ✓ unblocked
+action.scm.batch_design__driver               (string → BatchResult)      ✓ unblocked</code></pre>
+
+<!-- ───────────────────────────────────────────────────────────────────── -->
+<h2>③ Final state — v2 fully clean</h2>
+
+<table>
+  <tr><th>Gate</th><th>Baseline</th><th>After MERGEs</th><th>Cleared by</th></tr>
+  <tr>
+    <td>param_signature</td>
+    <td>3 NAME_MISMATCH</td>
+    <td><span class="tag ok">0</span></td>
+    <td>Structural axis: 3 RENAME_ACTION_PARAM MERGED</td>
+  </tr>
+  <tr>
+    <td>return_type</td>
+    <td>10 (8 PRIM + 1 OBJ + 1 IMPLICIT)</td>
+    <td><span class="tag ok">0</span></td>
+    <td>Structural: 6 direct MERGED + 4 term-cascade unblocked</td>
+  </tr>
+  <tr>
+    <td>exception</td>
+    <td>10 UNDECLARED_THROWS</td>
+    <td><span class="tag ok">0</span></td>
+    <td>Effect axis: 10 ADD_RAISES_EFFECT MERGED</td>
+  </tr>
+  <tr>
+    <td><strong>Total</strong></td>
+    <td><strong>23</strong></td>
+    <td><strong style="color: var(--accent-2);">0 (100% reduction)</strong></td>
+    <td></td>
+  </tr>
+</table>
+
+<!-- ───────────────────────────────────────────────────────────────────── -->
+<h2>④ Framework 의 build 누적</h2>
+
+<table>
+  <tr><th>Sprint 묶음</th><th>범위</th><th>주요 성과</th></tr>
+  <tr><td>W1–W26</td><td>Framework Core + Capstone</td><td>G1–G4 + 3-system parity</td></tr>
+  <tr><td>W27–W46</td><td>Production Wiring (UC10–16)</td><td>100% translator coverage, 5-layer ontology 실제 데이터</td></tr>
+  <tr><td>W47–W67</td><td>8-Dim Verification Stack + 5-Axis Detect→Fix Loop</td><td>존재/param/primitive return/object_ref return/behavior/trace/exception/annotation + 모든 axis remediation</td></tr>
+  <tr><td>W61, W62</td><td>Two-Engine Closed-Loop (term axis)</td><td>UC27 LLM proposer + UC28 lifecycle MERGED</td></tr>
+  <tr><td>W65</td><td>CI hook (regression-only mode)</td><td>UC31 baseline diff</td></tr>
+  <tr><td><strong>W68–W70</strong></td><td><strong>Final closed-loop axes + Capstone</strong></td><td>UC34 effect + UC35 structural + <strong>UC36 v2 fully clean</strong></td></tr>
+</table>
+
+<h3>회귀 테스트 추이</h3>
+<table>
+  <tr><th>시점</th><th>테스트 수</th><th>증분</th></tr>
+  <tr><td>W57 종료</td><td>1,242 PASS</td><td>baseline</td></tr>
+  <tr><td>W62 종료 (closed-loop)</td><td>1,411 PASS</td><td>+169</td></tr>
+  <tr><td>W67 종료 (모든 dim/axis)</td><td>1,575 PASS</td><td>+164</td></tr>
+  <tr><td><strong>W70 종료 (final capstone)</strong></td><td><strong>1,663 PASS</strong></td><td>+88</td></tr>
+</table>
+
+<!-- ───────────────────────────────────────────────────────────────────── -->
+<h2>⑤ 의의</h2>
+
+<div class="panel ok">
+  <h3 style="margin-top:0;">Framework 의 약속이 production-grade 로 실증</h3>
+  <ul>
+    <li><strong>ADR-001</strong>: Java↔Python twin 의 모든 surface 검증 → 8 dim verification stack 으로 실증</li>
+    <li><strong>ADR-002</strong>: Two-Engine + plugin → Verification + Recommendation engine 둘 다 production 위에서 closed-loop</li>
+    <li><strong>ADR-003</strong>: Integrator + proposal lifecycle → 6-state machine 이 30+ production proposal 처리</li>
+    <li><strong>ADR-005</strong>: 4-layer LLM defense → W61 TermProposer 에서 operational</li>
+    <li><strong>ADR-012</strong>: LLM-agnostic → stub/canned/live 모두 같은 Protocol</li>
+  </ul>
+</div>
+
+<div class="panel warn">
+  <h3 style="margin-top:0;">Framework 가 직접 못하는 부분</h3>
+  <ul>
+    <li>모든 finding 이 <em>simulated</em> post-merge 로 clean — 실제 ontology.db 의 mutation 은 Section 2 가 적용. Framework 는 read-only.</li>
+    <li>1 DRAFT (rest_endpoint needs_detail) — reviewer 가 http_method/path 만 fill 하면 완료.</li>
+    <li>Behavior/Trace gate (W59/W60) 는 fixture 의존 — production action 마다 fixture 작성 자동화는 별도 sprint.</li>
+  </ul>
+</div>
+
+<hr>
+
+<p class="subtitle" style="margin-top: 24px;">
+  생성: 2026-05-15 · 위치: <code>toClaude/modeling/section4-verification/sim-v2-v2-final-goal-summary.html</code> ·
+  관련 demo: <code>backend/sim_v2/demos/uc36_v2_final_goal/run.py</code>
+</p>
+
+</body>
+</html>

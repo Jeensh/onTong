@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Sim-Redesign 결정 — 12 항목 인터랙티브 선택</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+      "Noto Sans KR", sans-serif;
+    line-height: 1.6; color: #1f2937; max-width: 1100px;
+    margin: 0 auto; padding: 32px 24px 80px; background: #fafafa;
+  }
+  h1 { font-size: 28px; margin: 0 0 8px; color: #111827; }
+  h2 { font-size: 20px; margin: 32px 0 12px; padding-bottom: 8px;
+       border-bottom: 2px solid #e5e7eb; color: #111827; }
+  .lead { color: #6b7280; font-size: 15px; margin-bottom: 24px; }
+  .progress-bar {
+    background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+    padding: 14px 18px; margin: 16px 0; position: sticky; top: 0; z-index: 10;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+  }
+  .progress-track {
+    background: #e5e7eb; height: 8px; border-radius: 4px; margin-top: 8px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    background: linear-gradient(90deg, #2563eb, #9333ea);
+    height: 100%; width: 0%; transition: width 0.3s;
+  }
+  .progress-label { font-size: 13px; color: #4b5563; display: flex; justify-content: space-between; align-items: center; }
+  .progress-label .actions button { margin-left: 8px; }
+  button {
+    padding: 6px 14px; border-radius: 6px; border: 1px solid #d1d5db;
+    background: white; color: #374151; cursor: pointer; font-size: 13px;
+    font-family: inherit; font-weight: 500; transition: all 0.15s;
+  }
+  button:hover { background: #f3f4f6; border-color: #9ca3af; }
+  button.primary {
+    background: #2563eb; color: white; border-color: #2563eb;
+  }
+  button.primary:hover { background: #1d4ed8; }
+  button.danger {
+    background: #fef2f2; color: #991b1b; border-color: #fca5a5;
+  }
+  button.danger:hover { background: #fee2e2; }
+  .decision {
+    background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0;
+    transition: all 0.2s;
+  }
+  .decision.answered { border-color: #93c5fd; background: #eff6ff; }
+  .decision-header { display: flex; justify-content: space-between;
+                     align-items: baseline; margin-bottom: 8px; }
+  .decision-id {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 700; font-family: "SF Mono", monospace;
+    background: #f3f4f6; color: #6b7280; margin-right: 8px;
+  }
+  .decision-id.synth { background: #f3e8ff; color: #6b21a8; }
+  .decision-id.meta { background: #ffedd5; color: #9a3412; }
+  .decision-question { font-size: 16px; font-weight: 600; color: #111827;
+                       flex: 1; }
+  .decision-context {
+    font-size: 13px; color: #6b7280; font-style: italic;
+    margin: 4px 0 12px; padding-left: 12px; border-left: 3px solid #e5e7eb;
+  }
+  .options { display: grid; gap: 8px; margin-top: 12px; }
+  .option {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 14px; border: 1px solid #e5e7eb; border-radius: 6px;
+    cursor: pointer; transition: all 0.15s; background: white;
+  }
+  .option:hover { background: #f9fafb; border-color: #93c5fd; }
+  .option.selected {
+    background: #dbeafe; border-color: #2563eb;
+  }
+  .option-radio {
+    width: 18px; height: 18px; border: 2px solid #9ca3af;
+    border-radius: 50%; flex-shrink: 0; margin-top: 2px;
+    position: relative;
+  }
+  .option.selected .option-radio { border-color: #2563eb; }
+  .option.selected .option-radio::after {
+    content: ""; position: absolute; top: 50%; left: 50%;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #2563eb; transform: translate(-50%, -50%);
+  }
+  .option-body { flex: 1; }
+  .option-label { font-weight: 600; color: #111827; font-size: 14px; }
+  .option-desc { font-size: 13px; color: #6b7280; margin-top: 2px; }
+  .badge-recommend {
+    display: inline-block; padding: 1px 7px; border-radius: 999px;
+    background: #fef3c7; color: #92400e;
+    font-size: 10px; font-weight: 700; margin-left: 8px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .other-input {
+    margin-top: 4px; width: 100%; padding: 6px 10px;
+    border: 1px solid #d1d5db; border-radius: 4px; font-family: inherit;
+    font-size: 13px; display: none;
+  }
+  .option.selected.other .other-input { display: block; }
+  .notes-toggle {
+    font-size: 12px; color: #2563eb; cursor: pointer;
+    margin-top: 10px; user-select: none;
+  }
+  .notes-area {
+    margin-top: 8px; width: 100%; padding: 8px 12px;
+    border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit;
+    font-size: 13px; resize: vertical; min-height: 60px; display: none;
+  }
+  .notes-area.show { display: block; }
+  .summary-panel {
+    background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+    padding: 20px 24px; margin-top: 32px;
+  }
+  .summary-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+  .export-output {
+    background: #1f2937; color: #e5e7eb; padding: 14px 18px;
+    border-radius: 6px; font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px; line-height: 1.5; white-space: pre-wrap;
+    margin-top: 12px; max-height: 400px; overflow-y: auto;
+    display: none;
+  }
+  .export-output.show { display: block; }
+  .section-divider {
+    margin-top: 36px; padding-top: 16px;
+    border-top: 2px solid #e5e7eb; font-size: 18px;
+    font-weight: 600; color: #111827;
+  }
+  .toast {
+    position: fixed; bottom: 20px; right: 20px;
+    background: #1f2937; color: white; padding: 10px 18px;
+    border-radius: 6px; font-size: 14px; opacity: 0;
+    transition: opacity 0.3s; pointer-events: none; z-index: 100;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<h1>Sim-Redesign 결정 — 12 항목 인터랙티브 선택</h1>
+<p class="lead">
+  SYNTHESIS-ROUND2 의 D1-D7 + META-PROGRAMMING 의 D1-D5 (총 12 결정).<br>
+  옵션 선택 + 메모 작성 후 "Markdown 복사" → 채팅에 붙여넣기 → spec 작성 세션 인계.
+</p>
+
+<div class="progress-bar">
+  <div class="progress-label">
+    <span><strong>진행 상황</strong>: <span id="answered-count">0</span> / 12 답변됨</span>
+    <div class="actions">
+      <button onclick="applyAllRecommended()">모두 추천 채택</button>
+      <button class="danger" onclick="resetAll()">초기화</button>
+    </div>
+  </div>
+  <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+</div>
+
+<h2>Part A — Round 2 Synthesis (D1-D7)</h2>
+
+<div id="decisions-synth"></div>
+
+<h2>Part B — Meta-Programming (M-D1 ~ M-D5)</h2>
+
+<div id="decisions-meta"></div>
+
+<div class="summary-panel">
+  <h2 style="margin-top:0; border-bottom: none; padding-bottom: 0;">결과 + Export</h2>
+  <p style="font-size: 14px; color: #4b5563;">아래 버튼으로 답변을 markdown 으로 변환 — 채팅에 붙여넣어 spec 인계.</p>
+  <div class="summary-actions">
+    <button class="primary" onclick="showExport()">답변 미리보기</button>
+    <button class="primary" onclick="copyMarkdown()">Markdown 복사</button>
+    <button onclick="downloadMarkdown()">파일 다운로드 (.md)</button>
+  </div>
+  <pre class="export-output" id="export-output"></pre>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const decisions = [
+  // ===== Part A — SYNTHESIS-ROUND2 D1-D7 =====
+  {
+    id: "D1",
+    section: "synth",
+    question: "Two-Engine Plugin Framework 채택?",
+    context: "core (universal) + plugins/<sys>/ (specifics) + Verification Engine (deterministic) + Recommendation Engine (LLM-based) + Integrator (transactional) + 5번째 Schema Layer (ontology 확장)",
+    options: [
+      { value: "approve", label: "승인", desc: "현 설계 채택. spec 작성으로 진행", recommended: true },
+      { value: "partial", label: "일부 수정", desc: "특정 부분 수정 후 채택 (메모에 명시)" },
+      { value: "reject", label: "거부", desc: "다른 방향 재탐색 필요" },
+      { value: "other", label: "Other", desc: "직접 입력" }
+    ]
+  },
+  {
+    id: "D2",
+    section: "synth",
+    question: "v2 자산 (27 카드 + 5 facade + 5 fixture) 의 운명",
+    context: "M11 응답 — plugins/slab-design/ 으로 흡수. 폐기 X. 27 카드 → registry/, 5 facade → contracts/, 5 fixture → golden/",
+    options: [
+      { value: "absorb", label: "plugins/slab-design/ 흡수", desc: "Round 2 의 권장 — content reuse, framing rebrand", recommended: true },
+      { value: "discard", label: "폐기", desc: "Round 2 mechanism 으로 처음부터 재구성" },
+      { value: "reference", label: "별도 reference 보존", desc: "plugins 와 분리, history 보존만" },
+      { value: "other", label: "Other", desc: "직접 입력" }
+    ]
+  },
+  {
+    id: "D3",
+    section: "synth",
+    question: "2nd reference system 명시 (system-agnostic 검증)",
+    context: "Skeptic M1 — category error 인정. bank-credit hypothetical 으로 framework shape 검증, 실제 onboarding 부재",
+    options: [
+      { value: "aspirational", label: "bank-credit aspirational 유지", desc: "spec 단계는 hypothetical, 실제 onboarding 은 별도 세션", recommended: true },
+      { value: "real", label: "실제 2nd system 선정", desc: "spec 단계에서 실제 system 명시 + onboarding 시작" },
+      { value: "other_aspirational", label: "다른 aspirational system", desc: "bank-credit 외 (예: e-commerce, insurance) 메모 명시" },
+      { value: "other", label: "Other", desc: "직접 입력" }
+    ]
+  },
+  {
+    id: "D4",
+    section: "synth",
+    question: "Schema Layer migration 시점",
+    context: "Additive only — 기존 17 table 미수정. Backout = drop new 5+ tables. Seed 는 JPA annotation 자동",
+    options: [
+      { value: "immediate", label: "spec 직후 즉시", desc: "Additive 이므로 risk 낮음. spec 이 schema ready 상태로 출발", recommended: true },
+      { value: "separate", label: "별도 단계 (별도 sprint)", desc: "spec 작성 완료 후 별도 시점에 migration" },
+      { value: "after_validation", label: "v2 verification 완성 후", desc: "v2 가 end-to-end 동작 검증되면 schema layer 도입" },
+      { value: "other", label: "Other", desc: "직접 입력" }
+    ]
+  },
+  {
+    id: "D5",
+    section: "synth",
+    question: "Recommendation Engine 의 LLM 선택",
+    context: "Manifest 에 model_version pin. 동일 환경 reproducibility 만 claim",
+    options: [
+      { value: "claude", label: "Claude (현 onTong)", desc: "현 사용 중인 LLM 유지. model_version pin 으로 reproducibility", recommended: true },
+      { value: "other_llm", label: "다른 LLM (GPT 등)", desc: "특정 task 별 다른 LLM 사용" },
+      { value: "multi", label: "LLM-agnostic (다중 지원)", desc: "Claude / GPT / Gemini 등 swap 가능. 설계 복잡도 ↑" },
+      { value: "other", label: "Other", desc: "직접 입력" }
+    ]
+  },
+  {
+    id: "D6",
+    section: "synth",
+    question: "Onboarding cost 50-400h per system 수용?",
+    context: "Skeptic M9 실측: medium Java ~100-150h / first non-Java ~200-400h + 100-150h curation. ADR-002 의 'near-zero' 잘못 인정",
+    options: [
+      { value: "accept", label: "수용", desc: "Plugin scaffolding 만 reusable, curation dominant. 사용자 명시", recommended: true },
+      { value: "reduce_scope", label: "Scope 축소", desc: "smaller system 또는 anchored core 만 cover. Plugin layer 단순화" },
+      { value: "investment", label: "투자 — automation 강화", desc: "Section 2 의 auto extraction 비중 ↑ → curation cost ↓" },
+      { value: "other", label: "Other", desc: "직접 입력" }
+    ]
+  },
+  {
+    id: "D7",
+    section: "synth",
+    question: "다음 세션 (별도) — spec + ADR-003~005 작성",
+    context: "spec.md + ADR-003 (Two-Engine Substrate) + ADR-004 (Schema Layer) + ADR-005 (Recommendation Engine LLM defenses)",
+    options: [
+      { value: "proceed", label: "이대로 진행", desc: "spec + 3 ADR 작성 세션 인계", recommended: true },
+      { value: "additional", label: "추가 ADR 필요", desc: "예: cross-repo handling, multi-user concurrent, etc. (메모 명시)" },
+      { value: "wait", label: "추가 검토 필요", desc: "현 시점에 spec 작성 너무 이름 — 더 검토" },
+      { value: "other", label: "Other", desc: "직접 입력" }
+    ]
+  },
+  // ===== Part B — META-PROGRAMMING D1-D5 =====
+  {
+    id: "M-D1",
+    section: "meta",
+    question: "4 ADR (006-009) 채택 — meta-programming 처리",
+    context: "Polymorphic Dispatch / Annotation Processing / AOP / Bytecode Generation 4 영역 mechanism. v2 영향 zero, 일반화 시 활성",
+    options: [
+      { value: "all", label: "4 ADR 모두 채택", desc: "Meta-programming 처리 완전 명시. v2 외 system 일반화 ready", recommended: true },
+      { value: "partial", label: "일부 채택", desc: "어느 것 (메모 명시) — 예: 006 만, 또는 006+007 등" },
+      { value: "reject", label: "거부", desc: "현 design 충분. Meta-programming 추가 없이 진행" },
+      { value: "other", label: "Other", desc: "직접 입력" }
+    ]
+  },
+  {
+    id: "M-D2",
+    section: "meta",
+    question: "Section 2 의 작업 시점 (CallSiteAnalyzer / Aspect extractor 등)",
+    context: "합성기 자체와 별도 work item. Plugin onboarding 시점에 system 별 차이 흡수",
+    options: [
+      { value: "spec_integrated", label: "spec 단계 통합", desc: "Section 2 의 추가 작업 항목을 spec 안에 포함", recommended: true },
+      { value: "separate_sprint", label: "별도 sprint", desc: "Section 2 가 별도 진행, spec 은 dependency 만 명시" },
+      { value: "lazy", label: "필요 시점 (lazy)", desc: "실제 2nd system onboarding 시점에 작업" },
+      { value: "other", label: "Other", desc: "직접 입력" }
+    ]
+  },
+  {
+    id: "M-D3",
+    section: "meta",
+    question: "v2 의 즉시 우선순위",
+    context: "v2 영향 zero — meta-programming 작업은 일반화 대비. v2 자체 verification 이 먼저인지 병행인지",
+    options: [
+      { value: "v2_first", label: "v2 verification 먼저", desc: "v2 의 end-to-end byte-identical 완성 후 일반화 작업", recommended: true },
+      { value: "parallel", label: "일반화 병행", desc: "v2 verification + Section 2 일반화 작업 병행 진행" },
+      { value: "general_first", label: "일반화 먼저", desc: "Framework 일반화 먼저, v2 는 첫 plugin 으로 자연 처리" },
+      { value: "other", label: "Other", desc: "직접 입력" }
+    ]
+  },
+  {
+    id: "M-D4",
+    section: "meta",
+    question: "Honest limits 의 명시적 수용",
+    context: "Unbounded reflection / complex pointcut / custom CGLib 의 SIGNATURE_LOCKED 정책",
+    options: [
+      { value: "accept", label: "수용", desc: "SIGNATURE_LOCKED + GapSurfacer 로 명시. 일반화의 한계 정직 인정", recommended: true },
+      { value: "deeper", label: "더 깊이 (추가 mechanism)", desc: "예: unbounded reflection 의 partial handling, AspectJ CTW emulator 등" },
+      { value: "other", label: "Other", desc: "직접 입력" }
+    ]
+  },
+  {
+    id: "M-D5",
+    section: "meta",
+    question: "spec 작성 세션으로 인계 시점",
+    context: "D1-D7 + M-D1-M-D5 답변 후 spec 세션 (예상 2-3h)",
+    options: [
+      { value: "now", label: "지금 인계 (이 답변 받으면 즉시)", desc: "12 결정 답변 후 곧바로 spec 작성 세션 진입", recommended: true },
+      { value: "review", label: "추가 검토 필요", desc: "현 답변 외 추가 의문점 정리 후 인계" },
+      { value: "different", label: "다른 시점", desc: "메모에 명시" },
+      { value: "other", label: "Other", desc: "직접 입력" }
+    ]
+  }
+];
+
+const STORAGE_KEY = "sim-redesign-decisions-v1";
+let state = {};
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state = JSON.parse(raw);
+  } catch (e) { state = {}; }
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {}
+}
+
+function renderDecisions() {
+  const synthEl = document.getElementById("decisions-synth");
+  const metaEl = document.getElementById("decisions-meta");
+  synthEl.innerHTML = "";
+  metaEl.innerHTML = "";
+
+  decisions.forEach(d => {
+    const card = document.createElement("div");
+    card.className = "decision";
+    card.id = `decision-${d.id}`;
+    if (state[d.id]?.value) card.classList.add("answered");
+
+    const idClass = d.section === "synth" ? "synth" : "meta";
+
+    card.innerHTML = `
+      <div class="decision-header">
+        <div>
+          <span class="decision-id ${idClass}">${d.id}</span>
+          <span class="decision-question">${d.question}</span>
+        </div>
+      </div>
+      <div class="decision-context">${d.context}</div>
+      <div class="options">
+        ${d.options.map(opt => `
+          <div class="option ${opt.value === "other" ? "other" : ""} ${state[d.id]?.value === opt.value ? "selected" : ""}"
+               data-decision="${d.id}" data-value="${opt.value}">
+            <div class="option-radio"></div>
+            <div class="option-body">
+              <div class="option-label">${opt.label}${opt.recommended ? '<span class="badge-recommend">추천</span>' : ''}</div>
+              <div class="option-desc">${opt.desc}</div>
+              ${opt.value === "other" ? `<input type="text" class="other-input" placeholder="직접 입력..." data-decision="${d.id}" value="${state[d.id]?.otherText || ''}">` : ''}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+      <div class="notes-toggle" data-decision="${d.id}">+ 메모 추가</div>
+      <textarea class="notes-area ${state[d.id]?.notes ? 'show' : ''}" data-decision="${d.id}"
+                placeholder="이 결정에 대한 추가 메모 (예: 일부 수정 시 어느 부분, Other 시 의도)...">${state[d.id]?.notes || ""}</textarea>
+    `;
+
+    (d.section === "synth" ? synthEl : metaEl).appendChild(card);
+  });
+
+  // Event delegation
+  document.querySelectorAll(".option").forEach(opt => {
+    opt.addEventListener("click", e => {
+      // 클릭이 input 이면 무시 (text 입력 방해 X)
+      if (e.target.tagName === "INPUT") return;
+      const did = opt.dataset.decision;
+      const val = opt.dataset.value;
+      selectOption(did, val);
+    });
+  });
+  document.querySelectorAll(".other-input").forEach(inp => {
+    inp.addEventListener("input", e => {
+      const did = inp.dataset.decision;
+      if (!state[did]) state[did] = {};
+      state[did].otherText = inp.value;
+      saveState();
+    });
+    inp.addEventListener("click", e => e.stopPropagation());
+  });
+  document.querySelectorAll(".notes-toggle").forEach(t => {
+    t.addEventListener("click", e => {
+      const did = t.dataset.decision;
+      const ta = document.querySelector(`.notes-area[data-decision="${did}"]`);
+      ta.classList.toggle("show");
+      if (ta.classList.contains("show")) ta.focus();
+    });
+  });
+  document.querySelectorAll(".notes-area").forEach(ta => {
+    ta.addEventListener("input", e => {
+      const did = ta.dataset.decision;
+      if (!state[did]) state[did] = {};
+      state[did].notes = ta.value;
+      saveState();
+    });
+  });
+
+  updateProgress();
+}
+
+function selectOption(did, val) {
+  if (!state[did]) state[did] = {};
+  state[did].value = val;
+  saveState();
+
+  // Update visual
+  const card = document.getElementById(`decision-${did}`);
+  card.classList.add("answered");
+  card.querySelectorAll(".option").forEach(opt => {
+    opt.classList.toggle("selected", opt.dataset.value === val);
+  });
+
+  updateProgress();
+}
+
+function updateProgress() {
+  const answered = decisions.filter(d => state[d.id]?.value).length;
+  document.getElementById("answered-count").textContent = answered;
+  const pct = (answered / decisions.length) * 100;
+  document.getElementById("progress-fill").style.width = pct + "%";
+}
+
+function applyAllRecommended() {
+  if (!confirm("모든 결정을 추천 옵션으로 자동 채택할까요? 기존 답변은 덮어쓰여집니다.")) return;
+  decisions.forEach(d => {
+    const rec = d.options.find(o => o.recommended);
+    if (rec) {
+      if (!state[d.id]) state[d.id] = {};
+      state[d.id].value = rec.value;
+    }
+  });
+  saveState();
+  renderDecisions();
+  showToast("모두 추천 채택 완료");
+}
+
+function resetAll() {
+  if (!confirm("모든 답변과 메모를 초기화할까요?")) return;
+  state = {};
+  localStorage.removeItem(STORAGE_KEY);
+  renderDecisions();
+  showToast("초기화 완료");
+}
+
+function buildMarkdown() {
+  const lines = [];
+  lines.push("# Sim-redesign 결정 답변");
+  lines.push("");
+  lines.push(`작성일: ${new Date().toISOString().slice(0, 10)}`);
+  lines.push(`완료: ${decisions.filter(d => state[d.id]?.value).length} / ${decisions.length}`);
+  lines.push("");
+
+  const sections = [
+    { key: "synth", title: "## Part A — Round 2 Synthesis (D1-D7)" },
+    { key: "meta", title: "## Part B — Meta-Programming (M-D1 ~ M-D5)" }
+  ];
+
+  sections.forEach(sec => {
+    lines.push(sec.title);
+    lines.push("");
+    decisions.filter(d => d.section === sec.key).forEach(d => {
+      const answer = state[d.id];
+      lines.push(`### ${d.id}. ${d.question}`);
+      lines.push("");
+      if (!answer?.value) {
+        lines.push("**선택**: (미답변)");
+      } else {
+        const opt = d.options.find(o => o.value === answer.value);
+        const label = opt ? opt.label : answer.value;
+        if (answer.value === "other" && answer.otherText) {
+          lines.push(`**선택**: Other — ${answer.otherText}`);
+        } else {
+          lines.push(`**선택**: ${label}`);
+        }
+        if (opt?.recommended) lines.push("(추천 옵션)");
+      }
+      if (answer?.notes) {
+        lines.push("");
+        lines.push(`**메모**: ${answer.notes}`);
+      }
+      lines.push("");
+    });
+  });
+
+  lines.push("---");
+  lines.push("");
+  lines.push("이 답변을 받으면 spec 작성 세션 (별도) 으로 인계 가능.");
+
+  return lines.join("\n");
+}
+
+function showExport() {
+  const md = buildMarkdown();
+  const out = document.getElementById("export-output");
+  out.textContent = md;
+  out.classList.add("show");
+  out.scrollIntoView({ behavior: "smooth", block: "end" });
+}
+
+async function copyMarkdown() {
+  const md = buildMarkdown();
+  try {
+    await navigator.clipboard.writeText(md);
+    showToast("Markdown 이 클립보드에 복사되었습니다. 채팅에 붙여넣으세요.");
+  } catch (e) {
+    showExport();
+    showToast("클립보드 접근 실패 — 아래 미리보기에서 수동 복사");
+  }
+}
+
+function downloadMarkdown() {
+  const md = buildMarkdown();
+  const blob = new Blob([md], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `sim-redesign-decisions-${new Date().toISOString().slice(0, 10)}.md`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast("파일 다운로드 시작");
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2500);
+}
+
+// Initialize
+loadState();
+renderDecisions();
+</script>
+
+</body>
+</html>
