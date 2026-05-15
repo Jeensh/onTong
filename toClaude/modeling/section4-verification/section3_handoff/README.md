@@ -198,16 +198,16 @@ from backend.sim_v2.core.synthesizer.java_translator import (
 # 1) 본인 worktree 의 onTong repo 로 이동
 cd ~/workspace/ai/onTong   # (경로는 본인 환경에 맞게)
 
-# 2) 최신 main + Section 4 작업 브랜치 fetch
+# 2) Section 4 handoff 브랜치 fetch + checkout
 git fetch origin
-
-# 3) Section 4 작업 브랜치로 checkout (브랜치 이름은 모델링 세션에 확인)
-#    예: section4-verification
-git checkout section4-verification
-git pull origin section4-verification
+git checkout section4-handoff-clean
+# 또는 본인 작업 branch 따로:
+# git checkout -b my-sim-work section4-handoff-clean
 ```
 
 > 본 패키지는 `toClaude/modeling/section4-verification/section3_handoff/` 하위에 모두 들어 있음. 시뮬레이션 담당자는 *read-only 로 참조* + 본인 영역 (`toClaude/simulation/` 또는 `backend/section3/`) 에서 작업.
+>
+> Production DB (`data/slab-v2-handoff.db`, 3.4 MB) 도 같이 들어 있음 — 별도 setup 없이 demo 동작.
 
 ### 8.2 환경 setup
 
@@ -219,9 +219,14 @@ source .venv/bin/activate
 # 2) sim_v2 의존성은 onTong 의 기존 requirements.txt 안에 포함되어 있음
 pip install -r requirements.txt
 
-# 3) sim_v2 회귀 확인 — 1,892 passed 가 나와야 정상
+# 3) production DB 확인 (이미 git 에 포함)
+ls -lh data/slab-v2-handoff.db
+# → 3.4M 이 보이면 OK. PATH resolver 가 자동으로 잡아씁니다.
+
+# 4) sim_v2 회귀 확인
 .venv/bin/python -m pytest backend/sim_v2/ -q
-# → 1892 passed, 3 skipped in ~6s
+# 시뮬레이션 환경에서는 multi-repo production test 일부 skip,
+# 핵심 unit + slab-v2 관련 test 는 모두 PASS
 ```
 
 ### 8.3 first-run — 받은 자산이 실제 동작하는지 5 분 안에 검증

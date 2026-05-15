@@ -19,6 +19,7 @@ Run from repo root:
 """
 from __future__ import annotations
 
+import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -28,7 +29,60 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
 
-PRODUCTION_DB_PATH = Path("/Users/donghae/workspace/ai/onTong/data/ontology.db")
+# Repo root = backend/sim_v2/demos/uc10_production_inspector/run.py 의 5 상위
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+
+
+def _has_repo(db: Path, repo_id: str) -> bool:
+    """SQLite read-only 로 빠르게 repo 존재 여부 확인. exception → False."""
+    try:
+        import sqlite3
+        conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        try:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM business_terms WHERE repo_id = ?",
+                (repo_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+        return bool(row and row[0] > 0)
+    except Exception:
+        return False
+
+
+def _resolve_db_path() -> Path:
+    """Resolution order:
+
+        1. SIM_V2_DB_PATH 환경 변수 (caller 가 명시적 override)
+        2. <repo>/data/ontology.db — *if* slab-design-real-v2 가 포함됨
+           (modeling/sim_v2 dev 환경: 다른 repo 데이터도 같이 들어 있어
+           full 회귀가 통과해야 함)
+        3. <repo>/data/slab-v2-handoff.db (시뮬레이션 담당자 용 v2-only DB,
+           git push 되는 3.4 MB — slab-design-real-v2 만 들어 있음)
+        4. <repo>/data/ontology.db (v2 없는 경우의 fallback — caller 가
+           .exists() 또는 데이터 부재로 자연스럽게 skip)
+
+    의도:
+        - modeling dev 측 ontology.db 에 v2 가 있으면 그거 사용 → 회귀 통과
+        - 시뮬레이션 측은 ontology.db 가 main 의 80 MB v2 없는 버전이라
+          step 2 fail → step 3 의 slab-v2-handoff.db 자동 사용
+    """
+    env = os.environ.get("SIM_V2_DB_PATH")
+    if env:
+        return Path(env)
+
+    full = _REPO_ROOT / "data" / "ontology.db"
+    if full.exists() and _has_repo(full, "slab-design-real-v2"):
+        return full
+
+    v2_only = _REPO_ROOT / "data" / "slab-v2-handoff.db"
+    if v2_only.exists():
+        return v2_only
+
+    return full  # 없어도 default 반환 — 호출 측이 .exists() 로 안전하게 처리
+
+
+PRODUCTION_DB_PATH = _resolve_db_path()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
