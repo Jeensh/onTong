@@ -323,16 +323,19 @@
 
 <ol class="steps">
   <li>
-    <strong>Pull / checkout</strong>
-    <pre><button class="copy-btn" data-copy="pull">copy</button><code id="pull"># 본인 onTong worktree 로 이동 (경로는 환경에 맞게)
-cd ~/workspace/ai/onTong
+    <strong>Clone / checkout (shallow 권장 — 빠르고 가벼움)</strong>
+    <pre><button class="copy-btn" data-copy="pull">copy</button><code id="pull"># 신규 worktree 면 shallow clone (history 안 받음, branch tip 만)
+git clone --depth 1 --branch section4-handoff-clean \
+  https://github.com/Jeensh/onTong.git onTong
+cd onTong
 
-# Section 4 작업 가져오기
-git fetch origin
-git checkout section4-handoff-clean
-
-# 또는 본인 작업 branch 따로 만들고 싶으면:
-# git checkout -b my-sim-work section4-handoff-clean</code></pre>
+# 이미 onTong repo 가 있으면:
+# git fetch origin section4-handoff-clean --depth 1
+# git checkout section4-handoff-clean</code></pre>
+    <p style="font-size: 12.5px; color: var(--muted); margin-top: 4px;">
+      💡 normal clone 도 동작하지만 main 의 history 에 큰 binary (81 MB jar 등)
+      가 있어서 무거움. <code>--depth 1</code> 사용 시 branch tip 만 — 즉시 시작.
+    </p>
   </li>
 
   <li>
@@ -341,8 +344,13 @@ git checkout section4-handoff-clean
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# sim_v2 회귀 — "1,892 passed, 3 skipped" 가 나와야 정상
-.venv/bin/python -m pytest backend/sim_v2/ -q</code></pre>
+# production DB 확인 — slab-v2-handoff.db (3.4 MB) 가 들어 있음
+ls -lh data/slab-v2-handoff.db
+
+# sim_v2 회귀
+.venv/bin/python -m pytest backend/sim_v2/ -q
+# 시뮬레이션 환경에서는 multi-repo production test 일부 skip,
+# 핵심 unit + slab-v2 관련 test 는 모두 PASS</code></pre>
   </li>
 
   <li>

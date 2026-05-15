@@ -71,3 +71,18 @@ frontend/playwright-report/
 
 # Archive (clean-slate snapshots)
 archive/
+
+# Java / Maven build artifacts (절대 commit 안 됨 — 81 MB jar 가 들어간 적 있음)
+**/target/
+*.jar
+*.war
+*.class
+
+# Ontology DB — 너무 큼 (138 MB). 작은 v2-only 만 commit (data/slab-v2-handoff.db).
+# modeling/sim_v2 dev 환경의 full DB 는 untracked 로 유지.
+data/ontology.db
+data/ontology.db.bak-*
+data/ontology.db.backup-*
+
+# Frontend regenerable
+frontend/data/

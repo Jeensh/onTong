@@ -195,16 +195,19 @@ from backend.sim_v2.core.synthesizer.java_translator import (
 ### 8.1 Pull / 브랜치 확인
 
 ```bash
-# 1) 본인 worktree 의 onTong repo 로 이동
-cd ~/workspace/ai/onTong   # (경로는 본인 환경에 맞게)
+# (A) 신규 worktree — shallow clone 권장 (history 안 받음, 가벼움)
+git clone --depth 1 --branch section4-handoff-clean \
+  https://github.com/Jeensh/onTong.git onTong
+cd onTong
 
-# 2) Section 4 handoff 브랜치 fetch + checkout
-git fetch origin
-git checkout section4-handoff-clean
-# 또는 본인 작업 branch 따로:
-# git checkout -b my-sim-work section4-handoff-clean
+# (B) 이미 onTong repo 가 있는 경우
+# cd ~/workspace/ai/onTong
+# git fetch origin section4-handoff-clean --depth 1
+# git checkout section4-handoff-clean
 ```
 
+> normal clone 도 동작하지만 main 의 history 에 큰 binary (81 MB jar 등) 가 있어서 무거움. `--depth 1` 권장.
+>
 > 본 패키지는 `toClaude/modeling/section4-verification/section3_handoff/` 하위에 모두 들어 있음. 시뮬레이션 담당자는 *read-only 로 참조* + 본인 영역 (`toClaude/simulation/` 또는 `backend/section3/`) 에서 작업.
 >
 > Production DB (`data/slab-v2-handoff.db`, 3.4 MB) 도 같이 들어 있음 — 별도 setup 없이 demo 동작.
