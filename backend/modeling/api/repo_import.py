@@ -64,11 +64,35 @@ class ImportStartResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+def _find_similar_path_hint(target: Path) -> str | None:
+    parent = target.parent
+    if not parent.exists() or not parent.is_dir():
+        return None
+    target_name = target.name
+    candidates = [p.name for p in parent.iterdir() if p.is_dir()]
+    normalized = target_name.replace("-", "_")
+    for cand in candidates:
+        if cand == target_name:
+            continue
+        if cand.replace("-", "_") == normalized or cand.replace("_", "-") == target_name:
+            return str(parent / cand)
+    return None
+
+
 @router.post("/import", response_model=ImportStartResponse)
 def start_import(req: ImportRequest) -> ImportStartResponse:
     repo_path = Path(req.repo_path).expanduser().resolve()
-    if not repo_path.exists() or not repo_path.is_dir():
-        raise HTTPException(status_code=400, detail=f"repo_path not found: {repo_path}")
+    if not repo_path.exists():
+        detail = f"경로가 존재하지 않습니다: {repo_path}"
+        hint = _find_similar_path_hint(repo_path)
+        if hint:
+            detail += f" — 혹시 '{hint}' 를 의도하셨나요? (하이픈/언더스코어 차이)"
+        raise HTTPException(status_code=400, detail=detail)
+    if not repo_path.is_dir():
+        raise HTTPException(
+            status_code=400,
+            detail=f"디렉토리가 아닙니다 (파일임): {repo_path}",
+        )
 
     job_id = uuid.uuid4().hex[:12]
     job = ImportJob(id=job_id, repo_id=req.repo_id, repo_path=str(repo_path))

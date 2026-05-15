@@ -94,6 +94,7 @@ def _field_to_row(f: CodeField) -> CodeFieldRow:
         is_collection=f.is_collection,
         element_type=f.element_type,
         line=f.line,
+        repo_id="",  # filled by caller from parent CodeType.repo_id (same pattern as methods)
     )
 
 
@@ -224,19 +225,51 @@ class CodeLayerStore:
                     s.flush()
 
                 row = _ct_to_row(ct)
-                # method row 의 repo_id 채우기
+                # method/field row 의 repo_id 채우기 (DB UNIQUE 가 repo_id 포함)
                 for mrow in row.methods:
                     mrow.repo_id = repo_id
+                for frow in row.fields:
+                    frow.repo_id = repo_id
                 s.add(row)
                 count += 1
         return count
 
     def delete_repo(self, repo_id: str) -> int:
-        """repo 의 모든 CodeType (cascade fields/methods) + CallSite 삭제."""
+        """repo 의 모든 CodeType + 자식 (fields/methods/call_sites) 삭제.
+
+        DB DDL 에 FK 가 없어서 bulk delete 는 자동 cascade 안 됨 —
+        명시적으로 자식 정리 + 안전망으로 orphan 도 한 번 청소.
+        """
         with session_scope() as s:
-            n_types = s.execute(delete(CodeTypeRow).where(CodeTypeRow.repo_id == repo_id)).rowcount or 0
-            n_cs = s.execute(delete(CallSiteRow).where(CallSiteRow.repo_id == repo_id)).rowcount or 0
-            return n_types + n_cs
+            n_fields = s.execute(
+                delete(CodeFieldRow).where(CodeFieldRow.repo_id == repo_id)
+            ).rowcount or 0
+            n_methods = s.execute(
+                delete(CodeMethodRow).where(CodeMethodRow.repo_id == repo_id)
+            ).rowcount or 0
+            n_types = s.execute(
+                delete(CodeTypeRow).where(CodeTypeRow.repo_id == repo_id)
+            ).rowcount or 0
+            n_cs = s.execute(
+                delete(CallSiteRow).where(CallSiteRow.repo_id == repo_id)
+            ).rowcount or 0
+            # 안전망: 부모 사라진 자식 row 남아있으면 정리 (historical residue 대응)
+            s.execute(
+                delete(CodeFieldRow).where(
+                    ~CodeFieldRow.type_fqn.in_(select(CodeTypeRow.fqn))
+                )
+            )
+            s.execute(
+                delete(CodeMethodRow).where(
+                    ~CodeMethodRow.parent_type_fqn.in_(select(CodeTypeRow.fqn))
+                )
+            )
+            s.execute(
+                delete(CallSiteRow).where(
+                    ~CallSiteRow.caller_method_fqn.in_(select(CodeMethodRow.fqn))
+                )
+            )
+            return n_types + n_methods + n_fields + n_cs
 
     def upsert_call_sites(self, repo_id: str, call_sites: Iterable[CallSite]) -> int:
         """call_sites 갱신 — id 매칭으로 replace."""

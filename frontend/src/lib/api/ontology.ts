@@ -259,7 +259,20 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
-    throw new Error(`API ${res.status}: ${txt || res.statusText}`);
+    // FastAPI 는 `{"detail": "..."}` 또는 `{"detail": [{"msg": "..."}]}` 형식으로 에러를 반환.
+    // raw JSON 덤프 대신 detail 만 추출해서 사용자에게 깔끔히 노출.
+    let message = txt || res.statusText;
+    try {
+      const parsed = JSON.parse(txt);
+      if (typeof parsed?.detail === "string") {
+        message = parsed.detail;
+      } else if (Array.isArray(parsed?.detail) && parsed.detail[0]?.msg) {
+        message = parsed.detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join("; ");
+      }
+    } catch {
+      // not JSON — keep raw text
+    }
+    throw new Error(`API ${res.status}: ${message}`);
   }
   return res.json();
 }

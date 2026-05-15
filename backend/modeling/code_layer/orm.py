@@ -81,11 +81,14 @@ class CodeFieldRow(Base):
     is_collection:    Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     element_type:     Mapped[str | None] = mapped_column(String, nullable=True)
     line:             Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # repo_id 는 multi-repo 격리를 위해 UNIQUE 에 포함 — DB schema 와 정합.
+    # upsert_types 가 parent CodeType.repo_id 로 채움 (`_method_to_row` 패턴과 동일).
+    repo_id:          Mapped[str] = mapped_column(String, nullable=False, default="", index=True)
 
     parent_type: Mapped[CodeTypeRow] = relationship(back_populates="fields", foreign_keys=[type_fqn])
 
     __table_args__ = (
-        UniqueConstraint("type_fqn", "name", name="uq_code_fields_type_name"),
+        UniqueConstraint("type_fqn", "name", "repo_id", name="uq_code_fields_type_name"),
     )
 
 
