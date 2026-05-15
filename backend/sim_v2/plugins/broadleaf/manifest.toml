@@ -1,0 +1,28 @@
+[plugin]
+name = "broadleaf"
+version = "0.1.0"
+description = "Broadleaf Commerce community v6.x plugin (Track B3 — real OSS legacy stress test, ADR-011)"
+
+[recommendation]
+default_provider = "claude"
+default_model = "claude-opus-4-7"
+allowed_providers = ["claude", "openai", "gemini"]
+max_retries = 3
+
+[extensions]
+# BROADLEAF-ONBOARDING.md §6.2 — 5-6 plugin extension
+dispatchers = ["broadleaf.factory_dispatch"]
+annotations = ["broadleaf.merge_annotations"]
+aop = ["broadleaf.configurable_handler", "broadleaf.dynamic_field"]
+bytecode = ["broadleaf.dynamic_entity_dao_proxy"]
+
+[schema]
+source = "jpa_annotation"
+
+[fixtures]
+ids = ["B1", "B2", "B3", "B4", "B5"]
+
+[contracts]
+domain_exception = "BroadleafException"
+numeric_convention = "ecommerce_2decimal"
+domain_namespace_class = "BLCConstants"

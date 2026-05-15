@@ -1,0 +1,1 @@
+"""banking plugin — contracts"""
