@@ -42,10 +42,19 @@
 
 **Phase C-2 완료** (2026-05-13). 사용자는 @Entity / @Service / @Controller 클래스를 선택해서 ② 가설 까지 갈 수 있음:
 - @Entity → EntityHypothesis (기존 + downstream pipeline 그대로)
-- @Service / @Component / @RestController → ServiceHypothesis 카드 표시. 인터뷰/옵션/갭 등 downstream 은 Phase C-3 에서 wire-up 예정. 가설 결과는 chat 에 표시되고 store 의 hypothesis 필드에는 entity 만 저장.
+- @Service / @Component / @RestController → ServiceHypothesis 카드 표시. 인터뷰는 C-3a 에서 지원, 옵션/갭/명명/archive 는 후속.
 - Action 은 method-level 이라 UI 진입점 (C-4) 필요 → 현재는 backend 만 준비.
 
-**다음 세션**: Phase C-3 — interview/options/gaps/pattern/archive/naming 의 kind-aware 분기. 가장 큰 변화는 interview 프롬프트 — 질문 종류가 entity / service / action 별로 다름.
+**Phase C-3a 완료** (2026-05-13). Service/Action hypothesis → 인터뷰 ③ wire-up 완료:
+- 백엔드: `prompts/service_interview.md`, `prompts/action_interview.md` 추가. `interview.py` 에 `design_service_interview / design_action_interview / design_interview_dispatcher` 추가. `/authoring/interview` 가 Hypothesis union 디스패치.
+- 프론트: `store.ts` 의 `hypothesis: Hypothesis | null` 로 union 확장. `_entityOrThrow` / `_hypothesisDisplayFields` 헬퍼로 downstream 캡 가드 + 표시 통일. 인터뷰 API 콜은 union 그대로 전달.
+- 보안 효과: ③ 인터뷰 버튼은 모든 kind 활성화. ⑤ 옵션/⑥ 갭/⑦ 패턴/⑨ Archive/✓ Confirm 은 `hypothesis.kind !== "entity"` 일 때 비활성 + 한국어 툴팁.
+
+**Phase C-3b 완료** (2026-05-13). Toolbar 게이트 + Hypothesis 카드 universal display.
+
+**Phase C-3c (in progress)**: options/gaps/pattern/archive/naming 의 service/action 본격 지원은 별도 세션. 현재는 deferred (Entity-only 게이트 + 툴팁).
+
+**다음 세션**: Phase C-3 추가 캡 (Service options/gaps, Action BR 확정) — 필요 시 사용자 결정.
 
 **Phase B 완료** (2026-05-13). End-to-end 동작:
 - 사용자가 @Entity 클래스 선택 → 기존 JPO 풀 pipeline (hypothesis/interview/options/.../confirm)

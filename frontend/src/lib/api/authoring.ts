@@ -801,7 +801,7 @@ export const authoringApi = {
   },
   interview(
     id: string,
-    req: { turn_no: number; hypothesis: EntityHypothesis; user_comment?: string },
+    req: { turn_no: number; hypothesis: Hypothesis; user_comment?: string },
   ): Promise<InterviewBatch> {
     return http("POST", `/sessions/${id}/interview`, req);
   },

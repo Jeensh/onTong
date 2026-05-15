@@ -97,12 +97,54 @@ export interface ActiveToolTrace {
 /** Snapshot of one finished entity cycle within a session.
  *  Pushed when the user clicks "다음 Entity". `messages` / `costUsd` /
  *  `turnNo` are session-level, not per-entity, so they live elsewhere. */
+/** Narrow a Hypothesis to EntityHypothesis or throw. Used by downstream
+ *  capabilities (gaps/options/etc.) that haven't yet been ported to
+ *  Service/Action — Phase C-3a/b is interview-only. */
+function _entityOrThrow(h: Hypothesis | null | undefined): EntityHypothesis {
+  if (!h) throw new Error("hypothesis required.");
+  if (h.kind !== "entity") {
+    throw new Error(
+      `이 단계는 JPA Entity 만 지원합니다 (현재 hypothesis kind=${h.kind}).`,
+    );
+  }
+  return h;
+}
+
+/** Kind-aware {korean, english} display pair for any Hypothesis. */
+function _hypothesisDisplay(h: Hypothesis | null | undefined):
+  | { korean: string; english: string; role: string }
+  | null {
+  if (!h) return null;
+  if (h.kind === "entity") {
+    return {
+      korean: h.candidate_term_korean,
+      english: h.candidate_term_english,
+      role: h.domain_role,
+    };
+  }
+  if (h.kind === "service") {
+    return {
+      korean: h.candidate_capability_korean,
+      english: h.candidate_capability_english,
+      role: h.service_role,
+    };
+  }
+  return {
+    korean: h.domain_verb_korean,
+    english: h.domain_verb_english,
+    role: h.action_kind_guess,
+  };
+}
+
 export interface CompletedEntityCycle {
   /** Extracted code outline — JPA Entity (kind="jpo", full schema) or
    *  Generic (kind="generic", outline only). Phase B rename: this used to
    *  be `jpo: ExtractedJpo` when only JPA Entity was supported. */
   extracted: ExtractedClass;
-  hypothesis: EntityHypothesis | null;
+  /** Phase C-3 widened to Hypothesis union (entity | service | action).
+   *  Downstream caps (options/gaps/etc.) still narrow to EntityHypothesis
+   *  with a kind guard until those caps land in subsequent C-3 substeps. */
+  hypothesis: Hypothesis | null;
   acceptedOption: OntologyOption | null;
   names: NamingDecision | null;
   archive: ArchiveDocument | null;
@@ -128,7 +170,8 @@ export interface AuthoringState {
    *  or ExtractedGenericClass (kind="generic") which gates downstream
    *  capabilities (Phase B-8). Phase B rename: was `jpo: ExtractedJpo | null`. */
   extracted: ExtractedClass | null;
-  hypothesis: EntityHypothesis | null;
+  /** Phase C-3 widened to Hypothesis union (entity | service | action). */
+  hypothesis: Hypothesis | null;
   batch: InterviewBatch | null;
   answers: AbsorbedAnswers | null;
   optionTable: OptionTable | null;
@@ -602,6 +645,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       const { hypothesis, answers, session } = get();
       if (!session || !hypothesis || !answers)
         throw new Error("Need hypothesis + answers before options.");
+      const entityH = _entityOrThrow(hypothesis);
       const turn = get().turnNo + 1;
 
       const trace = await consumeStream(
@@ -609,7 +653,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         "options",
         authoringApi.optionsStream(session.id, {
           turn_no: turn,
-          hypothesis,
+          hypothesis: entityH,
           answers,
         }),
       );
@@ -634,6 +678,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       if (extracted.kind !== "jpo") {
         throw new Error("Gaps 는 현재 JPA Entity 만 지원합니다.");
       }
+      const entityH = _entityOrThrow(hypothesis);
       const turn = get().turnNo + 1;
 
       const trace = await consumeStream(
@@ -642,7 +687,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         authoringApi.gapsStream(session.id, {
           turn_no: turn,
           extracted_jpo: extracted,
-          hypothesis,
+          hypothesis: entityH,
           answers,
         }),
       );
@@ -811,7 +856,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
           set,
           "system",
           "info",
-          `· ${c.extracted.class_name} → ${c.hypothesis?.candidate_term_korean ?? "(미정)"} / ${accepted}${persisted}`,
+          `· ${c.extracted.class_name} → ${_hypothesisDisplay(c.hypothesis)?.korean ?? "(미정)"} / ${accepted}${persisted}`,
         );
       }
       if (r.current.jpo) {
@@ -836,13 +881,13 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       const entities: EntitySnapshot[] = [];
       // Completed cycles first
       for (const c of s.completedEntities) {
+        const cd = _hypothesisDisplay(c.hypothesis);
         entities.push({
           class_name: c.extracted.class_name,
           package: c.extracted.package,
-          candidate_term_korean: c.hypothesis?.candidate_term_korean ?? "(미정)",
-          candidate_term_english:
-            c.hypothesis?.candidate_term_english ?? c.extracted.class_name,
-          domain_role: c.hypothesis?.domain_role ?? "unknown",
+          candidate_term_korean: cd?.korean ?? "(미정)",
+          candidate_term_english: cd?.english ?? c.extracted.class_name,
+          domain_role: cd?.role ?? "unknown",
           accepted_option_name: c.acceptedOption?.name ?? null,
           accepted_option_alignment: c.acceptedOption?.domain_alignment ?? null,
           accepted_option_structure: c.acceptedOption?.structure_sketch ?? null,
@@ -857,13 +902,13 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       }
       // Then current in-progress (if at least extracted)
       if (s.extracted) {
+        const sd = _hypothesisDisplay(s.hypothesis);
         entities.push({
           class_name: s.extracted.class_name,
           package: s.extracted.package,
-          candidate_term_korean: s.hypothesis?.candidate_term_korean ?? "(미정)",
-          candidate_term_english:
-            s.hypothesis?.candidate_term_english ?? s.extracted.class_name,
-          domain_role: s.hypothesis?.domain_role ?? "unknown",
+          candidate_term_korean: sd?.korean ?? "(미정)",
+          candidate_term_english: sd?.english ?? s.extracted.class_name,
+          domain_role: sd?.role ?? "unknown",
           accepted_option_name: s.acceptedOption?.name ?? null,
           accepted_option_alignment: s.acceptedOption?.domain_alignment ?? null,
           accepted_option_structure: s.acceptedOption?.structure_sketch ?? null,
@@ -939,26 +984,30 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       const { hypothesis, acceptedOption, session, completedEntities } = get();
       if (!session || !hypothesis || !acceptedOption)
         throw new Error("Accept an option before pattern check.");
+      const entityH = _entityOrThrow(hypothesis);
       const turn = get().turnNo + 1;
-      const priors: PriorEntitySnapshot[] = completedEntities.map((c) => ({
-        class_name: c.extracted.class_name,
-        candidate_term_korean: c.hypothesis?.candidate_term_korean ?? "(미정)",
-        candidate_term_english: c.hypothesis?.candidate_term_english ?? c.extracted.class_name,
-        domain_role: c.hypothesis?.domain_role ?? "unknown",
-        accepted_option_name: c.acceptedOption?.name ?? null,
-        accepted_option_structure: c.acceptedOption?.structure_sketch ?? null,
-        accepted_option_alignment: c.acceptedOption?.domain_alignment ?? null,
-        persisted_fqns: c.persistedFqns,
-        archive_summary: c.archive
-          ? c.archive.markdown.split("\n").slice(0, 3).join(" / ")
-          : null,
-      }));
+      const priors: PriorEntitySnapshot[] = completedEntities.map((c) => {
+        const cd = _hypothesisDisplay(c.hypothesis);
+        return {
+          class_name: c.extracted.class_name,
+          candidate_term_korean: cd?.korean ?? "(미정)",
+          candidate_term_english: cd?.english ?? c.extracted.class_name,
+          domain_role: cd?.role ?? "unknown",
+          accepted_option_name: c.acceptedOption?.name ?? null,
+          accepted_option_structure: c.acceptedOption?.structure_sketch ?? null,
+          accepted_option_alignment: c.acceptedOption?.domain_alignment ?? null,
+          persisted_fqns: c.persistedFqns,
+          archive_summary: c.archive
+            ? c.archive.markdown.split("\n").slice(0, 3).join(" / ")
+            : null,
+        };
+      });
       const trace = await consumeStream(
         set,
         "pattern",
         authoringApi.patternStream(session.id, {
           turn_no: turn,
-          hypothesis,
+          hypothesis: entityH,
           accepted_option: acceptedOption,
           prior_session_entities: priors.length > 0 ? priors : null,
         }),
@@ -977,6 +1026,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       const { hypothesis, optionTable, session } = get();
       if (!session || !hypothesis || !optionTable)
         throw new Error("No options to select from.");
+      const entityH = _entityOrThrow(hypothesis);
       const accepted = optionTable.options.find((o) => o.id === optionId);
       if (!accepted) throw new Error(`Option ${optionId} not in current table`);
       set(() => ({ acceptedOption: accepted }));
@@ -986,7 +1036,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       const turn = get().turnNo + 1;
       const namingOut = await authoringApi.naming(session.id, {
         turn_no: turn,
-        hypothesis,
+        hypothesis: entityH,
         accepted_option: accepted,
       });
       set(() => ({ names: namingOut, turnNo: turn }));
@@ -1000,10 +1050,11 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       const { hypothesis, answers, acceptedOption, names, gaps, session } = get();
       if (!session || !hypothesis || !answers || !acceptedOption || !names)
         throw new Error("Need hypothesis + answers + accepted option + names before archive.");
+      const entityH = _entityOrThrow(hypothesis);
       const turn = get().turnNo + 1;
       const out = await authoringApi.archive(session.id, {
         turn_no: turn,
-        hypothesis,
+        hypothesis: entityH,
         answers,
         accepted_option: acceptedOption,
         names,
@@ -1115,12 +1166,13 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         pushMessage(set, "assistant", "interview", out);
       } else if (stage === "options") {
         if (!hypothesis || !answers) throw new Error("hypothesis + answers required");
+        const entityH = _entityOrThrow(hypothesis);
         const trace = await consumeStream(
           set,
           "options",
           authoringApi.optionsStream(session.id, {
             turn_no: turn,
-            hypothesis,
+            hypothesis: entityH,
             answers,
             user_comment: comment,
           }),
@@ -1140,9 +1192,10 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         });
       } else if (stage === "naming") {
         if (!hypothesis || !acceptedOption) throw new Error("hypothesis + acceptedOption required");
+        const entityH = _entityOrThrow(hypothesis);
         const out = await authoringApi.naming(session.id, {
           turn_no: turn,
-          hypothesis,
+          hypothesis: entityH,
           accepted_option: acceptedOption,
           user_comment: comment,
         });

@@ -86,6 +86,7 @@ from backend.application.authoring.capabilities.service_extractor import Extract
 from backend.application.authoring.capabilities.interview import (
     InterviewBatch,
     design_interview,
+    design_interview_dispatcher,
 )
 from backend.application.authoring.capabilities.naming import NamingDecision, decide_names
 from backend.application.authoring.capabilities.option_proposer import (
@@ -569,8 +570,26 @@ async def hypothesize_stream_endpoint(session_id: str, req: HypothesizeRequest):
 
 class InterviewRequest(BaseModel):
     turn_no: int
-    hypothesis: EntityHypothesis
+    # Phase C-3: accept the Hypothesis discriminated union directly.
+    # `hypothesis_entity` stays as a back-compat alias for the entity-only
+    # client code that hasn't migrated yet.
+    hypothesis: Annotated[
+        Union[EntityHypothesis, ServiceHypothesis, ActionHypothesis] | None,
+        Field(discriminator="kind"),
+    ] = None
+    hypothesis_entity: EntityHypothesis | None = None  # deprecated alias
     user_comment: str | None = None
+
+    @model_validator(mode="after")
+    def _coalesce_hypothesis(self) -> "InterviewRequest":
+        if self.hypothesis is None and self.hypothesis_entity is not None:
+            self.hypothesis = self.hypothesis_entity
+        if self.hypothesis is None:
+            raise ValueError(
+                "InterviewRequest requires `hypothesis` (union) or "
+                "`hypothesis_entity` (legacy alias)"
+            )
+        return self
 
 
 @router.post("/sessions/{session_id}/interview", response_model=InterviewBatch)
@@ -578,7 +597,8 @@ async def interview_endpoint(
     session_id: str, req: InterviewRequest
 ) -> InterviewBatch:
     _require_session(session_id)
-    out = await design_interview(
+    assert req.hypothesis is not None  # validator guarantees
+    out = await design_interview_dispatcher(
         req.hypothesis,
         session_id=session_id,
         turn_no=req.turn_no,

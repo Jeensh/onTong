@@ -247,27 +247,61 @@ function Toolbar() {
           extracted && extracted.kind === "generic"
             ? "Generic 클래스는 hypothesis 미지원 — JPA Entity / Service 클래스 선택"
             : extracted && extracted.kind === "service"
-              ? "Service hypothesis (Phase C-2) — 다운스트림 인터뷰/옵션은 JPA 전용 (Phase C-3)"
+              ? "Service hypothesis (Phase C-2) — 인터뷰까지 진행 가능 (C-3a). 옵션/갭/명명/archive 는 Entity 전용 (C-3 후속)"
               : undefined
         }
       >
         ② 가설
       </Button>
-      <Button size="sm" variant="outline" onClick={runInterview} disabled={loading || !hypothesis || !!batch}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={runInterview}
+        disabled={loading || !hypothesis || !!batch}
+        title={
+          hypothesis && hypothesis.kind !== "entity"
+            ? `${hypothesis.kind === "service" ? "Service" : "Action"} 인터뷰 (Phase C-3a) — 5~7 짧은 한국어 질문 생성`
+            : undefined
+        }
+      >
         ③ 인터뷰
       </Button>
-      <Button size="sm" variant="outline" onClick={runOptions} disabled={loading || !answers || !!acceptedOption}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={runOptions}
+        disabled={loading || !answers || !!acceptedOption || (hypothesis?.kind !== "entity")}
+        title={
+          hypothesis && hypothesis.kind !== "entity"
+            ? "⑤ 옵션은 Entity 가설 전용 (Phase C-3 후속에서 Service/Action 확장 예정)"
+            : undefined
+        }
+      >
         ⑤ 옵션
       </Button>
-      <Button size="sm" variant="outline" onClick={runGaps} disabled={loading || !answers}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={runGaps}
+        disabled={loading || !answers || (hypothesis?.kind !== "entity")}
+        title={
+          hypothesis && hypothesis.kind !== "entity"
+            ? "⑥ 갭은 Entity 가설 전용 (Phase C-3 후속에서 Service/Action 확장 예정)"
+            : undefined
+        }
+      >
         ⑥ 갭
       </Button>
       <Button
         size="sm"
         variant="outline"
         onClick={runPatternCheck}
-        disabled={loading || !acceptedOptionForToolbar}
-        title="cap 7 — 기존 ontology 패턴과의 정합성 검사"
+        disabled={loading || !acceptedOptionForToolbar || (hypothesis?.kind !== "entity")}
+        title={
+          hypothesis && hypothesis.kind !== "entity"
+            ? "⑦ 패턴은 Entity 가설 전용 (Phase C-3 후속에서 Service/Action 확장 예정)"
+            : "cap 7 — 기존 ontology 패턴과의 정합성 검사"
+        }
       >
         ⑦ 패턴
       </Button>
@@ -280,15 +314,30 @@ function Toolbar() {
       >
         ⑩ 다음 단계
       </Button>
-      <Button size="sm" variant="outline" onClick={runArchive} disabled={loading || !names || !!archive}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={runArchive}
+        disabled={loading || !names || !!archive || (hypothesis?.kind !== "entity")}
+        title={
+          hypothesis && hypothesis.kind !== "entity"
+            ? "⑨ Archive 는 Entity 가설 전용 (Phase C-3 후속에서 Service/Action 확장 예정)"
+            : undefined
+        }
+      >
         ⑨ Archive
       </Button>
       <Button
         size="sm"
         variant="outline"
         onClick={() => runConfirm(DEFAULT_REPO_ID, "scm")}
-        disabled={loading || !names || persistedFqns.length > 0}
+        disabled={loading || !names || persistedFqns.length > 0 || (hypothesis?.kind !== "entity")}
         className="border-emerald-400 text-emerald-400 hover:bg-emerald-400/10"
+        title={
+          hypothesis && hypothesis.kind !== "entity"
+            ? "✓ Confirm 은 Entity 가설 전용 (Phase C-3 후속에서 Service/Action 확장 예정)"
+            : undefined
+        }
       >
         ✓ Confirm
       </Button>
@@ -912,7 +961,7 @@ function ServiceHypothesisView({ h }: { h: ServiceHypothesis }) {
         <div className="text-[11px] text-rose-400 mt-1">⚠ {h.concerns[0]}</div>
       )}
       <div className="text-[10px] text-amber-300/70 mt-1">
-        ⓘ Service hypothesis 까지 land — 인터뷰/옵션/갭 등 downstream 은 Phase C-3 예정
+        ⓘ Service hypothesis + 인터뷰 지원 (Phase C-3a) — 옵션/갭/명명/archive 는 후속
       </div>
     </div>
   );
@@ -943,7 +992,7 @@ function ActionHypothesisView({ h }: { h: ActionHypothesis }) {
         <div className="text-[11px] text-rose-400 mt-1">⚠ {h.concerns[0]}</div>
       )}
       <div className="text-[10px] text-amber-300/70 mt-1">
-        ⓘ Action hypothesis 까지 land — 인터뷰/BR 확정 등 downstream 은 Phase C-3 예정
+        ⓘ Action hypothesis + 인터뷰 지원 (Phase C-3a) — BR 확정/옵션 등 downstream 은 후속
       </div>
     </div>
   );
@@ -1568,7 +1617,7 @@ function CompletedEntitiesPreview() {
               {c.acceptedOption ? (
                 <>★ {c.acceptedOption.name}</>
               ) : c.hypothesis ? (
-                <>가설: {c.hypothesis.candidate_term_korean}</>
+                <>가설: {_hypothesisDisplayFields(c.hypothesis).korean}</>
               ) : (
                 <>(미완)</>
               )}
@@ -1649,6 +1698,36 @@ function ArchivePreview({ archive }: { archive: ArchiveDocument }) {
   );
 }
 
+function _hypothesisDisplayFields(h: Hypothesis): {
+  korean: string;
+  english: string;
+  role: string;
+  summary: string;
+} {
+  if (h.kind === "entity") {
+    return {
+      korean: h.candidate_term_korean,
+      english: h.candidate_term_english,
+      role: h.domain_role,
+      summary: h.pk_role_summary,
+    };
+  }
+  if (h.kind === "service") {
+    return {
+      korean: h.candidate_capability_korean,
+      english: h.candidate_capability_english,
+      role: h.service_role,
+      summary: h.responsibility_summary,
+    };
+  }
+  return {
+    korean: h.domain_verb_korean,
+    english: h.domain_verb_english,
+    role: h.action_kind_guess,
+    summary: h.output_meaning_korean ?? "",
+  };
+}
+
 function HypothesisCard() {
   // P2-B: refresh button + contradiction indicator. The button re-runs cap 2
   // and clears downstream artifacts so the user can iterate cleanly.
@@ -1664,14 +1743,15 @@ function HypothesisCard() {
   // Heuristic contradiction count from absorbed answers' contradicts list.
   const contradictionCount = answers?.contradictions.length ?? 0;
   const hasAnswers = !!answers;
+  const display = _hypothesisDisplayFields(hypothesis);
 
   return (
     <div>
       <div className="flex items-start justify-between gap-2 mb-1">
         <div className="flex-1">
-          <div className="text-[14px] font-semibold">{hypothesis.candidate_term_korean}</div>
+          <div className="text-[14px] font-semibold">{display.korean}</div>
           <code className="text-[11px] font-mono text-muted-foreground">
-            {hypothesis.candidate_term_english}
+            {display.english}
           </code>
         </div>
         {hasAnswers && (
@@ -1697,10 +1777,12 @@ function HypothesisCard() {
         </div>
       )}
       <div className="text-[11px] text-muted-foreground mt-1">
-        role: <strong>{hypothesis.domain_role}</strong> · confidence:{" "}
+        role: <strong>{display.role}</strong> · confidence:{" "}
         {hypothesis.confidence.toFixed(2)}
       </div>
-      <div className="text-[11.5px] mt-2">{hypothesis.pk_role_summary}</div>
+      {display.summary && (
+        <div className="text-[11.5px] mt-2">{display.summary}</div>
+      )}
     </div>
   );
 }
