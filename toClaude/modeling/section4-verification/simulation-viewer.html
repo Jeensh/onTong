@@ -1,0 +1,1796 @@
+<!doctype html>
+<html lang="ko"><head>
+<meta charset="utf-8">
+<title>Section 4 — Simulation Viewer</title>
+<style>
+  :root { --blue:#1e40af; --green:#059669; --amber:#b45309; --red:#b91c1c;
+          --bg:#f9fafb; --card:#fff; --line:#e5e7eb; --text:#111827;
+          --muted:#6b7280; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, system-ui, sans-serif;
+         margin: 0; background: var(--bg); color: var(--text); }
+  header { background: linear-gradient(180deg,#1e3a8a,#1e40af); color:#fff;
+           padding: 22px 28px; }
+  header h1 { margin: 0 0 6px 0; font-size: 1.6rem; }
+  header .sub { color:#bfdbfe; font-size: 0.85rem; }
+  nav.tabs { display:flex; gap:0; padding: 0 16px; background:#1e3a8a;
+             border-top:1px solid #1d4ed8; }
+  nav.tabs button { background: transparent; color:#bfdbfe; border:0;
+                    padding: 10px 16px; cursor:pointer; font-size:0.95rem;
+                    border-bottom: 3px solid transparent; }
+  nav.tabs button.active { color:#fff; border-bottom-color:#fbbf24;
+                           background: rgba(255,255,255,0.08); }
+  nav.tabs button:hover { background: rgba(255,255,255,0.06); }
+  main { padding: 24px 28px; max-width: 1280px; margin: 0 auto; }
+  section.tab { display:none; }
+  section.tab.active { display:block; }
+  h2 { margin-top: 0; color: var(--blue); }
+  h3 { margin-top: 26px; color: #374151; }
+  .grid4 { display:grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+           margin: 18px 0; }
+  .card { background: var(--card); padding: 16px 18px; border-radius: 10px;
+          border:1px solid var(--line); }
+  .card .n { font-size: 1.8rem; font-weight: 700; color: var(--blue); }
+  .card .lbl { font-size: 0.82rem; color: var(--muted); margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; background: var(--card);
+          border-radius: 8px; overflow: hidden; border:1px solid var(--line);
+          margin-top: 12px; }
+  th, td { padding: 9px 12px; border-bottom: 1px solid var(--line);
+           text-align: left; font-size: 0.88rem; }
+  th { background: #f3f4f6; font-weight: 600; color: #374151; }
+  tr:last-child td { border-bottom: 0; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 8px;
+           font-size: 0.74rem; font-weight: 600; white-space: nowrap; }
+  .b-green { background: #d1fae5; color:#065f46; }
+  .b-amber { background: #fef3c7; color:#92400e; }
+  .b-red   { background: #fee2e2; color:#991b1b; }
+  .b-blue  { background: #dbeafe; color:#1e40af; }
+  .b-gray  { background: #e5e7eb; color:#374151; }
+  code { font-family: ui-monospace, monospace; background:#f3f4f6;
+         padding: 1px 5px; border-radius: 3px; font-size: 0.85em; }
+  .row-detail { color: var(--muted); font-size: 0.82rem; }
+  .legend { margin: 8px 0 16px; color: var(--muted); font-size: 0.85rem; }
+  .counts { display:flex; gap: 10px; flex-wrap: wrap; margin: 8px 0 16px; }
+  .count-chip { background:#fff; border:1px solid var(--line);
+                padding: 6px 12px; border-radius: 18px; font-size: 0.85rem; }
+  .count-chip b { color: var(--blue); }
+  details { background:#fff; border:1px solid var(--line); border-radius:6px;
+            padding: 8px 12px; margin: 6px 0; }
+  details summary { cursor: pointer; font-weight: 600; }
+  .filter-bar { display:flex; gap:8px; margin: 10px 0; flex-wrap: wrap; }
+  .filter-bar input { padding: 6px 10px; border:1px solid var(--line);
+                      border-radius: 6px; font-size: 0.9rem; min-width: 200px; }
+  .filter-bar select { padding: 6px 10px; border:1px solid var(--line);
+                       border-radius: 6px; font-size: 0.9rem; }
+  .empty { color: var(--muted); padding: 16px; text-align: center; }
+  pre.err { background: #fef2f2; color: #991b1b; padding: 8px 12px;
+            border-radius: 4px; font-size: 0.78rem; white-space: pre-wrap;
+            margin: 4px 0 0 0; }
+</style>
+</head><body>
+<header>
+  <h1>Section 4 — Simulation Viewer  <span style="font-size:0.7em;font-weight:400;opacity:0.7;">slab-design-real-v2</span></h1>
+  <div class="sub">UC36 (contract-level) + UC37/38/39 (B-level) — 결과 정적 viewer</div>
+</header>
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="overview">Overview</button>
+  <button class="tab-btn" data-tab="effect">Effect Axis</button>
+  <button class="tab-btn" data-tab="struct">Structural Axis</button>
+  <button class="tab-btn" data-tab="term">Term Axis</button>
+  <button class="tab-btn" data-tab="blevel">B-level</button>
+  <button class="tab-btn" data-tab="stubs">W74 Stub-injected</button>
+  <button class="tab-btn" data-tab="coverage">Coverage</button>
+</nav>
+<main>
+  <section id="overview" class="tab active"></section>
+  <section id="effect" class="tab"></section>
+  <section id="struct" class="tab"></section>
+  <section id="term" class="tab"></section>
+  <section id="blevel" class="tab"></section>
+  <section id="stubs" class="tab"></section>
+  <section id="coverage" class="tab"></section>
+</main>
+
+<script id="sim-data" type="application/json">{
+  "generated_at": "2026-05-16T05:03:37",
+  "uc36": {
+    "repo_id": "slab-design-real-v2",
+    "baseline_findings": 23,
+    "simulated_findings": 0,
+    "reduction_pct": 100.0,
+    "term_unblocked_count": 4,
+    "effect_lifecycles": [
+      {
+        "source_axis": "exception",
+        "effect_kind": "raises",
+        "discriminator": "AlgorithmException",
+        "action_fqn": "action.scm.slab.initial_slab_wgt_실행",
+        "proposal_id": "c30ab923-eb06-4094-afb3-3074cdfc0d07",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "bc650503-aca6-4bea-93ae-5462a9866a77",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "exception",
+        "effect_kind": "raises",
+        "discriminator": "AlgorithmException",
+        "action_fqn": "action.scm.length_range_실행",
+        "proposal_id": "21970f50-0ccf-4835-b67d-36976c972059",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "b6a3028f-927c-435c-b1e0-37d21ce8e3b5",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "exception",
+        "effect_kind": "raises",
+        "discriminator": "AlgorithmException",
+        "action_fqn": "action.scm.max_split_count_실행",
+        "proposal_id": "467b51f2-da87-48b5-84c1-38a731611094",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "78ebd76d-9d67-4590-abc7-15e0544c489c",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "exception",
+        "effect_kind": "raises",
+        "discriminator": "AlgorithmException",
+        "action_fqn": "action.scm.second_wgt_high_실행",
+        "proposal_id": "b9b9ad75-5e1e-44fa-899b-484c1de37233",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "1653a133-5fb8-4fe4-bf6e-b54151d786b9",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "exception",
+        "effect_kind": "raises",
+        "discriminator": "AlgorithmException",
+        "action_fqn": "action.scm.second_wgt_low_실행",
+        "proposal_id": "35bf7ae5-2562-4908-9e9a-f0aee60310f3",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "2c6cdebe-4e7a-4ce6-a1f4-7b5cb1cb280f",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "exception",
+        "effect_kind": "raises",
+        "discriminator": "AlgorithmException",
+        "action_fqn": "action.scm.slab.slab_count_실행",
+        "proposal_id": "72d853dc-781e-487e-8089-0abeb654b70c",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "57be8f03-33e0-4061-a61b-f35c082c6aba",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "exception",
+        "effect_kind": "raises",
+        "discriminator": "AlgorithmException",
+        "action_fqn": "action.scm.slab.slab_wgt_recalc_실행",
+        "proposal_id": "4d47a05f-ceda-4a77-9821-6be4b4f53619",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "183406a1-20d3-4396-87f4-16db155f3dc7",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "exception",
+        "effect_kind": "raises",
+        "discriminator": "AlgorithmException",
+        "action_fqn": "action.scm.split_range_실행",
+        "proposal_id": "ff6872b1-d1e0-43d7-8151-100fd4aaa368",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "3e89a6ec-c4f3-406a-97c0-8704cd396afc",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "exception",
+        "effect_kind": "raises",
+        "discriminator": "AlgorithmException",
+        "action_fqn": "action.scm.width_range_실행",
+        "proposal_id": "bbb6b0bb-1665-48d7-8f16-7a7adfc70ce3",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "0ffb5540-33b8-4ec9-b11d-28a66aa91210",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "exception",
+        "effect_kind": "raises",
+        "discriminator": "IllegalStateException",
+        "action_fqn": "action.scm.find_spec",
+        "proposal_id": "9283aa28-4d98-49cf-b7e1-6768f792a72e",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "b2cfa0e6-2fe2-44c8-9baf-bc1c3a4fadb0",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "annotation",
+        "effect_kind": "transactional",
+        "discriminator": "",
+        "action_fqn": "action.scm.slab.slab_save_실행",
+        "proposal_id": "8d06d5c0-8677-4d24-a155-57f3279007c8",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "13e09fd7-e621-4a51-8e4b-961e3511c319",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "annotation",
+        "effect_kind": "rest_endpoint",
+        "discriminator": "",
+        "action_fqn": "action.scm.batch_design",
+        "proposal_id": "659dd4e2-bc0d-4c00-8c8b-8ecf6ac69d14",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "DRAFT"
+        ],
+        "final_state": "DRAFT",
+        "oracle_status": "PASS",
+        "revision_id": null,
+        "rejection_reason": "change-requested (CHANGE_REQUEST) — needs detail fields"
+      },
+      {
+        "source_axis": "annotation",
+        "effect_kind": "transactional",
+        "discriminator": "",
+        "action_fqn": "action.scm.record_validation_failure",
+        "proposal_id": "7702afac-9a56-4642-9a20-cf0e2919a68c",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "33df6a32-2535-4fa8-8cb4-cdaed6c28dc2",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "annotation",
+        "effect_kind": "transactional",
+        "discriminator": "",
+        "action_fqn": "action.scm.record_step",
+        "proposal_id": "b0f43765-c315-472b-8c5a-0114de5667f8",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "48643425-70b2-4de5-b7b2-393c48be978a",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "annotation",
+        "effect_kind": "transactional",
+        "discriminator": "",
+        "action_fqn": "action.scm.record_algorithm_failure",
+        "proposal_id": "0d474f8e-1f60-42c0-98a2-5c7342eee7a3",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "6cf57d2d-c5cc-441f-a1e2-8ddeb0074a18",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "annotation",
+        "effect_kind": "transactional",
+        "discriminator": "",
+        "action_fqn": "action.scm.order.extract_designable_orders",
+        "proposal_id": "076c2e1e-f849-4c2d-9e32-4c570a2b05c1",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "3d2c599d-2e31-4478-85db-a26c6f2fafd4",
+        "rejection_reason": ""
+      }
+    ],
+    "struct_lifecycles": [
+      {
+        "source_axis": "param",
+        "kind": "RENAME_ACTION_PARAM",
+        "action_fqn": "action.scm.find_group",
+        "proposal_id": "926ad5d8-d136-4a79-889c-4daa450b4838",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "ce0404c3-8d35-4a0c-801c-b04b7b128bb8",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "param",
+        "kind": "RENAME_ACTION_PARAM",
+        "action_fqn": "action.scm.product.lookup_or_default",
+        "proposal_id": "2caacfe6-36bd-4ce5-90cf-6d9f9de96c78",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "baf074f7-68f1-4c5c-a82a-52d6a99bcf67",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "param",
+        "kind": "RENAME_ACTION_PARAM",
+        "action_fqn": "action.scm.product.cumulative_productivity",
+        "proposal_id": "07436d5f-d70b-4747-a9f7-fc85c6f22c41",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "48402d5d-7adc-405c-94c5-f2a51b5e7b3a",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "return_type",
+        "kind": "DECLARE_OUTPUT",
+        "action_fqn": "action.scm.슬랩설계_실행",
+        "proposal_id": "4a74ae57-1665-4d60-88a3-bffc6fa5e270",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "e1c9eaf6-4da4-4b61-861c-b51b4dbbdbf6",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "return_type",
+        "kind": "PROPOSE_NEW_TERM",
+        "action_fqn": "action.scm.product.분류",
+        "proposal_id": "6685834f-e33a-4567-ac4b-d426e536db5c",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "DRAFT"
+        ],
+        "final_state": "DRAFT",
+        "oracle_status": "PASS",
+        "revision_id": null,
+        "rejection_reason": "change-requested — PROPOSE_NEW_TERM needs term proposal first"
+      },
+      {
+        "source_axis": "return_type",
+        "kind": "WRAP_AS_LIST",
+        "action_fqn": "action.scm.slab.slab_save_실행",
+        "proposal_id": "26589463-47b3-4cf0-b3b3-97d7f0c9f08b",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "a09c7b71-5a3b-4eef-9bb7-1cb9cdfdeed8",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "return_type",
+        "kind": "CHANGE_PRIMITIVE_TYPE",
+        "action_fqn": "action.scm.결정",
+        "proposal_id": "7dfe36ce-2d9a-46d2-b26c-23da6a40f216",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "a2bb7008-d250-43c8-9a60-bba5c1cca23b",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "return_type",
+        "kind": "PROPOSE_NEW_TERM",
+        "action_fqn": "action.scm.batch_design",
+        "proposal_id": "e66301ed-5729-4492-b3bf-ce31e14871fa",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "DRAFT"
+        ],
+        "final_state": "DRAFT",
+        "oracle_status": "PASS",
+        "revision_id": null,
+        "rejection_reason": "change-requested — PROPOSE_NEW_TERM needs term proposal first"
+      },
+      {
+        "source_axis": "return_type",
+        "kind": "PROPOSE_NEW_TERM",
+        "action_fqn": "action.scm.batch_design__driver",
+        "proposal_id": "8e3f4b32-2e79-4e8c-8a24-4705b42da95c",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "DRAFT"
+        ],
+        "final_state": "DRAFT",
+        "oracle_status": "PASS",
+        "revision_id": null,
+        "rejection_reason": "change-requested — PROPOSE_NEW_TERM needs term proposal first"
+      },
+      {
+        "source_axis": "return_type",
+        "kind": "CHANGE_PRIMITIVE_TYPE",
+        "action_fqn": "action.scm.product.lookup_or_default",
+        "proposal_id": "c6b7a1cd-86ca-4160-9af6-90c0ff6beff3",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "7c2af8c2-2f88-4fc4-88bb-e52a4f2a9099",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "return_type",
+        "kind": "CHANGE_PRIMITIVE_TYPE",
+        "action_fqn": "action.scm.product.cumulative_productivity",
+        "proposal_id": "77f1e992-60c1-4274-9e67-05cbb1d217f3",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "6774edad-826b-4bca-beea-41b670cc96d1",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "return_type",
+        "kind": "WRAP_AS_LIST",
+        "action_fqn": "action.scm.order.extract_designable_orders",
+        "proposal_id": "dd36aa56-67a0-41b2-b4c2-9dce968cc8fb",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "7091e4a5-29e8-406f-b860-ee9f67edf170",
+        "rejection_reason": ""
+      },
+      {
+        "source_axis": "return_type",
+        "kind": "PROPOSE_NEW_TERM",
+        "action_fqn": "action.scm.product.classify_by_product_code",
+        "proposal_id": "07ce9aa0-97da-45a8-8f15-55e6bac54c17",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "DRAFT"
+        ],
+        "final_state": "DRAFT",
+        "oracle_status": "PASS",
+        "revision_id": null,
+        "rejection_reason": "change-requested — PROPOSE_NEW_TERM needs term proposal first"
+      }
+    ],
+    "term_lifecycles": [
+      {
+        "term_fqn": "term.scm.product.product_category",
+        "target_class": "ProductCategory",
+        "proposal_id": "59490174-c900-45e7-811f-b4490d699d33",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "0baf470c-61e1-4141-bc58-a73d4004e4d2",
+        "rejection_reason": ""
+      },
+      {
+        "term_fqn": "term.scm.driver.batch_result",
+        "target_class": "BatchResult",
+        "proposal_id": "148b63a5-1dcf-4929-a96e-2c7d9e32aea3",
+        "states_visited": [
+          "DRAFT",
+          "PROPOSED",
+          "ORACLED",
+          "ACCEPTED",
+          "MERGED"
+        ],
+        "final_state": "MERGED",
+        "oracle_status": "PASS",
+        "revision_id": "1062568c-870b-453d-92f1-79de5f5a7962",
+        "rejection_reason": ""
+      }
+    ],
+    "effect_state_counts": {
+      "MERGED": 15,
+      "DRAFT": 1
+    },
+    "struct_state_counts": {
+      "MERGED": 9,
+      "DRAFT": 4
+    },
+    "term_state_counts": {
+      "MERGED": 2
+    },
+    "effect_merged": 15,
+    "structural_merged": 13,
+    "remaining_by_gate": {}
+  },
+  "uc37": {
+    "repo_id": "slab-design-real-v2",
+    "total_actions": 38,
+    "total_fixtures": 151,
+    "directly_driveable": 11,
+    "status_counts": {
+      "ALL_NULL": 25,
+      "FULL_PRIMITIVE": 9,
+      "PARTIAL": 2,
+      "NO_LINK": 2
+    },
+    "rows": [
+      {
+        "action_fqn": "action.scm.슬랩설계_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.designer.SdDesigner.design(SDOrderEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 0,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.final_length_range_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdFinalLengthRangeAction.execute(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.final_width_range_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdFinalWidthRangeAction.execute(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.first_weight_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdFirstWeightAction.execute(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.slab.initial_slab_wgt_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdInitialSlabWgtAction.execute(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.length_range_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdLengthRangeAction.execute(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.max_split_count_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdMaxSplitCountAction.execute(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.order.정합성_검증",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdOrderValidator.validate(SDOrderEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 1,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.product.분류",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdProductClassifier.classify(SDOrderEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 1,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.second_wgt_high_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdSecondWgtHighAction.execute(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.second_wgt_low_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdSecondWgtLowAction.execute(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.slab.slab_count_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdSlabCountAction.execute(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.slab.slab_save_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdSlabSaveAction.execute(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.slab.slab_wgt_recalc_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdSlabWgtRecalcAction.execute(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.split_range_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdSplitRangeAction.execute(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.target_length_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdTargetLengthAction.execute(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.target_width_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdTargetWidthAction.execute(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.thickness_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdThicknessAction.execute(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.width_range_실행",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdWidthRangeAction.execute(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.결정",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SelectedHrTgtWidthResolver.resolve(SDOrderEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 1,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.pass",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.wrapper.ValidationResult.pass()",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 0,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.fail",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.wrapper.ValidationResult.fail(String,String)",
+        "status": "FULL_PRIMITIVE",
+        "fixtures": 12,
+        "primitives": 2,
+        "skipped": 0,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.batch_design",
+        "code_method_fqn": "com.example.slabdesign.facade.sd.rest.working.SdWorkingController.batchDesign(String,String)",
+        "status": "FULL_PRIMITIVE",
+        "fixtures": 12,
+        "primitives": 2,
+        "skipped": 0,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.batch_design__driver",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.driver.SdDriver.batchDesign(String,String)",
+        "status": "FULL_PRIMITIVE",
+        "fixtures": 12,
+        "primitives": 2,
+        "skipped": 0,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.record_validation_failure",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.history.action.SdHistoryAction.recordValidationFailure(SDOrderEntity,ValidationResult)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.record_step",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.history.action.SdHistoryAction.recordStep(SDOrderEntity,String,int,String,String)",
+        "status": "PARTIAL",
+        "fixtures": 12,
+        "primitives": 4,
+        "skipped": 1,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.record_algorithm_failure",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.history.action.SdHistoryAction.recordAlgorithmFailure(SDOrderEntity,int,String,String,String)",
+        "status": "PARTIAL",
+        "fixtures": 12,
+        "primitives": 4,
+        "skipped": 1,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.find_group",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.std.service.EdgingService.findGroup(String,String,String,String,String,BigDecimal)",
+        "status": "FULL_PRIMITIVE",
+        "fixtures": 12,
+        "primitives": 6,
+        "skipped": 0,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.find_spec",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.std.service.EdgingService.findSpec(String,String,String)",
+        "status": "FULL_PRIMITIVE",
+        "fixtures": 12,
+        "primitives": 3,
+        "skipped": 0,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.product.lookup_or_default",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.std.service.ProductivityService.lookupOrDefault(String,String,String,String,String,String)",
+        "status": "FULL_PRIMITIVE",
+        "fixtures": 12,
+        "primitives": 6,
+        "skipped": 0,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.product.cumulative_productivity",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.std.service.ProductivityService.cumulativeProductivity(String,String,String,String,String,String)",
+        "status": "FULL_PRIMITIVE",
+        "fixtures": 12,
+        "primitives": 6,
+        "skipped": 0,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.order.extract_designable_orders",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdOrderExtractor.extractDesignableOrders(String,String)",
+        "status": "FULL_PRIMITIVE",
+        "fixtures": 12,
+        "primitives": 2,
+        "skipped": 0,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.product.classify_by_product_code",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SdProductClassifier.classifyByProductCode(String)",
+        "status": "FULL_PRIMITIVE",
+        "fixtures": 6,
+        "primitives": 1,
+        "skipped": 0,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.resolve_and_set",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.action.SelectedHrTgtWidthResolver.resolveAndSet(SDOrderEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 1,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.slab.next",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.process.working.service.SlabNoSequence.next()",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 0,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.run",
+        "code_method_fqn": "com.example.slabdesign.feature.sd.designer.SdDesigner.AlgorithmStep.run(SDOrderEntity,SDSlabEntity)",
+        "status": "ALL_NULL",
+        "fixtures": 1,
+        "primitives": 0,
+        "skipped": 2,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.std.match_customer_limit_for_order",
+        "code_method_fqn": "",
+        "status": "NO_LINK",
+        "fixtures": 0,
+        "primitives": 0,
+        "skipped": 0,
+        "error": ""
+      },
+      {
+        "action_fqn": "action.scm.slab.design_orchestrator",
+        "code_method_fqn": "",
+        "status": "NO_LINK",
+        "fixtures": 0,
+        "primitives": 0,
+        "skipped": 0,
+        "error": ""
+      }
+    ]
+  },
+  "uc38": {
+    "repo_id": "slab-design-real-v2",
+    "total_actions": 38,
+    "total_fixtures": 126,
+    "total_passing": 0,
+    "status_counts": {
+      "FAIL_THROW": 9,
+      "ERROR": 2
+    },
+    "rows": [
+      {
+        "action_fqn": "action.scm.fail",
+        "declared_return": "object_ref",
+        "fixtures": 12,
+        "passing": 0,
+        "status": "FAIL_THROW",
+        "sample_error": "NameError: name 'ValidationResult' is not defined"
+      },
+      {
+        "action_fqn": "action.scm.batch_design",
+        "declared_return": "string",
+        "fixtures": 12,
+        "passing": 0,
+        "status": "FAIL_THROW",
+        "sample_error": "NameError: name 'driver' is not defined"
+      },
+      {
+        "action_fqn": "action.scm.batch_design__driver",
+        "declared_return": "string",
+        "fixtures": 12,
+        "passing": 0,
+        "status": "ERROR",
+        "sample_error": "twin source did not compile: invalid syntax (<twin:batchDesign>, line 3)"
+      },
+      {
+        "action_fqn": "action.scm.record_step",
+        "declared_return": "void",
+        "fixtures": 12,
+        "passing": 0,
+        "status": "FAIL_THROW",
+        "sample_error": "NameError: name 'SlabDesignHistEntity' is not defined"
+      },
+      {
+        "action_fqn": "action.scm.record_algorithm_failure",
+        "declared_return": "void",
+        "fixtures": 12,
+        "passing": 0,
+        "status": "FAIL_THROW",
+        "sample_error": "NameError: name 'SlabDesignHistEntity' is not defined"
+      },
+      {
+        "action_fqn": "action.scm.find_group",
+        "declared_return": "object_ref",
+        "fixtures": 12,
+        "passing": 0,
+        "status": "FAIL_THROW",
+        "sample_error": "NameError: name 'groupRepository' is not defined"
+      },
+      {
+        "action_fqn": "action.scm.find_spec",
+        "declared_return": "object_ref",
+        "fixtures": 12,
+        "passing": 0,
+        "status": "FAIL_THROW",
+        "sample_error": "NameError: name 'specRepository' is not defined"
+      },
+      {
+        "action_fqn": "action.scm.product.lookup_or_default",
+        "declared_return": "float",
+        "fixtures": 12,
+        "passing": 0,
+        "status": "FAIL_THROW",
+        "sample_error": "NameError: name 'lookup' is not defined"
+      },
+      {
+        "action_fqn": "action.scm.product.cumulative_productivity",
+        "declared_return": "float",
+        "fixtures": 12,
+        "passing": 0,
+        "status": "FAIL_THROW",
+        "sample_error": "NameError: name 'SdConstants' is not defined"
+      },
+      {
+        "action_fqn": "action.scm.order.extract_designable_orders",
+        "declared_return": "object_ref",
+        "fixtures": 12,
+        "passing": 0,
+        "status": "ERROR",
+        "sample_error": "twin source did not compile: invalid syntax (<twin:extractDesignableOrders>, line 3)"
+      },
+      {
+        "action_fqn": "action.scm.product.classify_by_product_code",
+        "declared_return": "string",
+        "fixtures": 6,
+        "passing": 0,
+        "status": "FAIL_THROW",
+        "sample_error": "NameError: name 'ProductCategory' is not defined"
+      }
+    ]
+  },
+  "uc39": {
+    "synthetic": {
+      "fixtures_generated": 4,
+      "fixtures_matched": 4,
+      "fixtures_passed": 4,
+      "aggregate_status": "PASS"
+    },
+    "production": {
+      "total_actions": 38,
+      "cause_counts": {
+        "TRANSLATOR_NAMERROR": 9,
+        "TRANSLATOR_SYNTAX": 2
+      },
+      "rows": [
+        {
+          "action_fqn": "action.scm.fail",
+          "fixtures": 12,
+          "matched": 0,
+          "passes": 0,
+          "failure_cause": "TRANSLATOR_NAMERROR",
+          "sample_error": "NameError: name 'ValidationResult' is not defined"
+        },
+        {
+          "action_fqn": "action.scm.batch_design",
+          "fixtures": 12,
+          "matched": 0,
+          "passes": 0,
+          "failure_cause": "TRANSLATOR_NAMERROR",
+          "sample_error": "NameError: name 'driver' is not defined"
+        },
+        {
+          "action_fqn": "action.scm.batch_design__driver",
+          "fixtures": 12,
+          "matched": 0,
+          "passes": 0,
+          "failure_cause": "TRANSLATOR_SYNTAX",
+          "sample_error": "twin source did not compile: invalid syntax (<twin:batchDesign>, line 3)"
+        },
+        {
+          "action_fqn": "action.scm.record_step",
+          "fixtures": 12,
+          "matched": 0,
+          "passes": 0,
+          "failure_cause": "TRANSLATOR_NAMERROR",
+          "sample_error": "NameError: name 'SlabDesignHistEntity' is not defined"
+        },
+        {
+          "action_fqn": "action.scm.record_algorithm_failure",
+          "fixtures": 12,
+          "matched": 0,
+          "passes": 0,
+          "failure_cause": "TRANSLATOR_NAMERROR",
+          "sample_error": "NameError: name 'SlabDesignHistEntity' is not defined"
+        },
+        {
+          "action_fqn": "action.scm.find_group",
+          "fixtures": 12,
+          "matched": 0,
+          "passes": 0,
+          "failure_cause": "TRANSLATOR_NAMERROR",
+          "sample_error": "NameError: name 'groupRepository' is not defined"
+        },
+        {
+          "action_fqn": "action.scm.find_spec",
+          "fixtures": 12,
+          "matched": 0,
+          "passes": 0,
+          "failure_cause": "TRANSLATOR_NAMERROR",
+          "sample_error": "NameError: name 'specRepository' is not defined"
+        },
+        {
+          "action_fqn": "action.scm.product.lookup_or_default",
+          "fixtures": 12,
+          "matched": 0,
+          "passes": 0,
+          "failure_cause": "TRANSLATOR_NAMERROR",
+          "sample_error": "NameError: name 'lookup' is not defined"
+        },
+        {
+          "action_fqn": "action.scm.product.cumulative_productivity",
+          "fixtures": 12,
+          "matched": 0,
+          "passes": 0,
+          "failure_cause": "TRANSLATOR_NAMERROR",
+          "sample_error": "NameError: name 'SdConstants' is not defined"
+        },
+        {
+          "action_fqn": "action.scm.order.extract_designable_orders",
+          "fixtures": 12,
+          "matched": 0,
+          "passes": 0,
+          "failure_cause": "TRANSLATOR_SYNTAX",
+          "sample_error": "twin source did not compile: invalid syntax (<twin:extractDesignableOrders>, line 3)"
+        },
+        {
+          "action_fqn": "action.scm.product.classify_by_product_code",
+          "fixtures": 6,
+          "matched": 0,
+          "passes": 0,
+          "failure_cause": "TRANSLATOR_NAMERROR",
+          "sample_error": "NameError: name 'ProductCategory' is not defined"
+        }
+      ]
+    }
+  },
+  "uc40": {
+    "repo_id": "slab-design-real-v2",
+    "total_actions": 38,
+    "total_fixtures": 126,
+    "total_passing": 74,
+    "status_counts": {
+      "PASS": 6,
+      "FAIL_RETURN_TYPE": 3,
+      "ERROR": 2
+    },
+    "rows": [
+      {
+        "action_fqn": "action.scm.fail",
+        "declared_return": "object_ref",
+        "fixtures": 12,
+        "passing": 12,
+        "status": "PASS",
+        "stub_count": 1,
+        "sample_error": ""
+      },
+      {
+        "action_fqn": "action.scm.batch_design",
+        "declared_return": "string",
+        "fixtures": 12,
+        "passing": 0,
+        "status": "FAIL_RETURN_TYPE",
+        "stub_count": 1,
+        "sample_error": "got MagicMock, declared string (expected ['str'])"
+      },
+      {
+        "action_fqn": "action.scm.batch_design__driver",
+        "declared_return": "string",
+        "fixtures": 12,
+        "passing": 0,
+        "status": "ERROR",
+        "stub_count": 0,
+        "sample_error": "twin source did not compile: invalid syntax (<twin:batchDesign>, line 3)"
+      },
+      {
+        "action_fqn": "action.scm.record_step",
+        "declared_return": "void",
+        "fixtures": 12,
+        "passing": 12,
+        "status": "PASS",
+        "stub_count": 5,
+        "sample_error": ""
+      },
+      {
+        "action_fqn": "action.scm.record_algorithm_failure",
+        "declared_return": "void",
+        "fixtures": 12,
+        "passing": 12,
+        "status": "PASS",
+        "stub_count": 5,
+        "sample_error": ""
+      },
+      {
+        "action_fqn": "action.scm.find_group",
+        "declared_return": "object_ref",
+        "fixtures": 12,
+        "passing": 12,
+        "status": "PASS",
+        "stub_count": 2,
+        "sample_error": ""
+      },
+      {
+        "action_fqn": "action.scm.find_spec",
+        "declared_return": "object_ref",
+        "fixtures": 12,
+        "passing": 12,
+        "status": "PASS",
+        "stub_count": 3,
+        "sample_error": ""
+      },
+      {
+        "action_fqn": "action.scm.product.lookup_or_default",
+        "declared_return": "float",
+        "fixtures": 12,
+        "passing": 0,
+        "status": "FAIL_RETURN_TYPE",
+        "stub_count": 2,
+        "sample_error": "got MagicMock, declared float (expected ['float', 'int'])"
+      },
+      {
+        "action_fqn": "action.scm.product.cumulative_productivity",
+        "declared_return": "float",
+        "fixtures": 12,
+        "passing": 12,
+        "status": "PASS",
+        "stub_count": 3,
+        "sample_error": ""
+      },
+      {
+        "action_fqn": "action.scm.order.extract_designable_orders",
+        "declared_return": "object_ref",
+        "fixtures": 12,
+        "passing": 0,
+        "status": "ERROR",
+        "stub_count": 0,
+        "sample_error": "twin source did not compile: invalid syntax (<twin:extractDesignableOrders>, line 3)"
+      },
+      {
+        "action_fqn": "action.scm.product.classify_by_product_code",
+        "declared_return": "string",
+        "fixtures": 6,
+        "passing": 2,
+        "status": "FAIL_RETURN_TYPE",
+        "stub_count": 1,
+        "sample_error": "got MagicMock, declared string (expected ['str'])"
+      }
+    ]
+  }
+}</script>
+<script>
+const DATA = JSON.parse(document.getElementById("sim-data").textContent);
+
+function el(tag, attrs, ...children) {
+  const e = document.createElement(tag);
+  for (const k in (attrs||{})) {
+    if (k === "class") e.className = attrs[k];
+    else if (k === "html") e.innerHTML = attrs[k];
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), attrs[k]);
+    else e.setAttribute(k, attrs[k]);
+  }
+  for (const c of children.flat()) {
+    if (c == null) continue;
+    if (typeof c === "string") e.appendChild(document.createTextNode(c));
+    else e.appendChild(c);
+  }
+  return e;
+}
+
+function badge(state) {
+  const m = {
+    "MERGED":  "b-green",
+    "ACCEPTED":"b-green",
+    "REVIEWED":"b-blue",
+    "ORACLED": "b-blue",
+    "PROPOSED":"b-blue",
+    "DRAFT":   "b-amber",
+    "REJECTED":"b-red",
+    "PASS":    "b-green",
+    "FAIL":    "b-red",
+    "GREEN":   "b-green",
+    "FULL_PRIMITIVE": "b-green",
+    "PARTIAL":         "b-amber",
+    "ALL_NULL":        "b-gray",
+    "NO_LINK":         "b-gray",
+    "TRANSLATOR_NAMERROR":  "b-amber",
+    "TRANSLATOR_ATTRERROR": "b-amber",
+    "TRANSLATOR_SYNTAX":    "b-amber",
+    "NO_BASELINE":          "b-blue",
+    "FAIL_THROW":           "b-red",
+    "FAIL_TYPE":            "b-red",
+    "FAIL_DETERMINISM":     "b-red",
+    "ERROR":                "b-red",
+    "INCONCLUSIVE":         "b-gray",
+  };
+  return el("span", {class: "badge " + (m[state] || "b-gray")}, state);
+}
+
+function countChips(counts) {
+  const wrap = el("div", {class:"counts"});
+  for (const [k, v] of Object.entries(counts || {})) {
+    wrap.appendChild(el("span", {class:"count-chip"},
+      el("b", null, String(v)), " " + k));
+  }
+  return wrap;
+}
+
+// ─── Overview ─────────────────────────────────────────────────────────
+function renderOverview() {
+  const sec = document.getElementById("overview");
+  sec.innerHTML = "";
+  if (DATA.error) {
+    sec.appendChild(el("div", {class:"empty"}, "production DB 없음 — viewer 가 빈 상태입니다."));
+    return;
+  }
+  const u36 = DATA.uc36, u37 = DATA.uc37, u38 = DATA.uc38, u39 = DATA.uc39;
+
+  sec.appendChild(el("h2", null, "Contract-level capstone (UC36) — v2 fully clean"));
+  const g = el("div", {class:"grid4"});
+  g.appendChild(el("div", {class:"card"},
+    el("div", {class:"n"}, String(u36.baseline_findings)),
+    el("div", {class:"lbl"}, "Baseline findings")));
+  g.appendChild(el("div", {class:"card"},
+    el("div", {class:"n"}, String(u36.simulated_findings)),
+    el("div", {class:"lbl"}, "Simulated remaining")));
+  g.appendChild(el("div", {class:"card"},
+    el("div", {class:"n"}, u36.reduction_pct.toFixed(1) + "%"),
+    el("div", {class:"lbl"}, "Reduction")));
+  g.appendChild(el("div", {class:"card"},
+    el("div", {class:"n"}, String(u36.effect_merged + u36.structural_merged + u36.term_lifecycles.filter(t=>t.final_state==="MERGED").length)),
+    el("div", {class:"lbl"}, "Total MERGED proposals")));
+  sec.appendChild(g);
+
+  sec.appendChild(el("h3", null, "Axis breakdown"));
+  const tbl = el("table");
+  tbl.appendChild(el("thead", null, el("tr", null,
+    el("th", null, "Axis"), el("th", null, "Lifecycles"),
+    el("th", null, "MERGED"), el("th", null, "Other states"))));
+  const tb = el("tbody");
+  for (const [axis, lcs, counts] of [
+    ["Effect (exception + annotation)", u36.effect_lifecycles, u36.effect_state_counts],
+    ["Structural (param + return-type)", u36.struct_lifecycles, u36.struct_state_counts],
+    ["Term (PROPOSE_NEW_TERM cascade)", u36.term_lifecycles, u36.term_state_counts],
+  ]) {
+    const merged = counts.MERGED || 0;
+    const other = Object.entries(counts).filter(([k]) => k !== "MERGED")
+      .map(([k,v]) => k + " " + v).join(", ") || "—";
+    tb.appendChild(el("tr", null,
+      el("td", null, axis),
+      el("td", null, String(lcs.length)),
+      el("td", null, badge(merged > 0 ? "MERGED" : "DRAFT"), " " + merged),
+      el("td", {class:"row-detail"}, other),
+    ));
+  }
+  tbl.appendChild(tb);
+  sec.appendChild(tbl);
+
+  sec.appendChild(el("h2", null, "B-level capstone (UC39)"));
+  const synth = u39.synthetic;
+  sec.appendChild(el("p", null,
+    "Part A — synthetic pipeline proof: ",
+    el("b", null, synth.fixtures_passed + " / " + synth.fixtures_matched + " PASS"),
+    " (status: ", badge(synth.aggregate_status), ")"));
+  const prod = u39.production;
+  const greenCount = prod.cause_counts.GREEN || 0;
+  sec.appendChild(el("p", null,
+    "Part B — production gap: ",
+    el("b", null, greenCount + " / " + prod.rows.length + " GREEN"),
+    " (rest 가 모두 named cause)"));
+  sec.appendChild(countChips(prod.cause_counts));
+
+  sec.appendChild(el("h3", null, "Production fixture reach (UC37)"));
+  sec.appendChild(el("p", {class:"row-detail"},
+    u37.directly_driveable + " / " + u37.total_actions +
+    " actions driveable end-to-end, " + u37.total_fixtures + " fixtures generated"));
+  sec.appendChild(countChips(u37.status_counts));
+
+  sec.appendChild(el("h3", null, "Twin invariant survey (UC38)"));
+  sec.appendChild(el("p", {class:"row-detail"},
+    u38.total_passing + " / " + u38.total_fixtures + " fixture PASS, " +
+    u38.rows.length + " actions surveyed"));
+  sec.appendChild(countChips(u38.status_counts));
+}
+
+// ─── Lifecycle tabs ──────────────────────────────────────────────────
+function renderLifecycleTable(sec_id, title, rows, columns) {
+  const sec = document.getElementById(sec_id);
+  sec.innerHTML = "";
+  sec.appendChild(el("h2", null, title));
+
+  const counts = {};
+  for (const r of rows) counts[r.final_state] = (counts[r.final_state]||0) + 1;
+  sec.appendChild(countChips(counts));
+
+  const bar = el("div", {class:"filter-bar"});
+  const inp = el("input", {placeholder:"action / target 검색…", type:"text"});
+  const sel = el("select");
+  sel.appendChild(el("option", {value:""}, "(모든 final_state)"));
+  for (const s of Object.keys(counts)) sel.appendChild(el("option", {value:s}, s));
+  bar.appendChild(inp); bar.appendChild(sel);
+  sec.appendChild(bar);
+
+  const tbl = el("table");
+  const head = el("thead", null,
+    el("tr", null, ...columns.map(c => el("th", null, c.label))));
+  tbl.appendChild(head);
+  const tb = el("tbody");
+  tbl.appendChild(tb);
+  sec.appendChild(tbl);
+
+  function render() {
+    tb.innerHTML = "";
+    const needle = inp.value.toLowerCase().trim();
+    const wantState = sel.value;
+    let shown = 0;
+    for (const r of rows) {
+      if (wantState && r.final_state !== wantState) continue;
+      const hay = (r.action_fqn || r.term_fqn || "") + " " +
+                  (r.target_class || "") + " " + (r.kind || r.effect_kind || "");
+      if (needle && !hay.toLowerCase().includes(needle)) continue;
+      const tr = el("tr");
+      for (const c of columns) {
+        const cell = c.render(r);
+        tr.appendChild(el("td", null, cell));
+      }
+      tb.appendChild(tr);
+      shown++;
+    }
+    if (shown === 0) tb.appendChild(el("tr", null,
+      el("td", {colspan:String(columns.length), class:"empty"}, "조건 일치 없음")));
+  }
+  inp.addEventListener("input", render);
+  sel.addEventListener("change", render);
+  render();
+}
+
+function renderEffect() {
+  if (!DATA.uc36) return;
+  renderLifecycleTable("effect",
+    "Effect axis — exception + annotation lifecycle",
+    DATA.uc36.effect_lifecycles, [
+      {label:"Action FQN",     render: r => r.action_fqn},
+      {label:"Source",         render: r => badge(r.source_axis)},
+      {label:"Effect kind",    render: r => r.effect_kind},
+      {label:"Discriminator",  render: r => r.discriminator || "—"},
+      {label:"States visited", render: r => el("span", {class:"row-detail"},
+         r.states_visited.join(" → "))},
+      {label:"Final",          render: r => badge(r.final_state)},
+      {label:"Oracle",         render: r => badge(r.oracle_status)},
+    ]);
+}
+
+function renderStruct() {
+  if (!DATA.uc36) return;
+  renderLifecycleTable("struct",
+    "Structural axis — param + return-type lifecycle",
+    DATA.uc36.struct_lifecycles, [
+      {label:"Action FQN",     render: r => r.action_fqn},
+      {label:"Source",         render: r => badge(r.source_axis)},
+      {label:"Kind",           render: r => r.kind},
+      {label:"States visited", render: r => el("span", {class:"row-detail"},
+         r.states_visited.join(" → "))},
+      {label:"Final",          render: r => badge(r.final_state)},
+      {label:"Oracle",         render: r => badge(r.oracle_status)},
+    ]);
+}
+
+function renderTerm() {
+  if (!DATA.uc36) return;
+  const sec = document.getElementById("term");
+  sec.innerHTML = "";
+  sec.appendChild(el("h2", null, "Term axis — PROPOSE_NEW_TERM lifecycle + cascade"));
+  sec.appendChild(el("p", {class:"row-detail"},
+    "두 term MERGE (ProductCategory + BatchResult) 가 " +
+    DATA.uc36.term_unblocked_count +
+    " PROPOSE_NEW_TERM structural case 를 cascade 로 unblock"));
+
+  const tbl = el("table");
+  tbl.appendChild(el("thead", null, el("tr", null,
+    el("th", null, "Term FQN"), el("th", null, "Target class"),
+    el("th", null, "States visited"), el("th", null, "Final"),
+    el("th", null, "Oracle"))));
+  const tb = el("tbody");
+  for (const r of DATA.uc36.term_lifecycles) {
+    tb.appendChild(el("tr", null,
+      el("td", null, r.term_fqn),
+      el("td", null, el("code", null, r.target_class)),
+      el("td", {class:"row-detail"}, r.states_visited.join(" → ")),
+      el("td", null, badge(r.final_state)),
+      el("td", null, badge(r.oracle_status)),
+    ));
+  }
+  tbl.appendChild(tb);
+  sec.appendChild(tbl);
+
+  if (Object.keys(DATA.uc36.remaining_by_gate).length) {
+    sec.appendChild(el("h3", null, "Remaining findings after simulation"));
+    const t2 = el("table");
+    t2.appendChild(el("thead", null, el("tr", null,
+      el("th", null, "Gate"), el("th", null, "Action FQN"),
+      el("th", null, "Status"), el("th", null, "Key"))));
+    const tb2 = el("tbody");
+    for (const [gate, items] of Object.entries(DATA.uc36.remaining_by_gate)) {
+      for (const f of items) tb2.appendChild(el("tr", null,
+        el("td", null, gate),
+        el("td", null, f.action_fqn),
+        el("td", null, f.status),
+        el("td", null, el("code", null, f.key)),
+      ));
+    }
+    t2.appendChild(tb2);
+    sec.appendChild(t2);
+  } else {
+    sec.appendChild(el("h3", null, "✓ Remaining findings: 0 (fully clean state)"));
+  }
+}
+
+function renderBLevel() {
+  if (!DATA.uc39) return;
+  const sec = document.getElementById("blevel");
+  sec.innerHTML = "";
+  const u39 = DATA.uc39;
+
+  sec.appendChild(el("h2", null, "B-level capstone — UC39"));
+
+  sec.appendChild(el("h3", null, "Part A — Synthetic pipeline proof"));
+  const synth = u39.synthetic;
+  const g = el("div", {class:"grid4"});
+  g.appendChild(el("div", {class:"card"},
+    el("div", {class:"n"}, String(synth.fixtures_generated)),
+    el("div", {class:"lbl"}, "Generated")));
+  g.appendChild(el("div", {class:"card"},
+    el("div", {class:"n"}, String(synth.fixtures_matched)),
+    el("div", {class:"lbl"}, "Baselines attached")));
+  g.appendChild(el("div", {class:"card"},
+    el("div", {class:"n"}, String(synth.fixtures_passed)),
+    el("div", {class:"lbl"}, "Behavioral PASS")));
+  g.appendChild(el("div", {class:"card"},
+    el("div", {class:"n"}, synth.aggregate_status),
+    el("div", {class:"lbl"}, "Aggregate")));
+  sec.appendChild(g);
+
+  sec.appendChild(el("h3", null, "Part B — Production gap diagnosis"));
+  sec.appendChild(countChips(u39.production.cause_counts));
+
+  const tbl = el("table");
+  tbl.appendChild(el("thead", null, el("tr", null,
+    el("th", null, "Action FQN"),
+    el("th", null, "Fixtures"),
+    el("th", null, "Matched"),
+    el("th", null, "Passes"),
+    el("th", null, "Cause"),
+    el("th", null, "Sample error"),
+  )));
+  const tb = el("tbody");
+  for (const r of u39.production.rows) {
+    tb.appendChild(el("tr", null,
+      el("td", null, r.action_fqn),
+      el("td", null, String(r.fixtures)),
+      el("td", null, String(r.matched)),
+      el("td", null, String(r.passes)),
+      el("td", null, badge(r.failure_cause)),
+      el("td", null, r.sample_error ? el("pre", {class:"err"}, r.sample_error) : "—"),
+    ));
+  }
+  tbl.appendChild(tb);
+  sec.appendChild(tbl);
+}
+
+function renderCoverage() {
+  if (!DATA.uc37) return;
+  const sec = document.getElementById("coverage");
+  sec.innerHTML = "";
+
+  sec.appendChild(el("h2", null, "Fixture coverage + invariant survey (UC37 + UC38)"));
+
+  if (DATA.uc40) {
+    sec.appendChild(el("h2", null, "W74 Stub-injected production behavioral (UC40)"));
+    const u40 = DATA.uc40;
+    const passN = u40.status_counts.PASS || 0;
+    sec.appendChild(el("p", null,
+      "Sandbox stub injection 적용 후 ",
+      el("b", null, passN + " / " + u40.rows.length + " actions PASS"),
+      " · fixture pass rate ",
+      el("b", null, (100 * u40.total_passing / Math.max(1, u40.total_fixtures))
+                        .toFixed(1) + "%")));
+    sec.appendChild(countChips(u40.status_counts));
+  }
+
+  sec.appendChild(el("h3", null, "UC37 — W71 fixture coverage"));
+  sec.appendChild(countChips(DATA.uc37.status_counts));
+
+  const t1 = el("table");
+  t1.appendChild(el("thead", null, el("tr", null,
+    el("th", null, "Action FQN"),
+    el("th", null, "Status"),
+    el("th", null, "Fixtures"),
+    el("th", null, "Primitives"),
+    el("th", null, "Skipped (object_ref)"),
+    el("th", null, "Code method FQN"),
+  )));
+  const tb1 = el("tbody");
+  for (const r of DATA.uc37.rows) tb1.appendChild(el("tr", null,
+    el("td", null, r.action_fqn),
+    el("td", null, badge(r.status)),
+    el("td", null, String(r.fixtures)),
+    el("td", null, String(r.primitives)),
+    el("td", null, String(r.skipped)),
+    el("td", {class:"row-detail"}, el("code", null, r.code_method_fqn || "—")),
+  ));
+  t1.appendChild(tb1);
+  sec.appendChild(t1);
+
+  sec.appendChild(el("h3", null, "UC38 — W72 invariant survey"));
+  sec.appendChild(countChips(DATA.uc38.status_counts));
+
+  const t2 = el("table");
+  t2.appendChild(el("thead", null, el("tr", null,
+    el("th", null, "Action FQN"),
+    el("th", null, "Status"),
+    el("th", null, "Pass / total fixtures"),
+    el("th", null, "Declared return"),
+    el("th", null, "Sample error"),
+  )));
+  const tb2 = el("tbody");
+  for (const r of DATA.uc38.rows) tb2.appendChild(el("tr", null,
+    el("td", null, r.action_fqn),
+    el("td", null, badge(r.status)),
+    el("td", null, r.passing + " / " + r.fixtures),
+    el("td", null, r.declared_return),
+    el("td", null, r.sample_error ? el("pre", {class:"err"}, r.sample_error) : "—"),
+  ));
+  t2.appendChild(tb2);
+  sec.appendChild(t2);
+}
+
+// Tab switching
+document.querySelectorAll("nav.tabs .tab-btn").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll("nav.tabs .tab-btn").forEach(x => x.classList.remove("active"));
+    document.querySelectorAll("section.tab").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    document.getElementById(b.dataset.tab).classList.add("active");
+  });
+});
+
+function renderStubs() {
+  if (!DATA.uc40) return;
+  const sec = document.getElementById("stubs");
+  sec.innerHTML = "";
+  const u = DATA.uc40;
+
+  sec.appendChild(el("h2", null, "W74 Stub-injected production behavioral survey (UC40)"));
+  sec.appendChild(el("p", {class:"row-detail"},
+    "W74 의 sandbox stub injection 으로 UC38 의 0/11 PASS → 큰 폭으로 개선. " +
+    "각 method 의 anchor_locator 의 'CONST = value' + AST unbound names 로 " +
+    "자동 stub 생성, NameError 발생 0건."));
+
+  const g = el("div", {class:"grid4"});
+  g.appendChild(el("div", {class:"card"},
+    el("div", {class:"n"}, (u.status_counts.PASS || 0) + " / " + u.rows.length),
+    el("div", {class:"lbl"}, "Actions PASS")));
+  g.appendChild(el("div", {class:"card"},
+    el("div", {class:"n"}, u.total_passing + " / " + u.total_fixtures),
+    el("div", {class:"lbl"}, "Fixtures PASS")));
+  const passPct = u.total_fixtures > 0
+    ? (100 * u.total_passing / u.total_fixtures).toFixed(1) : "0";
+  g.appendChild(el("div", {class:"card"},
+    el("div", {class:"n"}, passPct + "%"),
+    el("div", {class:"lbl"}, "Fixture pass rate")));
+  const totalStubs = u.rows.reduce((s, r) => s + r.stub_count, 0);
+  g.appendChild(el("div", {class:"card"},
+    el("div", {class:"n"}, String(totalStubs)),
+    el("div", {class:"lbl"}, "Total stubs auto-derived")));
+  sec.appendChild(g);
+
+  sec.appendChild(el("h3", null, "Status counts"));
+  sec.appendChild(countChips(u.status_counts));
+
+  sec.appendChild(el("h3", null, "Per-action"));
+  const tbl = el("table");
+  tbl.appendChild(el("thead", null, el("tr", null,
+    el("th", null, "Action FQN"),
+    el("th", null, "Status"),
+    el("th", null, "Pass / total"),
+    el("th", null, "Stubs"),
+    el("th", null, "Return"),
+    el("th", null, "Sample error"),
+  )));
+  const tb = el("tbody");
+  for (const row of u.rows) {
+    tb.appendChild(el("tr", null,
+      el("td", null, row.action_fqn),
+      el("td", null, badge(row.status)),
+      el("td", null, row.passing + " / " + row.fixtures),
+      el("td", null, String(row.stub_count)),
+      el("td", null, row.declared_return),
+      el("td", null, row.sample_error
+                       ? el("pre", {class:"err"}, row.sample_error) : "—"),
+    ));
+  }
+  tbl.appendChild(tb);
+  sec.appendChild(tbl);
+}
+
+renderOverview();
+renderEffect();
+renderStruct();
+renderTerm();
+renderBLevel();
+renderStubs();
+renderCoverage();
+</script>
+</body></html>

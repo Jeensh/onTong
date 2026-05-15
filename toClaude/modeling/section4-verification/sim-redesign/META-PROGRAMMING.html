@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Meta-Programming 처리 — Twin Framework 의 Reflection / Annotation / AOP / Bytecode</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+      "Noto Sans KR", sans-serif;
+    line-height: 1.6; color: #1f2937; max-width: 1200px;
+    margin: 0 auto; padding: 32px 24px 80px; background: #fafafa;
+  }
+  h1 { font-size: 28px; margin: 0 0 8px; color: #111827; }
+  h2 { font-size: 22px; margin: 48px 0 12px; padding-bottom: 8px;
+       border-bottom: 2px solid #e5e7eb; color: #111827; }
+  h3 { font-size: 17px; margin: 24px 0 8px; color: #1f2937; }
+  h4 { font-size: 13px; margin: 12px 0 6px; color: #4b5563;
+       text-transform: uppercase; letter-spacing: 0.05em; }
+  .lead { color: #6b7280; font-size: 15px; margin-bottom: 32px; }
+  .panel { background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+           padding: 20px 24px; margin: 16px 0; }
+  .panel.poly { border-left: 4px solid #2563eb; }
+  .panel.anno { border-left: 4px solid #db2777; }
+  .panel.aop  { border-left: 4px solid #16a34a; }
+  .panel.byte { border-left: 4px solid #ea580c; }
+  .panel.info { background: #eff6ff; border-color: #93c5fd; }
+  .panel.warn { background: #fff7ed; border-color: #fdba74; }
+  pre { background: #1f2937; color: #e5e7eb; padding: 14px 18px;
+        border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.55;
+        font-family: "SF Mono", Menlo, Monaco, Consolas, monospace; margin: 8px 0; }
+  pre.lang::before {
+    content: attr(data-lang); display: inline-block; background: #374151;
+    color: #9ca3af; font-size: 10px; padding: 2px 6px; border-radius: 3px;
+    margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  pre .kw { color: #c084fc; }
+  pre .str { color: #fca5a5; }
+  pre .fn { color: #93c5fd; }
+  pre .num { color: #fbbf24; }
+  pre .comment { color: #6b7280; font-style: italic; }
+  pre .anno { color: #f59e0b; }
+  pre .added { background: rgba(34, 197, 94, 0.18); padding: 1px 4px; border-radius: 3px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 12px 0; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin: 12px 0; }
+  .col { background: white; border: 1px solid #e5e7eb; border-radius: 6px;
+         padding: 12px 16px; }
+  .col h4 { margin-top: 0; }
+  .label { display: inline-block; padding: 2px 8px; border-radius: 999px;
+           font-size: 11px; font-weight: 700; margin-left: 6px;
+           text-transform: uppercase; letter-spacing: 0.05em; }
+  .label.adr006 { background: #dbeafe; color: #1e40af; }
+  .label.adr007 { background: #fce7f3; color: #9d174d; }
+  .label.adr008 { background: #dcfce7; color: #166534; }
+  .label.adr009 { background: #ffedd5; color: #9a3412; }
+  .label.auto { background: #d1fae5; color: #065f46; }
+  .label.queue { background: #fef3c7; color: #92400e; }
+  .label.locked { background: #fee2e2; color: #991b1b; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; background: white;
+          font-size: 13px; }
+  th, td { border: 1px solid #e5e7eb; padding: 9px 11px; text-align: left;
+           vertical-align: top; }
+  th { background: #f3f4f6; font-weight: 600; }
+  td.ok { color: #16a34a; font-weight: 700; text-align: center; }
+  td.no { color: #dc2626; font-weight: 700; text-align: center; }
+  td.partial { color: #d97706; font-weight: 700; text-align: center; }
+  .diagram { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px;
+             padding: 16px 20px; margin: 16px 0;
+             font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+             line-height: 1.6; white-space: pre; overflow-x: auto; color: #1e293b; }
+  .callout { background: #fef3c7; border-left: 4px solid #f59e0b;
+             padding: 12px 16px; margin: 16px 0; border-radius: 4px; font-size: 14px; }
+  .tldr { background: #eff6ff; border-left: 4px solid #3b82f6;
+          padding: 14px 18px; margin: 16px 0; border-radius: 4px; font-size: 14px; }
+  .case-row {
+    display: grid;
+    grid-template-columns: 100px 1fr 1fr 100px;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #e5e7eb;
+    align-items: start;
+  }
+  .case-row:last-child { border-bottom: none; }
+  .case-num { font-weight: 700; color: #4b5563; }
+  .filelink { color: #2563eb; font-family: "SF Mono", monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>Meta-Programming 처리 — Twin Framework <span class="label" style="background:#f3e8ff; color:#6b21a8;">ADR-006~009</span></h1>
+<p class="lead">
+  Polymorphic Dispatch + Annotation Processing + AOP + Bytecode Generation 4 영역의 ontology capture + 합성기 Python emit pattern + v2 reality + honest limit.<br>
+  사용자 reflection 질문 (D 선택) 의 응답.
+</p>
+
+<div class="tldr">
+  <strong>이 문서의 위치</strong> — Round 2 종합 설계 (SYNTHESIS-ROUND2.html) 의 reflection / meta-programming 처리를 명시. 4 ADR (ADR-006~009) 의 worked example 통합. 사용자 결정 분기 surface.
+</div>
+
+<h2>1. 왜 meta-programming 이 twin 의 핵심 문제인가</h2>
+
+<p>Java 의 강력한 meta-programming 은 production 동작의 상당 부분을 source code 가 아닌 <strong>runtime 또는 compile-time 의 동적 mechanism</strong> 에 둠. Twin (Python equivalent) 이 이걸 mirror 하려면 mechanism 자체를 모방할 수 없으므로 — <strong>의미만 capture, mechanism 무시</strong> 전략.</p>
+
+<div class="grid-2">
+  <div class="col">
+    <h4>4 종 meta-programming</h4>
+    <ul>
+      <li><strong>Polymorphic Dispatch</strong> — 어느 method 가 호출될지가 정적이 아닌 case</li>
+      <li><strong>Annotation Processing</strong> — annotation 이 compile 시 추가 code 생성 (Lombok 등)</li>
+      <li><strong>AOP</strong> — @Aspect 가 cross-cutting code 를 weaving</li>
+      <li><strong>Bytecode Generation</strong> — CGLib / ASM 이 runtime 또는 build 시 bytecode 생성</li>
+    </ul>
+  </div>
+  <div class="col">
+    <h4>각 종류의 twin 처리 원칙</h4>
+    <ul>
+      <li><strong>Bounded</strong> (compile-time 에 set 결정) → 자동 합성</li>
+      <li><strong>Static expression</strong> (pointcut, annotation rule) → 정적 매칭 후 합성</li>
+      <li><strong>Bytecode-level effect</strong> (CGLib proxy 등) → Python decorator 로 의미만</li>
+      <li><strong>Unbounded</strong> (runtime user input 의존) → SIGNATURE_LOCKED</li>
+    </ul>
+  </div>
+</div>
+
+<h2>2. v2 reality recap — grep 결과</h2>
+
+<table>
+  <thead><tr><th>종류</th><th>v2 사용</th><th>비고</th></tr></thead>
+  <tbody>
+    <tr><td>Direct reflection (<code>Class.forName</code>, <code>method.invoke</code>, <code>getDeclared*</code>)</td><td class="ok">0건</td><td>Application-level reflection 없음</td></tr>
+    <tr><td>AOP (<code>@Aspect</code>, <code>@Around</code>, <code>@Before</code>, <code>@After</code>)</td><td class="ok">0건</td><td>Custom aspect 없음. Spring 내부 @Transactional 만</td></tr>
+    <tr><td>Dynamic proxy (<code>InvocationHandler</code>, <code>Proxy</code>)</td><td class="ok">0건</td><td>없음</td></tr>
+    <tr><td>Strategy Map (<code>Map&lt;String, Strategy&gt;</code>)</td><td class="ok">0건</td><td>v2 의 21-step 은 Spring DI 의 list injection 으로 처리</td></tr>
+    <tr><td><code>instanceof</code></td><td class="partial">1건</td><td><code>TraceCollector.java:45</code> — 결과 type check</td></tr>
+    <tr><td>Lombok (<code>@Getter</code>, <code>@Setter</code>, <code>@Builder</code>)</td><td class="ok">0건</td><td>직접 getter/setter 정의</td></tr>
+    <tr><td>Spring DI (<code>@Component</code>, <code>@Autowired</code>)</td><td class="partial">40+ site</td><td>Framework reflection — ADR-002 의 stub 처리</td></tr>
+    <tr><td>JPA (<code>@Entity</code>, <code>@Column</code>)</td><td class="partial">10+ site</td><td>Framework reflection — ADR-002 의 LookupDataSource stub</td></tr>
+    <tr><td>@Transactional</td><td class="partial">6 site</td><td>Spring AOP CGLib — ADR-008/009 통합 처리</td></tr>
+  </tbody>
+</table>
+
+<p><strong>핵심</strong>: v2 는 application meta-programming 거의 없음 — 본 ADR 의 즉시 v2 작업 없음. <strong>framework 일반화 시 다른 system 에서 적용</strong>.</p>
+
+<h2>3. ADR-006: Polymorphic Dispatch <span class="label adr006">ADR-006</span></h2>
+
+<div class="panel poly">
+  <p><strong>핵심</strong>: Layer 1 의 slot template 에 <code>dispatch_kind</code> 추가, 8 case 별 Python emitter 분기. v4 D3 CallSiteAnalyzer 7-case + reflection_bounded 분리 = 8 case.</p>
+
+  <table>
+    <thead><tr><th>Case</th><th>종류</th><th>자동/큐</th><th>Bounded?</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><code>single_impl</code></td><td><span class="label auto">자동</span></td><td>✓</td></tr>
+      <tr><td>2</td><td><code>instanceof_guard</code></td><td><span class="label auto">자동</span></td><td>✓</td></tr>
+      <tr><td>3</td><td><code>annotation</code> (@Qualifier 등)</td><td><span class="label auto">자동</span></td><td>✓</td></tr>
+      <tr><td>4</td><td><code>factory_branch</code></td><td><span class="label auto">자동</span></td><td>✓</td></tr>
+      <tr><td>5</td><td><code>generic</code> (type erasure)</td><td><span class="label queue">사용자 큐</span></td><td>⚠</td></tr>
+      <tr><td>6</td><td><code>strategy_map</code></td><td><span class="label queue">사용자 큐</span></td><td>✓ (정적 map population)</td></tr>
+      <tr><td>7a</td><td><code>reflection_bounded</code></td><td><span class="label queue">사용자 큐</span></td><td>✓ (candidate set)</td></tr>
+      <tr><td>7b</td><td><code>reflection_unbounded</code></td><td><span class="label locked">SIGNATURE_LOCKED</span></td><td>✗</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Case 2 — instanceof_guard (worked example)</h4>
+<pre class="lang" data-lang="java"><span class="kw">if</span> (result == <span class="kw">null</span>) {
+    output = Map.<span class="fn">of</span>();
+} <span class="kw">else if</span> (result <span class="kw">instanceof</span> Map&lt;?, ?&gt; m) {
+    output = (Map&lt;String, Object&gt;) m;
+} <span class="kw">else</span> {
+    output = Map.<span class="fn">of</span>(<span class="str">"result"</span>, result);
+}</pre>
+
+<pre class="lang" data-lang="python"><span class="comment"># 합성기 emit (Case 2 dispatch_kind = instanceof_guard)</span>
+<span class="kw">if</span> result <span class="kw">is</span> <span class="kw">None</span>:
+    output = {}
+<span class="kw">elif</span> <span class="fn">isinstance</span>(result, <span class="fn">dict</span>):
+    output = result
+<span class="kw">else</span>:
+    output = {<span class="str">"result"</span>: result}</pre>
+
+  <h4>Case 6 — strategy_map (worked example)</h4>
+<pre class="lang" data-lang="java"><span class="comment">// 가상 - v2 에 없으나 일반 system 흔함</span>
+<span class="kw">private static final</span> Map&lt;String, AlgorithmStep&gt; STEPS = Map.<span class="fn">of</span>(
+    <span class="str">"thickness"</span>, <span class="kw">new</span> <span class="fn">SdThicknessAction</span>(),
+    <span class="str">"width"</span>, <span class="kw">new</span> <span class="fn">SdWidthRangeAction</span>(),
+    <span class="str">"length"</span>, <span class="kw">new</span> <span class="fn">SdLengthRangeAction</span>()
+);
+STEPS.<span class="fn">get</span>(stepName).<span class="fn">run</span>(order, slab);</pre>
+
+<pre class="lang" data-lang="python"><span class="comment"># 합성기 emit — 정적 map population 분석 후</span>
+<span class="comment"># dispatch_kind = strategy_map, ontology candidates: [thickness, width, length]</span>
+STEPS: <span class="fn">dict</span>[<span class="fn">str</span>, AlgorithmStep] = {
+    <span class="str">"thickness"</span>: <span class="fn">SdThicknessAction</span>(),
+    <span class="str">"width"</span>: <span class="fn">SdWidthRangeAction</span>(),
+    <span class="str">"length"</span>: <span class="fn">SdLengthRangeAction</span>(),
+}
+STEPS[step_name].<span class="fn">run</span>(order, slab)</pre>
+
+  <h4>Case 7a — reflection_bounded (worked example)</h4>
+<pre class="lang" data-lang="java"><span class="comment">// 가상 - 사용자가 @Component 로 표시된 모든 step 클래스를 동적 dispatch</span>
+String className = <span class="str">"com.example.scm.action."</span> + <span class="fn">capitalize</span>(stepName) + <span class="str">"Action"</span>;
+Class&lt;?&gt; clazz = Class.<span class="fn">forName</span>(className);
+AlgorithmStep step = (AlgorithmStep) clazz.<span class="fn">getDeclaredConstructor</span>().<span class="fn">newInstance</span>();
+step.<span class="fn">run</span>(order, slab);</pre>
+
+<pre class="lang" data-lang="python"><span class="comment"># ontology candidate set 확인: [Sd*Action] (Section 2 의 @Component scan)</span>
+<span class="comment"># 사용자 confirm 후 합성기 emit (dispatch_kind = reflection_bounded)</span>
+<span class="kw">from</span> plugins.slab_design.actions <span class="kw">import</span> (
+    SdThicknessAction, SdWidthRangeAction, SdLengthRangeAction,
+)
+
+ACTION_REGISTRY: <span class="fn">dict</span>[<span class="fn">str</span>, <span class="fn">type</span>[AlgorithmStep]] = {
+    <span class="str">"thickness"</span>: SdThicknessAction,
+    <span class="str">"width"</span>: SdWidthRangeAction,
+    <span class="str">"length"</span>: SdLengthRangeAction,
+}
+
+step_cls = ACTION_REGISTRY[step_name.<span class="fn">lower</span>()]
+step = <span class="fn">step_cls</span>()
+step.<span class="fn">run</span>(order, slab)</pre>
+
+  <h4>Case 7b — reflection_unbounded (SIGNATURE_LOCKED)</h4>
+<pre class="lang" data-lang="java"><span class="comment">// 사용자 config 에서 class name 받기</span>
+String className = config.<span class="fn">getProperty</span>(<span class="str">"handler.class"</span>);  <span class="comment">// runtime</span>
+Class&lt;?&gt; clazz = Class.<span class="fn">forName</span>(className);
+Object handler = clazz.<span class="fn">newInstance</span>();</pre>
+
+<pre class="lang" data-lang="python"><span class="comment"># UNCLEAR: unbounded reflection at L42.</span>
+<span class="comment"># Target class depends on runtime config property "handler.class".</span>
+<span class="comment"># Twin scope EXCLUDES this method body. SIGNATURE_LOCKED.</span>
+<span class="kw">def</span> <span class="fn">execute</span>(<span class="kw">self</span>, ...):
+    <span class="kw">raise</span> <span class="fn">NotImplementedError</span>(
+        <span class="str">"SIGNATURE_LOCKED: unbounded reflection. "</span>
+        <span class="str">"Target class resolution requires runtime config."</span>
+    )</pre>
+
+  <p style="font-size:13px; color:#6b7280; margin-top: 16px"><strong>전체 detail</strong>: <span class="filelink">ADR-006-polymorphic-dispatch.md</span></p>
+</div>
+
+<h2>4. ADR-007: Annotation Processing (Compile-time Meta) <span class="label adr007">ADR-007</span></h2>
+
+<div class="panel anno">
+  <p><strong>핵심</strong>: Lombok 등 compile-time annotation processor 의 효과를 Section 2 의 ontology 추출 단계에서 정적 시뮬레이션. 합성기는 생성된 method 와 직접 작성 method 구별 안 함.</p>
+
+  <h4>Lombok @Getter / @Setter (worked example)</h4>
+<pre class="lang" data-lang="java"><span class="anno">@Getter</span> <span class="anno">@Setter</span>
+<span class="kw">private</span> BigDecimal slabThickness;
+
+<span class="anno">@Getter</span>
+<span class="kw">private final</span> String orderNo;</pre>
+
+  <p><strong>Section 2 의 처리</strong>: Lombok annotation 감지 → ontology 의 <code>code_methods</code> 에 자동 추가 (is_synthetic=true):</p>
+
+<pre class="lang" data-lang="sql">INSERT INTO code_methods (fqn, return_type, params_json, is_synthetic, synthesized_from)
+VALUES
+  ('SDSlabEntity.getSlabThickness', 'BigDecimal', '[]', 1, '@Getter'),
+  ('SDSlabEntity.setSlabThickness', 'void', '[("value","BigDecimal")]', 1, '@Setter'),
+  ('SDSlabEntity.getOrderNo',       'String',     '[]', 1, '@Getter');</pre>
+
+  <p><strong>합성기 emit</strong>: synthetic flag 무시 — 평범한 method 처럼 처리</p>
+
+<pre class="lang" data-lang="python"><span class="kw">class</span> <span class="fn">SDSlabEntity</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="kw">self</span>, order_no: <span class="fn">str</span>):
+        <span class="kw">self</span>._slab_thickness: BigDecimal | <span class="kw">None</span> = <span class="kw">None</span>
+        <span class="kw">self</span>._order_no = order_no
+
+    @<span class="fn">property</span>
+    <span class="kw">def</span> <span class="fn">slab_thickness</span>(<span class="kw">self</span>) -> BigDecimal | <span class="kw">None</span>:
+        <span class="kw">return</span> <span class="kw">self</span>._slab_thickness
+
+    @slab_thickness.<span class="fn">setter</span>
+    <span class="kw">def</span> <span class="fn">slab_thickness</span>(<span class="kw">self</span>, value: BigDecimal):
+        <span class="kw">self</span>._slab_thickness = value
+
+    @<span class="fn">property</span>
+    <span class="kw">def</span> <span class="fn">order_no</span>(<span class="kw">self</span>) -> <span class="fn">str</span>:
+        <span class="kw">return</span> <span class="kw">self</span>._order_no</pre>
+
+  <p><em>또는</em> dataclass 가 plugins/<sys>/style.toml 의 정책일 경우:</p>
+
+<pre class="lang" data-lang="python">@<span class="fn">dataclass</span>
+<span class="kw">class</span> <span class="fn">SDSlabEntity</span>:
+    order_no: <span class="fn">str</span>
+    slab_thickness: BigDecimal | <span class="kw">None</span> = <span class="kw">None</span></pre>
+
+  <h4>Lombok @Builder (worked example)</h4>
+<pre class="lang" data-lang="java"><span class="anno">@Builder</span>
+<span class="kw">public class</span> <span class="fn">Order</span> {
+    String cmpCd;
+    String orgCd;
+    String productCd;
+}
+<span class="comment">// 사용: Order o = Order.builder().cmpCd("K").orgCd("1").productCd("SCM").build();</span></pre>
+
+  <p><strong>Section 2 처리</strong>: <code>OrderBuilder</code> class + fluent method 자동 추가 → <strong>합성기 emit</strong>:</p>
+
+<pre class="lang" data-lang="python">@<span class="fn">dataclass</span>
+<span class="kw">class</span> <span class="fn">Order</span>:
+    cmp_cd: <span class="fn">str</span> | <span class="kw">None</span> = <span class="kw">None</span>
+    org_cd: <span class="fn">str</span> | <span class="kw">None</span> = <span class="kw">None</span>
+    product_cd: <span class="fn">str</span> | <span class="kw">None</span> = <span class="kw">None</span>
+
+    @<span class="fn">staticmethod</span>
+    <span class="kw">def</span> <span class="fn">builder</span>() -> <span class="str">"OrderBuilder"</span>:
+        <span class="kw">return</span> <span class="fn">OrderBuilder</span>()
+
+<span class="kw">class</span> <span class="fn">OrderBuilder</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="kw">self</span>): <span class="kw">self</span>._order = <span class="fn">Order</span>()
+    <span class="kw">def</span> <span class="fn">cmp_cd</span>(<span class="kw">self</span>, v: <span class="fn">str</span>): <span class="kw">self</span>._order.cmp_cd = v; <span class="kw">return</span> <span class="kw">self</span>
+    <span class="kw">def</span> <span class="fn">org_cd</span>(<span class="kw">self</span>, v: <span class="fn">str</span>): <span class="kw">self</span>._order.org_cd = v; <span class="kw">return</span> <span class="kw">self</span>
+    <span class="kw">def</span> <span class="fn">product_cd</span>(<span class="kw">self</span>, v: <span class="fn">str</span>): <span class="kw">self</span>._order.product_cd = v; <span class="kw">return</span> <span class="kw">self</span>
+    <span class="kw">def</span> <span class="fn">build</span>(<span class="kw">self</span>) -> Order: <span class="kw">return</span> <span class="kw">self</span>._order</pre>
+
+  <h4>지원 annotation</h4>
+  <p><strong>Core (자동)</strong>: Lombok @Getter / @Setter / @Builder / @Data / @AllArgsConstructor / @NoArgsConstructor / @RequiredArgsConstructor / @ToString / @EqualsAndHashCode</p>
+  <p><strong>Plugin 영역</strong>: MapStruct @Mapper / Querydsl @QueryEntity / 사용자 정의 — <code>plugins/&lt;sys&gt;/processors/&lt;name&gt;.py</code></p>
+
+  <p style="font-size:13px; color:#6b7280; margin-top: 16px"><strong>전체 detail</strong>: <span class="filelink">ADR-007-annotation-processing.md</span></p>
+</div>
+
+<h2>5. ADR-008: AOP (Aspect-Oriented Programming) <span class="label adr008">ADR-008</span></h2>
+
+<div class="panel aop">
+  <p><strong>핵심</strong>: Aspect 를 ontology 의 별도 entity (<code>aspects</code> table) 로 모델. Pointcut expression 의 정적 target expansion. 합성기가 Python decorator 로 wrap.</p>
+
+  <h4>@Around (worked example)</h4>
+<pre class="lang" data-lang="java"><span class="anno">@Aspect</span> <span class="anno">@Component</span>
+<span class="kw">public class</span> <span class="fn">TimingAspect</span> {
+    <span class="kw">private static final</span> Logger log = LoggerFactory.<span class="fn">getLogger</span>(TimingAspect.<span class="kw">class</span>);
+
+    <span class="anno">@Around</span>(<span class="str">"execution(* SdDesigner.design(..))"</span>)
+    <span class="kw">public</span> Object <span class="fn">around</span>(ProceedingJoinPoint pjp) <span class="kw">throws</span> Throwable {
+        <span class="kw">long</span> start = System.<span class="fn">currentTimeMillis</span>();
+        <span class="kw">try</span> {
+            <span class="kw">return</span> pjp.<span class="fn">proceed</span>();
+        } <span class="kw">finally</span> {
+            <span class="kw">long</span> elapsed = System.<span class="fn">currentTimeMillis</span>() - start;
+            log.<span class="fn">info</span>(<span class="str">"design took {}ms"</span>, elapsed);
+        }
+    }
+}</pre>
+
+  <p><strong>Section 2 처리</strong>: <code>aspects</code> table 에 row:</p>
+
+<pre class="lang" data-lang="sql">INSERT INTO aspects (
+    fqn, advice_method_fqn, advice_kind,
+    pointcut_expression, pointcut_targets_json
+) VALUES (
+    'TimingAspect',
+    'TimingAspect.around',
+    'around',
+    'execution(* SdDesigner.design(..))',
+    '["SdDesigner.design(SDOrderEntity)"]'
+);</pre>
+
+  <p><strong>합성기 emit</strong>: target method (SdDesigner.design) 합성 시 자동 decorator wrap</p>
+
+<pre class="lang" data-lang="python"><span class="kw">import</span> functools
+<span class="kw">import</span> time
+<span class="kw">import</span> logging
+
+log = logging.<span class="fn">getLogger</span>(<span class="str">"TimingAspect"</span>)
+
+<span class="kw">def</span> <span class="fn">around_TimingAspect_around</span>(proceed_fn):
+    @functools.<span class="fn">wraps</span>(proceed_fn)
+    <span class="kw">def</span> <span class="fn">wrapper</span>(*args, **kwargs):
+        start = time.<span class="fn">time</span>()
+        <span class="kw">try</span>:
+            <span class="kw">return</span> <span class="fn">proceed_fn</span>(*args, **kwargs)
+        <span class="kw">finally</span>:
+            elapsed_ms = (time.<span class="fn">time</span>() - start) * <span class="num">1000</span>
+            log.<span class="fn">info</span>(<span class="fr">f"design took {elapsed_ms}ms"</span>)
+    <span class="kw">return</span> wrapper
+
+<span class="kw">class</span> <span class="fn">SdDesigner</span>:
+    <span class="added">@around_TimingAspect_around</span>   <span class="comment"># 합성기 자동 삽입</span>
+    <span class="kw">def</span> <span class="fn">design</span>(<span class="kw">self</span>, order: SDOrderEntity) -> SlabDesignResult:
+        <span class="comment"># 실제 design body</span>
+        ...</pre>
+
+  <h4>Pointcut expression 의 정적 매칭</h4>
+  <table>
+    <thead><tr><th>Expression</th><th>매칭</th></tr></thead>
+    <tbody>
+      <tr><td><code>execution(* Pkg..*Service.*(..))</code></td><td>Pkg 의 모든 *Service class 의 모든 method</td></tr>
+      <tr><td><code>@annotation(com.example.Audited)</code></td><td>@Audited annotated method</td></tr>
+      <tr><td><code>within(Foo)</code></td><td>Foo class 의 모든 method</td></tr>
+      <tr><td><code>target(Service+)</code></td><td>Service subtype 의 모든 method</td></tr>
+      <tr><td><code>args(String, Integer)</code></td><td>인자 type 으로 필터</td></tr>
+      <tr><td><code>bean(*Service)</code></td><td>Spring bean name pattern</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Multiple aspects + @Order</h4>
+<pre class="lang" data-lang="java"><span class="anno">@Order(1)</span> <span class="anno">@Around</span>(<span class="str">"execution(* *.design(..))"</span>) ... TimingAspect
+<span class="anno">@Order(2)</span> <span class="anno">@Around</span>(<span class="str">"execution(* *.design(..))"</span>) ... LoggingAspect</pre>
+
+<pre class="lang" data-lang="python"><span class="kw">class</span> <span class="fn">SdDesigner</span>:
+    @around_TimingAspect_around    <span class="comment"># Order 1 — outermost</span>
+    @around_LoggingAspect_around   <span class="comment"># Order 2 — innermost</span>
+    <span class="kw">def</span> <span class="fn">design</span>(<span class="kw">self</span>, order):
+        ...</pre>
+
+  <p style="font-size:13px; color:#6b7280; margin-top: 16px"><strong>전체 detail</strong>: <span class="filelink">ADR-008-aop-aspect-weaving.md</span></p>
+</div>
+
+<h2>6. ADR-009: Bytecode Generation <span class="label adr009">ADR-009</span></h2>
+
+<div class="panel byte">
+  <p><strong>핵심</strong>: Bytecode 자체는 미관찰. 효과 (생성된 method 의 의미) 만 Python 으로. 대부분은 ADR-006-008 으로 subsume.</p>
+
+  <table>
+    <thead><tr><th>Source</th><th>Twin 의 대응</th></tr></thead>
+    <tbody>
+      <tr><td>Spring AOP CGLib (<code>@Transactional</code>, concrete @Aspect)</td><td>ADR-008 의 Python decorator</td></tr>
+      <tr><td>Hibernate lazy proxy</td><td>LookupDataSource 가 <strong>eager load</strong> — lazy 의미 zero</td></tr>
+      <tr><td>Mockito (test scope)</td><td>Python <code>unittest.mock</code> / <code>pytest fixtures</code> 직접</td></tr>
+      <tr><td>JaCoCo coverage</td><td>Twin 은 측정 대상 아님 — 무관</td></tr>
+      <tr><td>Custom CGLib / ASM</td><td>SIGNATURE_LOCKED + <code>plugins/&lt;sys&gt;/bytecode_gens/</code> plugin</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Hibernate Lazy Loading → Python Eager (worked example)</h4>
+<pre class="lang" data-lang="java"><span class="anno">@Entity</span>
+<span class="kw">class</span> <span class="fn">Order</span> {
+    <span class="anno">@Id</span> <span class="kw">private</span> String orderNo;
+
+    <span class="anno">@OneToMany</span>(fetch = FetchType.LAZY)  <span class="comment">// Hibernate proxy</span>
+    <span class="kw">private</span> List&lt;Slab&gt; slabs;
+}
+
+<span class="comment">// 사용:</span>
+order.<span class="fn">getSlabs</span>().<span class="fn">forEach</span>(slab -&gt; ...);  <span class="comment">// → SELECT * FROM slab WHERE order_no = ?</span></pre>
+
+  <p><strong>Twin 의 처리</strong>: schema_foreign_keys 가 관계 정보 보유 → LookupDataSource fixture 가 직접 채움</p>
+
+<pre class="lang" data-lang="python">@<span class="fn">dataclass</span>
+<span class="kw">class</span> <span class="fn">Order</span>:
+    order_no: <span class="fn">str</span>
+    slabs: <span class="fn">list</span>[Slab]  <span class="comment"># fixture 가 직접 채움 (eager)</span>
+
+<span class="comment"># Fixture loading 시 (Twin Runner):</span>
+order = <span class="fn">Order</span>(
+    order_no=<span class="str">"ORD001"</span>,
+    slabs=lookup_data_source.<span class="fn">find_all_by_fk</span>(
+        table=<span class="str">"slab"</span>, fk_column=<span class="str">"order_no"</span>, fk_value=<span class="str">"ORD001"</span>
+    ),
+)
+
+<span class="comment"># 사용 시:</span>
+<span class="kw">for</span> slab <span class="kw">in</span> order.slabs:  <span class="comment"># 추가 SQL 없음 (이미 채워짐)</span>
+    ...</pre>
+
+  <p>LAZY 의 의미는 production 의 SQL latency 최적화 — twin 의 행동 등가성에 무관.</p>
+
+  <h4>Spring AOP CGLib → ADR-008 decorator (subsume)</h4>
+<pre class="lang" data-lang="java"><span class="comment">// Spring AOP 가 SdSlabSaveAction 의 CGLib subclass 생성</span>
+<span class="anno">@Component</span>
+<span class="kw">public class</span> <span class="fn">SdSlabSaveAction</span> {
+    <span class="anno">@Transactional</span>  <span class="comment">// 이 method 가 CGLib proxy 로 wrap</span>
+    <span class="kw">public void</span> <span class="fn">execute</span>(...) { ... }
+}</pre>
+
+<pre class="lang" data-lang="python"><span class="kw">class</span> <span class="fn">SdSlabSaveAction</span>:
+    @transactional  <span class="comment"># ADR-002 의 @Transactional stub (session journal)</span>
+    <span class="kw">def</span> <span class="fn">execute</span>(<span class="kw">self</span>, ...):
+        ...</pre>
+
+  <p>CGLib 의 bytecode-level mechanism 은 Python 에서 평범한 decorator chain.</p>
+
+  <p style="font-size:13px; color:#6b7280; margin-top: 16px"><strong>전체 detail</strong>: <span class="filelink">ADR-009-bytecode-generation.md</span></p>
+</div>
+
+<h2>7. Decision Tree — 사용자 코드의 meta-programming 처리</h2>
+
+<div class="diagram">
+사용자 system 의 Java code 분석 → meta-programming 종류별 처리:
+
+  Java code
+    │
+    ├─ Polymorphic dispatch?
+    │   ├─ single_impl       → 직접 call (자동)
+    │   ├─ instanceof        → Python isinstance (자동)
+    │   ├─ annotation        → dispatch table (자동)
+    │   ├─ factory_branch    → factory function (자동)
+    │   ├─ generic           → TypeVar + ontology candidates (사용자 큐)
+    │   ├─ strategy_map      → Python dict dispatch (정적 map 분석)
+    │   ├─ reflection_bounded → registry pattern (candidate 식별 후 user confirm)
+    │   └─ reflection_unbounded → <strong>SIGNATURE_LOCKED</strong> + GapSurfacer
+    │
+    ├─ Annotation?
+    │   ├─ Lombok            → core processor 자동 (@Getter/@Setter/@Builder/@Data 등)
+    │   ├─ Spring DI         → ADR-002 의 plugins/&lt;sys&gt;/stubs/spring_di.py
+    │   ├─ JPA               → ADR-002 의 LookupDataSource stub + Schema Layer
+    │   ├─ Jackson           → field 매핑 (verbatim per-field serializer)
+    │   ├─ MapStruct         → plugin/&lt;sys&gt;/processors/mapstruct.py
+    │   └─ 사용자 정의       → plugin/&lt;sys&gt;/processors/&lt;name&gt;.py
+    │
+    ├─ AOP?
+    │   ├─ @Around           → Python decorator (functools.wraps)
+    │   ├─ @Before           → call before target
+    │   ├─ @After            → try/finally wrap
+    │   ├─ @AfterThrowing    → except wrap
+    │   ├─ Pointcut 일반     → 정적 매칭 → 자동
+    │   └─ Pointcut 복잡     → <strong>SIGNATURE_LOCKED</strong> + 사용자 큐
+    │
+    └─ Bytecode generation?
+        ├─ Spring AOP CGLib    → ADR-008 decorator (subsume)
+        ├─ Hibernate lazy      → LookupDataSource eager load
+        ├─ Mockito (test)      → Python unittest.mock (twin scope 외)
+        ├─ JaCoCo (coverage)   → 무관 (Twin 측정 안 함)
+        └─ Custom CGLib/ASM    → plugin 또는 <strong>SIGNATURE_LOCKED</strong>
+</div>
+
+<h2>8. Honest Limits — 메타 프로그래밍의 잔여 한계</h2>
+
+<table>
+  <thead><tr><th>한계</th><th>대응</th><th>관련 ADR</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Unbounded reflection</strong> (runtime user input 의 class name)</td>
+      <td>SIGNATURE_LOCKED — 어떤 합성기도 풀 수 없는 근본 한계</td>
+      <td>ADR-006</td>
+    </tr>
+    <tr>
+      <td><strong>Generic candidate identification</strong> (type erasure)</td>
+      <td>Section 2 의 모든 call site 분석 — 비용 큼. 일부 사용자 confirm</td>
+      <td>ADR-006</td>
+    </tr>
+    <tr>
+      <td><strong>Complex AspectJ pointcut</strong> (예: <code>&& if(...) && args(...)</code>)</td>
+      <td>일반 expression 만 자동. 복잡 case 사용자 큐 + SIGNATURE_LOCKED</td>
+      <td>ADR-008</td>
+    </tr>
+    <tr>
+      <td><strong>Multi-stage annotation processor chain</strong></td>
+      <td>알려진 chain (Lombok → Spring) 만. 임의 chain 부분 지원</td>
+      <td>ADR-007</td>
+    </tr>
+    <tr>
+      <td><strong>Custom annotation processor 비공개 라이브러리</strong></td>
+      <td>Plugin 작성 불가능 → SIGNATURE_LOCKED</td>
+      <td>ADR-007</td>
+    </tr>
+    <tr>
+      <td><strong>Bytecode-level optimization</strong> (Java JIT 의 inlining 등)</td>
+      <td>Twin 의 Python 은 추적 불가. R3 tolerance 의 별도 영역</td>
+      <td>ADR-009</td>
+    </tr>
+    <tr>
+      <td><strong>Custom CGLib / ASM</strong></td>
+      <td>Plugin 별 작성 필수 → 사용자 비용</td>
+      <td>ADR-009</td>
+    </tr>
+    <tr>
+      <td><strong>AspectJ compile-time weaving (CTW)</strong></td>
+      <td>Source level 분석만 — generated bytecode 미관찰. 일부 누락</td>
+      <td>ADR-008</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>9. Section 2 의 추가 작업 — meta-programming 추출</h2>
+
+<div class="panel info">
+  <p>본 4 ADR 의 실현을 위해 Section 2 의 Java AST extractor 에 추가 pass 필요:</p>
+  <ol>
+    <li><strong>CallSiteAnalyzer 실제 구현</strong> (ADR-006) — 각 method call 의 dispatch_kind 추정. anchor_bindings.dispatch_kind 컬럼 추가</li>
+    <li><strong>Annotation processor 시뮬레이터</strong> (ADR-007) — Lombok 등의 synthesized method 를 code_methods.is_synthetic 으로 자동 추가</li>
+    <li><strong>Aspect extractor</strong> (ADR-008) — @Aspect class 의 advice + pointcut 정적 분석. aspects 신규 table</li>
+    <li><strong>Bytecode gen detector</strong> (ADR-009) — Spring AOP / Hibernate / Mockito / custom CGLib 사용 식별. 대부분 subsume, custom 만 plugin path</li>
+  </ol>
+  <p>이 작업들은 <strong>Section 2 의 ontology 추출 pipeline 확장</strong> 영역 — 합성기 자체와 별도. plugin/&lt;sys&gt;/extractors/ 에 system 별 차이 흡수.</p>
+</div>
+
+<h2>10. v2 reality 종합 — meta-programming 측면</h2>
+
+<table>
+  <thead><tr><th>영역</th><th>v2 사용</th><th>본 ADR 의 v2 영향</th></tr></thead>
+  <tbody>
+    <tr><td>Polymorphic dispatch</td><td>Case 1 (single_impl) + Case 2 (instanceof 1건)</td><td>최소 — ADR-006 이 cover</td></tr>
+    <tr><td>Annotation processing</td><td>Lombok 0건. Spring DI / JPA 만 (framework)</td><td>없음 — ADR-007 는 일반화 대비</td></tr>
+    <tr><td>AOP</td><td>Custom @Aspect 0건. Spring 내부 @Transactional 만</td><td>최소 — ADR-008 는 일반화 대비, @Transactional 은 ADR-002 stub 통합</td></tr>
+    <tr><td>Bytecode generation</td><td>Custom CGLib 0건. Spring AOP CGLib 만 (@Transactional)</td><td>없음 — ADR-008/009 subsume</td></tr>
+  </tbody>
+</table>
+
+<p><strong>결론</strong>: v2 자체는 meta-programming 측면에서 trivial. 본 4 ADR 의 진정한 가치는 <strong>v2 외 system (banking, e-commerce, legacy enterprise 등 — 통상 Lombok / @Aspect / Hibernate lazy / 복잡 dispatch 사용) 의 onboarding 시점에 발현</strong>. ADR-002 의 "system-agnostic" claim 의 실제 mechanism 제공.</p>
+
+<h2>11. 사용자 결정 요청</h2>
+
+<div class="panel info">
+  <h3>이제 결정해 주실 것</h3>
+  <table>
+    <thead><tr><th>#</th><th>질문</th><th>이 ADR 들의 응답</th><th>사용자 결정</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>D1</td>
+        <td>4 ADR (006-009) 채택 — meta-programming 처리 완전</td>
+        <td>Polymorphic / Annotation / AOP / Bytecode 4 영역 mechanism level 명시. v2 영향 zero, 일반화 시 활성</td>
+        <td><strong>채택 / 일부 / 거부</strong></td>
+      </tr>
+      <tr>
+        <td>D2</td>
+        <td>Section 2 의 작업 (CallSiteAnalyzer / Aspect extractor 등) 시점</td>
+        <td>합성기 자체와 별도 work item. Plugin onboarding 시점에 system 별 차이 흡수</td>
+        <td><strong>spec 단계 통합 / 별도 sprint</strong></td>
+      </tr>
+      <tr>
+        <td>D3</td>
+        <td>v2 의 즉시 우선순위</td>
+        <td>v2 영향 zero — meta-programming 작업은 일반화 대비. v2 verification 우선</td>
+        <td><strong>v2 verification 먼저 / 일반화 병행</strong></td>
+      </tr>
+      <tr>
+        <td>D4</td>
+        <td>Honest limits 의 명시적 수용</td>
+        <td>Unbounded reflection / complex pointcut / custom CGLib 의 SIGNATURE_LOCKED 정책</td>
+        <td><strong>수용 / 더 깊이</strong></td>
+      </tr>
+      <tr>
+        <td>D5</td>
+        <td>spec 작성 세션으로 인계 시점</td>
+        <td>D1-D4 + SYNTHESIS-ROUND2 의 D1-D7 답변 후 spec 세션 (별도)</td>
+        <td><strong>지금 인계 / 추가 검토</strong></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<p style="margin-top:16px"><strong>다음 단계</strong>: D1-D5 + SYNTHESIS-ROUND2 의 D1-D7 (총 12 결정) 답변 받으면 spec 작성 세션으로 인계 가능. 본 META-PROGRAMMING 의 4 ADR 은 spec 의 reference appendix 가 됨.</p>
+
+<p style="margin-top:48px; padding-top:16px; border-top:1px solid #e5e7eb; color:#9ca3af; font-size:12px;">
+  Meta-Programming Handling · 2026-05-13 · Section 4 sim-redesign 세션<br>
+  관련: <span class="filelink">ADR-006-polymorphic-dispatch.md</span> · <span class="filelink">ADR-007-annotation-processing.md</span> · <span class="filelink">ADR-008-aop-aspect-weaving.md</span> · <span class="filelink">ADR-009-bytecode-generation.md</span><br>
+  연관: <code>SYNTHESIS-ROUND2.html</code>, <code>ADR-001-python-twin.md</code>, <code>ADR-002-scope-expansion.md</code>
+</p>
+
+</body>
+</html>

@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>KNOWN_DIVERGENCE 해소 옵션 비교</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+      "Noto Sans KR", sans-serif;
+    line-height: 1.6;
+    color: #1f2937;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+    background: #fafafa;
+  }
+  h1 {
+    font-size: 28px;
+    margin: 0 0 8px;
+    color: #111827;
+  }
+  h2 {
+    font-size: 22px;
+    margin: 48px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e5e7eb;
+    color: #111827;
+  }
+  h3 {
+    font-size: 17px;
+    margin: 24px 0 8px;
+    color: #1f2937;
+  }
+  .lead {
+    color: #6b7280;
+    font-size: 15px;
+    margin-bottom: 32px;
+  }
+  .panel {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin: 16px 0;
+  }
+  .panel.option-a { border-left: 4px solid #2563eb; }
+  .panel.option-b { border-left: 4px solid #db2777; }
+  .panel.option-c { border-left: 4px solid #16a34a; }
+  .panel.warn { background: #fff7ed; border-color: #fdba74; }
+  pre {
+    background: #1f2937;
+    color: #e5e7eb;
+    padding: 14px 18px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.55;
+    font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+    margin: 8px 0;
+  }
+  pre.python::before {
+    content: "python";
+    display: inline-block;
+    background: #374151;
+    color: #9ca3af;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  pre .kw { color: #c084fc; }
+  pre .str { color: #fca5a5; }
+  pre .fn { color: #93c5fd; }
+  pre .comment { color: #6b7280; font-style: italic; }
+  pre .err { color: #fb923c; }
+  pre .new { background: rgba(34, 197, 94, 0.15); padding: 0 2px; border-radius: 2px; }
+  pre .del { background: rgba(239, 68, 68, 0.15); padding: 0 2px; border-radius: 2px;
+             text-decoration: line-through; }
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 12px 0;
+  }
+  .split > div {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 12px 14px;
+  }
+  .split h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6b7280;
+  }
+  .label {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .label.a { background: #dbeafe; color: #1e40af; }
+  .label.b { background: #fce7f3; color: #9d174d; }
+  .label.c { background: #dcfce7; color: #166534; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    background: white;
+  }
+  th, td {
+    border: 1px solid #e5e7eb;
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 14px;
+    vertical-align: top;
+  }
+  th {
+    background: #f3f4f6;
+    font-weight: 600;
+  }
+  td.center { text-align: center; }
+  .icon-mismatch { color: #dc2626; font-weight: 700; }
+  .icon-ok { color: #16a34a; font-weight: 700; }
+  .diagram {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre;
+    overflow-x: auto;
+    color: #374151;
+  }
+  .callout {
+    background: #fef3c7;
+    border-left: 4px solid #f59e0b;
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  .tldr {
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<h1>KNOWN_DIVERGENCE 5종 — 해소 옵션 비교</h1>
+<p class="lead">
+  α1 (runtime) 과 α2 (idiom 카드) 가 병렬로 작업하면서 만들어진 API 미스매치 5종을 어떻게 해소할지 결정합니다.<br>
+  3가지 방향 (A/B/C) 의 차이를 코드 예시로 비교합니다.
+</p>
+
+<h2>1. 무엇이 문제인가</h2>
+
+<p>
+  Phase α 에서 두 작업자가 병렬로 산출물을 만들었습니다:
+</p>
+
+<div class="diagram">
+α2 (idiom 카드 작성자)              α1 (runtime 작성자)
+        │                                    │
+        ▼                                    ▼
+  카드 27장 작성                    Python 모듈 작성
+  "Java처럼" 보이는 코드             함수형 API
+  BigDecimal("100").multiply(x)     bd_multiply_decimal64(bd("100"), x)
+  .divide(y, MathContext.DECIMAL64)
+        │                                    │
+        └──────────────┬─────────────────────┘
+                       ▼
+              Section 3 (시뮬레이터 작업자)
+              "카드 import 가 runtime 에 없네!"
+              → ImportError / NameError 폭탄</div>
+
+<p>
+  카드가 가정한 5개 이름이 실제 runtime 에는 없습니다 (smoke 테스트 E-1 이 잡아냄):
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width: 200px;">α2 카드가 import</th>
+      <th style="width: 100px;">의도</th>
+      <th>α1 runtime 실제</th>
+      <th style="width: 90px;">결과</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>BigDecimal</code></td>
+      <td>Java BigDecimal class wrapper</td>
+      <td><code>bd()</code> factory 함수, Python Decimal 반환</td>
+      <td class="icon-mismatch center">✗ NameError</td>
+    </tr>
+    <tr>
+      <td><code>MathContext</code></td>
+      <td>정밀도 + rounding 묶음<br>(<code>MathContext.DECIMAL64</code>)</td>
+      <td><code>DECIMAL64_PRECISION = 16</code>, <code>DECIMAL64_ROUNDING = ROUND_HALF_EVEN</code> (개별 상수)</td>
+      <td class="icon-mismatch center">✗ NameError</td>
+    </tr>
+    <tr>
+      <td><code>RoundingMode</code></td>
+      <td>enum (<code>RoundingMode.FLOOR</code>)</td>
+      <td>없음. <code>decimal.ROUND_FLOOR</code> 등 stdlib 상수 직접 사용</td>
+      <td class="icon-mismatch center">✗ NameError</td>
+    </tr>
+    <tr>
+      <td><code>SdConstants</code></td>
+      <td>namespace (<code>SdConstants.POS_SM</code>)</td>
+      <td><code>POS_SM</code>, <code>POS_HR</code> 등 module-level 직접 import</td>
+      <td class="icon-mismatch center">✗ NameError</td>
+    </tr>
+    <tr>
+      <td><code>ValidationResult</code></td>
+      <td>dataclass (<code>ValidationResult.fail(...)</code>)</td>
+      <td>없음. Java 에는 v2 source 에 있지만 Python runtime 미구현</td>
+      <td class="icon-mismatch center">✗ NameError</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>실제 카드 코드와 runtime 코드의 차이</h3>
+
+<p>P01 idiom card (<code>body.compute</code> — slab 무게 계산) 예시:</p>
+
+<div class="split">
+  <div>
+    <h4>α2 카드가 보여주는 Python</h4>
+<pre class="python"><span class="kw">from</span> backend.modeling.sim_verify.runtime <span class="kw">import</span> (
+    <span class="err">BigDecimal</span>,         <span class="comment"># ✗ 없음</span>
+    <span class="err">MathContext</span>,        <span class="comment"># ✗ 없음</span>
+    <span class="err">RoundingMode</span>,       <span class="comment"># ✗ 없음</span>
+)
+
+INVERSE_UNIT = <span class="err">BigDecimal</span>(<span class="str">"1000000"</span>)
+
+raw = (slab.slab_wgt_in_progress
+       .<span class="fn">multiply</span>(INVERSE_UNIT)
+       .<span class="fn">divide</span>(slab.target_slab_width
+                  .<span class="fn">multiply</span>(thickness)
+                  .<span class="fn">multiply</span>(density),
+               <span class="err">MathContext</span>.DECIMAL64))
+
+floored = raw.<span class="fn">set_scale</span>(0, <span class="err">RoundingMode</span>.FLOOR)</pre>
+    <div class="callout" style="margin-top: 8px; font-size: 12px;">
+      Section 3 가 이걸 그대로 옮기면 <strong>3개 ImportError</strong> + 메서드 체이닝 (<code>.multiply()</code> 등) 도 Python Decimal 에 없어 <strong>AttributeError</strong>.
+    </div>
+  </div>
+  <div>
+    <h4>α1 runtime 이 실제로 제공</h4>
+<pre class="python"><span class="kw">from</span> backend.modeling.sim_verify.runtime <span class="kw">import</span> (
+    bd, bd_multiply_decimal64,
+    bd_divide_decimal64, bd_set_scale,
+)
+<span class="kw">from</span> decimal <span class="kw">import</span> ROUND_FLOOR
+
+INVERSE_UNIT = <span class="fn">bd</span>(<span class="str">"1000000"</span>)
+
+<span class="comment"># multiply 2회 + divide 1회 (함수 호출)</span>
+denom = <span class="fn">bd_multiply_decimal64</span>(
+    <span class="fn">bd_multiply_decimal64</span>(
+        slab.target_slab_width, thickness),
+    density)
+numer = <span class="fn">bd_multiply_decimal64</span>(
+    slab.slab_wgt_in_progress, INVERSE_UNIT)
+raw = <span class="fn">bd_divide_decimal64</span>(numer, denom)
+
+floored = <span class="fn">bd_set_scale</span>(raw, 0, rounding=ROUND_FLOOR)</pre>
+    <div class="callout" style="margin-top: 8px; font-size: 12px; background: #dcfce7; border-color: #16a34a;">
+      실제로 돌아가는 코드. 하지만 Java 원본과 모양이 많이 달라 1:1 매핑이 헷갈림.
+    </div>
+  </div>
+</div>
+
+<h2>2. 해소 옵션 A — Runtime 에 facade 추가 <span class="label a">A</span></h2>
+
+<div class="panel option-a">
+  <p>
+    α1 runtime 의 함수형 API 는 그대로 두고, 그 <strong>위에</strong> Java-스러운 클래스 / enum / 네임스페이스를 만들어 얹습니다. 카드는 한 글자도 안 고치고 그대로 실행 가능해집니다.
+  </p>
+
+  <h3>Runtime 에 추가할 것 (+200줄 정도)</h3>
+<pre class="python"><span class="kw">class</span> <span class="fn">BigDecimal</span>:
+    <span class="str">"""Java BigDecimal-like wrapper around bd()."""</span>
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, value):
+        self._d = <span class="fn">bd</span>(value)
+
+    <span class="kw">def</span> <span class="fn">multiply</span>(self, other):
+        <span class="kw">return</span> <span class="fn">BigDecimal</span>(
+            <span class="fn">bd_multiply_decimal64</span>(self._d, other._d))
+
+    <span class="kw">def</span> <span class="fn">divide</span>(self, other, mc=<span class="kw">None</span>):
+        <span class="kw">return</span> <span class="fn">BigDecimal</span>(
+            <span class="fn">bd_divide_decimal64</span>(self._d, other._d))
+
+    <span class="kw">def</span> <span class="fn">set_scale</span>(self, scale, rounding):
+        <span class="kw">return</span> <span class="fn">BigDecimal</span>(
+            <span class="fn">bd_set_scale</span>(self._d, scale, rounding=rounding))
+
+
+<span class="kw">class</span> <span class="fn">MathContext</span>:
+    DECIMAL64 = (DECIMAL64_PRECISION, DECIMAL64_ROUNDING)
+
+
+<span class="kw">class</span> <span class="fn">RoundingMode</span>:
+    FLOOR = ROUND_FLOOR
+    HALF_EVEN = ROUND_HALF_EVEN
+    CEILING = ROUND_CEILING
+
+
+<span class="kw">class</span> <span class="fn">SdConstants</span>:
+    POS_SM = POS_SM
+    POS_HR = POS_HR
+    <span class="comment"># ... 8개 position 상수</span>
+
+
+<span class="kw">@dataclass</span>
+<span class="kw">class</span> <span class="fn">ValidationResult</span>:
+    is_failed: bool
+    error_code: str | <span class="kw">None</span>
+    message: str | <span class="kw">None</span>
+
+    <span class="kw">@classmethod</span>
+    <span class="kw">def</span> <span class="fn">fail</span>(cls, code, msg): ...
+    <span class="kw">@classmethod</span>
+    <span class="kw">def</span> <span class="fn">ok</span>(cls): ...</pre>
+
+  <h3>그러면 P01 카드는 한 줄도 안 고침</h3>
+<pre class="python"><span class="kw">from</span> backend.modeling.sim_verify.runtime <span class="kw">import</span> (
+    BigDecimal, MathContext, RoundingMode,
+)
+
+INVERSE_UNIT = <span class="fn">BigDecimal</span>(<span class="str">"1000000"</span>)
+
+<span class="new">raw = (slab.slab_wgt_in_progress
+       .multiply(INVERSE_UNIT)
+       .divide(slab.target_slab_width.multiply(thickness).multiply(density),
+               MathContext.DECIMAL64))
+
+floored = raw.set_scale(0, RoundingMode.FLOOR)</span>  <span class="comment"># ✓ 그대로 작동</span></pre>
+
+  <h3>장단</h3>
+  <table>
+    <tr><th style="width: 100px;">장점</th><td>
+      • 카드 27장 손 안 댐<br>
+      • Java 원본과 거의 1:1 매핑 (slab 설계 알고리즘 자바 코드 보면서 옮기기 쉬움)<br>
+      • Section 3 가 카드를 <strong>copy-paste 수준으로 사용</strong> 가능
+    </td></tr>
+    <tr><th>단점</th><td>
+      • runtime 에 약 200줄의 wrapper 코드 추가 (유지보수 부담)<br>
+      • Pythonic 하지 않음 (Python 사람은 <code>a * b</code> 가 자연스러운데 <code>a.multiply(b)</code> 강제)<br>
+      • wrapper 와 functional API 가 공존 → "어느 쪽을 쓸지" 혼란 가능
+    </td></tr>
+  </table>
+</div>
+
+<h2>3. 해소 옵션 B — 카드 27장 재작성 <span class="label b">B</span></h2>
+
+<div class="panel option-b">
+  <p>
+    runtime 은 그대로 두고, 카드 27장의 Python 예제를 모두 함수형 API + Python idiomatic 으로 다시 씁니다.
+  </p>
+
+  <h3>P01 카드 재작성 후</h3>
+<pre class="python"><span class="kw">from</span> backend.modeling.sim_verify.runtime <span class="kw">import</span> (
+    bd, bd_multiply_decimal64, bd_divide_decimal64, bd_set_scale,
+)
+<span class="kw">from</span> decimal <span class="kw">import</span> ROUND_FLOOR
+
+INVERSE_UNIT = <span class="fn">bd</span>(<span class="str">"1000000"</span>)
+
+<span class="del">raw = (slab.slab_wgt_in_progress
+       .multiply(INVERSE_UNIT)
+       .divide(slab.target_slab_width.multiply(thickness).multiply(density),
+               MathContext.DECIMAL64))</span>
+
+<span class="new">denom = <span class="fn">bd_multiply_decimal64</span>(
+    <span class="fn">bd_multiply_decimal64</span>(slab.target_slab_width, thickness),
+    density)
+numer = <span class="fn">bd_multiply_decimal64</span>(slab.slab_wgt_in_progress, INVERSE_UNIT)
+raw = <span class="fn">bd_divide_decimal64</span>(numer, denom)
+
+floored = <span class="fn">bd_set_scale</span>(raw, 0, rounding=ROUND_FLOOR)</span>  <span class="comment"># ✓</span></pre>
+
+  <h3>모든 카드 (27장) 가 이런 식으로 변환됨</h3>
+  <table>
+    <tr><th style="width: 100px;">장점</th><td>
+      • runtime 에 새 코드 0 줄<br>
+      • Python idiomatic (<code>from decimal import …</code>, 함수 호출, 명시적 매개변수)<br>
+      • "wrapper class 와 함수, 어느 쪽?" 혼란 없음
+    </td></tr>
+    <tr><th>단점</th><td>
+      • 카드 27장 모두 재작성 — 작업량 큼<br>
+      • Java 원본과 모양이 달라 1:1 매핑이 직관적이지 않음<br>
+      • slab 설계 알고리즘 같이 BigDecimal 체이닝이 핵심인 코드는 <strong>가독성 떨어짐</strong>
+    </td></tr>
+  </table>
+</div>
+
+<h2>4. 해소 옵션 C — 하이브리드 <span class="label c">C</span></h2>
+
+<div class="panel option-c">
+  <p>
+    BigDecimal 만 facade class 로 (Java 체이닝 유지), 나머지 4종 (MathContext / RoundingMode / SdConstants / ValidationResult) 은 카드를 고쳐서 runtime 의 실제 이름을 사용하게 합니다.
+  </p>
+
+  <h3>Runtime 에 추가할 것 (+80줄 정도, BigDecimal 만)</h3>
+<pre class="python"><span class="kw">class</span> <span class="fn">BigDecimal</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, value): self._d = <span class="fn">bd</span>(value)
+    <span class="kw">def</span> <span class="fn">multiply</span>(self, other): ...
+    <span class="kw">def</span> <span class="fn">divide</span>(self, other): ...      <span class="comment"># MathContext 인자 제거</span>
+    <span class="kw">def</span> <span class="fn">set_scale</span>(self, scale, rounding): ...
+
+<span class="comment"># MathContext, RoundingMode, SdConstants, ValidationResult 추가 X</span></pre>
+
+  <h3>P01 카드 부분 수정 (BigDecimal 체이닝은 유지, 나머지는 stdlib)</h3>
+<pre class="python"><span class="kw">from</span> backend.modeling.sim_verify.runtime <span class="kw">import</span> BigDecimal
+<span class="del">from backend.modeling.sim_verify.runtime import MathContext, RoundingMode</span>
+<span class="new"><span class="kw">from</span> decimal <span class="kw">import</span> ROUND_FLOOR</span>  <span class="comment"># stdlib 직접</span>
+
+INVERSE_UNIT = <span class="fn">BigDecimal</span>(<span class="str">"1000000"</span>)
+
+raw = (slab.slab_wgt_in_progress
+       .<span class="fn">multiply</span>(INVERSE_UNIT)
+       .<span class="fn">divide</span>(slab.target_slab_width.<span class="fn">multiply</span>(thickness).<span class="fn">multiply</span>(density)))
+       <span class="del">, MathContext.DECIMAL64)</span>  <span class="comment"># MathContext 인자 제거 — 기본 DECIMAL64 자동</span>
+
+floored = raw.<span class="fn">set_scale</span>(0, <span class="new">ROUND_FLOOR</span>)  <span class="comment"># RoundingMode.FLOOR 대신 stdlib</span></pre>
+
+  <h3>다른 카드 (P22) 예시 — SdConstants 부분</h3>
+<pre class="python"><span class="del">from backend.modeling.sim_verify.runtime import SdConstants</span>
+<span class="new"><span class="kw">from</span> backend.modeling.sim_verify.runtime <span class="kw">import</span> POS_SM, POS_HR, POS_HRF</span>
+
+<span class="del">if confirmed_plant_cd[SdConstants.POS_SM] != ' ':</span>
+<span class="new"><span class="kw">if</span> confirmed_plant_cd[POS_SM] != <span class="str">' '</span>:</span>  <span class="comment"># 직접 이름</span></pre>
+
+  <h3>장단</h3>
+  <table>
+    <tr><th style="width: 100px;">장점</th><td>
+      • Java BigDecimal 체이닝의 가독성 유지 (slab 알고리즘의 핵심 패턴)<br>
+      • runtime wrapper 코드 80줄로 최소<br>
+      • 카드 수정도 단순 search & replace 수준 (MathContext.DECIMAL64 제거, RoundingMode.X → ROUND_X)
+    </td></tr>
+    <tr><th>단점</th><td>
+      • runtime 과 카드 양쪽 수정 — 일관성 없는 듯한 인상<br>
+      • "BigDecimal 만 클래스, 나머지는 함수/상수" 라는 디자인 선택을 문서화 필요<br>
+      • <code>ValidationResult</code> 는 어차피 새로 만들어야 함 (옵션 A 처럼 runtime 에 추가)
+    </td></tr>
+  </table>
+</div>
+
+<h2>5. 한눈에 비교</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th></th>
+      <th class="center">A: Facade</th>
+      <th class="center">B: 카드 재작성</th>
+      <th class="center">C: 하이브리드</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Runtime 추가 코드</strong></td>
+      <td class="center">~200줄 (5개 클래스/enum)</td>
+      <td class="center">0줄</td>
+      <td class="center">~80줄 (BigDecimal + ValidationResult)</td>
+    </tr>
+    <tr>
+      <td><strong>카드 변경량</strong></td>
+      <td class="center">0장</td>
+      <td class="center">27장 전부</td>
+      <td class="center">27장 부분 (찾기-바꾸기)</td>
+    </tr>
+    <tr>
+      <td><strong>예상 작업 시간</strong></td>
+      <td class="center">중간</td>
+      <td class="center">큼</td>
+      <td class="center">작음</td>
+    </tr>
+    <tr>
+      <td><strong>Java 원본과 1:1 매핑</strong></td>
+      <td class="center icon-ok">매우 좋음</td>
+      <td class="center">보통</td>
+      <td class="center icon-ok">좋음 (BigDecimal 부분)</td>
+    </tr>
+    <tr>
+      <td><strong>Python idiomatic</strong></td>
+      <td class="center">낮음</td>
+      <td class="center icon-ok">높음</td>
+      <td class="center">중간</td>
+    </tr>
+    <tr>
+      <td><strong>Section 3 의 사용성</strong></td>
+      <td class="center icon-ok">카드 copy-paste 가능</td>
+      <td class="center">카드 그대로 사용 가능</td>
+      <td class="center">대부분 copy-paste, 일부 변환</td>
+    </tr>
+    <tr>
+      <td><strong>유지보수 부담</strong></td>
+      <td class="center">runtime wrapper 유지</td>
+      <td class="center icon-ok">runtime 만 유지</td>
+      <td class="center">양쪽 일부</td>
+    </tr>
+    <tr>
+      <td><strong>일관성</strong></td>
+      <td class="center icon-ok">전부 Java-like</td>
+      <td class="center icon-ok">전부 Pythonic</td>
+      <td class="center">혼합</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>6. 결정 가이드</h2>
+
+<div class="tldr">
+  <strong>Section 3 가 자바 코드 보면서 옮길 때 무엇을 더 중시하는지</strong> 가 핵심 결정 기준입니다.
+</div>
+
+<table>
+  <tr>
+    <th style="width: 50%;">이런 우선순위라면</th>
+    <th>추천 옵션</th>
+  </tr>
+  <tr>
+    <td>Java 원본 알고리즘 (특히 BigDecimal 체이닝 + MathContext) 의 모양과 가능한 똑같이 보이도록 Python 을 짜고 싶다. Section 3 가 카드를 거의 copy-paste 로 쓸 수 있어야 한다.</td>
+    <td><span class="label a">A</span> Facade</td>
+  </tr>
+  <tr>
+    <td>onTong 의 다른 Python 코드와 같은 스타일 (함수형, 명시적, stdlib) 유지를 우선. 카드는 "이렇게 짜는 게 정석" 인 문서 역할.</td>
+    <td><span class="label b">B</span> 카드 재작성</td>
+  </tr>
+  <tr>
+    <td>BigDecimal 의 정밀도/rounding 동작은 Java 와 동일하게 보존하고 싶지만 enum/namespace 같은 사소한 wrapper 까지는 과하다. 빠르게 끝내고 Phase β 진입하고 싶다.</td>
+    <td><span class="label c">C</span> 하이브리드</td>
+  </tr>
+</table>
+
+<div class="callout">
+  <strong>참고:</strong> 어떤 옵션을 선택하든, <code>tests/verification/test_idiom_runtime_contract.py</code> 의 <code>KNOWN_DIVERGENCE</code> set 이 해소된 항목만큼 줄어들고, 모든 항목이 해소되면 빈 set 이 됩니다. Phase β 진입 전 빈 set 이 되어야 합니다.
+</div>
+
+</body>
+</html>

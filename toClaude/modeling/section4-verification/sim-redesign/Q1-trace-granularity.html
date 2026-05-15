@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Q1 — Trace Granularity 결정</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+      "Noto Sans KR", sans-serif;
+    line-height: 1.6;
+    color: #1f2937;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+    background: #fafafa;
+  }
+  h1 {
+    font-size: 28px;
+    margin: 0 0 8px;
+    color: #111827;
+  }
+  h2 {
+    font-size: 22px;
+    margin: 48px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e5e7eb;
+    color: #111827;
+  }
+  h3 {
+    font-size: 17px;
+    margin: 24px 0 8px;
+    color: #1f2937;
+  }
+  h4 {
+    font-size: 14px;
+    margin: 12px 0 6px;
+    color: #4b5563;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .lead {
+    color: #6b7280;
+    font-size: 15px;
+    margin-bottom: 32px;
+  }
+  .panel {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin: 16px 0;
+  }
+  .panel.opt-a { border-left: 4px solid #2563eb; }
+  .panel.opt-b { border-left: 4px solid #db2777; }
+  .panel.opt-c { border-left: 4px solid #16a34a; }
+  .panel.opt-d { border-left: 4px solid #9333ea; }
+  .panel.warn  { background: #fff7ed; border-color: #fdba74; }
+  .panel.info  { background: #eff6ff; border-color: #93c5fd; }
+  pre {
+    background: #1f2937;
+    color: #e5e7eb;
+    padding: 14px 18px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.55;
+    font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+    margin: 8px 0;
+  }
+  pre.lang::before {
+    content: attr(data-lang);
+    display: inline-block;
+    background: #374151;
+    color: #9ca3af;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  pre .kw { color: #c084fc; }
+  pre .str { color: #fca5a5; }
+  pre .fn { color: #93c5fd; }
+  pre .num { color: #fbbf24; }
+  pre .comment { color: #6b7280; font-style: italic; }
+  pre .err { color: #fb923c; }
+  pre .anc { background: rgba(34, 197, 94, 0.18); padding: 1px 4px; border-radius: 3px; }
+  pre .slot { color: #34d399; font-weight: 600; }
+  pre .new { background: rgba(34, 197, 94, 0.15); padding: 0 2px; border-radius: 2px; }
+  pre .del { background: rgba(239, 68, 68, 0.15); padding: 0 2px; border-radius: 2px;
+             text-decoration: line-through; }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 12px 0;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    margin: 12px 0;
+  }
+  .col {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 12px 16px;
+  }
+  .col h4 { margin-top: 0; }
+  .label {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-left: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .label.a { background: #dbeafe; color: #1e40af; }
+  .label.b { background: #fce7f3; color: #9d174d; }
+  .label.c { background: #dcfce7; color: #166534; }
+  .label.d { background: #f3e8ff; color: #6b21a8; }
+  .label.rec { background: #fef3c7; color: #92400e; margin-left: 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    background: white;
+  }
+  th, td {
+    border: 1px solid #e5e7eb;
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 14px;
+    vertical-align: top;
+  }
+  th {
+    background: #f3f4f6;
+    font-weight: 600;
+  }
+  td.center { text-align: center; }
+  td.ok { color: #16a34a; font-weight: 700; text-align: center; }
+  td.no { color: #dc2626; font-weight: 700; text-align: center; }
+  td.partial { color: #d97706; font-weight: 700; text-align: center; }
+  .diagram {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre;
+    overflow-x: auto;
+    color: #1e293b;
+  }
+  .callout {
+    background: #fef3c7;
+    border-left: 4px solid #f59e0b;
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  .tldr {
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    padding: 14px 18px;
+    margin: 16px 0;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  .rec-banner {
+    background: linear-gradient(90deg, #fef3c7, #fde68a);
+    border: 2px solid #f59e0b;
+    border-radius: 8px;
+    padding: 14px 20px;
+    margin: 20px 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #78350f;
+  }
+  .anchor-pill {
+    display: inline-block;
+    background: #dcfce7;
+    color: #166534;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: "SF Mono", monospace;
+    font-size: 11px;
+    margin-right: 4px;
+    margin-bottom: 2px;
+  }
+  .quote {
+    border-left: 3px solid #94a3b8;
+    padding-left: 16px;
+    color: #475569;
+    font-style: italic;
+    margin: 12px 0;
+  }
+  .checkmark { color: #16a34a; font-weight: 700; }
+  .crossmark { color: #dc2626; font-weight: 700; }
+  .partialmark { color: #d97706; font-weight: 700; }
+  .scenario-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+  }
+  .scenario-card h3 {
+    margin-top: 0;
+    color: #be185d;
+  }
+  .effort {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #f1f5f9;
+    color: #334155;
+    margin-left: 4px;
+  }
+  .effort.low { background: #dcfce7; color: #166534; }
+  .effort.med { background: #fef3c7; color: #92400e; }
+  .effort.high { background: #fee2e2; color: #991b1b; }
+</style>
+</head>
+<body>
+
+<h1>Q1 — R4 검증 단위 결정 <span class="label rec">grill-with-docs Q1</span></h1>
+<p class="lead">
+  R4 ("동일 처리 과정 보장") 의 검증 단위(trace granularity) 를 어디로 둘 것인가.<br>
+  실제 v2 의 <code>SdThicknessAction</code> 을 예시로 4가지 옵션이 어떻게 다른지 비교합니다.
+</p>
+
+<div class="tldr">
+  <strong>이 문서의 목적</strong> — Q1 의 4 옵션 (A/B/C/D) 을 실제 코드 + 실제 ontology 데이터로 비교해서, 사용자가 trade-off 를 손에 잡히는 형태로 평가할 수 있도록. 결정 후 ADR-001 로 기록 예정.
+</div>
+
+<h2>1. R4 가 묻는 것 — "동일 처리 과정" 의 정의</h2>
+
+<div class="quote">
+  "시뮬레이션의 최고 kpi는 자바소스가 실제로 동작한 것과 동일한 input, 동일한 output이 보장되고
+  <strong>데이터 처리과정 또한 똑같은 형태의 코드는 아닐지언정 동일한 처리과정을 보장</strong>하는 것"
+  <br>— 사용자, 2026-05-12
+</div>
+
+<p>
+  R3 (동일 input/output) 은 비교 단위가 명확합니다 — 최종 결과 JSON 이 비트 단위로 일치. 이미 oracle differ 가 처리 중.
+</p>
+
+<p>
+  <strong>R4 는 모호</strong>합니다. "처리과정 동일" 이란?
+</p>
+
+<ul>
+  <li>같은 외부 서비스를 같은 순서로 호출 → "동일" 인가?</li>
+  <li>같은 if-branch 를 같은 순서로 거침 → "동일" 인가?</li>
+  <li>같은 변수를 같은 순서로 set → "동일" 인가?</li>
+</ul>
+
+<p>
+  이 결정이 모든 하위 설계를 분기시킵니다 — Python 코드 형태, Java instrumentation 범위, idiom card 운명, oracle differ 알고리즘.
+</p>
+
+<h2>2. 실제 예시 — <code>SdThicknessAction.execute()</code></h2>
+
+<p>
+  v2 의 step 1 액션. 슬랩 두께를 결정하는 가장 단순한 step (40줄). 다음을 모두 보여줍니다 — input validation, external lookup, downstream lookup, output assignment.
+</p>
+
+<h3>Java 원본 (sample-repos/slab-design-real_v2/.../action/SdThicknessAction.java:41-71)</h3>
+
+<pre class="lang" data-lang="java"><span class="kw">public void</span> <span class="fn">execute</span>(SDOrderEntity order, SDSlabEntity slab) {
+    String confirmed = order.<span class="fn">getConfirmedPlantCd</span>();
+<span class="anc">    <span class="kw">if</span> (confirmed == <span class="kw">null</span> || confirmed.<span class="fn">isEmpty</span>()) {                <span class="comment">// ← anchor #1</span>
+        <span class="kw">throw</span> <span class="fn">fail</span>(<span class="str">"확정통과공장코드 미설정"</span>);                          <span class="comment">// slot: atomic.confirmed_plant_cd.invalid_check</span>
+    }</span>
+    <span class="kw">char</span> smChar = confirmed.<span class="fn">charAt</span>(<span class="num">0</span>);
+<span class="anc">    <span class="kw">if</span> (smChar == SdConstants.INACTIVE_PROCESS) {                       <span class="comment">// ← anchor #2</span>
+        <span class="kw">throw</span> <span class="fn">fail</span>(<span class="str">"제강 공장 비활성 (확통[0] = ' ')"</span>);                    <span class="comment">// slot: atomic.confirmed_plant_cd.activation_check</span>
+    }</span>
+    String smCd = String.<span class="fn">valueOf</span>(smChar);
+
+<span class="anc">    PlantMapping mapping = plantMapping.<span class="fn">getMapping</span>(smCd);                <span class="comment">// ← anchor #3</span></span>
+    <span class="kw">if</span> (mapping == <span class="kw">null</span>) {                                          <span class="comment">// slot: body.service_lookup (L52)</span>
+        <span class="kw">throw</span> <span class="fn">fail</span>(<span class="str">"PlantMapping 미정의 for smCd="</span> + smCd);
+    }
+
+<span class="anc">    CastSpecEntity spec = castSpecService.<span class="fn">lookup</span>(                       <span class="comment">// ← anchor #4</span>
+        order.<span class="fn">getCmpCd</span>(), order.<span class="fn">getOrgCd</span>(),                              <span class="comment">// slot: body.service_lookup (L57)</span>
+        smCd, mapping.<span class="fn">castCd</span>(), mapping.<span class="fn">machineCd</span>(),
+        order.<span class="fn">getProductCd</span>());</span>
+    <span class="kw">if</span> (spec == <span class="kw">null</span>) {
+        <span class="kw">throw</span> <span class="fn">fail</span>(<span class="str">"CAST_SPEC 미존재 ..."</span>);
+    }
+    <span class="kw">if</span> (spec.<span class="fn">getSlabThickness</span>() == <span class="kw">null</span>) {
+        <span class="kw">throw</span> <span class="fn">fail</span>(<span class="str">"CAST_SPEC.SLAB_THICKNESS NULL"</span>);
+    }
+
+<span class="anc">    slab.<span class="fn">setSlabThickness</span>(spec.<span class="fn">getSlabThickness</span>());                       <span class="comment">// ← anchor #5</span></span>
+}                                                                       <span class="comment">// slot: body.set_output (L70)</span>
+</pre>
+
+<h3>같은 메서드를 두 가지 단위로 본 결과</h3>
+
+<div class="grid-2">
+  <div class="col">
+    <h4>v2 TraceCollector — Action 단위</h4>
+    <p style="margin-top:0; font-size:13px; color:#6b7280">한 번의 <code>execute()</code> 호출에서 trace 1 entry 적재</p>
+<pre class="lang" data-lang="json">{
+  <span class="str">"step"</span>: <span class="num">1</span>,
+  <span class="str">"stepName"</span>: <span class="str">"SLAB_THICKNESS"</span>,
+  <span class="str">"phase"</span>: <span class="str">"ONE_SHOT"</span>,
+  <span class="str">"iteration"</span>: <span class="num">1</span>,
+  <span class="str">"input"</span>: {
+    <span class="str">"order.confirmedPlantCd"</span>: <span class="str">"K1 K    "</span>,
+    <span class="str">"order.cmpCd"</span>: <span class="str">"K"</span>,
+    <span class="str">"order.productCd"</span>: <span class="str">"SCM"</span>
+  },
+  <span class="str">"output"</span>: {
+    <span class="str">"slab.slabThickness"</span>: <span class="num">230.0</span>
+  },
+  <span class="str">"status"</span>: <span class="str">"OK"</span>,
+  <span class="str">"errorCode"</span>: <span class="kw">null</span>,
+  <span class="str">"errorMessage"</span>: <span class="kw">null</span>
+}</pre>
+    <p style="font-size:13px; color:#6b7280">중간 단계 (plant_mapping 조회 / cast_spec 조회 / 두께 추출) 는 보이지 않음. 박스 안이 블랙박스.</p>
+  </div>
+
+  <div class="col">
+    <h4>Ontology anchor_bindings — Slot 단위</h4>
+    <p style="margin-top:0; font-size:13px; color:#6b7280">같은 메서드에 5개 anchor 가 매핑됨</p>
+<pre class="lang" data-lang="anchor-bindings">L43 <span class="slot">atomic.confirmed_plant_cd.invalid_check</span>
+    rationale: Guard clause — confirmedPlantCd null/empty
+            → DG ALG_CAST_SPEC_NOT_FOUND
+L47 <span class="slot">atomic.confirmed_plant_cd.activation_check</span>
+    rationale: 제강 공장 비활성(' ') → fail. INACTIVE_PROCESS
+            sentinel check on confirmedPlantCd[0]
+L52 <span class="slot">body.service_lookup</span>
+    rationale: smCd → (castCd, machineCd) plant lookup.
+            Drives downstream CAST_SPEC keys.
+L57 <span class="slot">body.service_lookup</span>
+    rationale: Primary CAST_SPEC lookup with 6-key tuple
+            — main data source for thickness.
+L70 <span class="slot">body.set_output</span>
+    rationale: Step 1 output assignment —
+            CAST_SPEC.SLAB_THICKNESS → SDSlabEntity</pre>
+    <p style="font-size:13px; color:#6b7280">각 anchor 가 "처리 과정" 의 의미 단위. 5개 anchor 가 합쳐서 1 action 의 본문 의미를 충실히 표현.</p>
+  </div>
+</div>
+
+<div class="callout">
+  <strong>핵심 통찰</strong> — 같은 메서드를 보는 두 단위가 모두 ontology 에 이미 존재합니다. v2 TraceCollector 는 action 단위, anchor_bindings 는 slot 단위. <strong>둘 중 어느 단위에서 "동일 처리 과정" 을 정의할지가 Q1.</strong>
+</div>
+
+<h2>2.5. <code>emit</code> 의 정확한 정의 — 한 줄로</h2>
+
+<p>이전 섹션에서 <code>trace.emit(...)</code> / <code>trace.anchor(...)</code> 라는 표현을 썼습니다. 정확히 무슨 동작인가요?</p>
+
+<div class="tldr">
+  <strong>한 줄 정의</strong> — <code>emit</code> 은 "현재 코드 위치 식별자 + 변수 snapshot + status (OK/FAIL) 를 trace 리스트에 <code>append</code>" 하는 동작. 그 이상도 이하도 아닙니다.
+</div>
+
+<h3>현재 v2 의 Java 측 emit (이미 구현됨)</h3>
+
+<p>v2 의 <code>TraceCollector.wrap()</code> (<code>sample-repos/.../sd/trace/TraceCollector.java:36-59</code>) 가 <strong>action 단위 emit</strong> 의 reference 구현입니다:</p>
+
+<pre class="lang" data-lang="java"><span class="kw">public</span> &lt;T&gt; T <span class="fn">wrap</span>(<span class="kw">int</span> step, String stepName, String phase, <span class="kw">int</span> iteration,
+                  Map&lt;String, Object&gt; input, Supplier&lt;T&gt; body) {
+    <span class="kw">long</span> t0 = System.<span class="fn">nanoTime</span>();
+    <span class="kw">try</span> {
+        T result = body.<span class="fn">get</span>();                                <span class="comment">// ← 실제 action 실행</span>
+        <span class="kw">double</span> ms = (System.<span class="fn">nanoTime</span>() - t0) / <span class="num">1_000_000.0</span>;
+        Map&lt;String, Object&gt; output = ...;                       <span class="comment">// result 를 map 으로 변환</span>
+        traces.<span class="fn">add</span>(<span class="kw">new</span> StepTrace(step, stepName, phase, iteration,   <span class="comment">// ← emit !</span>
+            input, output, TraceStatus.OK, <span class="kw">null</span>, <span class="kw">null</span>, ms));
+        <span class="kw">return</span> result;
+    } <span class="kw">catch</span> (AlgorithmException e) {
+        traces.<span class="fn">add</span>(<span class="kw">new</span> StepTrace(step, stepName, phase, iteration,   <span class="comment">// ← emit (FAIL)</span>
+            input, <span class="kw">null</span>, TraceStatus.FAIL, e.<span class="fn">getErrorCode</span>(), e.<span class="fn">getMessage</span>(), ms));
+        <span class="kw">throw</span> e;
+    }
+}</pre>
+
+<p>핵심: <code>traces.add(...)</code> 가 <strong>유일한 emit 동작</strong>. action 시작 시 input snapshot 인자로 받고, 끝났을 때 output snapshot + status 와 함께 list 에 append. 옵션 B/C 의 anchor-level <code>emit</code> 은 정확히 이 동작을 anchor 단위에서 한 번 더 하는 것 — 새 개념이 아님.</p>
+
+<h3>Python 측 anchor emit 의 구체 구현 (옵션 C 의 with 문)</h3>
+
+<pre class="lang" data-lang="python"><span class="kw">class</span> <span class="fn">TraceCollector</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="kw">self</span>):
+        <span class="kw">self</span>.entries = []      <span class="comment"># action 단위 trace (v2 와 동일)</span>
+        <span class="kw">self</span>.anchors = []      <span class="comment"># anchor 단위 trace (옵션 B/C 신규)</span>
+
+    @contextmanager
+    <span class="kw">def</span> <span class="fn">anchor</span>(<span class="kw">self</span>, slot_id, **input_vars):
+        <span class="comment"># 진입 시점: input snapshot 캡처</span>
+        entry = {<span class="str">"slot"</span>: slot_id, <span class="str">"input"</span>: <span class="fn">dict</span>(input_vars), <span class="str">"line_start"</span>: ...}
+        <span class="kw">try</span>:
+            <span class="kw">yield</span>                                <span class="comment"># ← with 블록 안의 Python 코드 실행</span>
+            entry[<span class="str">"status"</span>] = <span class="str">"OK"</span>
+        <span class="kw">except</span> AlgorithmException <span class="kw">as</span> e:
+            entry[<span class="str">"status"</span>] = <span class="str">"FAIL"</span>
+            entry[<span class="str">"error_code"</span>] = e.error_code
+            <span class="kw">raise</span>
+        <span class="kw">finally</span>:
+            <span class="kw">self</span>.anchors.<span class="fn">append</span>(entry)         <span class="comment"># ← emit !</span>
+
+<span class="comment"># 사용:</span>
+<span class="kw">with</span> trace.<span class="fn">anchor</span>(<span class="str">"body.service_lookup"</span>, sm_char=sm_char):
+    mapping = plant_mapping_service.<span class="fn">get_mapping</span>(sm_char)
+<span class="comment"># → trace.anchors 에 entry append 됨</span></pre>
+
+<p>즉, "emit" = "trace 리스트에 dict 1개 append". 무거운 framework 아닙니다. 단지 <strong>어디서 (slot)</strong>, <strong>무엇을 (vars)</strong>, <strong>결과는 (status)</strong> 를 기록.</p>
+
+<h2>2.6. Ontology 매핑이 있는데 왜 runtime trace 가 필요한가?</h2>
+
+<p>이 질문이 핵심입니다. ontology 에는 Action ↔ method ↔ anchor ↔ business rule ↔ source 매핑이 모두 있습니다. 그렇다면 Python 을 ontology 따라 짜기만 하면 R4 ("동일 처리 과정") 가 보장되지 않나요?</p>
+
+<h3>Ontology 와 runtime trace 가 각각 보장하는 것</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>보장하려는 속성</th>
+      <th>Static (ontology 매핑 + synthesis)</th>
+      <th>Dynamic (runtime trace)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Python 코드 <strong>구조</strong> 가 Java 와 의미적으로 같음</td>
+      <td class="ok">✓ — synthesizer 가 ontology 따라 코드 생성</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Python <strong>최종 출력</strong> 이 Java 와 동일 (R3)</td>
+      <td class="partial">⚠ — 구조 같으면 동일할 것이라는 추정. <strong>검증 아님</strong></td>
+      <td class="ok">✓ — 실제 실행해서 출력 직접 비교</td>
+    </tr>
+    <tr>
+      <td>같은 input 에서 Python 이 거친 <strong>branch sequence</strong> 가 Java 와 동일</td>
+      <td class="no">✗ — static 코드만 보면 어느 분기가 실제로 실행됐는지 모름</td>
+      <td class="ok">✓ — trace 에 어느 anchor 가 emit 됐는지 기록</td>
+    </tr>
+    <tr>
+      <td>각 anchor 시점의 <strong>중간 변수값</strong> 이 Java 와 동일</td>
+      <td class="no">✗ — runtime 에만 나타나는 값</td>
+      <td class="ok">✓ — 옵션 B/C 의 anchor input/output snapshot</td>
+    </tr>
+    <tr>
+      <td>Python 이 <strong>refactor 됐을 때</strong> 처리 과정이 보존됨</td>
+      <td class="no">✗ — synthesizer 가 보장 못함 (사람이 refactor 하면 ontology 와 분리)</td>
+      <td class="ok">✓ — refactor 후 실행해도 trace 가 같으면 안전</td>
+    </tr>
+    <tr>
+      <td>Ontology <strong>빈틈 (gap)</strong> 영역이 명시됨</td>
+      <td class="ok">✓ — synthesis 시점에 <code># UNCLEAR</code> 주석 삽입 가능</td>
+      <td class="partial">⚠ — 런타임 경고 발생 가능 (옵션 C 의 anchor 부재 fallback)</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>핵심 답변</strong> — <strong>"Python 이 못하는 영역"이 아니라, "static 매핑만으로 동적 동등성을 직접 확인할 수 없는 영역" 이 존재합니다</strong>:
+  <ul>
+    <li><strong>분기 실행 경로</strong> (branch coverage) — 같은 코드라도 input 에 따라 다른 분기. 어느 분기를 거쳤는지는 실행해야 안다</li>
+    <li><strong>중간 변수값</strong> — 외부 service 호출 결과, lookup 결과, 누적 계산값. 코드만 보면 모름</li>
+    <li><strong>Synthesis 자체의 오류</strong> — synthesizer 가 잘못 짰을 가능성 (실제로 α 의 KNOWN_DIVERGENCE 5종이 정확히 이 케이스. ontology 는 옳았는데 idiom card 작성자 + runtime 작성자가 API 형태에서 갈라짐)</li>
+  </ul>
+</div>
+
+<h3>α KNOWN_DIVERGENCE 5종이 이 빈틈에서 발생한 정확한 이유</h3>
+
+<p>Phase α 에서 ontology 는 완비 상태였습니다 (anchor 163/163 confirmed). 그런데도 미스매치 5종이 발생:</p>
+
+<div class="diagram">
+Ontology 매핑 (정상):
+  anchor body.compute @ SdTargetLengthAction.java:25
+    → P01-body.compute.md (idiom card)
+    → backend.modeling.sim_verify.runtime (Python runtime)
+
+문제: 동일 anchor 에 대한 두 Python 산출물이 API 형태에서 갈라짐
+  P01 카드:   <span class="del">BigDecimal("0.95").multiply(x)</span>          ← 클래스형
+  α1 runtime: bd("0.95"); bd_multiply(_, x)               ← 함수형
+
+→ 카드 그대로 Python 짜면 NameError (BigDecimal 클래스 없음)
+→ <strong>Ontology 매핑은 옳았으나, 산출물 일관성을 검증할 mechanism 부재</strong>
+→ 정확히 runtime trace 가 catch 했을 케이스
+</div>
+
+<p>옵션 A (action trace) 도 이 케이스를 잡지 못합니다 (출력만 같으면 OK). <strong>그래서 우리에게 진짜 필요한 검증 layer 가 무엇인지가 Q1 의 핵심.</strong></p>
+
+<h2>3. 5가지 옵션을 동일 예시로 비교</h2>
+
+<p>같은 <code>SdThicknessAction</code> 의 Python 등가를 각 옵션이 어떻게 다르게 짜는지 보입니다.</p>
+
+<div class="panel" style="border-left: 4px solid #0891b2;">
+  <h3>옵션 E — Ontology synthesis + 출력만 검증 <span class="label" style="background:#cffafe; color:#155e75;">E</span><span class="effort low">Java 인프라: zero</span><span class="effort low">Python: trace 없음</span> <span class="label" style="background:#e0f2fe; color:#075985; margin-left:0;">새 옵션</span></h3>
+
+  <p>사용자 의문에 가장 직접 대응하는 옵션: <strong>"Ontology 매핑이 완비됐으니 Python 은 synthesis 로 짠다. Runtime trace 는 안 만든다. R3 (출력 일치) 만 검증."</strong> R4 의 "동일 처리 과정 보장" 은 <em>synthesis 의 정확성에 의해 자동 보장</em>된다고 가정.</p>
+
+  <h4>Python 등가 (옵션 E 스타일 — 가장 단순)</h4>
+<pre class="lang" data-lang="python"><span class="kw">def</span> <span class="fn">execute_thickness</span>(order: SDOrderEntity, slab: SDSlabEntity):
+    confirmed = order.confirmed_plant_cd
+    <span class="kw">if</span> <span class="kw">not</span> confirmed:
+        <span class="kw">raise</span> AlgorithmException(<span class="str">"DG101"</span>, <span class="str">"확정통과공장코드 미설정"</span>)
+    sm_char = confirmed[<span class="num">0</span>]
+    <span class="kw">if</span> sm_char == INACTIVE_PROCESS:
+        <span class="kw">raise</span> AlgorithmException(<span class="str">"DG101"</span>, <span class="str">"제강 공장 비활성"</span>)
+    mapping = plant_mapping_service.get_mapping(sm_char)
+    spec = cast_spec_service.lookup(...)
+    slab.slab_thickness = spec.slab_thickness
+    <span class="kw">return</span> slab                                <span class="comment"># trace 없음. emit 없음.</span>
+</pre>
+
+  <h4>R4 의 보장 mechanism — Synthesis 정확성</h4>
+<pre class="lang" data-lang="python"><span class="comment"># Python synthesis pipeline (별도 모듈)</span>
+<span class="kw">def</span> <span class="fn">synthesize_action</span>(action_fqn: <span class="kw">str</span>) -> <span class="kw">str</span>:
+    realization = ontology.get_realization(action_fqn)
+    anchors = ontology.get_anchors(action_fqn)              <span class="comment"># 5개 anchor</span>
+    java_ast = parse_java(realization.code_method_fqn)
+
+    py_code = []
+    <span class="kw">for</span> anchor <span class="kw">in</span> anchors:
+        slot = anchor.target_slot                          <span class="comment"># e.g. body.service_lookup</span>
+        idiom = idiom_registry.get(slot)                   <span class="comment"># P01-P27 카드 매핑</span>
+        py_snippet = idiom.<span class="fn">render</span>(java_ast, anchor.line)
+        py_code.append(py_snippet)
+
+    <span class="kw">return</span> <span class="str">"\n"</span>.join(py_code)
+</pre>
+
+  <h4>비교 알고리즘 — R3 만</h4>
+  <pre class="lang" data-lang="python"><span class="kw">assert</span> py_result.slab_results == v2_result.slabResults
+<span class="kw">assert</span> py_result.error_code == v2_result.errorCode
+<span class="comment"># 그게 전부. 중간 trace 비교 없음.</span></pre>
+
+  <div class="grid-2">
+    <div>
+      <h4>장점</h4>
+      <ul>
+        <li><strong>가장 단순</strong> — 새 인프라 zero, v2 변경 zero, Python boilerplate zero</li>
+        <li><strong>R4 의 "코드 형태 무관" 정신과 가장 잘 맞음</strong> — refactor 완전 자유</li>
+        <li>Synthesis 가 결정론적이면 결과는 재현 가능</li>
+        <li>α 의 카드/runtime 미스매치 같은 buug 도 R3 (5개 fixture) 에서 자동 드러남</li>
+      </ul>
+    </div>
+    <div>
+      <h4>단점</h4>
+      <ul>
+        <li><strong>R4 의 "보장" 이 empirical</strong> — 5개 fixture 통과 = 동일 처리 추정. 진짜 보장 아님</li>
+        <li>Synthesis 가 잘못된 anchor 를 쓴 경우 (R5 의 corner case) 우연히 R3 통과하면 못 잡음 — 시나리오 #1 같은 hardcode bug</li>
+        <li>R2 (빈틈 자각) 은 synthesis 시점 정적 marker 만 가능 — runtime 빈틈 (예: lookup 결과가 예상과 다를 때) 은 표면화 안 됨</li>
+        <li>R5 (수정 전후 비교) 는 trace diff 가 아닌 code diff + output diff 만. 사람이 읽기 어려울 수 있음</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>E 가 가장 적합한 시나리오</strong> — Ontology 가 완비되고 synthesizer 의 idiom card 정합성이 별도 검증된 경우. 5개 fixture 가 coverage 양호하다고 가정하면 실용적으로 충분할 수 있음. <strong>하지만</strong> α 의 5종 미스매치가 정확히 이 가정의 빈틈에서 발생 — 그러므로 E 채택 시 synthesizer 자체에 대한 contract test (idiom × runtime smoke 같은 것) 가 더 두꺼워야 함.
+  </div>
+</div>
+
+<div class="panel opt-a">
+  <h3>옵션 A — Action 단위만 <span class="label a">A</span><span class="effort low">Java 인프라: zero work</span><span class="effort low">Python: 가볍다</span></h3>
+
+  <p>R4 검증 = "각 action 의 input/output snapshot 이 일치". 내부 anchor 는 무관.</p>
+
+  <h4>Python 등가 (옵션 A 스타일)</h4>
+<pre class="lang" data-lang="python"><span class="kw">def</span> <span class="fn">execute_thickness</span>(order: SDOrderEntity, slab: SDSlabEntity,
+                      trace: TraceCollector | <span class="kw">None</span> = <span class="kw">None</span>):
+    <span class="kw">def</span> <span class="fn">body</span>():
+        confirmed = order.confirmed_plant_cd
+        <span class="kw">if</span> <span class="kw">not</span> confirmed:
+            <span class="kw">raise</span> AlgorithmException(<span class="str">"DG101"</span>, <span class="str">"확정통과공장코드 미설정"</span>)
+        sm_char = confirmed[<span class="num">0</span>]
+        <span class="kw">if</span> sm_char == INACTIVE_PROCESS:
+            <span class="kw">raise</span> AlgorithmException(<span class="str">"DG101"</span>, <span class="str">"제강 공장 비활성"</span>)
+        mapping = plant_mapping_service.get_mapping(sm_char)
+        <span class="comment"># ... 자유롭게 짜기 — refactor 해도 OK, anchor 무시 ...</span>
+        slab.slab_thickness = spec.slab_thickness
+        <span class="kw">return</span> {<span class="str">"slab.slabThickness"</span>: slab.slab_thickness}
+
+    <span class="kw">if</span> trace:
+        <span class="kw">return</span> trace.wrap(step=<span class="num">1</span>, name=<span class="str">"SLAB_THICKNESS"</span>,
+                          phase=<span class="str">"ONE_SHOT"</span>, body=body)
+    <span class="kw">return</span> body()
+</pre>
+
+  <h4>비교 알고리즘</h4>
+  <pre class="lang" data-lang="python">v2_trace[i].input == py_trace[i].input  <span class="comment"># action 단위</span>
+v2_trace[i].output == py_trace[i].output
+v2_trace[i].status == py_trace[i].status</pre>
+
+  <div class="grid-2">
+    <div>
+      <h4>장점</h4>
+      <ul>
+        <li>v2 인프라 zero work — 현 TraceCollector 그대로</li>
+        <li>Python 작성자에게 최대 자유. refactor 가능</li>
+        <li>oracle differ 이미 작동 (Phase α 산출물)</li>
+      </ul>
+    </div>
+    <div>
+      <h4>단점</h4>
+      <ul>
+        <li><strong>R4 "처리 과정 동일" 의 약속을 못 지킴</strong> — 내부 로직이 완전 다른데 우연히 input/output 만 일치하는 케이스 검출 불가</li>
+        <li>α 의 KNOWN_DIVERGENCE 5종 같은 문제가 또 발생할 가능성 — 외부 API 형태 차이는 잡지 못함</li>
+        <li>Anchor 가 만든 빈틈 가시화 가치 (Gap A/B/C) 활용 못함</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="panel opt-b">
+  <h3>옵션 B — Anchor 단위까지 <span class="label b">B</span><span class="effort high">Java 인프라: 신규 작업</span><span class="effort high">Python: boilerplate ↑</span></h3>
+
+  <p>R4 검증 = "각 action 내부의 anchor sequence 가 일치 + 각 anchor 의 변수값 snapshot 일치". 가장 강한 보장.</p>
+
+  <h4>Python 등가 (옵션 B 스타일)</h4>
+<pre class="lang" data-lang="python"><span class="kw">def</span> <span class="fn">execute_thickness</span>(order, slab, trace=<span class="kw">None</span>):
+    confirmed = order.confirmed_plant_cd
+
+    <span class="kw">if</span> <span class="kw">not</span> confirmed:
+        trace.emit(<span class="str">"atomic.confirmed_plant_cd.invalid_check"</span>,           <span class="comment"># anchor #1</span>
+                   {<span class="str">"confirmed"</span>: confirmed}, status=<span class="str">"FAIL"</span>)
+        <span class="kw">raise</span> AlgorithmException(<span class="str">"DG101"</span>, <span class="str">"..."</span>)
+
+    sm_char = confirmed[<span class="num">0</span>]
+    <span class="kw">if</span> sm_char == INACTIVE_PROCESS:
+        trace.emit(<span class="str">"atomic.confirmed_plant_cd.activation_check"</span>,        <span class="comment"># anchor #2</span>
+                   {<span class="str">"sm_char"</span>: sm_char}, status=<span class="str">"FAIL"</span>)
+        <span class="kw">raise</span> AlgorithmException(<span class="str">"DG101"</span>, <span class="str">"..."</span>)
+
+    mapping = plant_mapping_service.get_mapping(sm_char)
+    trace.emit(<span class="str">"body.service_lookup"</span>,                                  <span class="comment"># anchor #3</span>
+               {<span class="str">"sm_char"</span>: sm_char}, {<span class="str">"mapping"</span>: mapping})
+
+    spec = cast_spec_service.lookup(...)
+    trace.emit(<span class="str">"body.service_lookup"</span>,                                  <span class="comment"># anchor #4</span>
+               {<span class="str">"6keys"</span>: keys}, {<span class="str">"spec"</span>: spec})
+
+    slab.slab_thickness = spec.slab_thickness
+    trace.emit(<span class="str">"body.set_output"</span>,                                      <span class="comment"># anchor #5</span>
+               {}, {<span class="str">"slab.slabThickness"</span>: slab.slab_thickness})
+</pre>
+
+  <h4>Java 측에도 동일 emit 이 필요</h4>
+  <pre class="lang" data-lang="java"><span class="comment">// SdThicknessAction.execute() 안에 5개 emit 추가</span>
+trace.<span class="fn">emitAnchor</span>(<span class="str">"atomic.confirmed_plant_cd.invalid_check"</span>, ...);
+trace.<span class="fn">emitAnchor</span>(<span class="str">"body.service_lookup"</span>, ...);  <span class="comment">// × 5 모든 action</span></pre>
+
+  <div class="grid-2">
+    <div>
+      <h4>장점</h4>
+      <ul>
+        <li>R4 의 강한 보장 — 처리 과정이 anchor sequence 수준에서 일치</li>
+        <li>R2 (빈틈 자각) 직접 연결: anchor 부재 → "이 부분 처리과정 추정"</li>
+        <li>α KNOWN_DIVERGENCE 같은 미스매치 즉시 발견</li>
+      </ul>
+    </div>
+    <div>
+      <h4>단점</h4>
+      <ul>
+        <li><strong>Java 측 instrumentation 신규 작업</strong> — 36 body_anchored action × 평균 4-5 anchor = ~150 emit 호출 추가</li>
+        <li>Python boilerplate 폭증 — 각 anchor 가 emit 호출 1개</li>
+        <li>Refactor 자유도 제한 — anchor 순서 = 처리 순서로 강제</li>
+        <li>v2 (Java) 코드를 건드려야 함 — Section 2 산출물에 영향</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="panel opt-c">
+  <h3>옵션 C — 계층적 (Action default + Anchor drill-down) <span class="label c">C</span><span class="effort med">Java: 점진 추가</span><span class="effort med">Python: emit 헬퍼 1개</span> <span class="label rec">추천</span></h3>
+
+  <p>R3 (output) 은 항상 검증. R4 의 강도는 "action 단위 (baseline)" 와 "anchor 단위 (옵션)" 두 레벨을 모두 제공. 기본은 baseline, fidelity mode 옵션 시 drill-down.</p>
+
+  <h4>Python 등가 (옵션 C 스타일)</h4>
+<pre class="lang" data-lang="python"><span class="kw">def</span> <span class="fn">execute_thickness</span>(order, slab, trace=<span class="kw">None</span>):
+    <span class="kw">def</span> <span class="fn">body</span>():
+        confirmed = order.confirmed_plant_cd
+
+        <span class="kw">with</span> trace.anchor(<span class="str">"atomic.confirmed_plant_cd.invalid_check"</span>):  <span class="comment"># 자동 emit</span>
+            <span class="kw">if</span> <span class="kw">not</span> confirmed:
+                <span class="kw">raise</span> AlgorithmException(<span class="str">"DG101"</span>, <span class="str">"..."</span>)
+
+        sm_char = confirmed[<span class="num">0</span>]
+        <span class="kw">with</span> trace.anchor(<span class="str">"atomic.confirmed_plant_cd.activation_check"</span>):
+            <span class="kw">if</span> sm_char == INACTIVE_PROCESS:
+                <span class="kw">raise</span> AlgorithmException(<span class="str">"DG101"</span>, <span class="str">"..."</span>)
+
+        <span class="kw">with</span> trace.anchor(<span class="str">"body.service_lookup"</span>, key=<span class="str">"plant_mapping"</span>):
+            mapping = plant_mapping_service.get_mapping(sm_char)
+
+        <span class="kw">with</span> trace.anchor(<span class="str">"body.service_lookup"</span>, key=<span class="str">"cast_spec"</span>):
+            spec = cast_spec_service.lookup(...)
+
+        <span class="kw">with</span> trace.anchor(<span class="str">"body.set_output"</span>):
+            slab.slab_thickness = spec.slab_thickness
+
+        <span class="kw">return</span> {<span class="str">"slab.slabThickness"</span>: slab.slab_thickness}
+
+    <span class="kw">return</span> trace.wrap_action(step=<span class="num">1</span>, name=<span class="str">"SLAB_THICKNESS"</span>, body=body)
+</pre>
+
+  <h4>Java 측은 옵션 적용</h4>
+<pre class="lang" data-lang="java"><span class="comment">// SdThicknessAction 에 anchor emit 추가는 점진적 — fidelity mode 활성 시만 동작</span>
+<span class="comment">// 기본 mode 에서는 trace.wrap() 하나만 → v2 변경 zero</span>
+<span class="comment">// fidelity mode 에서는 trace.anchor(...) 호출 추가 → action 별로 개별 작업</span>
+<span class="kw">if</span> (trace != <span class="kw">null</span> && trace.<span class="fn">isFidelityMode</span>()) {
+    trace.<span class="fn">emitAnchor</span>(<span class="str">"body.service_lookup"</span>, ...);
+}</pre>
+
+  <h4>비교 알고리즘 — 2단 비교</h4>
+<pre class="lang" data-lang="python"><span class="comment"># Tier 1: action 단위 (항상 검증)</span>
+<span class="kw">assert</span> v2_trace[i].input == py_trace[i].input
+<span class="kw">assert</span> v2_trace[i].output == py_trace[i].output
+
+<span class="comment"># Tier 2: anchor 단위 (해당 action 의 anchor 가 있고 fidelity mode 일 때만)</span>
+<span class="kw">if</span> v2_trace[i].anchors:
+    <span class="kw">for</span> j, anchor <span class="kw">in</span> <span class="fn">enumerate</span>(v2_trace[i].anchors):
+        <span class="kw">assert</span> anchor.slot == py_trace[i].anchors[j].slot
+        <span class="kw">assert</span> anchor.vars == py_trace[i].anchors[j].vars</pre>
+
+  <div class="grid-2">
+    <div>
+      <h4>장점</h4>
+      <ul>
+        <li>R3 (output) 즉시 가용 — Phase α 그대로</li>
+        <li>R4 의 강한 보장이 옵션으로 제공 — 필요한 곳만 fidelity</li>
+        <li>R2 자연 통합: anchor 가 없는 method (Gap A 추상 메서드, Gap B 미보강) → 자동 action 단위 fallback → "이 영역은 처리 과정 보장 안 됨" 자각</li>
+        <li>v2 변경은 점진적 — fidelity mode 도입 액션부터 차례로</li>
+      </ul>
+    </div>
+    <div>
+      <h4>단점</h4>
+      <ul>
+        <li>두 단계 비교 알고리즘 구현 — oracle differ 확장 필요</li>
+        <li>"기본 모드만 쓰면 옵션 A 와 같다" — fidelity mode 가 실제로 켜져야 R4 강화 효과</li>
+        <li>Python 작성자가 with 문 자리에서 헷갈릴 수 있음 — 가이드 필요</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="panel opt-d">
+  <h3>옵션 D — 사용자 정의 logical step <span class="label d">D</span><span class="effort med">Java/Python: 양쪽 annotation</span></h3>
+
+  <p>R4 검증 = "사람이 의미적으로 같다고 본 단계 (phase boundary, iteration 시작 등) 가 일치". anchor 자동 추출 무시.</p>
+
+  <h4>Python 등가 (옵션 D 스타일)</h4>
+<pre class="lang" data-lang="python"><span class="kw">def</span> <span class="fn">execute_thickness</span>(order, slab, trace=<span class="kw">None</span>):
+    trace.<span class="fn">step</span>(<span class="str">"phase1.thickness.start"</span>)             <span class="comment"># 사용자 정의 logical marker</span>
+    <span class="comment"># ... validation + lookups ...</span>
+    trace.<span class="fn">step</span>(<span class="str">"phase1.thickness.cast_spec_resolved"</span>)
+    slab.slab_thickness = spec.slab_thickness
+    trace.<span class="fn">step</span>(<span class="str">"phase1.thickness.complete"</span>)
+</pre>
+
+  <h4>Java 측에도 동일 marker 가 필요</h4>
+  <pre class="lang" data-lang="java">trace.<span class="fn">step</span>(<span class="str">"phase1.thickness.start"</span>);
+<span class="comment">// ... validation + lookups ...</span>
+trace.<span class="fn">step</span>(<span class="str">"phase1.thickness.cast_spec_resolved"</span>);
+slab.<span class="fn">setSlabThickness</span>(spec.<span class="fn">getSlabThickness</span>());
+trace.<span class="fn">step</span>(<span class="str">"phase1.thickness.complete"</span>);</pre>
+
+  <div class="grid-2">
+    <div>
+      <h4>장점</h4>
+      <ul>
+        <li>R4 가 "사람이 보는 처리 과정" 수준 — 직관적</li>
+        <li>Anchor 라는 ontology 개념을 verification 에서 분리</li>
+        <li>외부 도메인 (slab-design 아닌 다른 시스템) 으로 확장 시 자유</li>
+      </ul>
+    </div>
+    <div>
+      <h4>단점</h4>
+      <ul>
+        <li><strong>Ontology 와 분리</strong> — 시뮬 검증을 위해 사람이 또 marker 를 정의해야 함. 작업 폭증</li>
+        <li>Marker 의 일관성 보장 X — 사람마다 다르게 찍을 가능성</li>
+        <li>v2 Java 에 marker 삽입 = 옵션 B 와 동일 작업량 + 무엇을 marker 로 둘지 결정 추가</li>
+        <li><strong>R2 (빈틈 자각) 와 단절</strong> — anchor 부재 신호가 marker 와 무관</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2>4. Mismatch 시나리오별 검출력 비교</h2>
+
+<p>실제 Python 시뮬레이터가 만들 수 있는 3가지 미스 케이스. 각 옵션이 잡아내는지 비교.</p>
+
+<div class="scenario-card">
+  <h3>시나리오 #1 — 우연한 동일 output, 잘못된 처리 과정</h3>
+  <p>Python 작성자가 <code>plant_mapping</code> lookup 을 빠뜨리고 hardcode 로 채워넣었음. 우연히 S1 fixture 에서는 output 이 일치.</p>
+<pre class="lang" data-lang="python"><span class="comment"># 잘못 짠 Python</span>
+<span class="kw">def</span> <span class="fn">execute_thickness</span>(order, slab):
+    <span class="del">mapping = plant_mapping_service.get_mapping(sm_char)</span>  <span class="comment"># 빠뜨림</span>
+    <span class="new">mapping = PlantMapping(cast_cd=<span class="str">"K1"</span>, machine_cd=<span class="str">"K"</span>)</span>  <span class="comment"># hardcode</span>
+    spec = cast_spec_service.lookup(...)
+    slab.slab_thickness = spec.slab_thickness</pre>
+
+  <table>
+    <thead>
+      <tr><th>옵션</th><th>검출?</th><th>이유</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="label" style="background:#cffafe; color:#155e75;">E</span></td><td class="partial">⚠</td><td><strong>사람이 못 짠다 (Python 은 synthesizer 가 ontology 따라 생성).</strong> 만약 synthesizer 자체가 이 bug 를 일으키면 (anchor body.service_lookup 을 빠뜨림), S2/S3 의 다른 input 에서 output diff 가 catch 할 가능성 높음. 단 S1 만 통과하고 S2-S5 가 다르면 R3 통과로 false-OK 가능</td></tr>
+      <tr><td><span class="label a">A</span></td><td class="no">✗</td><td>S1 input/output 이 일치 → action 단위만 보면 OK</td></tr>
+      <tr><td><span class="label b">B</span></td><td class="ok">✓</td><td><code>body.service_lookup (L52)</code> anchor 의 input snapshot (<code>sm_char</code>) 은 일치하지만 출력 mapping 의 출처가 다름 — anchor 단위 비교 시 발견</td></tr>
+      <tr><td><span class="label c">C</span></td><td class="partial">⚠</td><td>Fidelity mode 켰을 때만 검출. 기본 모드에서는 A 와 동일</td></tr>
+      <tr><td><span class="label d">D</span></td><td class="no">✗</td><td>사용자가 <code>plant_mapping_resolved</code> marker 를 따로 두지 않았다면 검출 못함</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="scenario-card">
+  <h3>시나리오 #2 — Refactor (의도된 코드 형태 변경, 처리 과정 동일)</h3>
+  <p>Python 작성자가 <code>get_mapping</code> 과 <code>cast_spec.lookup</code> 을 하나의 helper 로 묶음. 결과 동일, 호출 횟수도 같음.</p>
+<pre class="lang" data-lang="python"><span class="comment"># 의도된 refactor</span>
+<span class="kw">def</span> <span class="fn">resolve_cast_spec</span>(order, sm_char):
+    mapping = plant_mapping_service.get_mapping(sm_char)
+    <span class="kw">return</span> cast_spec_service.lookup(
+        order.cmp_cd, order.org_cd, sm_char,
+        mapping.cast_cd, mapping.machine_cd, order.product_cd)
+
+<span class="kw">def</span> <span class="fn">execute_thickness</span>(order, slab):
+    sm_char = ...
+    spec = <span class="fn">resolve_cast_spec</span>(order, sm_char)  <span class="comment"># refactor</span>
+    slab.slab_thickness = spec.slab_thickness</pre>
+
+  <table>
+    <thead>
+      <tr><th>옵션</th><th>거부?</th><th>이유</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="label" style="background:#cffafe; color:#155e75;">E</span></td><td class="partial">N/A</td><td><strong>"사람 refactor" 개념 자체가 없음.</strong> Python 은 synthesizer 가 매번 ontology 에서 재생성 → 같은 ontology 면 같은 Python. 사람이 refactor 한 코드는 다음 synthesis 에서 사라짐 (이게 약점일 수도)</td></tr>
+      <tr><td><span class="label a">A</span></td><td class="ok">✓ pass</td><td>Output 일치 → OK. Refactor 허용 (R4 의 "코드 형태 무관" 정신과 맞음)</td></tr>
+      <tr><td><span class="label b">B</span></td><td class="no">✗ fail</td><td><code>body.service_lookup</code> 두 anchor 가 차례로 emit 되어야 하지만 helper 안에 함께 emit → 위치/순서 mismatch 가능. <strong>정당한 refactor 를 거부</strong></td></tr>
+      <tr><td><span class="label c">C</span></td><td class="ok">✓ pass</td><td>기본 모드는 A 처럼 통과. Fidelity 켰어도 with 문 안에서만 anchor emit 이므로 작성자가 의식 가능 (with 문 위치만 신경 쓰면 refactor OK)</td></tr>
+      <tr><td><span class="label d">D</span></td><td class="ok">✓ pass</td><td>Logical step marker 가 같으면 OK. 사람이 정한 단계만 일치하면 됨</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="scenario-card">
+  <h3>시나리오 #3 — α의 KNOWN_DIVERGENCE 5종 같은 API 형태 차이</h3>
+  <p>Python 이 <code>BigDecimal</code> 클래스 대신 <code>bd()</code> 함수형 API 사용. 결과 동일, 호출 순서 동일, 변수 흐름 동일.</p>
+<pre class="lang" data-lang="python"><span class="comment"># Java: thickness = spec.getSlabThickness() (BigDecimal 클래스)</span>
+<span class="comment"># Python α2 카드 (class API 가정): BigDecimal("230.0").set_scale(0, ...)</span>
+<span class="comment"># Python α1 runtime (실제 함수형): bd("230.0"); bd_set_scale(...)</span></pre>
+
+  <table>
+    <thead>
+      <tr><th>옵션</th><th>거부?</th><th>이유</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="label" style="background:#cffafe; color:#155e75;">E</span></td><td class="ok">✓ catch (loud)</td><td><strong>실제 발생 시: ImportError 즉시 발생</strong> (synthesizer 가 class API 카드 + function API runtime 동시 참조 시). 출력 비교 전에 fail — silent bug 아님. 또는 synthesizer 의 contract test (Phase α E-1 smoke 같은 것) 가 합성 단계에서 catch</td></tr>
+      <tr><td><span class="label a">A</span></td><td class="ok">✓ pass</td><td>최종 thickness 값이 같으면 OK. 클래스 vs 함수형 차이는 검증 영역 밖</td></tr>
+      <tr><td><span class="label b">B</span></td><td class="ok">✓ pass</td><td>Anchor 의 input/output snapshot 만 비교 — 사용한 API 형태는 무관</td></tr>
+      <tr><td><span class="label c">C</span></td><td class="ok">✓ pass</td><td>A 와 동일 — API 형태는 trace 위에 보이지 않음</td></tr>
+      <tr><td><span class="label d">D</span></td><td class="ok">✓ pass</td><td>Logical marker 와 무관</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:13px; color:#6b7280; margin-top:8px"><strong>중요</strong>: 이 시나리오는 R4 의 "동일 처리 과정" 보다 idiom card 의 import contract 문제. Q1 (granularity) 자체로는 해결되지 않지만, <strong>옵션 E 는 synthesizer 의 contract test 를 1급 시민으로 두므로 이런 케이스를 합성 시점에 catch</strong>. KNOWN_DIVERGENCE 는 별도 결정 (runtime API surface 결정 = Q2 이후 다룰 주제) 이지만 옵션 E 가 가장 자연스럽게 통합.</p>
+</div>
+
+<h2>5. Trade-off matrix</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>축</th>
+      <th>E (synthesis only)</th>
+      <th>A (action only)</th>
+      <th>B (anchor)</th>
+      <th>C (계층적)</th>
+      <th>D (logical)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Java 인프라 작업</strong></td>
+      <td class="ok">없음 (TraceCollector 가 action emit 만 유지 — diagnostic 용)</td>
+      <td class="ok">없음</td>
+      <td class="no">150+ emit 호출 신규</td>
+      <td class="partial">점진 (fidelity mode 도입 액션부터)</td>
+      <td class="partial">사용자가 marker 위치 결정 후 삽입</td>
+    </tr>
+    <tr>
+      <td><strong>Python 작성 부담</strong></td>
+      <td class="ok">Python 안 씀 (합성)</td>
+      <td class="ok">자유</td>
+      <td class="no">anchor 마다 emit boilerplate</td>
+      <td class="partial">with 문 사용 (1줄/anchor)</td>
+      <td class="partial">marker 호출</td>
+    </tr>
+    <tr>
+      <td><strong>Synthesizer 자체 인프라</strong></td>
+      <td class="no">두꺼움 — ontology→Python 합성기 + idiom card registry + contract test</td>
+      <td class="partial">중간 (Python 사람 작성 또는 가벼운 합성)</td>
+      <td class="partial">중간</td>
+      <td class="partial">중간</td>
+      <td class="partial">중간</td>
+    </tr>
+    <tr>
+      <td><strong>R3 (output 동일) 검증</strong></td>
+      <td class="ok">완전 보장</td>
+      <td class="ok">완전 보장</td>
+      <td class="ok">완전 보장</td>
+      <td class="ok">완전 보장</td>
+      <td class="ok">완전 보장</td>
+    </tr>
+    <tr>
+      <td><strong>R4 (처리 과정 동일) 보장 mechanism</strong></td>
+      <td class="partial">By construction (합성기 정확성 + contract test + R3)</td>
+      <td class="no">약함 (output 일치만 보장)</td>
+      <td class="ok">By verification (anchor sequence 일치)</td>
+      <td class="ok">By verification (옵션 모드에서)</td>
+      <td class="partial">사람 합의 수준</td>
+    </tr>
+    <tr>
+      <td><strong>R2 (빈틈 자각) 자연성</strong></td>
+      <td class="ok">합성 시점 정적 marker (# UNCLEAR 자동 삽입)</td>
+      <td class="no">단절</td>
+      <td class="ok">직접 연결 (anchor 부재 = 빈틈)</td>
+      <td class="ok">직접 연결 + fallback 명시적</td>
+      <td class="no">단절</td>
+    </tr>
+    <tr>
+      <td><strong>α KNOWN_DIVERGENCE 미스 검출</strong></td>
+      <td class="ok">합성 단계 contract test 가 1급 시민으로 catch</td>
+      <td class="no">못 잡음 (API 형태 무관)</td>
+      <td class="no">못 잡음 (snapshot 동일)</td>
+      <td class="no">못 잡음</td>
+      <td class="no">못 잡음</td>
+    </tr>
+    <tr>
+      <td><strong>정당한 refactor 허용</strong></td>
+      <td class="partial">사람 refactor 개념 X (재합성 시 사라짐)</td>
+      <td class="ok">최대 자유</td>
+      <td class="no">anchor 위치 제약</td>
+      <td class="ok">with 문 위치만 신경</td>
+      <td class="ok">marker 위치만 신경</td>
+    </tr>
+    <tr>
+      <td><strong>v2 변경 risk</strong></td>
+      <td class="ok">zero</td>
+      <td class="ok">zero</td>
+      <td class="no">대규모 v2 코드 수정</td>
+      <td class="partial">점진</td>
+      <td class="no">marker 삽입 만큼</td>
+    </tr>
+    <tr>
+      <td><strong>Oracle differ 작업량</strong></td>
+      <td class="ok">slabResults + errorCode 만 비교 (trace 섹션 무시)</td>
+      <td class="ok">현 상태</td>
+      <td class="partial">anchor sequence 비교 추가</td>
+      <td class="partial">2-tier 비교</td>
+      <td class="partial">marker sequence 비교</td>
+    </tr>
+    <tr>
+      <td><strong>R5 (수정 전후 비교) surface</strong></td>
+      <td class="partial">Python 합성 결과 diff + output diff (사람이 읽기 좋음)</td>
+      <td class="partial">action trace diff (현 oracle differ)</td>
+      <td class="ok">anchor 수준 diff (가장 세밀)</td>
+      <td class="ok">2-tier diff</td>
+      <td class="partial">marker 시퀀스 diff</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>6. 추천 + 다음 결정 연결</h2>
+
+<div class="rec-banner">
+  결정의 본질 — <strong>R4 "보장" 을 어떻게 충족할 것인가</strong>: <br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<strong>"By construction"</strong> (옵션 E) — Synthesizer 가 ontology 따라 정확히 합성 → R4 자동 보장<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<strong>"By verification"</strong> (옵션 C) — 런타임 trace 비교로 R4 직접 확인
+</div>
+
+<p>이전 추천 (C 단독) 을 재검토했습니다. 사용자가 지적한 "ontology 매핑이 완비된 영역에서 Python 이 못하는 게 뭔가?" 질문에 답하면서, <strong>옵션 E 가 equally viable</strong> 한 것이 분명해졌습니다. 둘 다 풀 시연 가능. 선택은 R4 보장 mechanism 에 대한 입장 차이.</p>
+
+<div class="grid-2">
+  <div class="panel" style="border-left: 4px solid #0891b2; margin:0;">
+    <h3>옵션 E 가 맞는 경우</h3>
+    <ul>
+      <li><strong>"Ontology 매핑이 완비되면 synthesis 만 정확하면 충분"</strong> — 사용자 의문의 자연스러운 결론</li>
+      <li>v2 변경 zero, Python boilerplate zero — 가장 단순</li>
+      <li>R4 보장 = synthesizer 정확성 + R3 fixture coverage. 둘 다 독립 테스트 가능</li>
+      <li>α KNOWN_DIVERGENCE 같은 케이스는 synthesizer contract test (1급 시민) 가 catch</li>
+      <li><strong>대신: synthesizer 에 무게가 실림</strong> — ontology→Python 합성기, idiom card registry, contract test suite 를 두껍게</li>
+    </ul>
+  </div>
+
+  <div class="panel opt-c" style="margin:0;">
+    <h3>옵션 C 가 맞는 경우</h3>
+    <ul>
+      <li><strong>"R4 보장은 런타임에서 직접 확인되어야 함"</strong> — 합성기 신뢰만으로는 부족</li>
+      <li>R5 (수정 전후 비교) 에서 anchor 단위 trace diff 가 사람에게 더 읽기 쉽다고 판단</li>
+      <li>Python 을 합성만 하지 않고 사람도 수정/확장하는 흐름 (refactor 자유 유지)</li>
+      <li>Fidelity mode 옵션을 통해 verification 깊이를 동적으로 조절</li>
+      <li><strong>대신: oracle differ + Java instrument + Python boilerplate 모두 점진 작업</strong></li>
+    </ul>
+  </div>
+</div>
+
+<h3>둘 다 풀 시연 가능 — MVP 가 아님을 명시</h3>
+<p>두 옵션 모두 sample-repos/slab-design-real_v2 의 5개 시나리오를 end-to-end 로 처리합니다. E 의 "합성기에 집중" 도, C 의 "trace 에 집중" 도 부분 구현이 아닙니다.</p>
+
+<h3>옵션 E vs C 의 본질 차이 — "Python 어디서 오는가"</h3>
+<table>
+  <thead>
+    <tr><th>측면</th><th>옵션 E (synthesis)</th><th>옵션 C (hybrid)</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Python 코드의 출처</td>
+      <td>합성기 (deterministic)</td>
+      <td>사람 + 합성기 둘 다 (사람이 편집한 코드도 trace 와 비교)</td>
+    </tr>
+    <tr>
+      <td>Python 코드가 commit 되는가</td>
+      <td>예 (재생성 가능 산출물)</td>
+      <td>예 (사람 편집 보존)</td>
+    </tr>
+    <tr>
+      <td>"빈틈 (R2)" 표면화 시점</td>
+      <td>합성 시점 정적 (코드에 # UNCLEAR 주석)</td>
+      <td>합성 시점 + 런타임 (anchor 부재 fallback 신호)</td>
+    </tr>
+    <tr>
+      <td>R5 (수정 전후 비교) 의 사람 친화성</td>
+      <td>Python 코드 diff (사람이 읽기 좋음, 의미 단위는 약함)</td>
+      <td>trace diff (어느 step 에서 변경 났는지 직관적)</td>
+    </tr>
+    <tr>
+      <td>Java 변경 (v2 → v2') 대응</td>
+      <td>ontology 갱신 → Python 재합성</td>
+      <td>ontology 갱신 → 사람이 Python 수정 (또는 합성기 도움)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>옵션 E 가 채택되면 다음 결정 (Q들)</h3>
+<ul>
+  <li><strong>Q2-E</strong>: Synthesizer 의 정확성 보장 mechanism — contract test (Phase α E-1 스타일) 의 범위?</li>
+  <li><strong>Q3-E</strong>: 합성 시점 # UNCLEAR 의 표면 — Python 주석 / 별도 보고서 / IDE marker?</li>
+  <li><strong>Q4-E</strong>: 시뮬 에이전트 (LLM) 가 합성기인가, 별도 도구가 합성기인가</li>
+  <li><strong>Q5-E</strong>: idiom card 의 운명 — synthesizer 의 internal registry 로 흡수 (사람용 markdown 삭제) vs 사람용 markdown 유지 + registry 도 별도</li>
+  <li><strong>Q6-E</strong>: R5 의 surface — Python 재합성 후 git diff? Trace 도 같이? side-by-side viewer?</li>
+</ul>
+
+<h3>옵션 C 가 채택되면 다음 결정 (Q들)</h3>
+<ul>
+  <li><strong>Q2-C</strong>: Python 등가 코드의 lifecycle — long-lived / regenerated / dual</li>
+  <li><strong>Q3-C</strong>: R2 빈틈 surface — 코드 주석 + 런타임 경고 둘 다? 별도 보고서?</li>
+  <li><strong>Q4-C</strong>: 시뮬 에이전트 자율도 — 코드 합성 자동? 사람 보조?</li>
+  <li><strong>Q5-C</strong>: idiom card 의 재정의 형태 — anchor 별 1 카드?</li>
+  <li><strong>Q6-C</strong>: R5 surface — trace diff + 코드 diff?</li>
+</ul>
+
+<h3>두 옵션 모두에 공통된 위험</h3>
+<ul>
+  <li><strong>합성기/synthesizer 의 정확성을 검증해야 함</strong> — α 의 KNOWN_DIVERGENCE 가 정확히 합성기 정합성 문제 (카드 작성자 vs runtime 작성자 동기화 부재). 어느 옵션이든 idiom × runtime contract test 같은 cross-check 필요</li>
+  <li><strong>Ontology 완비도 의존</strong> — Gap A (2 추상), Gap C (14 type_realization 미확정) 등이 합성/trace 의 신뢰도 상한선</li>
+</ul>
+
+<div class="callout">
+  <strong>판단의 핵심 질문</strong>: <strong>"Python 을 사람이 손대는 것을 허용하나?"</strong><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;아니오 (합성 → 검토 → 출력) → <strong>E</strong><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;예 (합성/사람 편집 양쪽 + 검증 필요) → <strong>C</strong><br>
+  사용자가 R5 ("소스 수정 시 비교 분석") 에서 말한 "소스" 가 Java 인지 Python 인지에 따라도 달라집니다. Java 만이면 E 가 더 깔끔, 둘 다면 C 의 trace diff 가 더 유리.
+</div>
+
+<h2>7. 결정 요청</h2>
+
+<p>다음 중 하나로 답변 주세요. ADR-001 로 기록 후 Q2 로 진행합니다.</p>
+
+<table>
+  <thead>
+    <tr><th>선택</th><th>핵심 입장</th><th>R4 보장</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>E</strong></td>
+      <td>"Ontology 완비 + synthesis 정확성으로 충분". Python 은 합성 산물, 사람 직접 편집 X (또는 최소). 가장 단순</td>
+      <td>By construction</td>
+    </tr>
+    <tr>
+      <td><strong>C</strong></td>
+      <td>"R4 는 런타임 검증으로 확실히". Python 은 사람 + 합성기 둘 다. Fidelity mode 옵션</td>
+      <td>By verification (opt-in)</td>
+    </tr>
+    <tr>
+      <td>C+strict</td>
+      <td>C 이되 fidelity mode 가 default. Anchor 모두 mandatory trace</td>
+      <td>By verification (always)</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>Anchor 강제. 모든 action 에서 anchor trace mandatory. v2 변경 최대</td>
+      <td>By verification (strict)</td>
+    </tr>
+    <tr>
+      <td>A</td>
+      <td>Action trace 만. 가장 약한 R4</td>
+      <td>약함</td>
+    </tr>
+    <tr>
+      <td>D</td>
+      <td>Logical step marker. Ontology 와 분리</td>
+      <td>사람 합의</td>
+    </tr>
+    <tr>
+      <td>Other</td>
+      <td>위 외 다른 방향. 의견 주시면 발전</td>
+      <td>—</td>
+    </tr>
+  </tbody>
+</table>
+
+<p style="margin-top:16px"><strong>판단 가이드</strong>: 사용자가 처음 던진 질문 — "ontology 매핑이 있는데 Python 이 못하는 게 뭔가" — 의 대답이 <strong>"못하는 게 없다, synthesis 만 정확하면 됨"</strong> 이면 <strong>E</strong>. 대답이 <strong>"synthesis 만 믿기는 어렵다, 런타임에 직접 verify 해야 안심"</strong> 이면 <strong>C</strong>.</p>
+
+<p style="margin-top:48px; padding-top:16px; border-top:1px solid #e5e7eb; color:#9ca3af; font-size:12px;">
+  Q1 — Trace Granularity 결정 · 작성: Section 4 sim-redesign 세션 · 2026-05-12<br>
+  관련: <code>sample-repos/slab-design-real_v2/.../sd/process/working/action/SdThicknessAction.java</code>,
+  <code>sample-repos/.../sd/trace/TraceCollector.java</code>,
+  <code>data/ontology.db</code> (anchor_bindings · action.scm.thickness_실행)
+</p>
+
+</body>
+</html>
