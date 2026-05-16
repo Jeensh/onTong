@@ -237,6 +237,101 @@ export function RichResultCard({ result, highlightMethod }: Props) {
           <CodeBlock code={result.visualization.cypher} language="cypher" maxHeight={200} showLineNumbers={false} />
         </Section>
       )}
+
+      {/* ── legacy 보강 — modeling graph 가 빈약할 때 채워주는 정보 ── */}
+      {result.legacy_enrich && <LegacyEnrichSection enrich={result.legacy_enrich} />}
+    </div>
+  );
+}
+
+function LegacyEnrichSection({ enrich }: { enrich: any }) {
+  const src = (enrich.source_code ?? []) as Array<Record<string, any>>;
+  const rules = (enrich.business_rules ?? []) as Array<Record<string, any>>;
+  const anchors = (enrich.anchors ?? []) as Array<Record<string, any>>;
+  const realiz = (enrich.action_realizations ?? []) as Array<Record<string, any>>;
+  const callSites = (enrich.call_sites ?? []) as Array<Record<string, any>>;
+  const hits = (enrich.search_hits ?? []) as Array<Record<string, any>>;
+  const queries = (enrich.queries ?? []) as string[];
+
+  const total = src.length + rules.length + anchors.length + realiz.length + callSites.length + hits.length;
+  if (total === 0) return null;
+
+  return (
+    <div className="space-y-3 border-t-2 border-dashed border-amber-300 pt-3 mt-4">
+      <div className="text-[11px] uppercase tracking-wide text-amber-700 font-bold">
+        ⚙️ legacy /api/ontology/* 보강 — modeling graph 가 비어 있을 때 채워주는 정보
+      </div>
+
+      {src.length > 0 && (
+        <Section title="📜 Java 소스 (body_text)" delay={0.05}>
+          {src.map((m, i) => (
+            <div key={i} className="mb-3">
+              <div className="text-[10px] text-muted-foreground font-mono mb-1">
+                {m.method_fqn}{" "}
+                {m.line_start && m.line_end && <span className="text-amber-700">(line {m.line_start}–{m.line_end})</span>}
+                {m.role && <span className="ml-2 px-1 py-0 rounded bg-blue-100 text-blue-700">{m.role}</span>}
+              </div>
+              <CodeBlock code={m.body_text ?? ""} language="text" maxHeight={240} showLineNumbers={false} />
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {rules.length > 0 && (
+        <Section title="📐 비즈니스 룰" subtitle={`${rules.length}건`} delay={0.15}>
+          <div className="space-y-2">
+            {rules.map((r, i) => (
+              <div key={i} className="rounded border border-rose-200 bg-rose-50 p-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <code className="text-[10px] text-rose-700">{r.fqn}</code>
+                  {r.severity && (
+                    <span className="text-[10px] px-1 py-0 rounded bg-rose-200 text-rose-800">{r.severity}</span>
+                  )}
+                </div>
+                <div className="text-[12px] text-foreground mt-1">{r.statement}</div>
+                {(r.operational_history ?? []).length > 0 && (
+                  <div className="mt-1.5 text-[10px] text-rose-700">
+                    📕 과거 incident:{" "}
+                    {(r.operational_history as any[])
+                      .map((h) => `${h.incident_id}${h.summary ? ` (${h.summary})` : ""}`)
+                      .join(" · ")}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {anchors.length > 0 && (
+        <Section title="📍 anchor — 코드 라인 ↔ action slot 매핑" subtitle={`${anchors.length}건`} delay={0.25}>
+          <DataTable
+            rows={anchors}
+            preferredColumns={["line", "anchor_locator", "target_slot", "code_method_fqn"]}
+          />
+        </Section>
+      )}
+
+      {realiz.length > 0 && (
+        <Section title="🔗 action → code 매핑" subtitle={`${realiz.length}건`} delay={0.32}>
+          <DataTable rows={realiz} preferredColumns={["code_method_fqn", "scope", "confidence", "rationale"]} />
+        </Section>
+      )}
+
+      {callSites.length > 0 && (
+        <Section title="📞 call-sites (의심스러운 호출)" subtitle={`${callSites.length}건`} delay={0.4}>
+          <DataTable
+            rows={callSites}
+            preferredColumns={["callee_simple_name", "line", "needs_user_confirm", "analysis_source"]}
+          />
+        </Section>
+      )}
+
+      {hits.length > 0 && (
+        <Section title="🔍 legacy 통합 검색 hits" subtitle={queries.length ? `질의: ${queries.join(", ")}` : `${hits.length}건`} delay={0.5}>
+          <DataTable rows={hits} preferredColumns={["kind", "fqn", "label", "score"]} />
+        </Section>
+      )}
     </div>
   );
 }

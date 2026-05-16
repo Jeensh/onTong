@@ -1,0 +1,1 @@
+{"lookups": {"scm.std.CustomerStd:7": {"pk": 7, "table_spec_fqn": "scm.std.CustomerStd", "columns": {"customer_name": "정XX", "thickness_min": 200}}}, "metadata": {"scenario_origin": "P-2018-0098", "snapshot_at": "2018-04-23T03:14", "scenario_kind": "regression"}}

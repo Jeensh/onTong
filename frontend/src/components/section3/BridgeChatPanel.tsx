@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * 온톨로지 브릿지 agent — chat UI.
+ * 온톨로지 브릿지 — chat UI.
  *
  * Rich assistant message:
  * - 진행 중: phase pulse + 현재 step 명시

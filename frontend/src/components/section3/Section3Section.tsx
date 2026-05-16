@@ -4,7 +4,7 @@
  * Section 3 entry — 좌측 nav 4 항목 + 메인 panel.
  *
  * 4 항목:
- * 1. 온톨로지 브릿지 agent (chat) — 자연어 + 다른 3 메뉴 기능 모두 호출 가능
+ * 1. 온톨로지 브릿지 (chat) — 자연어 + 다른 3 메뉴 기능 모두 호출 가능
  * 2. 샌드박스 — 테스트 데이터 + 실행
  * 3. 영향도 분석 — 코드 변경
  * 4. 데이터 변경 분석 — 기준 / Table / 주문
@@ -22,7 +22,7 @@ type View = "dashboard" | "bridge" | "sandbox" | "code-impact" | "data-impact";
 
 const NAV: Array<{ id: View; label: string; icon: React.ReactNode; description: string }> = [
   { id: "dashboard", label: "대시보드", icon: <Activity size={16} />, description: "ontology 통계 + 빠른 진입" },
-  { id: "bridge", label: "온톨로지 브릿지 agent", icon: <MessageSquare size={16} />, description: "자연어 chat — 의도 분석 + 4 기능 orchestration" },
+  { id: "bridge", label: "온톨로지 브릿지", icon: <MessageSquare size={16} />, description: "자연어 chat — 의도 분석 + 4 기능 orchestration" },
   { id: "sandbox", label: "샌드박스", icon: <Beaker size={16} />, description: "테스트 데이터 생성 + 안전 가상 실행" },
   { id: "code-impact", label: "영향도 분석", icon: <Flame size={16} />, description: "코드 변경 (method/class)" },
   { id: "data-impact", label: "데이터 변경 분석", icon: <Database size={16} />, description: "기준 (Standard) / Table / 주문" },

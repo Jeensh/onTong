@@ -83,7 +83,7 @@ export function DataImpactPanel() {
                 <MessageSquare size={11} className="flex-shrink-0 mt-0.5" />
                 <span>
                   id 카탈로그가 modeling 측에 아직 미구현 (요청 #② 진행 중).
-                  지금은 <b>온톨로지 브릿지 agent</b> 에서 자연어로 검색 (예: "<i>기준값 목록 보여줘</i>") → 발견된 id 를 여기 붙여넣기.
+                  지금은 <b>온톨로지 브릿지</b> 에서 자연어로 검색 (예: "<i>기준값 목록 보여줘</i>") → 발견된 id 를 여기 붙여넣기.
                 </span>
               </p>
             </div>

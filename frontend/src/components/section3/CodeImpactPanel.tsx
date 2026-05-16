@@ -74,7 +74,7 @@ export function CodeImpactPanel() {
               <p className="text-[10px] text-muted-foreground mt-1.5 flex items-start gap-1">
                 <MessageSquare size={11} className="flex-shrink-0 mt-0.5" />
                 <span>
-                  id 모르면 <b>온톨로지 브릿지 agent</b> 에서 자연어로 검색
+                  id 모르면 <b>온톨로지 브릿지</b> 에서 자연어로 검색
                   → 검색 결과의 method 이름을 그대로 여기 붙여넣으면 됩니다.
                 </span>
               </p>

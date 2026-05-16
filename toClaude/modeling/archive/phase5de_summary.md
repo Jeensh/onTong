@@ -1,6 +1,6 @@
 # Phase 5-D/E: 수평 확장 + LLM 최적화 — 완료 요약
 
-## Phase 5-D: 수평 확장 + 리소스 거버넌스 (5/5)
+## Phase 5-D: 수평 확장 + 리소스 운영 (5/5)
 
 ### P5D-1: Nginx 리버스 프록시 + 로드 밸런서
 - `nginx.conf`: least_conn upstream, keepalive 32, SSE 프록시 설정

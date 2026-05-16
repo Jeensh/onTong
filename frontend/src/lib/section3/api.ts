@@ -78,7 +78,49 @@ export interface AgentFinalPayload {
     edges?: Array<{ from: string; to: string; label?: string }>;
     cypher?: string;
   } | null;
+  /** legacy /api/ontology/* 에서 가져온 보강 정보 (modeling graph 가 빈약할 때 채움) */
+  legacy_enrich?: LegacyEnrich | null;
   error?: string | null;
+}
+
+export interface LegacyEnrich {
+  /** 메서드의 실 Java body_text + line 범위 */
+  source_code?: Array<{
+    method_fqn: string;
+    body_text: string;
+    line_start?: number;
+    line_end?: number;
+    source_file?: string;
+    role?: string;
+    annotations?: string[];
+  }>;
+  /** 영향 받는 비즈니스 룰 + 과거 incident */
+  business_rules?: Array<{
+    fqn: string;
+    statement: string;
+    severity?: string;
+    enforced_by?: string[];
+    operational_history?: Array<{ incident_id?: string; summary?: string; occurred_at?: string }>;
+  }>;
+  /** anchor — 코드 라인 ↔ action slot 매핑 */
+  anchors?: Array<{
+    id: string;
+    anchor_locator?: string;
+    target_slot?: string;
+    target_action_fqn?: string;
+    code_method_fqn?: string;
+    line?: number;
+    confidence?: number;
+  }>;
+  /** action.realizations[] */
+  action_realizations?: Array<{ code_method_fqn: string; confidence?: number; scope?: string; rationale?: string }>;
+  /** delegates-to-tree */
+  delegates_tree?: { action_fqn: string; children: unknown[]; cycle_detected: boolean };
+  /** call-sites (confidence>0.5 또는 needs_user_confirm) */
+  call_sites?: Array<{ callee_simple_name: string; line?: number; needs_user_confirm?: boolean; analysis_source?: string }>;
+  /** legacy /api/ontology/search hits */
+  search_hits?: Array<Record<string, unknown>>;
+  queries?: string[];
 }
 
 // ─── SSE consumer ───────────────────────────────────────────

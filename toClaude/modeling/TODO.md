@@ -557,7 +557,7 @@
 | P5A | 프론트엔드 생존 (Lazy Tree + 서버 검색) | 4 | ✅ 완료 |
 | P5B | 백엔드 동시성 + 비동기 인덱싱 | 7 | ✅ 완료 |
 | P5C | Redis 기반 상태 공유 | 4 | ✅ 완료 |
-| P5D | 수평 확장 + 리소스 거버넌스 | 5 | ✅ 완료 |
+| P5D | 수평 확장 + 리소스 운영 | 5 | ✅ 완료 |
 | P5E | LLM 처리량 최적화 | 4 | ✅ 완료 |
 | | **Phase 5 합계** | **24 tasks** | **✅ 완료** |
 | | | | |
@@ -682,7 +682,7 @@
 | P5C-3 | Lock Refresh 배치화 — batch-refresh API + 중앙 매니저 | [x] | `MarkdownEditor.tsx`, `lock.py`, `wiki.ts`, `lockManager.ts` |
 | P5C-4 | ACL 캐싱 + 핫 리로드 — LRU + 파일 변경 감지 | [x] | `acl_store.py` |
 
-## Phase 5-D: 수평 확장 + 리소스 거버넌스
+## Phase 5-D: 수평 확장 + 리소스 운영
 
 | # | Task | 상태 | 산출물 |
 |---|------|------|--------|

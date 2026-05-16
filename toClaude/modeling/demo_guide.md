@@ -2116,7 +2116,7 @@ curl http://localhost:8001/api/acl
 
 ---
 
-## BA-21. Phase 5-D: 수평 확장 + 리소스 거버넌스
+## BA-21. Phase 5-D: 수평 확장 + 리소스 운영
 
 ### 테스트 1: Nginx 리버스 프록시 (P5D-1)
 

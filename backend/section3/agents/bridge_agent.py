@@ -1,4 +1,4 @@
-"""온톨로지 브릿지 agent (chat) — Section 3 의 메인 entry.
+"""온톨로지 브릿지 (chat) — Section 3 의 메인 entry.
 
 흐름:
 1. 사용자 자연어 message + history
@@ -13,7 +13,8 @@
 
 from __future__ import annotations
 
-from typing import AsyncIterator
+import logging
+from typing import Any, AsyncIterator
 
 from backend.section3.agents.base import BaseAgent
 from backend.section3.agents.code_impact_agent import CodeImpactAgent
@@ -29,6 +30,8 @@ from backend.section3.contracts import (
     StreamEvent,
 )
 from backend.section3.llm.intent_classifier import classify_intent
+
+logger = logging.getLogger(__name__)
 
 
 class BridgeAgent(BaseAgent):
@@ -120,7 +123,11 @@ class BridgeAgent(BaseAgent):
         yield self.error(f"지원하지 않는 intent: {ic.modeling_intent}")
 
     async def _handle_explain(self, message: str) -> AsyncIterator[StreamEvent]:
-        """explain intent — modeling.query 직접 호출 + layer 스캔."""
+        """explain intent — modeling.query 직접 호출 + (필요시) legacy search 로 source_locations 보강.
+
+        ONTOLOGY_API_AUDIT.md §3.2 — modeling 의 source_locations 는 Class/Method 노드가 0개라
+        항상 빈 배열. legacy `/api/ontology/search` 와 `/api/ontology/actions` 로 method fqn 후보를 보강.
+        """
         yield self.modeling_call("explain", {"natural_language": message})
         try:
             resp = await self.modeling.query(
@@ -142,6 +149,33 @@ class BridgeAgent(BaseAgent):
         for layer_name, items in self.extract_layers(result):
             yield self.layer_scan(layer_name, items)
 
+        # legacy enrich — source_locations 가 비었을 때 legacy search 로 후보 method fqn 채우기.
+        # modeling 의 matched_terms[].korean/english 가 더 정확한 검색어 (사용자 발화 통째보다).
+        legacy: dict[str, Any] = {}
+        if not result.get("source_locations"):
+            queries: list[str] = []
+            for t in (result.get("matched_terms") or [])[:3]:
+                for k in ("korean", "english"):
+                    v = t.get(k)
+                    if v and v not in queries:
+                        queries.append(v)
+            if not queries:
+                queries = [message]   # 매칭 term 없으면 원문 fallback
+
+            all_hits: list[dict[str, Any]] = []
+            try:
+                for q in queries[:3]:
+                    hits = await self.modeling.search(q, limit=6, repo_id="slab-design-real")
+                    for h in hits:
+                        if h not in all_hits:
+                            all_hits.append(h)
+            except Exception as e:
+                logger.warning("legacy search enrich 실패: %s", e)
+            if all_hits:
+                yield self.layer_scan("legacy 검색 — 코드/액션 후보", all_hits[:10])
+                legacy["search_hits"] = all_hits[:10]
+                legacy["queries"] = queries[:3]
+
         summary = result.get("summary") or "위치 정보를 조회했습니다"
         yield self.final(
             AgentFinalResult(
@@ -149,6 +183,7 @@ class BridgeAgent(BaseAgent):
                 summary=summary,
                 modeling_response=resp,
                 visualization=result.get("ontology_trace"),
+                legacy_enrich=legacy or None,
             ).model_dump()
         )
 

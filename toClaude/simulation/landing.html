@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>onTong · Section 3 — Simulation</title>
+<style>
+  :root {
+    --bg: #fafafa; --fg: #18181b; --muted: #71717a; --accent: #f97316; --accent2: #10b981;
+    --line: #e4e4e7; --card: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", sans-serif; background: var(--bg); color: var(--fg); line-height: 1.55; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+  header { padding-bottom: 28px; border-bottom: 1px solid var(--line); margin-bottom: 32px; }
+  header h1 { margin: 0 0 6px; font-size: 28px; font-weight: 700; }
+  header .tagline { color: var(--muted); font-size: 14px; }
+  header .badges { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .badge.ok { background: #d1fae5; color: #065f46; }
+  .badge.skill { background: #ffedd5; color: #9a3412; }
+  .badge.tech { background: #e0e7ff; color: #3730a3; }
+  h2 { font-size: 19px; margin: 36px 0 12px; padding-top: 4px; }
+  h3 { font-size: 15px; margin: 22px 0 8px; color: var(--fg); }
+  p, li { font-size: 14px; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin: 14px 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .card .num { font-size: 28px; font-weight: 700; color: var(--accent); }
+  .card .label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  figure { margin: 16px 0 26px; }
+  figure img { width: 100%; max-width: 100%; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  figcaption { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 14px 16px; border-radius: 10px; overflow-x: auto; font-size: 12px; line-height: 1.5; }
+  code { font-family: "SF Mono", Menlo, monospace; }
+  p code, li code { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; font-size: 12px; color: #0f172a; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 14px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: #f8fafc; font-weight: 600; }
+  .pipeline { background: linear-gradient(135deg, #fff7ed 0%, #ecfdf5 100%); padding: 18px 20px; border-radius: 10px; border: 1px solid #fed7aa; margin: 16px 0; }
+  .pipeline pre { background: transparent; color: #18181b; padding: 0; font-size: 13px; }
+  .links { display: flex; gap: 8px; flex-wrap: wrap; }
+  .links a { padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); text-decoration: none; color: var(--fg); font-size: 12px; }
+  .links a:hover { border-color: var(--accent); }
+  .quote { border-left: 3px solid var(--accent); padding-left: 12px; color: var(--muted); font-style: italic; margin: 10px 0; }
+  .demo { background: #f1f5f9; padding: 12px 14px; border-radius: 8px; margin: 10px 0; font-size: 13px; }
+  .demo strong { color: var(--accent2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>onTong · Section 3 — Simulation</h1>
+  <div class="tagline">modeling Neo4j 적재 ❌ — ontology API 실시간 호출 → AST 파싱 → Python 실행까지 한 흐름</div>
+  <div class="badges">
+    <span class="badge ok">composer + AST + sandbox 동작 검증 완료</span>
+    <span class="badge tech">tree-sitter-java</span>
+    <span class="badge tech">SSE 스트리밍</span>
+    <span class="badge skill">Section 2 미수정</span>
+  </div>
+</header>
+
+<section>
+  <h2>📐 핵심 파이프라인</h2>
+  <div class="pipeline">
+<pre>사용자 발화 / fqn 입력
+   ↓
+[1] OntologyComposer        legacy /api/ontology/* 실시간 호출 (병렬 7종)
+                             ├─ actions/{fqn}                          params · output · realizations
+                             ├─ code-methods/{fqn}/call-sites          호출 그래프
+                             ├─ code-methods/{fqn}/anchor-bindings     literal · guard line
+                             ├─ code-types/{class_fqn}                 methods.body_text · fields
+                             ├─ business-rules?repo_id=                enforced_by 매칭
+                             ├─ modules/inventory/actions              method ↔ action 인덱스
+                             └─ repos/{repo_id}/graph?mode=neighborhood  시각화 trace
+   ↓
+[2] JavaToPython AST        tree-sitter-java → Python source
+                             null → None · &amp;&amp; → and · BigDecimal → Decimal
+                             length() → len() · charAt(i) → s[i]
+                             for(int i=0;i&lt;N;++i) → for i in range(0, N)
+   ↓
+[3] Sandbox subprocess      JSON stdin → run() 호출 → stdout JSON result
+   ↓
+UI : SSE 스트리밍 — thinking · layer_scan(영향 메서드, 룰, anchor, …) · final</pre>
+  </div>
+</section>
+
+<section>
+  <h2>🖥 화면에서 확인 가능한 5 panel</h2>
+
+  <h3>① 대시보드 — graph_stats 그대로 노출</h3>
+  <figure>
+    <img src="./screenshots/01_dashboard.png" alt="dashboard">
+    <figcaption>
+      좌측 4 메뉴 카드 + 우측 75 nodes / 117 relations 카운트.
+      <strong>코드 (Class / Method) = 0</strong> 박스가 modeling Neo4j 의 빈약함을 그대로 노출 — 우리 작업이 시작된 지점.
+    </figcaption>
+  </figure>
+
+  <h3>② 온톨로지 브릿지 (chat)</h3>
+  <figure>
+    <img src="./screenshots/02_bridge.png" alt="bridge">
+    <figcaption>자연어 입력 → LLM 분류 (impact_analysis / simulate / explain) → task agent 호출. 추천 prompt 카드 4개.</figcaption>
+  </figure>
+
+  <div class="demo">
+    <strong>시연:</strong> "실수율이 어디서 계산되나?" 입력
+  </div>
+  <figure>
+    <img src="./screenshots/08_bridge_chat.png" alt="bridge demo">
+    <figcaption>matched_term <code>실수율 (YieldRate)</code> + Step 2개 + Table 2개 + legacy 검색으로 rule 까지 추가 표시.</figcaption>
+  </figure>
+
+  <h3>③ 샌드박스 — composer + AST + subprocess</h3>
+  <figure>
+    <img src="./screenshots/03_sandbox.png" alt="sandbox">
+    <figcaption>대상 종류 (step / method / class) · target_id · 케이스 타입 3종 (normal/boundary/error) · 코드 합성+실행 토글.</figcaption>
+  </figure>
+
+  <div class="demo">
+    <strong>시연:</strong> <code>ProductivityService.cumulativeProductivity</code> 메서드 시뮬
+  </div>
+  <figure>
+    <img src="./screenshots/07_sandbox_result.png" alt="sandbox demo">
+    <figcaption>
+      3 case 모두 실행 성공 — <code>result = 0.95</code> (Java 로직 그대로).
+      우측 하단에 생성된 Python 코드 그대로 표시 — <code>DEFAULT_PRODUCTIVITY = 0.95</code> 가 anchor_locator 에서 추출되어 prelude 에 들어감.
+    </figcaption>
+  </figure>
+
+  <h3>④ 영향도 분석 — 코드 변경</h3>
+  <figure>
+    <img src="./screenshots/04_code_impact.png" alt="code-impact">
+    <figcaption>method / class / column 선택 → composer 가 7 endpoint 병렬 호출 → 영향 method · 룰 · anchor · 시각화 합성.</figcaption>
+  </figure>
+
+  <div class="demo">
+    <strong>시연:</strong> <code>cumulativeProductivity</code> 변경 시 영향
+  </div>
+  <figure>
+    <img src="./screenshots/06_code_impact_result.png" alt="code-impact demo">
+    <figcaption>
+      <strong>[HIGH]</strong> 위험도 — 강제 룰 1건, hard severity. Ontology Graph 4 nodes 5 edges 자동 렌더링.
+      summary: "cumulativeProductivity 변경 — action 1건 · 룰 1건 · anchor 7건".
+    </figcaption>
+  </figure>
+
+  <h3>⑤ 데이터 변경 분석</h3>
+  <figure>
+    <img src="./screenshots/05_data_impact.png" alt="data-impact">
+    <figcaption>
+      table / standard_value / order 선택. composer 가 <code>business-rules.statement</code> · <code>anchor-bindings.target_slot</code> 매칭 + <code>search</code> 통합 검색까지 한 호출 합성.
+      modeling 의 <code>impact_analysis(standard_value)</code> 분기 버그를 우회.
+    </figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>📤 Section 2 (Modeling) 에 정말 필요한 3건</h2>
+  <p>49 endpoint 전수 호출 감사 결과, Section 3 가 legacy <code>/api/ontology/*</code> 만으로 자체 합성 가능. 기존 7건 요청은 우회 완료로 보류. <strong>진짜 필수 3건만</strong> 남음.</p>
+
+  <table>
+    <thead>
+      <tr><th>#</th><th>우선순위</th><th>제목</th><th>목적 / 막힘 정도</th><th>Section 3 활용처</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td><td>🔴 필수</td>
+        <td><code>search</code> 한국어 / aliases / 한↔영 매칭</td>
+        <td>사용자 한국어 발화 ("실수율" "주문") 시 legacy <code>/api/ontology/search</code> 가 0 hit. chat UX 정보량 절반.</td>
+        <td>BridgeChatPanel · CodeImpactPanel · DataImpactPanel 의 자동완성 · explain enrich</td>
+      </tr>
+      <tr>
+        <td>2</td><td>🔴 필수</td>
+        <td><code>action.output</code> 55% → 90%+ backfill</td>
+        <td>38 action 중 21 (55%) 이 <code>output: null</code>. sandbox 의 <code>expected_output</code> 검증 불가.</td>
+        <td>SandboxPanel 의 case 검증 — expected 자동 생성, 결과 일치 표시</td>
+      </tr>
+      <tr>
+        <td>3</td><td>🟡 권장</td>
+        <td><code>repos/.../graph</code> default mode 명시 + <code>include_kinds</code> 동작 검증</td>
+        <td>default 가 60 nodes 라 UI 가 무거움. <code>include_kinds</code> 동작 spec 불명확.</td>
+        <td>OntologyGraphSVG — <code>mode=neighborhood&amp;hops=2</code> 적당한 크기 시각화</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>상세는 <a href="./SECTION2_REQUEST_ESSENTIAL.md">SECTION2_REQUEST_ESSENTIAL.md</a> 참조.</p>
+</section>
+
+<section>
+  <h2>📊 작업 통계</h2>
+  <div class="grid">
+    <div class="card"><div class="num">49</div><div class="label">호출한 ontology endpoint</div></div>
+    <div class="card"><div class="num">127</div><div class="label">raw 응답 (variant 포함)</div></div>
+    <div class="card"><div class="num">2</div><div class="label">자체 신규 모듈 (composer / transpiler)</div></div>
+    <div class="card"><div class="num">4</div><div class="label">전환된 agent (bridge · sandbox · code-impact · data-impact)</div></div>
+    <div class="card"><div class="num">0</div><div class="label">Section 2 수정 (단독 우회)</div></div>
+    <div class="card"><div class="num">3</div><div class="label">Section 2 에 남은 필수 요청</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>🔗 관련 문서</h2>
+  <div class="links">
+    <a href="./WORK_REPORT.md">📋 작업 보고서</a>
+    <a href="./ONTOLOGY_API_AUDIT.md">🔍 ontology API 49 endpoint 감사</a>
+    <a href="./SECTION2_REQUEST_ESSENTIAL.md">📤 Section 2 필수 요청 (3건)</a>
+    <a href="./SECTION2_REQUESTS.md">📚 누적 요청 인덱스</a>
+    <a href="./LANDING.md">📄 동일 내용 마크다운</a>
+  </div>
+</section>
+
+<footer style="margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 11px; color: var(--muted);">
+  2026-05-13 · onTong Section 3 simulation 세션 · backend <code>localhost:8001/api/section3/*</code> · frontend <code>localhost:3000/?section=simulation</code>
+</footer>
+
+</div>
+</body>
+</html>

@@ -3,6 +3,19 @@
 > Section 3 재개편 (2026-05-12~) 진행 중, modeling API 만으로 부족하거나 개선이 필요한 항목을 누적합니다.
 > 각 항목에 **우선순위 / 현재 상태 / 우회 가능 여부 / 요청 사유** 를 명시합니다.
 
+---
+
+## ★ 핵심 문서 (2026-05-12 최종) — 정말 필요한 것만
+
+> **👉 [`SECTION2_REQUEST_ESSENTIAL.md`](./SECTION2_REQUEST_ESSENTIAL.md)** — 49 endpoint 전수 호출 감사 결과,
+> Section 3 단독 우회 후에도 정말 필요한 **3건만** 추린 단일 요청서. **Section 2 개발자는 이 문서 먼저 읽기 권장**.
+
+아래 ① ~ ⑦ 의 개별 항목은 현재 **Section 3 단독 우회 완료** 로 인해 보류된 백로그. 시간 나면 작업 권장이지만 막힘 ❌.
+
+근거: [`ONTOLOGY_API_AUDIT.md`](./ONTOLOGY_API_AUDIT.md) §7 (다양한 variant 호출 결과)
+
+---
+
 상태 표기:
 - 🔴 **블로커** — 이게 없으면 핵심 기능 미동작
 - 🟡 **개선** — 동작은 하지만 UX/정확도 떨어짐
@@ -35,6 +48,40 @@
 
 → 상세 문서 참조.
 **발견 일자**: 2026-05-12 Phase 1
+
+---
+
+## ★★ NEW (2026-05-12 사용자 요청) — Build step 제거 / lazy 적재로 architecture 전환
+
+**우선순위**: 🟡 개선 (아키텍처)
+**발견 일자**: 2026-05-12 (사용자 의도 직접 표명)
+
+**사용자 메시지**:
+> "적재해서 읽는 방식이 아니라, 처음부터 ontology API 호출 후 그 응답을 가지고 작업이 되게끔 개편이 필요할 것 같은데."
+
+**현재**:
+- `data/*.json` → `builders/*.py` (Python 모듈 실행) → Neo4j MERGE → query
+- "Build step" 이 사용자/운영자에게 명시적 명령으로 존재
+- API 호출만으로 셋업 → 동작 흐름 불가
+
+**요청 (옵션)**:
+- 옵션 A — startup lifespan 자동 build (개발/데모 환경)
+- 옵션 B — `POST /api/modeling/ontology/rebuild` HTTP API
+- 옵션 C — lazy build (modeling API 가 빈 응답 감지 시 자동 적재)
+- 옵션 D — Neo4j 제거, modeling API 가 매 호출 JSON 직접 읽어 응답 합성. graph traversal 은 in-memory 로 재구현.
+
+**trade-off (옵션 D 의 경우)**:
+- impact_analysis 의 `indirect_impact.downstream_steps` 같은 multi-hop traversal 재구현 필요
+- 16 relation 의 양방향 index 자체 구현
+- 16+ Cypher 쿼리 → Python in-memory traversal 로 재작성
+
+**Section 3 측 상태**:
+- 사용자가 명시: **Section 2 코드 수정 절대 안 됨**. 이 작업은 Section 2 책임.
+- Section 3 는 modeling API 응답만 활용. modeling 내부가 어떻게 동작하든 무관.
+
+**현재 우회 (Section 3 측)**:
+- modeling API 의 미활용 endpoint 들 적극 활용 (`/api/ontology/code-types` body_text 등)
+- 빈 응답 시 사용자에게 명시적 안내 ("modeling 데이터 적재 필요 — `python -m backend.modeling.ontology.builders.*`")
 
 ---
 
@@ -115,6 +162,71 @@
 **요청**: `GET /api/modeling/ontology/variables/{id}` → `valid_range / unit / sample_values`.
 **우회 (Section 3 현재)**: `simulate` 의 응답 그대로 사용. Section 3 가 직접 합성할 때만 필요.
 **발견 일자**: 2026-05-12 Phase 1
+
+---
+
+---
+
+## ★★★ NEW (2026-05-12) — Ontology API 전수 호출 감사 기반 신규 요청 5 건
+
+**감사 문서**: 👉 [`ONTOLOGY_API_AUDIT.md`](./ONTOLOGY_API_AUDIT.md) (51 endpoint 호출 결과 + Section 3 활용 가능성)
+
+51 개 endpoint 를 다양한 파라미터로 직접 호출한 결과를 토대로 다음 5 건을 정식 요청서로 작성.
+
+---
+
+## ③ modeling graph 에 `Class` / `Method` 노드 적재
+
+**우선순위**: 🔴 블로커
+**상세 문서**: 👉 [`SECTION2_REQUEST_03_method_class_in_graph.md`](./SECTION2_REQUEST_03_method_class_in_graph.md)
+
+**한 줄 요약**: `graph/stats` 에 `Class:0, Method:0`. 따라서 `impact_analysis(method|class)` 가 항상 빈 응답. legacy `/api/ontology/code-types` (5166 class) 의 정보를 modeling Neo4j 에도 적재해 달라.
+
+**Section 3 막힌 곳**: `CodeImpactPanel` (좌측 nav 3번) 의 핵심 기능이 100% 실패.
+
+---
+
+## ④ `impact_analysis` 의 `standard_value` / `class` / `column` 분기 정상화
+
+**우선순위**: 🟡 개선
+**상세 문서**: 👉 [`SECTION2_REQUEST_04_impact_dispatch.md`](./SECTION2_REQUEST_04_impact_dispatch.md)
+
+**한 줄 요약**: `standard_value` 호출이 잘못된 cypher (`MATCH (t:Table)`) 로 라우팅되고, `class`/`column` 은 partial 미구현. 4 kind 정상화.
+
+**Section 3 막힌 곳**: `DataImpactPanel` 의 `target_kind=standard_value` 시 "테이블이 그래프에 없습니다" 오답.
+
+---
+
+## ⑤ `simulate` intent 에 `method` / `class` / `order` 추가 지원
+
+**우선순위**: 🟡 개선
+**상세 문서**: 👉 [`SECTION2_REQUEST_05_simulate_kinds.md`](./SECTION2_REQUEST_05_simulate_kinds.md)
+
+**한 줄 요약**: 현재 `step` 만 지원. `method` / `class` / `order` 도 valid_range / param schema 기반 자동 케이스 생성. 보너스로 `parameters.lang=python` 옵션도.
+
+**Section 3 막힌 곳**: `SandboxPanel` 의 method 단독 시뮬이 modeling 으로 불가 → LLM fallback 으로 정확도 떨어짐.
+
+---
+
+## ⑥ `explain` 의 `parameters.keywords[]` 배열 형식 수용
+
+**우선순위**: 🟡 개선 (Section 3 가 우회 가능)
+**상세 문서**: 👉 [`SECTION2_REQUEST_06_explain_params.md`](./SECTION2_REQUEST_06_explain_params.md)
+
+**한 줄 요약**: 현재 `natural_language` 또는 `parameters.query|keyword` (단수) 만 인식. Section 3 LLM 은 자연스럽게 `keywords: string[]` 을 만든다. 둘 다 받도록 normalize.
+
+**Section 3 막힌 곳**: `BridgeChatPanel` 의 explain 호출이 "검색할 키워드가 필요합니다" 로 자주 거절됨. (Section 3 측 즉시 우회 적용 예정)
+
+---
+
+## ⑦ `term/search` 의 hit rate / alias / 한↔영 cross-match 강화
+
+**우선순위**: 🟢 선택
+**상세 문서**: 👉 [`SECTION2_REQUEST_07_modeling_search_quality.md`](./SECTION2_REQUEST_07_modeling_search_quality.md)
+
+**한 줄 요약**: `/api/modeling/ontology/term/search?q=실수율` 빈 응답. 같은 graph 의 explain 은 잘 매칭되는데 search GET 만 약하다. exact / prefix / contains / alias / 한↔영 cross-match 강화.
+
+**Section 3 막힌 곳**: 자동완성 / 빠른 검색 UX. (legacy `/api/ontology/search` 로 우회 중)
 
 ---
 

@@ -125,4 +125,14 @@ class AgentFinalResult(BaseModel):
     sandbox_result: Optional[dict[str, Any]] = None
     visualization: Optional[dict[str, Any]] = None
     """nodes/edges/cypher 등 — modeling.ontology_trace 그대로 또는 가공."""
+    legacy_enrich: Optional[dict[str, Any]] = None
+    """legacy /api/ontology/* 에서 가져온 보강 데이터.
+
+    shape:
+    - source_code: list[{ method_fqn, body_text, line_start, line_end, source_file }]
+    - business_rules: list[{ fqn, statement, severity, operational_history[] }]
+    - anchors: list[{ id, anchor_locator, target_slot, line }]
+    - action_realizations: list[{ code_method_fqn, confidence, scope }]
+    - delegates_tree: { action_fqn, children, cycle_detected }
+    """
     error: Optional[str] = None

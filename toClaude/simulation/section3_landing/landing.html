@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>onTong · Section 3 — Simulation</title>
+<style>
+  :root {
+    --bg: #fafafa; --fg: #18181b; --muted: #71717a; --accent: #f97316; --accent2: #10b981; --accent3: #6366f1;
+    --line: #e4e4e7; --card: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+  header { padding-bottom: 28px; border-bottom: 1px solid var(--line); margin-bottom: 32px; }
+  header h1 { margin: 0 0 6px; font-size: 28px; font-weight: 700; }
+  header .tagline { color: var(--muted); font-size: 14px; }
+  header .badges { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .badge.ok { background: #d1fae5; color: #065f46; }
+  .badge.skill { background: #ffedd5; color: #9a3412; }
+  .badge.tech { background: #e0e7ff; color: #3730a3; }
+  .badge.warn { background: #fef3c7; color: #92400e; }
+  h2 { font-size: 21px; margin: 44px 0 14px; padding-top: 6px; border-top: 1px solid var(--line); padding-top: 22px; }
+  h2:first-of-type { border-top: none; padding-top: 0; }
+  h3 { font-size: 16px; margin: 26px 0 10px; color: var(--fg); }
+  h4 { font-size: 14px; margin: 18px 0 8px; color: var(--accent); }
+  p, li { font-size: 14px; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin: 14px 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .card .num { font-size: 28px; font-weight: 700; color: var(--accent); }
+  .card .label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  figure { margin: 16px 0 26px; }
+  figure img { width: 100%; max-width: 100%; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  figcaption { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 14px 16px; border-radius: 10px; overflow-x: auto; font-size: 12px; line-height: 1.5; }
+  code { font-family: "SF Mono", Menlo, monospace; }
+  p code, li code, td code { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; font-size: 12px; color: #0f172a; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 14px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: #f8fafc; font-weight: 600; }
+  .pipeline { background: linear-gradient(135deg, #fff7ed 0%, #ecfdf5 100%); padding: 18px 20px; border-radius: 10px; border: 1px solid #fed7aa; margin: 16px 0; }
+  .pipeline pre { background: transparent; color: #18181b; padding: 0; font-size: 12.5px; }
+  .links { display: flex; gap: 8px; flex-wrap: wrap; }
+  .quote { border-left: 3px solid var(--accent); padding: 6px 12px; color: #44403c; background: #fff7ed; margin: 12px 0; font-size: 13px; font-style: italic; }
+  .demo { background: #f1f5f9; padding: 10px 14px; border-radius: 8px; margin: 10px 0; font-size: 13px; }
+  .demo strong { color: var(--accent2); }
+  .phase { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent3); border-radius: 8px; padding: 14px 18px; margin: 14px 0; }
+  .phase h4 { margin: 0 0 6px; color: var(--accent3); font-size: 14px; font-weight: 700; }
+  .phase .meta { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  .answer-table th { width: 30%; }
+  .toc { background: #f8fafc; border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin: 16px 0; }
+  .toc ol { margin: 0; padding-left: 18px; font-size: 13px; }
+  .toc li { margin: 3px 0; }
+  .toc a { color: var(--accent3); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>onTong · Section 3 — Simulation</h1>
+  <div class="tagline">modeling Neo4j 적재 ❌ · ontology API 실시간 호출 → Java AST 파싱 → Python subprocess 실행</div>
+  <div class="badges">
+    <span class="badge ok">composer + AST + sandbox 동작 검증 ✓</span>
+    <span class="badge tech">tree-sitter-java</span>
+    <span class="badge tech">SSE 스트리밍</span>
+    <span class="badge skill">Section 2 미수정</span>
+    <span class="badge warn">2026-05-13</span>
+  </div>
+  <div class="toc">
+    <ol>
+      <li><a href="#pipeline">핵심 파이프라인</a></li>
+      <li><a href="#dashboard">대시보드</a></li>
+      <li><a href="#bridge"><strong>온톨로지 브릿지 (자연어 chat) — 5 시연</strong></a></li>
+      <li><a href="#sandbox">샌드박스</a></li>
+      <li><a href="#code-impact">영향도 분석 (코드)</a></li>
+      <li><a href="#data-impact">데이터 변경 분석</a></li>
+      <li><a href="#sse">백엔드 SSE 시퀀스</a></li>
+      <li><a href="#section2-req">Section 2 에 필요한 3건</a></li>
+      <li><a href="#stats">작업 통계</a></li>
+      <li><a href="#process"><strong>작업 진행 과정 (Phase 1~9)</strong></a></li>
+    </ol>
+  </div>
+</header>
+
+<section id="pipeline">
+<h2>1 · 핵심 파이프라인</h2>
+<div class="pipeline">
+<pre>사용자 발화 / fqn 입력
+   ↓
+[1] OntologyComposer        legacy /api/ontology/* 실시간 호출 (병렬 7종)
+                             ├─ actions/{fqn}                          params · output · realizations
+                             ├─ code-methods/{fqn}/call-sites          호출 그래프
+                             ├─ code-methods/{fqn}/anchor-bindings     literal · guard line
+                             ├─ code-types/{class_fqn}                 methods.body_text · fields
+                             ├─ business-rules?repo_id=                enforced_by 매칭
+                             ├─ modules/inventory/actions              method ↔ action 인덱스
+                             └─ repos/{repo_id}/graph?mode=neighborhood  시각화 trace
+   ↓
+[2] JavaToPython AST        tree-sitter-java → Python source
+                             null → None · &amp;&amp;/|| → and/or · BigDecimal → Decimal
+                             length()/charAt(i) → len()/s[i]
+                             for(int i=0;i&lt;N;++i) → for i in range(0, N)
+   ↓
+[3] Sandbox subprocess      JSON stdin → run() 호출 → stdout JSON result
+   ↓
+UI : SSE 스트리밍 — thinking · layer_scan(영향 메서드, 룰, anchor, …) · final</pre>
+</div>
+</section>
+
+<section id="dashboard">
+<h2>2 · 대시보드 — graph_stats 즉시 노출</h2>
+<figure>
+  <img src="./screenshots/01_dashboard.png" alt="dashboard">
+  <figcaption>
+    좌측 5 메뉴 + 우측 75 nodes / 117 relations 카운트.
+    <strong>코드 (Class / Method) = 0</strong> 박스가 modeling Neo4j 의 빈약함을 그대로 노출 — Section 3 가 legacy 로 보강함의 이유.
+  </figcaption>
+</figure>
+</section>
+
+<section id="bridge">
+<h2>3 · 온톨로지 브릿지 (자연어 chat) — 핵심 메뉴</h2>
+<p>Section 3 의 가장 풍부한 메뉴. 자연어 입력 → LLM 의도 분류 (<code>impact_analysis</code> / <code>simulate</code> / <code>explain</code>) → composer 가 legacy API 다종 병렬 호출 → SSE 스트리밍으로 단계별 표시 → 최종 답변에 RichResultCard 부착.</p>
+
+<h3 id="bridge-empty">3.1 빈 시작 화면 — 추천 prompt 5종</h3>
+<figure>
+  <img src="./screenshots/bridge_empty.png" alt="bridge empty">
+  <figcaption>
+    헤더 + 현재 ontology 등록 통계 한 줄 + 💡 패턴 예시 5 카드 + 하단 입력창.
+  </figcaption>
+</figure>
+<table class="answer-table">
+  <thead><tr><th>카드 라벨</th><th>템플릿 (밑줄 자리에 용어/식별자 입력)</th></tr></thead>
+  <tbody>
+    <tr><td>용어 검색</td><td><code>ontology 에 등록된 용어 중 ___ 비슷한 것 찾아줘</code></td></tr>
+    <tr><td>method 영향 분석</td><td><code>___ method 를 바꾸면 무엇이 영향받아?</code></td></tr>
+    <tr><td>기준값 영향 분석</td><td><code>기준값 ___ 을(를) 바꾸면 어디가 영향받아?</code></td></tr>
+    <tr><td>Step 시뮬</td><td><code>Step ___ 의 테스트 케이스를 만들어줘</code></td></tr>
+    <tr><td>위치 찾기</td><td><code>___ 은(는) 어디서 계산되나요?</code></td></tr>
+  </tbody>
+</table>
+<p>placeholder: <code>자연어로 ontology 에 물어보세요...</code> · 통계 한 줄: <code>19 Term · 5 TermCategory · 12 Step · 14 Standard · 10 Variable · 1 ErrorCode · 14 Table</code></p>
+
+<h3 id="bridge-demo-1">3.2 시연 ① — "실수율이 어디서 계산되나?"</h3>
+<p>LLM 분류 → <code>explain</code> intent. modeling explain + legacy search cross-query 보강.</p>
+<figure>
+  <img src="./screenshots/bridge_demo_01_yieldrate.png" alt="bridge demo 1 — 실수율">
+  <figcaption>matched_term + Step 2 + Table 2 + Cypher + LEGACY 보강 (term · rule 2 hits) + 실행 timeline + follow-ups</figcaption>
+</figure>
+
+<h4>SSE 스트리밍 단계 (9 events)</h4>
+<pre>1. thinking            "의도 분석 중 — '실수율이 어디서 계산되나?'"
+2. intent_classification {modeling_intent: "explain", confidence: 0.9}
+3. modeling_call       intent=explain, natural_language=원본
+4. modeling_result     matched_terms 1건 · Step 2건 · Table 2건
+5. layer_scan          "프로세스 (Step)"   → 2 items
+6. layer_scan          "데이터 (Table)"   → 2 items
+7. layer_scan          "매칭 용어 (Term)"  → 1 item
+8. layer_scan          "legacy 검색 — 코드/액션 후보" → 2 hits (composer 한↔영 cross-query 보강)
+9. final               summary + visualization (cypher)</pre>
+
+<h4>캡처에 보이는 답변 영역</h4>
+<table>
+  <thead><tr><th>영역</th><th>내용</th></tr></thead>
+  <tbody>
+    <tr><td><strong>영향 받는 Step</strong></td><td><code>Step 7 분할수 계산 (input)</code> · <code>Step 8 매수 및 목표단중 계산 (input)</code></td></tr>
+    <tr><td><strong>데이터 위치</strong></td><td><code>TB_C40_050SC160 (SC160, POSPIA)</code> · <code>TB_C40_050SC370 (SC370, POSPIA)</code></td></tr>
+    <tr><td><strong>Cypher</strong></td><td><pre style="font-size:11px">// Term 매핑 → REFERS_TO_PROCESS → Step → CALCULATES → Method
+MATCH (t:Term) WHERE t.korean_name CONTAINS … OR english_name OR aliases
+MATCH (t)-[:REFERS_TO_PROCESS]-&gt;(s:Step)-[:CALCULATES]-(m:Method)←[:CONTAINS]-(c:Class)</pre></td></tr>
+    <tr><td><strong>LEGACY 보강 hits</strong></td><td>
+      <table style="margin:0;font-size:12px">
+        <tr><th>kind</th><th>fqn</th><th>label</th><th>score</th></tr>
+        <tr><td>term</td><td>term.scm.product.productivity_std</td><td>실수율표준</td><td>0.85</td></tr>
+        <tr><td>rule</td><td>rule.scm.std.productivity_safe_range</td><td>실수율 범위 (0.5 ≤ p ≤ 1.0). cumulativeProductivity 결과의 안전 영역.</td><td>0.85</td></tr>
+      </table>
+    </td></tr>
+    <tr><td><strong>suggested follow-ups</strong></td><td>3 chip: <code>실수율이 뭐야?</code> · <code>실수율을 개선하려면 어떻게 해야 해?</code> · <code>실수율과 관련된 다른 지표는 뭐가 있어?</code></td></tr>
+  </tbody>
+</table>
+<div class="quote">왜 의미 있나: modeling 자체 explain 은 한국어 매칭이 가능해서 <code>실수율</code> term 은 찾지만, 그 term 의 <strong>연관 rule</strong> 까지 못 가져온다. composer 가 영문 alias <code>YieldRate</code> 로 재검색하여 <code>rule.scm.std.productivity_safe_range</code> 까지 보강 — 정보량 2배.</div>
+
+<h3 id="bridge-demo-2">3.3 시연 ② — "ProductivityService 의 cumulativeProductivity 를 바꾸면 무엇이 영향받아?"</h3>
+<figure>
+  <img src="./screenshots/bridge_demo_02_impact.png" alt="bridge demo 2 — impact">
+  <figcaption>IMPACT_ANALYSIS intent 자동 분류 — <code>conf 0.85</code></figcaption>
+</figure>
+<p>답변:</p>
+<ul>
+  <li><code>[LOW] cumulativeProductivity 변경 — action 0건 · 룰 0건 · anchor 0건</code></li>
+  <li>스캔된 코드 위치 1 모듈</li>
+  <li>실행 timeline 7 steps</li>
+  <li>follow-ups: <code>cumulativeProductivity 의 현재 기능은 뭐야?</code> · <code>ProductivityService 의 다른 메서드에 대해 알려줘</code></li>
+</ul>
+<div class="quote">왜 이런 결과?: chat 의 LLM 이 자연어에서 fqn 을 정확히 못 만든다 (6 인자 signature 까지). <strong>정확한 영향 분석은 §5 영향도 분석 panel 에서 fqn 직접 입력</strong> 시 [HIGH] 가 나옴.</div>
+
+<h3 id="bridge-demo-3">3.4 시연 ③ — "엣징 사양 룩업 룰 보여줘" (한국어 매칭 한계)</h3>
+<figure>
+  <img src="./screenshots/bridge_demo_03_edging.png" alt="bridge demo 3 — 엣징">
+  <figcaption>EXPLAIN intent — 키워드 ['엣징', '사양', '룩업', '룰'] 매칭 실패 (conf 0.30)</figcaption>
+</figure>
+<p>답변:</p>
+<ul>
+  <li><code>키워드 ['엣징', '사양', '룩업', '룰']와 매칭되는 업무 용어를 찾지 못했습니다</code></li>
+  <li>실행 timeline 5 steps</li>
+  <li>follow-ups: <code>엣징 사양에 대한 더 자세한 정보는?</code> · <code>룩업 룰의 예시를 보여줘.</code></li>
+</ul>
+<div class="quote">ontology 에 <code>term.scm.spec.edging_spec</code> · <code>rule.scm.spec.edging_spec_lookup_strategy</code> 가 분명히 존재. modeling 의 explain keyword matcher 와 legacy <code>search</code> 가 모두 한국어 <code>엣징</code> ↔ 영문 <code>edging</code> cross-match 못함. <strong><code>SECTION2_REQUEST_ESSENTIAL.md</code> 필수 1번의 정확한 evidence 가 이 캡처</strong>.</div>
+
+<h3 id="bridge-demo-4">3.5 시연 ④ — "Step 7 의 테스트 케이스를 만들어줘"</h3>
+<figure>
+  <img src="./screenshots/bridge_demo_04_step_sim.png" alt="bridge demo 4 — Step 시뮬">
+  <figcaption>SIMULATE intent — sandbox agent 자동 호출 → 풀 결과 표시</figcaption>
+</figure>
+<p>답변에 표시되는 영역:</p>
+<table>
+  <thead><tr><th>영역</th><th>내용</th></tr></thead>
+  <tbody>
+    <tr><td>생성된 테스트 케이스 3건</td><td>normal/boundary/error · input · expected_output 표</td></tr>
+    <tr><td>Sandbox 실행 결과</td><td>3 case 모두 ok=true · matched · elapsed_sec</td></tr>
+    <tr><td>Data dependencies</td><td>chip <code>TB_C40_050SC370</code></td></tr>
+    <tr><td>합성된 Python 코드</td><td>LLM 이 modeling 응답 메타만으로 합성 (slab-design 참조 0)</td></tr>
+    <tr><td>Cypher</td><td><code>MATCH (s:Step {step_number: $sid}) OPTIONAL MATCH (s)-[:REQUIRES_INPUT]-&gt;(v:Variable) …</code></td></tr>
+  </tbody>
+</table>
+<p>※ Step kind 는 modeling <code>/query</code> 가 정확한 응답을 주므로 composer 가 modeling 으로 위임 (composer 는 method/class/action 만 자체 합성).</p>
+
+<h3 id="bridge-demo-5">3.6 시연 ⑤ — "ontology 에 등록된 용어 중 단중 비슷한 것 찾아줘"</h3>
+<figure>
+  <img src="./screenshots/bridge_demo_05_term_search.png" alt="bridge demo 5 — term search">
+  <figcaption>EXPLAIN intent — Step 3개 + Table 11개 + LEGACY 통합 검색 rule 2건</figcaption>
+</figure>
+<p>답변 (스크롤 후):</p>
+<ul>
+  <li>프로세스 위치 — Step 5 · 6 · 8 (모두 <code>output</code> 역할). 즉 "단중" 이라는 용어가 정의되는 Step 들</li>
+  <li>데이터 위치 (11 테이블): <code>TB_C40_050SC040 ~ TB_C40_050SC370</code> · 각각 매핑된 SC 코드</li>
+  <li>Cypher · LEGACY 통합 검색 hits (rule 2건 — DG003 포장단중 적치상한, DG004 설계지연 평가)</li>
+  <li>follow-ups: <code>단중을 합치는 뭐야?</code> · <code>단중과 비슷한 용어는 무엇이 있어요?</code></li>
+</ul>
+<div class="quote">단일 한국어 keyword <code>단중</code> 으로 → 3 Step + 11 Table + 2 BR 까지 한 호출로 매칭. composer 의 다종 endpoint 병렬 합성 효과.</div>
+</section>
+
+<section id="sandbox">
+<h2>4 · 샌드박스 — composer + AST + subprocess</h2>
+<figure>
+  <img src="./screenshots/03_sandbox.png" alt="sandbox">
+  <figcaption>대상 종류 (step/method/class) · target_id · 케이스 타입 3종 · 코드 합성+실행 토글</figcaption>
+</figure>
+<div class="demo"><strong>시연:</strong> <code>ProductivityService.cumulativeProductivity</code> 메서드 시뮬</div>
+<figure>
+  <img src="./screenshots/07_sandbox_result.png" alt="sandbox result">
+  <figcaption>3 case 모두 <code>result = 0.95</code> (Java 로직 그대로). 우측 하단에 transpiled Python 코드 표시.</figcaption>
+</figure>
+<p>composer 가 <code>code-types</code> 에서 body_text 가져오고, <code>code-methods/{fqn}/anchor-bindings</code> 의 <code>anchor_locator: "DEFAULT_PRODUCTIVITY = 0.95"</code> 에서 field initializer 추출하여 transpile prelude 에 prepend:</p>
+<pre>from decimal import Decimal
+
+DEFAULT_PRODUCTIVITY = 0.95     # ← anchor_locator 에서 추출
+
+def cumulativeProductivity(cmpCd, orgCd, confirmedPlantCd, gradeCd, prodKindCd, customerCd):
+    if (confirmedPlantCd == None or len(confirmedPlantCd) &lt; 8):
+        return DEFAULT_PRODUCTIVITY
+    ...</pre>
+</section>
+
+<section id="code-impact">
+<h2>5 · 영향도 분석 — 코드 변경</h2>
+<figure>
+  <img src="./screenshots/04_code_impact.png" alt="code-impact">
+  <figcaption>method / class / column · FQN 입력 · composer 가 5 endpoint 병렬</figcaption>
+</figure>
+<div class="demo"><strong>시연:</strong> <code>cumulativeProductivity</code> FQN 직접 입력 (chat 분기보다 정확)</div>
+<figure>
+  <img src="./screenshots/06_code_impact_result.png" alt="code-impact result">
+  <figcaption>
+    <strong>[HIGH]</strong> 위험 — 강제 룰 1건, hard severity. Ontology Graph 4 nodes 5 edges (ProductivityService ↔ lookup_or_default, cumulative_productivity action) 자동 시각화. 하단에 LEGACY 보강 섹션 (Java 소스 body_text, business rule, anchor 7건).
+  </figcaption>
+</figure>
+</section>
+
+<section id="data-impact">
+<h2>6 · 데이터 변경 분석</h2>
+<figure>
+  <img src="./screenshots/05_data_impact.png" alt="data-impact">
+  <figcaption>
+    table / standard_value / order · composer 가 <code>business-rules.statement</code> · <code>anchor-bindings.target_slot</code> 매칭 + 통합 검색까지 한 호출 합성. modeling 의 <code>impact_analysis(standard_value)</code> 분기 버그 우회.
+  </figcaption>
+</figure>
+</section>
+
+<section id="sse">
+<h2>7 · 백엔드 SSE 시퀀스 (method kind 기준)</h2>
+<pre>POST /api/section3/code-impact
+   { target_kind:"method", target_id:"...cumulativeProductivity(...)" }
+ ├─ thinking         "코드 영향도 — method=..."
+ ├─ modeling_call    "composer.impact_analysis"
+ ├─ [composer] 병렬 fetch (5 endpoints)
+ │    ├─ GET /api/ontology/code-types/{class_fqn}
+ │    ├─ GET /api/ontology/code-methods/{fqn}/anchor-bindings
+ │    ├─ GET /api/ontology/code-methods/{fqn}/call-sites
+ │    ├─ GET /api/ontology/business-rules?repo_id=slab-design-real
+ │    └─ GET /api/ontology/repos/slab-design-real/modules/inventory/actions
+ ├─ modeling_result  (composer 합성 응답)
+ ├─ layer_scan       "영향 메서드"     (1 item)
+ ├─ layer_scan       "비즈니스 룰"     (1 item — productivity_safe_range)
+ ├─ layer_scan       "anchor (라인 매핑)" (7 items)
+ ├─ layer_scan       "call-sites"      (1 item)
+ ├─ layer_scan       "owning actions"  (1 item — cumulative_productivity)
+ └─ final {risk: HIGH, summary, legacy_enrich, visualization}</pre>
+</section>
+
+<section id="section2-req">
+<h2>8 · Section 2 (Modeling) 에 정말 필요한 3건</h2>
+<table>
+  <thead>
+    <tr><th>#</th><th>우선순위</th><th>제목</th><th>목적 / 막힘 정도</th><th>Section 3 활용처</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td><td>🔴 필수</td>
+      <td><code>search</code> 한국어 / aliases / 한↔영 매칭</td>
+      <td>"엣징", "주문", "단중" 등 한국어 검색 0 hit. chat UX 정보량 절반. (§3.4 evidence)</td>
+      <td>BridgeChatPanel · CodeImpactPanel · DataImpactPanel 자동완성</td>
+    </tr>
+    <tr>
+      <td>2</td><td>🔴 필수</td>
+      <td><code>action.output</code> 55%→90%+ backfill</td>
+      <td>38 action 중 21 (55%) 이 output:null. sandbox 의 expected_output 검증 불가</td>
+      <td>SandboxPanel 결과 일치 표시</td>
+    </tr>
+    <tr>
+      <td>3</td><td>🟡 권장</td>
+      <td><code>repos/.../graph</code> default mode 명시 + <code>include_kinds</code> 동작 검증</td>
+      <td>default 가 60 nodes 라 UI 무거움</td>
+      <td>OntologyGraphSVG 시각화</td>
+    </tr>
+  </tbody>
+</table>
+<p>기존 7건은 모두 Section 3 단독 우회 완료 — Section 2 변경 ❌ 없이 동작.</p>
+</section>
+
+<section id="stats">
+<h2>9 · 작업 통계</h2>
+<div class="grid">
+  <div class="card"><div class="num">49</div><div class="label">호출한 ontology endpoint</div></div>
+  <div class="card"><div class="num">127</div><div class="label">raw 응답 (variant 포함)</div></div>
+  <div class="card"><div class="num">2</div><div class="label">자체 신규 모듈 (composer / transpiler)</div></div>
+  <div class="card"><div class="num">4</div><div class="label">전환된 agent</div></div>
+  <div class="card"><div class="num">0</div><div class="label">Section 2 수정</div></div>
+  <div class="card"><div class="num">3</div><div class="label">Section 2 에 남은 필수 요청</div></div>
+</div>
+</section>
+
+<section id="process">
+<h2>10 · 작업 진행 과정 — ontology API 응답을 기반으로 한 단계별 의사결정</h2>
+<p>처음부터 composer + AST 가 있었던 것이 아닙니다. 각 단계마다 <strong>API 응답을 직접 보고</strong> 다음 결정을 했고, 그래서 단계가 9개로 나뉩니다.</p>
+
+<div class="phase">
+  <h4>Phase 1 — 초기 구조 (modeling <code>/query</code> 단독 의존)</h4>
+  <p>처음에는 4 agent (bridge / sandbox / code-impact / data-impact) 가 전부 modeling 한 endpoint 만 호출:</p>
+  <pre>agent → POST /api/modeling/ontology/query { intent, parameters: {target: {kind, id}} }
+      ← OntologyResponse { result: { ... } }</pre>
+  <div class="quote">사용자 첫 demo 반응: "응답이 계속 헛방이네… 왜그러지?"</div>
+</div>
+
+<div class="phase">
+  <h4>Phase 2 — 첫 진단 (<code>graph_stats</code> 호출로 빈 그래프 발견)</h4>
+  <p>진단 1순위로 <code>/api/modeling/ontology/graph/stats</code> →</p>
+  <pre>{ "nodes": { "Term":19, "Step":12, "Standard":14, "Table":14,
+             "Class":0, "Method":0 },                              // ★ 코드 노드 0
+  "totals": { "nodes":75, "relations":117 } }</pre>
+  <p>이어서 <code>impact_analysis(method=…)</code> 호출 → <code>"... 에 해당하는 메서드가 그래프에 없습니다"</code>. cypher 는 정상인데 <code>(m:Method)</code> 매치가 0건. layer3_code 미적재.</p>
+  <div class="quote">사용자 명시: "Section 2 수정 절대 ❌. Section 3 만으로 해결."</div>
+</div>
+
+<div class="phase">
+  <h4>Phase 3 — Ontology API 1차 전수 호출 (94 raw 응답)</h4>
+  <p>대안 데이터 소스를 찾아 <code>/api/ontology/*</code> 전수 호출. 발견 요약:</p>
+  <table>
+    <thead><tr><th>endpoint</th><th>응답 풍부도</th></tr></thead>
+    <tbody>
+      <tr><td><code>/api/ontology/terms</code></td><td><strong>1236 term</strong> (modeling 의 19 에 비해 65배)</td></tr>
+      <tr><td><code>/api/ontology/actions</code></td><td><strong>1514 action</strong> + realizations[].code_method_fqn 매핑 포함</td></tr>
+      <tr><td><code>/api/ontology/code-types</code></td><td><strong>5166 class</strong> — 각 <code>methods[].body_text</code> (실 Java 소스)</td></tr>
+      <tr><td><code>/api/ontology/business-rules</code></td><td>enforced_by + <strong>operational_history (P-2018-0237 등)</strong></td></tr>
+      <tr><td><code>/api/ontology/anchor-bindings</code></td><td><code>"DEFAULT_PRODUCTIVITY = 0.95"</code> 같은 라인 단위 literal</td></tr>
+      <tr><td><code>code-methods/{fqn}/call-sites</code></td><td>confidence + needs_user_confirm</td></tr>
+    </tbody>
+  </table>
+  <p><strong>결정</strong>: modeling /query 응답에 legacy 보강 layer 추가. ModelingClient 에 11 endpoint wrapper.</p>
+</div>
+
+<div class="phase">
+  <h4>Phase 4 — 보강 PoC + 사용자 추가 지적 (큰 방향 전환)</h4>
+  <p>ModelingClient + <code>_enrich_with_legacy()</code> 추가. code-impact 가 빈 응답이라도 legacy 에서 body_text · rule · anchor 보강.</p>
+  <div class="quote">사용자: "<strong>적재해서 읽는 방식이 아니라, 처음부터 ontology API 호출 후 그 응답을 가지고 작업이 되게끔 개편이 필요할 것 같은데.</strong>"</div>
+  <p>→ "modeling /query 가 메인 + legacy 가 보조" 가 아닌, <strong>"legacy 가 메인, modeling /query 는 step kind 만 fallback"</strong> 으로 구조 자체 전환 결정.</p>
+</div>
+
+<div class="phase">
+  <h4>Phase 5 — Ontology API 2차 보강 호출 (33 응답 추가)</h4>
+  <p>사용자 지적: "모든 온톨로지가 제공하는 api 를 호출만 딱 하고, 호출된 것들의 응답을 철저히 분석해서 진행해." 1차 누락 endpoint 추가 호출 → 결정적 발견 4가지:</p>
+  <table>
+    <thead><tr><th>발견</th><th>영향</th></tr></thead>
+    <tbody>
+      <tr><td>★ <code>repos/{repo_id}/graph?mode=neighborhood&amp;focus_fqn=…&amp;hops=2</code></td><td>modeling ontology_trace 가 빈 응답이라도 시각화 자립 가능</td></tr>
+      <tr><td>★★ <code>repos/{repo_id}/modules/inventory/actions</code></td><td><strong>method ↔ action 1:1 매핑 36/36 = 100%</strong> — modeling Class/Method=0 우회 완전</td></tr>
+      <tr><td>★ <code>POST recommend?persist=false</code></td><td>modeling builder 입력을 read-only 로 직접 — 적재 단계 자체 우회</td></tr>
+      <tr><td><code>search?q=실수율</code> 0 hit / <code>search?q=productivity</code> OK</td><td><strong>한국어 매칭 약함 evidence</strong> — Section 2 요청 #1 근거</td></tr>
+      <tr><td><code>code-types?role=service</code> 400 error</td><td>role enum = {framework, domain, infra} 3개 뿐</td></tr>
+    </tbody>
+  </table>
+  <p><strong>결론</strong>: legacy 만으로 modeling 과 동등 응답 합성 가능. Section 3 단독 자립 길 확정.</p>
+</div>
+
+<div class="phase">
+  <h4>Phase 6 — OntologyComposer 설계 + 구현</h4>
+  <p><code>backend/section3/composer.py</code> 신설 — modeling /query 응답과 동등 shape 반환:</p>
+  <pre>class OntologyComposer:
+    impact_analysis(target_kind, target_id)
+        ├─ _impact_method  — code-types + anchor-bindings + call-sites + business-rules + modules/inventory/actions 병렬
+        ├─ _impact_class   — code-types.methods + modules/inventory/actions + business-rules
+        ├─ _impact_action  — actions/{fqn} + anchor-bindings + delegates-to-tree + business-rules
+        └─ _impact_data    — business-rules + anchor-bindings + search (statement 매칭)
+
+    simulate(target_kind, target_id)
+        ├─ _simulate_action  — params + 첫 realization 의 body_text + class.fields + method anchors
+        ├─ _simulate_method  — code-types + method anchors
+        └─ _simulate_class   — public methods × per-method cases
+
+    explain(natural_language)
+        ├─ legacy /search 1차 hit
+        └─ list_terms + in-memory korean fuzzy fallback</pre>
+</div>
+
+<div class="phase">
+  <h4>Phase 7 — JavaToPython AST transpiler 추가 (사용자 명시 요구)</h4>
+  <div class="quote">사용자: "<strong>실시간으로 ontology api 를 호출하고 그 응답을 바탕으로 ast 파싱을 하고 python 코드로 실행되는 일련의 과정이 구축될거라고 믿어.</strong>"</div>
+  <p><code>backend/section3/transpiler.py</code> 신설. <code>tree-sitter-java</code> 사용. body_text → AST → Python source.</p>
+  <p><strong>복병 발견</strong>: legacy <code>code-types.fields</code> 가 <code>name</code>/<code>type</code> 만 노출, <strong>initializer 텍스트는 노출 안 함</strong>. 그러나 Phase 5 에서 호출했던 <code>anchor-bindings</code> 의 <code>anchor_locator: "DEFAULT_PRODUCTIVITY = 0.95"</code> 가 답. regex <code>^([A-Z_]+)\s*=\s*(.+)$</code> 로 추출 → module-level prelude 에 prepend.</p>
+</div>
+
+<div class="phase">
+  <h4>Phase 8 — agents 전환 + UI 보강 + end-to-end 검증</h4>
+  <ol>
+    <li><code>agents/sandbox_agent.py</code> → <code>composer.simulate</code> → <code>transpiler.transpile</code> → <code>run_python_multi</code></li>
+    <li><code>agents/code_impact_agent.py</code> → <code>composer.impact_analysis</code></li>
+    <li><code>agents/data_impact_agent.py</code> → <code>composer.impact_analysis</code></li>
+    <li><code>agents/bridge_agent.py</code> → explain 분기 legacy search enrich (한국어→영문 cross-query)</li>
+    <li><code>frontend/.../api.ts</code> → <code>LegacyEnrich</code> 타입</li>
+    <li><code>frontend/.../RichResultCard.tsx</code> → legacy 보강 섹션 UI</li>
+  </ol>
+  <p><strong>최종 검증</strong> — <code>cumulativeProductivity("ABC")</code> 입력 → composer 5 endpoint 병렬 → tree-sitter-java AST → Python source 1447b (warnings: []) → subprocess <code>{"ok": true, "result": 0.95}</code> ✓</p>
+</div>
+
+<div class="phase">
+  <h4>Phase 9 — Section 2 요청 정리 (7건 → 3건)</h4>
+  <table>
+    <thead><tr><th>기존 요청</th><th>composer 도입 후 상태</th></tr></thead>
+    <tbody>
+      <tr><td>#02 id 카탈로그 (table/standard/order)</td><td>legacy <code>terms</code> + <code>modules/inventory(/actions)</code> 로 대체 ✓</td></tr>
+      <tr><td>#03 modeling graph 에 Class/Method 적재</td><td><code>repos/.../graph?mode=neighborhood</code> + <code>modules/inventory/actions</code> 로 우회 ✓</td></tr>
+      <tr><td>#04 impact_analysis standard_value 분기 버그</td><td>composer 가 자체 합성 ✓</td></tr>
+      <tr><td>#05 simulate method/class/order 지원</td><td>composer + transpiler 가 자체 합성 ✓</td></tr>
+      <tr><td>#06 explain <code>keywords[]</code> 배열 수용</td><td>bridge_agent 가 <code>natural_language</code> 만 전송 ✓</td></tr>
+      <tr><td>#07 modeling term/search alias 강화</td><td>composer 가 legacy <code>search</code> + in-memory fuzzy fallback ✓</td></tr>
+    </tbody>
+  </table>
+  <p>→ <strong>모두 보류 (Section 3 단독 우회 완료)</strong>. 진짜 필수만 추려 §8 의 3건만 남김.</p>
+</div>
+</section>
+
+<footer style="margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 11px; color: var(--muted);">
+  2026-05-13 · onTong Section 3 simulation 세션 · backend <code>localhost:8001/api/section3/*</code> · frontend <code>localhost:3000/?section=simulation</code><br>
+  같은 내용 마크다운: <a href="./README.md">README.md</a>
+</footer>
+
+</div>
+</body>
+</html>
