@@ -16,8 +16,10 @@ import {
   type ArchiveDocument,
   type AuthoringSession,
   type EntityHypothesis,
+  type ExtractedClass,
   type ExtractedJpo,
   type GapAnalysis,
+  type Hypothesis,
   type InterviewBatch,
   type NamingDecision,
   type ComprehensiveArchive,
@@ -95,9 +97,54 @@ export interface ActiveToolTrace {
 /** Snapshot of one finished entity cycle within a session.
  *  Pushed when the user clicks "다음 Entity". `messages` / `costUsd` /
  *  `turnNo` are session-level, not per-entity, so they live elsewhere. */
+/** Narrow a Hypothesis to EntityHypothesis or throw. Used by downstream
+ *  capabilities (gaps/options/etc.) that haven't yet been ported to
+ *  Service/Action — Phase C-3a/b is interview-only. */
+function _entityOrThrow(h: Hypothesis | null | undefined): EntityHypothesis {
+  if (!h) throw new Error("hypothesis required.");
+  if (h.kind !== "entity") {
+    throw new Error(
+      `이 단계는 JPA Entity 만 지원합니다 (현재 hypothesis kind=${h.kind}).`,
+    );
+  }
+  return h;
+}
+
+/** Kind-aware {korean, english} display pair for any Hypothesis. */
+function _hypothesisDisplay(h: Hypothesis | null | undefined):
+  | { korean: string; english: string; role: string }
+  | null {
+  if (!h) return null;
+  if (h.kind === "entity") {
+    return {
+      korean: h.candidate_term_korean,
+      english: h.candidate_term_english,
+      role: h.domain_role,
+    };
+  }
+  if (h.kind === "service") {
+    return {
+      korean: h.candidate_capability_korean,
+      english: h.candidate_capability_english,
+      role: h.service_role,
+    };
+  }
+  return {
+    korean: h.domain_verb_korean,
+    english: h.domain_verb_english,
+    role: h.action_kind_guess,
+  };
+}
+
 export interface CompletedEntityCycle {
-  jpo: ExtractedJpo;
-  hypothesis: EntityHypothesis | null;
+  /** Extracted code outline — JPA Entity (kind="jpo", full schema) or
+   *  Generic (kind="generic", outline only). Phase B rename: this used to
+   *  be `jpo: ExtractedJpo` when only JPA Entity was supported. */
+  extracted: ExtractedClass;
+  /** Phase C-3 widened to Hypothesis union (entity | service | action).
+   *  Downstream caps (options/gaps/etc.) still narrow to EntityHypothesis
+   *  with a kind guard until those caps land in subsequent C-3 substeps. */
+  hypothesis: Hypothesis | null;
   acceptedOption: OntologyOption | null;
   names: NamingDecision | null;
   archive: ArchiveDocument | null;
@@ -118,8 +165,13 @@ export interface AuthoringState {
   costUsd: number;
 
   // Capability accumulators (each set by the corresponding action)
-  jpo: ExtractedJpo | null;
-  hypothesis: EntityHypothesis | null;
+  /** Most-recent extract output. Either ExtractedJpo (kind="jpo") for
+   *  @Entity classes — feeds the full hypothesis/interview/options pipeline —
+   *  or ExtractedGenericClass (kind="generic") which gates downstream
+   *  capabilities (Phase B-8). Phase B rename: was `jpo: ExtractedJpo | null`. */
+  extracted: ExtractedClass | null;
+  /** Phase C-3 widened to Hypothesis union (entity | service | action). */
+  hypothesis: Hypothesis | null;
   batch: InterviewBatch | null;
   answers: AbsorbedAnswers | null;
   optionTable: OptionTable | null;
@@ -301,7 +353,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
   error: null,
   costUsd: 0,
 
-  jpo: null,
+  extracted: null,
   hypothesis: null,
   batch: null,
   answers: null,
@@ -324,7 +376,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       loading: false,
       error: null,
       costUsd: 0,
-      jpo: null,
+      extracted: null,
       hypothesis: null,
       batch: null,
       answers: null,
@@ -377,8 +429,8 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         "extract",
         authoringApi.extractStream(sess.id, req),
       );
-      const out = trace.output as ExtractedJpo;
-      set(() => ({ jpo: out, turnNo: turn }));
+      const out = trace.output as ExtractedClass;
+      set(() => ({ extracted: out, turnNo: turn }));
       pushMessage(set, "assistant", "extracted", out, {
         toolTrace: trace.completed,
       });
@@ -388,19 +440,36 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
 
   runHypothesize: async () => {
     await withLoading(set, async () => {
-      const { jpo, session } = get();
-      if (!session || !jpo) throw new Error("Run extract first.");
+      const { extracted, session } = get();
+      if (!session || !extracted) throw new Error("Run extract first.");
+      // Phase C-2: hypothesis dispatcher accepts jpo / service / action.
+      // ExtractedGenericClass (kind="generic") has no hypothesis prompt yet —
+      // the toolbar gate prevents it from reaching this code path.
+      if (extracted.kind === "generic") {
+        throw new Error(
+          "Generic 클래스 hypothesis 는 미지원 — JPA Entity 또는 Service / Action 클래스를 선택하세요.",
+        );
+      }
       const turn = get().turnNo + 1;
       const trace = await consumeStream(
         set,
         "hypothesize",
         authoringApi.hypothesizeStream(session.id, {
           turn_no: turn,
-          extracted_jpo: jpo,
+          extracted,
         }),
       );
-      const out = trace.output as EntityHypothesis;
-      set(() => ({ hypothesis: out, turnNo: turn }));
+      const out = trace.output as Hypothesis;
+      // Phase C-2 boundary: the store's `hypothesis` field still types as
+      // EntityHypothesis because downstream caps (interview/gaps/options)
+      // are JPO-only until Phase C-3. Service/Action hypotheses display in
+      // chat but don't trigger downstream — preserves current pipeline
+      // semantics while letting users exercise the new hypothesis surface.
+      if (out.kind === "entity") {
+        set(() => ({ hypothesis: out, turnNo: turn }));
+      } else {
+        set(() => ({ turnNo: turn }));
+      }
       pushMessage(set, "assistant", "hypothesis", out, {
         toolTrace: trace.completed,
       });
@@ -419,8 +488,11 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
     // resetting downstream state so the user can re-run options/gaps/naming
     // against the new hypothesis without confusion.
     await withLoading(set, async () => {
-      const { jpo, session, answers } = get();
-      if (!session || !jpo) throw new Error("Run extract first.");
+      const { extracted, session, answers } = get();
+      if (!session || !extracted) throw new Error("Run extract first.");
+      if (extracted.kind === "generic") {
+        throw new Error("Generic 클래스 hypothesis 는 미지원.");
+      }
       pushMessage(
         set,
         "user",
@@ -435,12 +507,14 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         "hypothesize",
         authoringApi.hypothesizeStream(session.id, {
           turn_no: turn,
-          extracted_jpo: jpo,
+          extracted,
         }),
       );
-      const out = trace.output as EntityHypothesis;
+      const out = trace.output as Hypothesis;
+      // See runHypothesize — narrow to EntityHypothesis for the store field.
+      const narrowedHypothesis = out.kind === "entity" ? out : get().hypothesis;
       set(() => ({
-        hypothesis: out,
+        hypothesis: narrowedHypothesis,
         turnNo: turn,
         // Clear everything downstream of hypothesis so the user can re-run.
         optionTable: null,
@@ -571,6 +645,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       const { hypothesis, answers, session } = get();
       if (!session || !hypothesis || !answers)
         throw new Error("Need hypothesis + answers before options.");
+      const entityH = _entityOrThrow(hypothesis);
       const turn = get().turnNo + 1;
 
       const trace = await consumeStream(
@@ -578,7 +653,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         "options",
         authoringApi.optionsStream(session.id, {
           turn_no: turn,
-          hypothesis,
+          hypothesis: entityH,
           answers,
         }),
       );
@@ -597,9 +672,13 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
 
   runGaps: async () => {
     await withLoading(set, async () => {
-      const { jpo, hypothesis, answers, session } = get();
-      if (!session || !jpo || !hypothesis || !answers)
-        throw new Error("Need jpo + hypothesis + answers before gaps.");
+      const { extracted, hypothesis, answers, session } = get();
+      if (!session || !extracted || !hypothesis || !answers)
+        throw new Error("Need extracted + hypothesis + answers before gaps.");
+      if (extracted.kind !== "jpo") {
+        throw new Error("Gaps 는 현재 JPA Entity 만 지원합니다.");
+      }
+      const entityH = _entityOrThrow(hypothesis);
       const turn = get().turnNo + 1;
 
       const trace = await consumeStream(
@@ -607,8 +686,8 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         "gaps",
         authoringApi.gapsStream(session.id, {
           turn_no: turn,
-          extracted_jpo: jpo,
-          hypothesis,
+          extracted_jpo: extracted,
+          hypothesis: entityH,
           answers,
         }),
       );
@@ -663,12 +742,12 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
     // capability state. Session, messages, turnNo, costUsd, and
     // completedEntities itself are kept (session-level state).
     const s = get();
-    if (!s.jpo) {
+    if (!s.extracted) {
       // Nothing to capture (no entity processed yet) — ignore.
       return;
     }
     const cycle: CompletedEntityCycle = {
-      jpo: s.jpo,
+      extracted: s.extracted,
       hypothesis: s.hypothesis,
       acceptedOption: s.acceptedOption,
       names: s.names,
@@ -683,7 +762,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       completedEntities: [...s.completedEntities, cycle],
       turnNo: turn,
       // Reset per-entity state
-      jpo: null,
+      extracted: null,
       hypothesis: null,
       batch: null,
       answers: null,
@@ -707,7 +786,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       set,
       "system",
       "info",
-      `✓ ${cycle.jpo.class_name} 마무리 — 다음 JPO 추천 받는 중...`,
+      `✓ ${cycle.extracted.class_name} 마무리 — 다음 Entity 추천 받는 중...`,
     );
   },
 
@@ -717,9 +796,14 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
     // structured artifacts.
     await withLoading(set, async () => {
       const r = await authoringApi.replay(sessionId);
+      // Backend keeps the legacy "jpo" field name in replay payloads (Phase B
+      // boundary translation; Phase C will unify when backend gains Service /
+      // Action schemas). Frontend store uses `extracted: ExtractedClass`
+      // throughout — cast at the boundary, default to kind="jpo" so older
+      // payloads without the discriminator still deserialize correctly.
       const cycles: CompletedEntityCycle[] = r.completed_entities.map(
         (c) => ({
-          jpo: c.jpo as ExtractedJpo,
+          extracted: c.jpo as ExtractedClass,
           hypothesis: c.hypothesis,
           acceptedOption: c.accepted_option,
           names: c.names,
@@ -736,8 +820,8 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         loading: false,
         error: null,
         costUsd: r.cost_total_usd,
-        // Current cycle artifacts
-        jpo: r.current.jpo,
+        // Current cycle artifacts — translate backend `jpo` → store `extracted`.
+        extracted: (r.current.jpo as ExtractedClass | null) ?? null,
         hypothesis: r.current.hypothesis,
         batch: r.current.batch,
         answers: r.current.answers,
@@ -757,7 +841,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         set,
         "system",
         "info",
-        `↻ 세션 ${sessionId.slice(0, 8)}… 이어서 진행 (완료 ${cycles.length} entity, 현재 ${r.current.jpo ? r.current.jpo.class_name : "(없음)"})`,
+        `↻ 세션 ${sessionId.slice(0, 8)}… 이어서 진행 (완료 ${cycles.length} entity, 현재 ${r.current.jpo ? (r.current.jpo as ExtractedClass).class_name : "(없음)"})`,
       );
       // P3 polish: replay history into chat as a compact summary so the
       // user sees what was done before the reload. Skipping full per-cap
@@ -772,15 +856,16 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
           set,
           "system",
           "info",
-          `· ${c.jpo.class_name} → ${c.hypothesis?.candidate_term_korean ?? "(미정)"} / ${accepted}${persisted}`,
+          `· ${c.extracted.class_name} → ${_hypothesisDisplay(c.hypothesis)?.korean ?? "(미정)"} / ${accepted}${persisted}`,
         );
       }
       if (r.current.jpo) {
+        const cur = r.current.jpo as ExtractedClass;
         pushMessage(
           set,
           "system",
           "info",
-          `· 현재 진행 중: ${r.current.jpo.class_name}${r.current.hypothesis ? ` / 가설 = ${r.current.hypothesis.candidate_term_korean}` : ""}`,
+          `· 현재 진행 중: ${cur.class_name}${r.current.hypothesis ? ` / 가설 = ${r.current.hypothesis.candidate_term_korean}` : ""}`,
         );
       }
     });
@@ -796,13 +881,13 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       const entities: EntitySnapshot[] = [];
       // Completed cycles first
       for (const c of s.completedEntities) {
+        const cd = _hypothesisDisplay(c.hypothesis);
         entities.push({
-          class_name: c.jpo.class_name,
-          package: c.jpo.package,
-          candidate_term_korean: c.hypothesis?.candidate_term_korean ?? "(미정)",
-          candidate_term_english:
-            c.hypothesis?.candidate_term_english ?? c.jpo.class_name,
-          domain_role: c.hypothesis?.domain_role ?? "unknown",
+          class_name: c.extracted.class_name,
+          package: c.extracted.package,
+          candidate_term_korean: cd?.korean ?? "(미정)",
+          candidate_term_english: cd?.english ?? c.extracted.class_name,
+          domain_role: cd?.role ?? "unknown",
           accepted_option_name: c.acceptedOption?.name ?? null,
           accepted_option_alignment: c.acceptedOption?.domain_alignment ?? null,
           accepted_option_structure: c.acceptedOption?.structure_sketch ?? null,
@@ -816,14 +901,14 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         });
       }
       // Then current in-progress (if at least extracted)
-      if (s.jpo) {
+      if (s.extracted) {
+        const sd = _hypothesisDisplay(s.hypothesis);
         entities.push({
-          class_name: s.jpo.class_name,
-          package: s.jpo.package,
-          candidate_term_korean: s.hypothesis?.candidate_term_korean ?? "(미정)",
-          candidate_term_english:
-            s.hypothesis?.candidate_term_english ?? s.jpo.class_name,
-          domain_role: s.hypothesis?.domain_role ?? "unknown",
+          class_name: s.extracted.class_name,
+          package: s.extracted.package,
+          candidate_term_korean: sd?.korean ?? "(미정)",
+          candidate_term_english: sd?.english ?? s.extracted.class_name,
+          domain_role: sd?.role ?? "unknown",
           accepted_option_name: s.acceptedOption?.name ?? null,
           accepted_option_alignment: s.acceptedOption?.domain_alignment ?? null,
           accepted_option_structure: s.acceptedOption?.structure_sketch ?? null,
@@ -860,8 +945,8 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       if (!s.session) throw new Error("No session.");
       const completed_entity_fqns: string[] = s.completedEntities
         .map((c) => {
-          const pkg = c.jpo.package;
-          const cls = c.jpo.class_name;
+          const pkg = c.extracted.package;
+          const cls = c.extracted.class_name;
           return pkg ? `${pkg}.${cls}` : cls;
         })
         .filter((fqn) => fqn.length > 0);
@@ -899,26 +984,30 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       const { hypothesis, acceptedOption, session, completedEntities } = get();
       if (!session || !hypothesis || !acceptedOption)
         throw new Error("Accept an option before pattern check.");
+      const entityH = _entityOrThrow(hypothesis);
       const turn = get().turnNo + 1;
-      const priors: PriorEntitySnapshot[] = completedEntities.map((c) => ({
-        class_name: c.jpo.class_name,
-        candidate_term_korean: c.hypothesis?.candidate_term_korean ?? "(미정)",
-        candidate_term_english: c.hypothesis?.candidate_term_english ?? c.jpo.class_name,
-        domain_role: c.hypothesis?.domain_role ?? "unknown",
-        accepted_option_name: c.acceptedOption?.name ?? null,
-        accepted_option_structure: c.acceptedOption?.structure_sketch ?? null,
-        accepted_option_alignment: c.acceptedOption?.domain_alignment ?? null,
-        persisted_fqns: c.persistedFqns,
-        archive_summary: c.archive
-          ? c.archive.markdown.split("\n").slice(0, 3).join(" / ")
-          : null,
-      }));
+      const priors: PriorEntitySnapshot[] = completedEntities.map((c) => {
+        const cd = _hypothesisDisplay(c.hypothesis);
+        return {
+          class_name: c.extracted.class_name,
+          candidate_term_korean: cd?.korean ?? "(미정)",
+          candidate_term_english: cd?.english ?? c.extracted.class_name,
+          domain_role: cd?.role ?? "unknown",
+          accepted_option_name: c.acceptedOption?.name ?? null,
+          accepted_option_structure: c.acceptedOption?.structure_sketch ?? null,
+          accepted_option_alignment: c.acceptedOption?.domain_alignment ?? null,
+          persisted_fqns: c.persistedFqns,
+          archive_summary: c.archive
+            ? c.archive.markdown.split("\n").slice(0, 3).join(" / ")
+            : null,
+        };
+      });
       const trace = await consumeStream(
         set,
         "pattern",
         authoringApi.patternStream(session.id, {
           turn_no: turn,
-          hypothesis,
+          hypothesis: entityH,
           accepted_option: acceptedOption,
           prior_session_entities: priors.length > 0 ? priors : null,
         }),
@@ -937,6 +1026,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       const { hypothesis, optionTable, session } = get();
       if (!session || !hypothesis || !optionTable)
         throw new Error("No options to select from.");
+      const entityH = _entityOrThrow(hypothesis);
       const accepted = optionTable.options.find((o) => o.id === optionId);
       if (!accepted) throw new Error(`Option ${optionId} not in current table`);
       set(() => ({ acceptedOption: accepted }));
@@ -946,7 +1036,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       const turn = get().turnNo + 1;
       const namingOut = await authoringApi.naming(session.id, {
         turn_no: turn,
-        hypothesis,
+        hypothesis: entityH,
         accepted_option: accepted,
       });
       set(() => ({ names: namingOut, turnNo: turn }));
@@ -960,10 +1050,11 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       const { hypothesis, answers, acceptedOption, names, gaps, session } = get();
       if (!session || !hypothesis || !answers || !acceptedOption || !names)
         throw new Error("Need hypothesis + answers + accepted option + names before archive.");
+      const entityH = _entityOrThrow(hypothesis);
       const turn = get().turnNo + 1;
       const out = await authoringApi.archive(session.id, {
         turn_no: turn,
-        hypothesis,
+        hypothesis: entityH,
         answers,
         accepted_option: acceptedOption,
         names,
@@ -1011,7 +1102,7 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
     // every downstream stage so the user re-progresses cleanly. This is the
     // "사용자 정정 → AI 재검토" cascading pattern from Round 5.
     await withLoading(set, async () => {
-      const { jpo, hypothesis, batch, answers, acceptedOption, session } = get();
+      const { extracted, hypothesis, batch, answers, acceptedOption, session } = get();
       if (!session) throw new Error("No session.");
 
       const tag = comment?.trim()
@@ -1022,20 +1113,25 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       const turn = get().turnNo + 1;
 
       if (stage === "hypothesis") {
-        if (!jpo) throw new Error("jpo required");
+        if (!extracted) throw new Error("extracted required");
+        if (extracted.kind === "generic") {
+          throw new Error("Generic 클래스 hypothesis rerun 은 미지원.");
+        }
         const trace = await consumeStream(
           set,
           "hypothesize",
           authoringApi.hypothesizeStream(session.id, {
             turn_no: turn,
-            extracted_jpo: jpo,
+            extracted,
             user_comment: comment,
           }),
         );
-        const out = trace.output as EntityHypothesis;
+        const out = trace.output as Hypothesis;
+        // Narrow for store (downstream caps still JPO-only in Phase C-2).
+        const narrowed = out.kind === "entity" ? out : hypothesis;
         // Clear everything downstream of hypothesis.
         set(() => ({
-          hypothesis: out,
+          hypothesis: narrowed,
           turnNo: turn,
           batch: null,
           answers: null,
@@ -1070,12 +1166,13 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         pushMessage(set, "assistant", "interview", out);
       } else if (stage === "options") {
         if (!hypothesis || !answers) throw new Error("hypothesis + answers required");
+        const entityH = _entityOrThrow(hypothesis);
         const trace = await consumeStream(
           set,
           "options",
           authoringApi.optionsStream(session.id, {
             turn_no: turn,
-            hypothesis,
+            hypothesis: entityH,
             answers,
             user_comment: comment,
           }),
@@ -1095,9 +1192,10 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         });
       } else if (stage === "naming") {
         if (!hypothesis || !acceptedOption) throw new Error("hypothesis + acceptedOption required");
+        const entityH = _entityOrThrow(hypothesis);
         const out = await authoringApi.naming(session.id, {
           turn_no: turn,
-          hypothesis,
+          hypothesis: entityH,
           accepted_option: acceptedOption,
           user_comment: comment,
         });

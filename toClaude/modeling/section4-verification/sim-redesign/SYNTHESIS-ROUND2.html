@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Sim-Redesign Round 2 종합 — Two-Engine Plugin Framework</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+      "Noto Sans KR", sans-serif;
+    line-height: 1.6; color: #1f2937; max-width: 1200px;
+    margin: 0 auto; padding: 32px 24px 80px; background: #fafafa;
+  }
+  h1 { font-size: 28px; margin: 0 0 8px; color: #111827; }
+  h2 { font-size: 22px; margin: 48px 0 12px; padding-bottom: 8px;
+       border-bottom: 2px solid #e5e7eb; color: #111827; }
+  h3 { font-size: 17px; margin: 24px 0 8px; color: #1f2937; }
+  h4 { font-size: 13px; margin: 12px 0 6px; color: #4b5563;
+       text-transform: uppercase; letter-spacing: 0.05em; }
+  .lead { color: #6b7280; font-size: 15px; margin-bottom: 32px; }
+  .panel { background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+           padding: 20px 24px; margin: 16px 0; }
+  .panel.architect    { border-left: 4px solid #2563eb; }
+  .panel.recommender  { border-left: 4px solid #db2777; }
+  .panel.integrator   { border-left: 4px solid #16a34a; }
+  .panel.skeptic      { border-left: 4px solid #ea580c; }
+  .panel.synth        { border-left: 4px solid #9333ea; background: #faf5ff; }
+  .panel.info         { background: #eff6ff; border-color: #93c5fd; }
+  .panel.warn         { background: #fff7ed; border-color: #fdba74; }
+  pre { background: #1f2937; color: #e5e7eb; padding: 14px 18px;
+        border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.55;
+        font-family: "SF Mono", Menlo, Monaco, Consolas, monospace; margin: 8px 0; }
+  pre.lang::before {
+    content: attr(data-lang); display: inline-block; background: #374151;
+    color: #9ca3af; font-size: 10px; padding: 2px 6px; border-radius: 3px;
+    margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  pre .kw { color: #c084fc; }
+  pre .str { color: #fca5a5; }
+  pre .fn { color: #93c5fd; }
+  pre .num { color: #fbbf24; }
+  pre .comment { color: #6b7280; font-style: italic; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 12px 0; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin: 12px 0; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin: 12px 0; }
+  .col { background: white; border: 1px solid #e5e7eb; border-radius: 6px;
+         padding: 12px 16px; }
+  .col h4 { margin-top: 0; }
+  .label { display: inline-block; padding: 2px 8px; border-radius: 999px;
+           font-size: 11px; font-weight: 700; margin-left: 6px;
+           text-transform: uppercase; letter-spacing: 0.05em; }
+  .label.A1 { background: #dbeafe; color: #1e40af; }
+  .label.A2 { background: #fce7f3; color: #9d174d; }
+  .label.A3 { background: #dcfce7; color: #166534; }
+  .label.A4 { background: #ffedd5; color: #9a3412; }
+  .label.synth { background: #f3e8ff; color: #6b21a8; }
+  .label.mandate { background: #fef3c7; color: #92400e; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; background: white;
+          font-size: 13px; }
+  th, td { border: 1px solid #e5e7eb; padding: 9px 11px; text-align: left;
+           vertical-align: top; }
+  th { background: #f3f4f6; font-weight: 600; }
+  td.ok { color: #16a34a; font-weight: 700; text-align: center; }
+  td.no { color: #dc2626; font-weight: 700; text-align: center; }
+  td.partial { color: #d97706; font-weight: 700; text-align: center; }
+  .diagram { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px;
+             padding: 16px 20px; margin: 16px 0;
+             font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+             line-height: 1.6; white-space: pre; overflow-x: auto; color: #1e293b; }
+  .callout { background: #fef3c7; border-left: 4px solid #f59e0b;
+             padding: 12px 16px; margin: 16px 0; border-radius: 4px; font-size: 14px; }
+  .tldr { background: #eff6ff; border-left: 4px solid #3b82f6;
+          padding: 14px 18px; margin: 16px 0; border-radius: 4px; font-size: 14px; }
+  .rec-banner {
+    background: linear-gradient(90deg, #f3e8ff, #ede9fe);
+    border: 2px solid #9333ea;
+    border-radius: 8px;
+    padding: 14px 20px;
+    margin: 20px 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #6b21a8;
+  }
+  .mandate-card {
+    background: #fff7ed; border: 1px solid #fdba74; border-radius: 6px;
+    padding: 10px 14px; margin: 8px 0; font-size: 14px;
+  }
+  .mandate-card strong { color: #9a3412; }
+  .mandate-card .resolution {
+    background: #ecfdf5; border-left: 3px solid #10b981;
+    padding: 6px 10px; margin-top: 8px; font-size: 13px;
+  }
+  .filelink { color: #2563eb; font-family: "SF Mono", monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>Sim-Redesign Round 2 종합 — Two-Engine Plugin Framework <span class="label synth">v2</span></h1>
+<p class="lead">
+  ADR-002 의 확장 scope (system-agnostic + Recommendation Engine) 에 대한 4 perspective 종합.<br>
+  3 design proposal (architect / recommendation / integrator) 강점 통합 + skeptic 11 mandate 흡수.
+</p>
+
+<div class="tldr">
+  <strong>이 문서의 위치</strong> — Round 1 종합 (Anchored Twin Synthesizer) 의 확장. ADR-002 가 도입한 두 차원 (시스템 일반화 + 추천 엔진) 의 detail 설계. 4 exploration 의 full text 는 <code>explorations/round2/{1-4}-*.md</code>. <strong>이 문서가 Round 2 의 최종 종합 — 사용자 결정 받으면 spec 작성으로 인계.</strong>
+</div>
+
+<div class="rec-banner">
+  권장: <strong>Two-Engine Plugin Framework</strong><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;= core (universal) + plugins/&lt;system&gt;/ + Schema Layer (5번째 ontology) + Integrator substrate<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;Verification Engine (deterministic) + Recommendation Engine (LLM-based)
+</div>
+
+<h2>1. 4 perspective 한눈에</h2>
+
+<div class="grid-2">
+  <div class="panel architect">
+    <h3>① Architect — System-Agnostic <span class="label A1">A1</span></h3>
+    <p><strong>핵심</strong>: core/ universal + plugins/&lt;sys&gt;/ per-system. <code>code_types.role</code> (domain/infra/framework) 가 자동 분류 lever. v2 의 모든 specifics (79 slot / 5 KNOWN_DIVERGENCE / 9 JPA repo / Spring DI) 가 plugin 으로 collapse.</p>
+    <p><strong>onboarding</strong>: 7 artifact + 1 ontology import per new system. Hypothetical bank-credit ~3000 LOC plugin, core churn 0.</p>
+    <p><strong>강점</strong>: Multi-language path (tree-sitter swap), 명확한 plugin boundary</p>
+    <p><strong>약점 (인정)</strong>: Plugin scaffolding cost, role 분류 quality 의존, 인증된 second system 부재</p>
+    <p style="font-size:12px"><span class="filelink">explorations/round2/1-architect-systemagnostic.md</span> (1914w)</p>
+  </div>
+
+  <div class="panel recommender">
+    <h3>② Recommendation Specialist <span class="label A2">A2</span></h3>
+    <p><strong>핵심</strong>: 3 sub-engine (Schema/Code/Ontology Evolver) 직렬. LLM 4 방어: typed tool / deterministic step jailing / structured artifact output / Verification RPC fence.</p>
+    <p><strong>worked example</strong>: "고객사 슬랩 두께 override" 7-step end-to-end. CustomerStdJpo 실제 column 검증, 새 anchor `atomic.customer_override_check` 삽입.</p>
+    <p><strong>강점</strong>: LLM context retrieval (FTS5, 5-15K token), manifest 기반 reproducibility</p>
+    <p><strong>약점 (인정)</strong>: Silent hallucination, 한국어 자연어 의존, multi-proposal cost</p>
+    <p style="font-size:12px"><span class="filelink">explorations/round2/2-recommendation-specialist.md</span> (2061w)</p>
+  </div>
+
+  <div class="panel integrator">
+    <h3>③ Two-Engine Integrator <span class="label A3">A3</span></h3>
+    <p><strong>핵심</strong>: 5번째 Schema Layer DDL (5 table + schema_code_map). Bitemporal (<code>revision_introduced</code>/<code>obsoleted</code>). Proposal lifecycle state machine + Integrator (단일 transactional mutation point).</p>
+    <p><strong>3 CI gates</strong>: Verification regression / Schema-Code sync / Proposal validation</p>
+    <p><strong>강점</strong>: 명확한 contract substrate ("revision id + schema_code_map + proposal artifact" triple)</p>
+    <p><strong>약점 (인정)</strong>: SQLite write contention, bitemporal query complexity, Integrator SPOF</p>
+    <p style="font-size:12px"><span class="filelink">explorations/round2/3-two-engine-integrator.md</span> (1678w prose + DDL)</p>
+  </div>
+
+  <div class="panel skeptic">
+    <h3>④ Skeptic <span class="label A4">A4</span></h3>
+    <p><strong>가장 강한 한 줄</strong>: <em>"ADR-002 가 13 grill 중 10 을 system-agnostic 으로 reframe 했지만 v2 외 reference system 부재 — generalization 은 currently unfalsifiable"</em></p>
+    <p><strong>onboarding cost 실측</strong>: medium Java ~100-150h / first non-Java ~200-400h mechanism + 100-150h curation</p>
+    <p><strong>Layer 1 reusability</strong>: 79 slot 중 ~40-50 v2-domain-specific → 60% per-system</p>
+    <p><strong>LLM context overflow</strong>: 5K+ class ontology 는 multi-million token → RAG required (unspecified)</p>
+    <p><strong>11 mandates</strong> — 합성 전 답해야 할 항목</p>
+    <p style="font-size:12px"><span class="filelink">explorations/round2/4-skeptic.md</span> (2190w)</p>
+  </div>
+</div>
+
+<h2>2. 합의점 — A1/A2/A3 가 모두 동의하는 것</h2>
+
+<table>
+  <thead><tr><th>항목</th><th>합의 내용</th></tr></thead>
+  <tbody>
+    <tr><td>두 engine 분리</td><td>Verification (deterministic) + Recommendation (LLM-based). 통신 한 방향 — Recommendation propose, Verification simulate</td></tr>
+    <tr><td>System-agnostic mechanism</td><td>core (universal) + plugins/&lt;sys&gt;/ (specifics). v2 = 한 instance</td></tr>
+    <tr><td><code>code_types.role</code></td><td>핵심 lever (universal). 자동 + 사용자 override</td></tr>
+    <tr><td>5번째 Schema Layer</td><td>ontology 확장 (5 new table + schema_code_map). Bitemporal 권장</td></tr>
+    <tr><td>Revision pointer</td><td>모든 artifact 에 <code>(proposal_id, revision_id, run_id)</code> stamp</td></tr>
+    <tr><td>Verification = Recommendation 의 oracle</td><td>모든 proposal 의 regression check 가 fence</td></tr>
+    <tr><td>Audit trail</td><td>proposal lifecycle + verification_runs + ontology_revisions table</td></tr>
+    <tr><td>LLM 방어</td><td>Typed tool + structured output + retrieval (FTS5) + manifest reproducibility</td></tr>
+  </tbody>
+</table>
+
+<h2>3. Skeptic 의 11 Mandate — Round 2 합성이 답해야 할 것</h2>
+
+<p>Skeptic 은 design proposal 하지 않음. 대신 합성 전 반드시 답해야 할 빈틈 11종 catalog. 각 mandate 에 종합 설계의 응답을 inline.</p>
+
+<div class="mandate-card">
+  <strong>M1. Name the second system</strong> — concrete non-v2 reference (language / framework / scale / pattern). 모든 system-agnostic claim test 됨
+  <div class="resolution"><strong>응답</strong>: Architect (A1) 의 hypothetical "bank-credit" (SpringBoot loan scoring + MyBatis + Reactor + CreditScoreException) 를 spec 의 reference 로 명시. 실제 onboarding 은 사용자 선정 후 별도 세션 — 단 framework 설계 자체는 bank-credit 의 plugin shape (7 artifact + 1 ontology) 으로 검증된 형태</div>
+</div>
+
+<div class="mandate-card">
+  <strong>M2. Recommendation scope decision tree</strong> — UC4 의 explicit scope: column add / + downstream code / multi-table refactor / full migration
+  <div class="resolution"><strong>응답</strong>: 3 sub-engine 직렬 (Schema → Code → Ontology) + 사용자 turn 단위 scope 선택. Default = "column add + downstream code stub + ontology delta". 다중 alternative (α: column / β: 새 table) 제시</div>
+</div>
+
+<div class="mandate-card">
+  <strong>M3. Determinism boundary</strong> — artifact provenance: deterministic vs LLM-derived; prompt+input hash for cache
+  <div class="resolution"><strong>응답</strong>: <code>manifest.yaml</code> per proposal — <code>model_version + prompt_hash + ontology_revision + seed</code>. Verification artifact 는 ontology_revision 만 의존 (fully deterministic). Recommendation artifact 는 manifest 4-tuple 의존 (동일 환경 reproducibility)</div>
+</div>
+
+<div class="mandate-card">
+  <strong>M4. Schema Layer migration plan</strong> — 새 5+ table 의 추가, audit_log / realizations / composition_edges 호환, migration + backout
+  <div class="resolution"><strong>응답</strong>: <strong>Additive only</strong> — 기존 17 table 의 row 미수정. CREATE TABLE 5 (schema_tables/columns/foreign_keys/indexes/constraints) + schema_code_map + ontology_revisions/proposals/verification_runs 3. <strong>Backout = drop the new tables</strong> (additive 이므로 zero-impact rollback). Seed 는 JPA annotation 자동 + 사용자 confirm</div>
+</div>
+
+<div class="mandate-card">
+  <strong>M5. Two-engine sync protocol</strong> — when Recommendation modifies ontology, conflict resolution, audit trail for LLM-derived state, versioning across 5 axes
+  <div class="resolution"><strong>응답</strong>: Integrator (transactional, ~200 LOC) 가 ontology mutation 의 단일 channel. Proposal lifecycle (<code>draft → analyzing → ready → reviewed → accepted | rejected | stale</code>). <code>base_revision</code> pin → 동시 proposal 중 first-apply wins, 나머지 STALE_PROPOSAL</div>
+</div>
+
+<div class="mandate-card">
+  <strong>M6. Layer 2 scaling test</strong> — 5K-8K method synthetic load
+  <div class="resolution"><strong>응답</strong>: AST visitor + role-based scope routing은 method 당 ~5ms 추정. 5K method ≈ 25s synthesis cold. Incremental synthesis (변경 file 만) 기본. Performance budget = 60s cold / 5s incremental</div>
+</div>
+
+<div class="mandate-card">
+  <strong>M7. Recommendation context retrieval</strong> — ontology 전체가 prompt 에 안 들어감 (5K+ class system). RAG 명시
+  <div class="resolution"><strong>응답</strong>: FTS5 인덱스 (BusinessTerm.synonyms + Action.name_ko + Method/Class fqn) → query 매칭 typed JSON 으로 top-N=20 + 2-hop graph 확장. Token budget 5-15K per call. v2 (985 method) 와 100K class system 동일 mechanism</div>
+</div>
+
+<div class="mandate-card">
+  <strong>M8. User trust mechanism</strong> — wrong recommendation detection: review UI, validation steps, "fixture-must-be-added-before-approve" rule
+  <div class="resolution"><strong>응답</strong>: Recommendation 의 output 에 항상 verification result 첨부 (regression S1-S5 + forward S6 expected). <strong>Forward fixture 의 expected output 은 사용자가 직접 작성</strong> — LLM 자기 채점 차단. Apply 전 user-review gate (modeling UI 의 confirm queue 패턴 재사용)</div>
+</div>
+
+<div class="mandate-card">
+  <strong>M9. Onboarding cost honesty</strong> — per-new-system cost (mechanism vs curation), v2 ≥ 50h 와 비교
+  <div class="resolution"><strong>응답</strong>: <strong>Skeptic 의 실측 (medium Java ~100-150h / first non-Java ~200-400h+150h) 을 그대로 수용</strong>. ADR-002 의 "near-zero per-system cost" 가정은 잘못 — curation 이 dominant. Plugin scaffolding 만 reusable. 사용자에게 명시적 비용 surface</div>
+</div>
+
+<div class="mandate-card">
+  <strong>M10. Failure mode catalog</strong> — UC4-UC6 각각 3+ failure mode + system response
+  <div class="resolution"><strong>응답</strong>: Recommendation Specialist (A2) 의 9 failure mode + Integrator (A3) 의 5 추가 → 14 failure mode catalogued. 가장 위험: silent hallucination (verification PASS 인데 의도 다름) → forward fixture 강제 + multi-alternative + manifest immutability</div>
+</div>
+
+<div class="mandate-card">
+  <strong>M11. v2 artifact disposition</strong> — v2 = ground-truth example / migrated to generic+v2-extension / deleted post-generalization
+  <div class="resolution"><strong>응답</strong>: <strong>v2 artifact = 첫 plugin (generic+v2-extension)</strong>. 27 idiom card → <code>plugins/slab-design/registry/</code>. 5 facade → <code>plugins/slab-design/contracts/</code>. 5 golden fixture → <code>plugins/slab-design/golden/</code>. v2 의 자산은 v2 plugin 의 1차 content 가 됨, 폐기 X</div>
+</div>
+
+<h2>4. 종합 설계 — "Two-Engine Plugin Framework"</h2>
+
+<h3>Architecture (universal core + plugin layers + two engines + integrator)</h3>
+
+<div class="diagram">
+                ┌──────────────────── ONTOLOGY STORE (shared SQLite) ────────────────────┐
+                │                                                                        │
+                │  Code | Domain | Mapping | Simulation | <strong>Schema (NEW 5번째)</strong>      │
+                │  + ontology_revisions / proposals / verification_runs / audit_log      │
+                │  FTS5 인덱스 (BusinessTerm/Action/Method fqn) → retrieval               │
+                └─────┬──────────────────────────────────────────────────────┬───────────┘
+                      │ pinned revision R_n                                  │ pinned revision R_n
+                      ▼ (read)                                               ▼ (read)
+        ┌──────────────────────────────┐                  ┌──────────────────────────────────┐
+        │  VERIFICATION ENGINE          │                  │  RECOMMENDATION ENGINE           │
+        │  (deterministic, ADR-001)     │                  │  (LLM-based, ADR-002 §D2)        │
+        │                               │  ◄── oracle ───  │                                  │
+        │  ┌─ Anchored Twin Synth ────┐ │     RPC          │  (1) Feature Spec Parser         │
+        │  │  Layer 1 (slot template) │ │                  │  (2) Ontology Locator (typed)    │
+        │  │  Layer 2 (AST walker)    │ │                  │  (3) Gap Identifier (det)        │
+        │  │  Layer 3 (stub router)   │ │                  │  (4) Proposal Composer (LLM jail)│
+        │  └──────────────────────────┘ │                  │      ├── Schema Recommender (UC4)│
+        │  ContractGate (Protocol)      │                  │      ├── Code Recommender (UC5) │
+        │  GapSurfacer (det fn)         │                  │      └── Ontology Evolver (UC6) │
+        │  TwinRunner                   │                  │  (5) Proposal Validator          │
+        │  OracleDiffer (semantic)      │                  │      ├── static (parse/FQN)     │
+        │  TraceDiffAnalyzer (UC1/2/3)  │                  │      └── Verification RPC fence │
+        └──────────────┬────────────────┘                  └─────────────┬────────────────────┘
+                       │                                                  │
+                       │ generated/&lt;repo&gt;/&lt;R_n&gt;/*.py                       │ proposals/&lt;pid&gt;/*
+                       │ runs/&lt;run_id&gt;/{trace,output,gap-report}.json      │
+                       ▼                                                  ▼
+        ┌────────────────────────────────────────────────────────────────────────────┐
+        │  INTEGRATOR (transactional, ~200 LOC, 단일 ontology mutation point)        │
+        │  - applies accepted proposals → new ontology_revisions row                  │
+        │  - stamps (proposal_id, revision_id, run_id) on every artifact              │
+        │  - serialized writer (WAL mode)                                              │
+        └────────────────────────────────────────────────────────────────────────────┘
+                                            │
+                       ┌────────────────────┴────────────────────┐
+                       │                                         │
+              <strong>plugins/&lt;system&gt;/</strong> (system-specific)   <strong>core/</strong> (universal mechanism)
+                       │                                         │
+                       ├── system.toml                           ├── synthesizer/
+                       ├── role_overrides.yaml                   ├── recommendation/
+                       ├── twin_scope.toml                       ├── integrator/
+                       ├── registry/ (slot templates)            ├── contracts/base.py
+                       ├── contracts/ (Protocol extensions)      ├── stubs/abstract.py
+                       ├── stubs/ (DI/JPA/TX adapters)           ├── verification/
+                       ├── ast_rules/ (Layer 2 visitor)          └── retrieval/ (FTS5)
+                       └── golden/ (fixtures)
+</div>
+
+<h3>핵심 설계 요소 6가지</h3>
+
+<div class="panel synth">
+  <h4>1. core/ + plugins/&lt;system&gt;/ 분리 (A1)</h4>
+  <p>Mechanism (Synthesizer 2-layer, Contract Gate, Gap Surfacer, Twin Runner, Oracle Differ) 는 universal core. v2 specifics (79 slot, 5 facade, 9 JPA repo handling, Spring DI) 는 plugins/slab-design/. 새 system = 7 artifact + ontology import.</p>
+  <p><strong>v2 자산의 운명</strong>: 27 카드 → <code>plugins/slab-design/registry/</code>, 5 facade → <code>plugins/slab-design/contracts/</code>, 5 fixture → <code>plugins/slab-design/golden/</code>. 폐기 없이 그대로 첫 plugin 의 content.</p>
+</div>
+
+<div class="panel synth">
+  <h4>2. 5번째 Schema Layer ontology (A3 의 DDL)</h4>
+  <p>기존 4-layer (Code/Domain/Mapping/Simulation) + Schema Layer (persistence surface). <strong>Additive migration</strong> — 기존 row 미수정, backout = drop new tables.</p>
+<pre class="lang" data-lang="sql">CREATE TABLE schema_tables (
+  fqn, physical_name, label, domain, kind, is_lookup,
+  storage_engine, source, confirmed, repo_id,
+  revision_introduced INTEGER NOT NULL,
+  revision_obsoleted INTEGER,
+  PRIMARY KEY (fqn, repo_id)
+);
+
+CREATE TABLE schema_columns (
+  id, table_fqn, physical_name, logical_name, sql_type,
+  nullable, is_primary_key, pk_ordinal, default_value,
+  repo_id, revision_introduced, revision_obsoleted,
+  FOREIGN KEY (table_fqn, repo_id) REFERENCES schema_tables (fqn, repo_id)
+);
+
+CREATE TABLE schema_foreign_keys (...);
+CREATE TABLE schema_indexes (...);
+CREATE TABLE schema_constraints (...);
+
+CREATE TABLE schema_code_map (   <span class="comment">-- type_realizations 동형 (Section 2 UI 재사용)</span>
+  id, code_type_fqn, code_field_fqn,
+  schema_table_fqn, schema_column_id,
+  source, confidence, confirmed, confirmed_by,
+  repo_id, revision_introduced, revision_obsoleted
+);
+
+CREATE TABLE ontology_revisions (id, parent_id, created_at, summary, proposal_id, git_commit);
+CREATE TABLE proposals (id, kind, status, base_revision, target_revision,
+                        spec_md_path, artifacts_json, user_decisions_json);
+CREATE TABLE verification_runs (id, revision_id, fixture, proposal_id,
+                                status, result_path, started_at, ended_at);</pre>
+  <p>Bitemporal (<code>revision_introduced</code>/<code>obsoleted</code>) — Verification 이 임의 historical revision 으로 replay 가능.</p>
+</div>
+
+<div class="panel synth">
+  <h4>3. Recommendation Engine 4 방어 (A2)</h4>
+  <ol>
+    <li><strong>Typed tool</strong>: LLM 이 raw row 가 아닌 schema-validated JSON 받음 (hallucination 시 reject)</li>
+    <li><strong>Deterministic step jailing</strong>: parse/locate/gap/validate 는 결정론적, LLM 은 step 4 (compose) 안에서만</li>
+    <li><strong>Structured artifact output</strong>: Pydantic 강제, 위반 시 retry max 3</li>
+    <li><strong>Verification RPC fence</strong>: 모든 proposal → twin regen → regression + forward fixture</li>
+  </ol>
+  <p>LLM context: FTS5 retrieval (top-N=20 + 2-hop) → 5-15K token. 5K+ class system 도 동일 mechanism.</p>
+</div>
+
+<div class="panel synth">
+  <h4>4. Integrator (A3) — 단일 mutation point</h4>
+  <p>모든 ontology mutation 이 Integrator 1개 channel 통과. Proposal lifecycle state machine:</p>
+<pre class="lang" data-lang="text">draft → analyzing → ready → reviewed → accepted (target_revision 생성)
+                                    └→ rejected (artifacts 보존, ontology 미반영)
+                                    └→ stale (base_revision 가 obsolete)</pre>
+  <p>Concurrent proposals: base_revision pin → first-apply wins, peers STALE_PROPOSAL.</p>
+</div>
+
+<div class="panel synth">
+  <h4>5. Manifest 기반 reproducibility (A2)</h4>
+<pre class="lang" data-lang="yaml">proposals/&lt;pid&gt;/manifest.yaml:
+  timestamp: 2026-05-13T...
+  model_version: claude-opus-4-7
+  prompt_hash: sha256:...
+  ontology_revision: R_42
+  seed: 12345
+  retrieval_query_hash: sha256:...</pre>
+  <p>동일 4-tuple 입력 → 동일 proposal id (캐싱). 100% reproducibility 는 LLM mutability 로 불가능, <strong>동일 환경 reproducibility</strong> 만 claim.</p>
+</div>
+
+<div class="panel synth">
+  <h4>6. 3 CI Gates (A3)</h4>
+  <ol>
+    <li><strong>Verification regression gate</strong> — PR 의 Java 변경 → twin regen + S1-S5 byte-identical 검증</li>
+    <li><strong>Schema-Code sync gate</strong> — Java <code>@Column</code> 변경 → <code>schema_code_map</code> migration 강제</li>
+    <li><strong>Proposal validation gate</strong> — PR 이 proposal_id 참조 시 <code>artifacts_json.code_diff</code> 와 PR diff 일치 확인</li>
+  </ol>
+</div>
+
+<h2>5. Worked example — "고객사 슬랩 두께 override" end-to-end (A2 + A3 통합)</h2>
+
+<table>
+  <thead><tr><th>#</th><th>Actor / Engine</th><th>Output</th><th>Storage</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td>User → Recommendation</td>
+      <td>spec.md ("고객사가 슬랩 두께 override...")</td>
+      <td><code>proposals</code> row, status=draft</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Recommendation: Spec Parser + Ontology Locator</td>
+      <td>JSON typed schema (entities/attributes/found_terms/found_actions/schema_layer)</td>
+      <td>proposals/&lt;pid&gt;/spec.json</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>Gap Identifier (결정론적)</td>
+      <td>3 gap: column 부재 / action 분기 부재 / term 부재</td>
+      <td>proposals/&lt;pid&gt;/gaps.json</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>Schema Recommender (LLM jail)</td>
+      <td>Option α (ALTER TABLE) + Option β (새 table), rationale + blast radius</td>
+      <td>proposals/&lt;pid&gt;/schema.sql + schema-diff-rationale.md</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>Code Recommender (LLM jail)</td>
+      <td>Java diff (SdThicknessAction.java L50 다음 새 block + 새 anchor)</td>
+      <td>proposals/&lt;pid&gt;/code-diff.patch</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>Ontology Evolver (LLM jail)</td>
+      <td>BusinessTerm + BusinessRule + AnchorBinding delta</td>
+      <td>proposals/&lt;pid&gt;/ontology-delta.json</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>Proposal Validator → Verification RPC</td>
+      <td>regression (S1-S5 unchanged ✓) + forward (S6 override=240 → thickness=240 PASS)</td>
+      <td>verification_runs row + result_path</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>User Review (modeling UI)</td>
+      <td>Option α 채택 + Sub-option decisions</td>
+      <td>proposals.user_decisions_json</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>Integrator (transactional)</td>
+      <td>ontology_revisions R_43 (parent R_42) + Schema Layer row + Domain delta</td>
+      <td>ontology.db (single transaction)</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>Verification: full re-synth + regression run</td>
+      <td>generated/&lt;repo&gt;/R_43/*.py + trace.json (all pass)</td>
+      <td>content-addressed</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>Integrator: PR draft</td>
+      <td>Schema migration SQL + Java diff PR + deep-link to modeling UI</td>
+      <td>git branch + filesystem</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>각 step 의 artifact 가 <code>(proposal_id, revision_id, run_id)</code> stamp 보유</strong> — 7분 후 Recommendation 이 같은 R_43 로 재조회 가능, race condition 차단.</p>
+
+<h2>6. Hypothetical 2nd system check — bank-credit (A1 의 generalization 검증)</h2>
+
+<table>
+  <thead>
+    <tr><th>항목</th><th>v2 (slab-design)</th><th>bank-credit (hypothetical)</th><th>core 공유?</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Synthesizer mechanism</td><td>2-layer</td><td>2-layer (동일)</td><td class="ok">Yes</td></tr>
+    <tr><td>Contract base</td><td>BigDecimal, MathContext, AlgorithmException</td><td>BigDecimal, MathContext, CreditScoreException (extends RuntimeException)</td><td class="ok">Yes (base + 확장)</td></tr>
+    <tr><td>ORM stub</td><td>Spring Data JPA → in-memory adapter</td><td>MyBatis XML mapper → dict-of-functions stub</td><td class="partial">Per-system</td></tr>
+    <tr><td>Async pattern</td><td>없음 (synchronous)</td><td>Reactor <code>Mono&lt;&gt;</code> → sync resolve stub</td><td class="partial">Per-system</td></tr>
+    <tr><td>Registry slot</td><td>79 slot (`body.compute`, `body.service_lookup`...)</td><td>~110 slot (~30 base 재사용, ~25 reshape, ~55 new like `atomic.credit_score.fico_bucket`)</td><td class="partial">Mixed</td></tr>
+    <tr><td>Twin scope boundary</td><td>feature + store entities</td><td><code>Flux</code> → OUT, <code>Mono</code> → STUB, <code>@Async</code> → STUB</td><td class="partial">Per-system</td></tr>
+    <tr><td>Verification mechanism</td><td>Twin Runner + Oracle Differ</td><td>동일 (변경 없음)</td><td class="ok">Yes</td></tr>
+    <tr><td>Recommendation Engine</td><td>3 sub-engine (Schema/Code/Ontology)</td><td>동일 mechanism, 다른 ontology + plugin</td><td class="ok">Yes</td></tr>
+    <tr><td>Plugin LOC</td><td>~3000 (idioms+contracts+stubs+fixtures)</td><td>~3000 (similar order)</td><td>—</td></tr>
+    <tr><td>Onboarding 시간</td><td>~50h (실측 — 첫 system)</td><td>~100-150h (medium Java, skeptic 추정)</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<p style="font-size:13px; color:#6b7280"><strong>중요</strong>: bank-credit 은 <strong>aspirational</strong> — 실제 onboarding 검증 아님. Skeptic M1 인정. 단 framework 의 plugin shape 이 bank-credit 의 7 artifact 로 검증된 형태로 설계됨 → 실제 onboarding 의 fail 모드 즉시 catch 가능.</p>
+
+<h2>7. Honest limitations (M4-M11 의 잔여 risk)</h2>
+
+<table>
+  <thead><tr><th>한계</th><th>대응</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>v2 외 실제 system onboarding 없음</strong></td>
+      <td>bank-credit aspirational — framework 의 plugin shape 으로 형태 검증. 실제 onboarding 은 사용자 선정 후 별도 세션</td>
+    </tr>
+    <tr>
+      <td><strong>LLM non-determinism</strong></td>
+      <td>Manifest 기반 동일 환경 reproducibility 만 claim. 100% reproducibility 는 LLM mutability 로 불가능</td>
+    </tr>
+    <tr>
+      <td><strong>Onboarding cost = 50-400h per system</strong></td>
+      <td>Skeptic 실측 수용. ADR-002 의 "near-zero" 잘못. 사용자에게 명시</td>
+    </tr>
+    <tr>
+      <td><strong>Schema Layer JPO 추출의 system 의존</strong></td>
+      <td>JPA annotation = trivial. MyBatis XML / JDBC string = system-specific extractor 필요. plugin/&lt;sys&gt;/extractors/</td>
+    </tr>
+    <tr>
+      <td><strong>Trace contract 은 sequence (DAG 미지원)</strong></td>
+      <td>v2 synchronous orchestrator 가정. Async/microservices = future ADR. 현 mechanism 명시적 한계</td>
+    </tr>
+    <tr>
+      <td><strong>Bootstrap paradox (Recommendation 이 ontology 필요)</strong></td>
+      <td>Section 2 의 ontology 추출이 prerequisite. Recommendation 은 빈 ontology 에서 동작 안 함 — 명시</td>
+    </tr>
+    <tr>
+      <td><strong>SQLite write contention</strong></td>
+      <td>WAL mode + serialized writer (single Integrator). 10K proposal/year 까지 OK, 그 이상은 PostgreSQL 이동</td>
+    </tr>
+    <tr>
+      <td><strong>Cross-repo proposal (microservice migration)</strong></td>
+      <td>현 design 은 same-repo only. Future ADR-003 candidate</td>
+    </tr>
+    <tr>
+      <td><strong>Silent hallucination 잔존</strong></td>
+      <td>Forward fixture 사용자 작성 강제 + multi-proposal + manifest 로 attack surface 축소. 완전 차단은 불가능</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>8. 최종 사용자 결정 요청</h2>
+
+<div class="panel info">
+  <h3>이제 결정해 주실 것</h3>
+  <table>
+    <thead><tr><th>#</th><th>질문</th><th>이 합성안 의 응답</th><th>사용자 결정</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>D1</td>
+        <td>Two-Engine Plugin Framework 채택?</td>
+        <td>core + plugins + Verification + Recommendation + Integrator + 5번째 Schema Layer</td>
+        <td><strong>승인 / 일부 수정 / 거부</strong></td>
+      </tr>
+      <tr>
+        <td>D2</td>
+        <td>v2 자산 (27 카드 + 5 facade + 5 fixture) 의 운명</td>
+        <td>plugins/slab-design/ 으로 흡수 (M11 응답)</td>
+        <td><strong>확정?</strong></td>
+      </tr>
+      <tr>
+        <td>D3</td>
+        <td>2nd reference system 명시 (실제 onboarding 인가, aspirational 인가)</td>
+        <td>bank-credit aspirational. 실제 onboarding 별도 세션</td>
+        <td><strong>실제 system 선정 / aspirational 유지</strong></td>
+      </tr>
+      <tr>
+        <td>D4</td>
+        <td>Schema Layer migration 시점</td>
+        <td>Spec 작성 후 즉시 (additive, backout 가능)</td>
+        <td><strong>spec 직후 / 별도 단계</strong></td>
+      </tr>
+      <tr>
+        <td>D5</td>
+        <td>Recommendation Engine 의 LLM 선택</td>
+        <td>현 onTong 의 LLM 사용 (Claude). Manifest 에 model_version pin</td>
+        <td><strong>Claude 확정 / 다른 옵션</strong></td>
+      </tr>
+      <tr>
+        <td>D6</td>
+        <td>Onboarding cost 50-400h 수용?</td>
+        <td>Skeptic 실측 수용. ADR-002 의 "near-zero" 잘못 인정</td>
+        <td><strong>수용 / scope 축소</strong></td>
+      </tr>
+      <tr>
+        <td>D7</td>
+        <td>다음 세션 (별도) — spec 작성 + ADR-003~005</td>
+        <td>spec.md + ADR-003 (Two-Engine Substrate) + ADR-004 (Schema Layer) + ADR-005 (Recommendation Engine LLM defenses)</td>
+        <td><strong>이대로 진행 / 추가</strong></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<p style="margin-top:16px"><strong>다음 단계</strong>: D1-D7 답변 받으면 spec 작성 세션 (~2-3h) 으로 인계. spec + 3 신규 ADR 작성 후 implementation plan 은 또 별도 세션. Round 2 종합 = 이 HTML 까지.</p>
+
+<p style="margin-top:48px; padding-top:16px; border-top:1px solid #e5e7eb; color:#9ca3af; font-size:12px;">
+  Sim-Redesign Round 2 종합 · 2026-05-13 · Section 4 sim-redesign 세션<br>
+  Source: <code>explorations/round2/{1-architect,2-recommendation,3-integrator,4-skeptic}.md</code><br>
+  관련: <code>ADR-001-python-twin.md</code>, <code>ADR-002-scope-expansion.md</code>,
+  <code>DESIGN-SYNTHESIS.html</code>, <code>DESIGN-WALKTHROUGH.html</code>
+</p>
+
+</body>
+</html>

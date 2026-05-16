@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
@@ -59,8 +60,15 @@ class CodeColumn(BaseModel):
 
 
 class ExtractedJpo(BaseModel):
-    """Structured form of one JPA entity Java file."""
+    """Structured form of one JPA entity Java file.
 
+    `kind="jpo"` discriminator added in Phase B so this can sit in a
+    union with ExtractedGenericClass (and later ExtractedService /
+    ExtractedAction). Default value means older serialized payloads
+    without the field still deserialize correctly.
+    """
+
+    kind: Literal["jpo"] = "jpo"
     package: str
     class_name: str
     table_name: str

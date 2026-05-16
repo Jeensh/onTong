@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { Loader2, ChevronDown, ChevronRight, Search, X as XIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   ontologyApi,
@@ -11,6 +12,7 @@ import {
   type TermDTO,
 } from "@/lib/api/ontology";
 import { useWorkbench } from "./store";
+import { HelpHint } from "./HelpHint";
 
 /**
  * 좌측 트리의 "온톨로지" 탭 — Term / Action / BR / Anchor 4 영역을 도메인별로 모음.
@@ -36,7 +38,7 @@ const SECTION_COLOR: Record<Section, string> = {
 };
 
 export function OntologyTab() {
-  const { activeRepoId, setSelectedTerm, setSelectedAction } = useWorkbench();
+  const { activeRepoId, setSelectedTerm, setSelectedAction, setSelectedRule, setSelectedAnchor } = useWorkbench();
 
   const [terms, setTerms] = useState<TermDTO[]>([]);
   const [actions, setActions] = useState<ActionDTO[]>([]);
@@ -44,6 +46,7 @@ export function OntologyTab() {
   const [anchors, setAnchors] = useState<AnchorBindingDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
 
   // 섹션 expand 상태
   const [expanded, setExpanded] = useState<Set<Section>>(
@@ -77,12 +80,43 @@ export function OntologyTab() {
     return () => { cancelled = true; };
   }, [activeRepoId]);
 
-  // 도메인 별 그루핑 (terms / actions). domain 비어있으면 "(도메인 없음)" 으로.
-  const termsByDomain = useMemo(() => groupBy(terms, (t) => t.domain || "(도메인 없음)"), [terms]);
-  const actionsByDomain = useMemo(() => groupBy(actions, (a) => a.domain || "(도메인 없음)"), [actions]);
+  // 검색 필터 — 4 entity type 공통 substring (label / fqn / statement) 매치.
+  const q = searchQ.trim().toLowerCase();
+  const filteredTerms = useMemo(
+    () => q ? terms.filter(t =>
+      t.fqn.toLowerCase().includes(q) ||
+      t.label.toLowerCase().includes(q) ||
+      t.aliases.some(a => a.toLowerCase().includes(q))
+    ) : terms, [terms, q],
+  );
+  const filteredActions = useMemo(
+    () => q ? actions.filter(a =>
+      a.fqn.toLowerCase().includes(q) ||
+      a.label.toLowerCase().includes(q) ||
+      a.aliases.some(x => x.toLowerCase().includes(q))
+    ) : actions, [actions, q],
+  );
+  const filteredRules = useMemo(
+    () => q ? rules.filter(r =>
+      r.fqn.toLowerCase().includes(q) ||
+      r.statement.toLowerCase().includes(q)
+    ) : rules, [rules, q],
+  );
+  const filteredAnchors = useMemo(
+    () => q ? anchors.filter(a =>
+      a.id.toLowerCase().includes(q) ||
+      a.anchor_locator.toLowerCase().includes(q) ||
+      a.target_action_fqn.toLowerCase().includes(q) ||
+      a.target_slot.toLowerCase().includes(q)
+    ) : anchors, [anchors, q],
+  );
 
-  const atomicTerms = terms.filter((t) => t.kind === "atomic");
-  const compositeTerms = terms.filter((t) => t.kind === "composite");
+  // 도메인 별 그루핑 (filtered terms / actions).
+  const termsByDomain = useMemo(() => groupBy(filteredTerms, (t) => t.domain || "(도메인 없음)"), [filteredTerms]);
+  const actionsByDomain = useMemo(() => groupBy(filteredActions, (a) => a.domain || "(도메인 없음)"), [filteredActions]);
+
+  const atomicTerms = filteredTerms.filter((t) => t.kind === "atomic");
+  const compositeTerms = filteredTerms.filter((t) => t.kind === "composite");
 
   const toggle = (s: Section) =>
     setExpanded((prev) => {
@@ -104,17 +138,52 @@ export function OntologyTab() {
   }
 
   return (
-    <div className="overflow-y-auto flex-1 text-[11.5px]">
-      {/* 헤더 — 합계 카운트 */}
-      <div className="px-2 py-1.5 border-b border-border bg-muted/30 text-[10.5px] text-muted-foreground">
-        {atomicTerms.length} atomic · {compositeTerms.length} composite · {actions.length} action ·{" "}
-        {rules.length} rule · {anchors.length} anchor
+    <div className="flex flex-col h-full overflow-hidden text-[11.5px]">
+      {/* 검색 바 */}
+      <div className="px-2 py-1.5 border-b border-border">
+        <div className="relative">
+          <Search className="absolute left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
+          <Input
+            value={searchQ}
+            onChange={(e) => setSearchQ(e.target.value)}
+            placeholder="검색 (Term / Action / BR / Anchor)"
+            className="pl-6 pr-7 h-7 text-[11px]"
+          />
+          {searchQ && (
+            <button
+              type="button"
+              onClick={() => setSearchQ("")}
+              title="검색어 지우기"
+              className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+            >
+              <XIcon className="w-3 h-3" />
+            </button>
+          )}
+        </div>
       </div>
+      {/* 헤더 — 합계 카운트 (필터 시 / 전체 표시) */}
+      <div className="px-2 py-1.5 border-b border-border bg-muted/30 text-[10.5px] text-muted-foreground flex-shrink-0">
+        {q ? (
+          <>
+            <strong className="text-foreground">{filteredTerms.length}</strong>/{terms.length} term ·{" "}
+            <strong className="text-foreground">{filteredActions.length}</strong>/{actions.length} action ·{" "}
+            <strong className="text-foreground">{filteredRules.length}</strong>/{rules.length} rule ·{" "}
+            <strong className="text-foreground">{filteredAnchors.length}</strong>/{anchors.length} anchor
+          </>
+        ) : (
+          <>
+            {atomicTerms.length} atomic <HelpHint term="atomic" inline /> · {compositeTerms.length} composite <HelpHint term="composite" inline /> · {actions.length} action <HelpHint term="action" inline /> ·{" "}
+            {rules.length} rule <HelpHint term="business_rule" inline /> · {anchors.length} anchor <HelpHint term="anchor" inline />
+          </>
+        )}
+      </div>
+      <div className="overflow-y-auto flex-1">
+      {/* 본문 sections */}
 
       {/* === Terms === */}
       <SectionHeader
         section="terms"
-        count={terms.length}
+        count={filteredTerms.length}
         sub={`atomic ${atomicTerms.length} / composite ${compositeTerms.length}`}
         expanded={expanded.has("terms")}
         onToggle={() => toggle("terms")}
@@ -155,8 +224,8 @@ export function OntologyTab() {
       {/* === Actions === */}
       <SectionHeader
         section="actions"
-        count={actions.length}
-        sub={`confirmed ${actions.filter((a) => a.verification_level !== "unmapped" && a.verification_level !== "draft").length} / draft ${actions.filter((a) => a.verification_level === "draft").length}`}
+        count={filteredActions.length}
+        sub={`confirmed ${filteredActions.filter((a) => a.verification_level !== "unmapped" && a.verification_level !== "draft").length} / draft ${filteredActions.filter((a) => a.verification_level === "draft").length}`}
         expanded={expanded.has("actions")}
         onToggle={() => toggle("actions")}
       />
@@ -180,15 +249,15 @@ export function OntologyTab() {
       {/* === BusinessRules === */}
       <SectionHeader
         section="rules"
-        count={rules.length}
-        sub={`hard ${rules.filter((r) => r.severity === "hard").length}`}
+        count={filteredRules.length}
+        sub={`hard ${filteredRules.filter((r) => r.severity === "hard").length}`}
         expanded={expanded.has("rules")}
         onToggle={() => toggle("rules")}
       />
       {expanded.has("rules") && (
         <div className="pl-2 pb-1">
-          {rules.map((r) => (
-            <BRRow key={r.fqn} r={r} />
+          {filteredRules.map((r) => (
+            <BRRow key={r.fqn} r={r} onClick={() => setSelectedRule(r.fqn)} />
           ))}
         </div>
       )}
@@ -196,18 +265,19 @@ export function OntologyTab() {
       {/* === AnchorBindings === */}
       <SectionHeader
         section="anchors"
-        count={anchors.length}
-        sub={`confirmed ${anchors.filter((a) => a.confirmed).length}`}
+        count={filteredAnchors.length}
+        sub={`confirmed ${filteredAnchors.filter((a) => a.confirmed).length}`}
         expanded={expanded.has("anchors")}
         onToggle={() => toggle("anchors")}
       />
       {expanded.has("anchors") && (
         <div className="pl-2 pb-1">
-          {anchors.map((a) => (
-            <AnchorRow key={a.id} a={a} onClick={() => setSelectedAction(a.target_action_fqn)} />
+          {filteredAnchors.map((a) => (
+            <AnchorRow key={a.id} a={a} onClick={() => setSelectedAnchor(a.id)} />
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -271,10 +341,11 @@ function ActionRow({ a, onClick }: { a: ActionDTO; onClick: () => void }) {
   );
 }
 
-function BRRow({ r }: { r: BusinessRuleDTO }) {
+function BRRow({ r, onClick }: { r: BusinessRuleDTO; onClick: () => void }) {
   return (
-    <div
-      className="pl-3 pr-2 py-0.5 hover:bg-muted/40 transition-colors"
+    <button
+      onClick={onClick}
+      className="w-full text-left pl-3 pr-2 py-0.5 hover:bg-muted/40 transition-colors"
       title={`${r.fqn}\nseverity: ${r.severity}\n${r.statement}`}
     >
       <div className="flex items-center gap-1.5">
@@ -286,7 +357,7 @@ function BRRow({ r }: { r: BusinessRuleDTO }) {
         {r.confirmed && <span className="text-[9px] text-emerald-700 shrink-0">✓</span>}
       </div>
       <div className="pl-3 text-[10px] text-muted-foreground line-clamp-1">{r.statement}</div>
-    </div>
+    </button>
   );
 }
 

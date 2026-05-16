@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>onTong · Section 4 → Section 3 시뮬레이션 담당자용 안내</title>
+<style>
+  :root {
+    --bg: #fafafa; --fg: #18181b; --muted: #71717a;
+    --accent: #f97316; --accent2: #10b981; --accent3: #6366f1;
+    --danger: #dc2626; --warn: #d97706;
+    --line: #e4e4e7; --card: #ffffff; --soft: #f4f4f5;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Pretendard",
+          "Apple SD Gothic Neo", sans-serif;
+         background: var(--bg); color: var(--fg); line-height: 1.6; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px 80px; }
+
+  /* HERO */
+  .hero { background: linear-gradient(135deg, #fff7ed 0%, #ecfdf5 100%);
+          padding: 60px 24px 50px; text-align: center; margin-bottom: 0;
+          border-bottom: 1px solid var(--line); }
+  .hero h1 { font-size: 34px; margin: 0 0 8px; font-weight: 700; }
+  .hero .sub { color: var(--muted); font-size: 15px; max-width: 720px; margin: 0 auto; }
+  .hero .stats { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+                 margin-top: 28px; }
+  .stat-card { background: white; padding: 16px 22px; border-radius: 12px;
+               border: 1px solid var(--line); min-width: 140px;
+               box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .stat-card .num { font-size: 28px; font-weight: 700; color: var(--accent); }
+  .stat-card .lbl { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .stat-card.green .num { color: var(--accent2); }
+  .stat-card.indigo .num { color: var(--accent3); }
+
+  /* SECTIONS */
+  section { padding-top: 50px; }
+  h2 { font-size: 24px; margin: 0 0 8px; font-weight: 700; }
+  h2 .em { color: var(--accent); }
+  .lead { color: var(--muted); font-size: 15px; margin: 0 0 24px; max-width: 780px; }
+  h3 { font-size: 17px; margin: 28px 0 10px; }
+
+  /* CARDS */
+  .grid-3 { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .grid-2 { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+          padding: 16px 18px; }
+  .card h4 { margin: 0 0 6px; font-size: 15px; color: var(--accent3); }
+  .card .meta { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .card.closed { border-left: 4px solid var(--accent2); }
+  .card.gap { border-left: 4px solid var(--warn); }
+  .card.open { border-left: 4px solid var(--danger); }
+
+  /* BADGE */
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px;
+           font-size: 11px; font-weight: 600; }
+  .badge.ok    { background: #d1fae5; color: #065f46; }
+  .badge.warn  { background: #fef3c7; color: #92400e; }
+  .badge.fail  { background: #fee2e2; color: #991b1b; }
+  .badge.tech  { background: #e0e7ff; color: #3730a3; }
+
+  /* CODE */
+  pre { background: #0f172a; color: #e2e8f0; padding: 12px 16px; border-radius: 8px;
+        font-size: 13px; line-height: 1.5; overflow-x: auto;
+        font-family: "SF Mono", Menlo, monospace; }
+  pre.java code { color: #fbbf24; }
+  code { font-family: "SF Mono", Menlo, monospace; }
+  p code, li code, td code { background: #f1f5f9; padding: 1px 5px;
+        border-radius: 4px; font-size: 13px; color: #0f172a; }
+  .kw   { color: #c084fc; }   /* keyword */
+  .typ  { color: #6ee7b7; }   /* type */
+  .str  { color: #fde68a; }   /* string */
+  .com  { color: #94a3b8; font-style: italic; }
+  .num-c { color: #fdba74; }   /* numeric */
+
+  /* DEMO BOXES */
+  .demo { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          padding: 18px 20px; margin: 14px 0; }
+  .demo-tabs { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 2px solid var(--line); }
+  .demo-tabs button { background: transparent; border: 0; padding: 10px 16px;
+                       font-size: 14px; cursor: pointer; color: var(--muted);
+                       border-bottom: 3px solid transparent; margin-bottom: -2px;
+                       font-weight: 500; }
+  .demo-tabs button.active { color: var(--fg); border-bottom-color: var(--accent); }
+  .demo-tabs button:hover { color: var(--fg); }
+  .demo-pane { display: none; }
+  .demo-pane.active { display: block; }
+  .diff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .diff-grid .col h5 { font-size: 13px; margin: 0 0 8px; color: var(--muted);
+                       text-transform: uppercase; letter-spacing: 0.5px; }
+  .col.before .label { color: var(--danger); }
+  .col.after  .label { color: var(--accent2); }
+
+  /* STUB VIZ */
+  .stub-viz { background: var(--card); border: 1px solid var(--line);
+              border-radius: 12px; padding: 18px 20px; margin: 14px 0; }
+  .stub-source { background: #f8fafc; border-left: 3px solid var(--accent3);
+                  padding: 10px 14px; margin: 8px 0; border-radius: 6px;
+                  font-size: 13px; }
+  .stub-source .arrow { color: var(--accent2); font-weight: 700; margin: 0 8px; }
+  .stub-pill { display: inline-block; background: #ecfdf5; color: #065f46;
+               padding: 4px 12px; border-radius: 999px; font-size: 12px;
+               font-weight: 600; margin: 2px; cursor: pointer;
+               border: 1px solid #d1fae5; }
+  .stub-pill:hover { background: #d1fae5; }
+  .stub-pill.bean { background: #e0e7ff; color: #3730a3; border-color: #c7d2fe; }
+  .stub-pill.class-stub { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+
+  /* IDIOM TABLE — clickable */
+  .idiom-table { width: 100%; border-collapse: collapse; }
+  .idiom-table th, .idiom-table td { padding: 10px 12px;
+                                      border-bottom: 1px solid var(--line); }
+  .idiom-table th { background: #f8fafc; text-align: left; font-size: 13px; }
+  .idiom-table .lhs { color: var(--danger); font-family: monospace; font-size: 13px; }
+  .idiom-table .rhs { color: var(--accent2); font-family: monospace; font-size: 13px; }
+  .idiom-table tr.row-typed { background: #fffbeb; }
+  .idiom-table tr.row-static { background: #ecfdf5; }
+  .idiom-cat { display: inline-block; padding: 2px 8px; border-radius: 4px;
+               font-size: 11px; font-weight: 600; }
+  .idiom-cat.unk { background: #f1f5f9; color: #475569; }
+  .idiom-cat.typed { background: #fef3c7; color: #92400e; }
+  .idiom-cat.static { background: #d1fae5; color: #065f46; }
+  .idiom-filter { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  .idiom-filter button { background: white; border: 1px solid var(--line);
+                          padding: 6px 12px; border-radius: 6px; font-size: 13px;
+                          cursor: pointer; }
+  .idiom-filter button.active { background: var(--accent); color: white;
+                                 border-color: var(--accent); }
+
+  /* PROGRESS */
+  .progress-row { display: flex; align-items: center; gap: 12px;
+                  padding: 6px 0; font-size: 13px; }
+  .progress-row .label { width: 320px; font-family: monospace; font-size: 12px;
+                         color: var(--muted); }
+  .progress-bar { flex: 1; height: 22px; background: #f1f5f9;
+                  border-radius: 4px; overflow: hidden; display: flex; }
+  .progress-bar .fill { height: 100%; transition: width 0.3s; }
+  .progress-bar .fill.pass { background: var(--accent2); }
+  .progress-bar .fill.fail { background: #fca5a5; }
+  .progress-row .right { width: 80px; text-align: right; font-size: 12px;
+                         font-family: monospace; }
+
+  /* DECISION TREE */
+  .decision-grid { display: grid; gap: 12px;
+                   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                   margin-top: 20px; }
+  .decision-card { background: var(--card); border: 1px solid var(--line);
+                   border-radius: 12px; padding: 16px; cursor: pointer;
+                   transition: all 0.2s; }
+  .decision-card:hover { border-color: var(--accent); transform: translateY(-2px);
+                          box-shadow: 0 4px 12px rgba(249, 115, 22, 0.12); }
+  .decision-card h4 { margin: 0 0 6px; font-size: 14px; color: var(--accent3); }
+  .decision-card p { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+  .decision-card .recipe-link { font-size: 12px; color: var(--accent);
+                                 font-weight: 600; }
+
+  /* TOC */
+  .toc { background: #f8fafc; border: 1px solid var(--line); border-radius: 10px;
+         padding: 16px 22px; margin: 30px 0 40px; }
+  .toc h3 { margin: 0 0 10px; font-size: 14px; color: var(--muted); }
+  .toc ol { margin: 0; padding-left: 20px; font-size: 14px; }
+  .toc li { margin: 4px 0; }
+  .toc a { color: var(--accent3); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* QUOTE */
+  .quote { border-left: 4px solid var(--accent); padding: 12px 18px;
+           color: #44403c; background: #fff7ed; margin: 16px 0;
+           font-size: 14px; border-radius: 0 8px 8px 0; }
+  .quote strong { color: var(--accent); }
+
+  .arrow-big { font-size: 24px; color: var(--accent2); margin: 0 6px; }
+  .footnote { color: var(--muted); font-size: 12px; margin-top: 8px; }
+
+  /* analogy box */
+  .analogy { background: linear-gradient(135deg, #f0f9ff 0%, #faf5ff 100%);
+             border: 1px solid #c7d2fe; border-radius: 10px; padding: 14px 18px;
+             margin: 14px 0; font-size: 14px; }
+  .analogy strong { color: var(--accent3); }
+
+  /* architecture diagrams */
+  .arch-card { background: var(--card); border: 1px solid var(--line);
+                border-radius: 12px; padding: 20px 24px; margin: 16px 0; }
+  .arch-card h4 { margin: 0 0 4px; font-size: 16px; color: var(--accent3); }
+  .arch-card .why { color: var(--accent); font-size: 13px; font-weight: 600;
+                     text-transform: uppercase; letter-spacing: 0.5px;
+                     margin: 12px 0 4px; }
+  .arch-card .what-for { background: #fff7ed; border-left: 3px solid var(--accent);
+                          padding: 8px 12px; margin: 10px 0; border-radius: 0 6px 6px 0;
+                          font-size: 13.5px; }
+  .arch-card .what-for strong { color: var(--accent); }
+  .arch-diagram { background: #f8fafc; border: 1px dashed var(--line);
+                   padding: 14px 18px; border-radius: 8px; margin: 10px 0;
+                   font-family: "SF Mono", Menlo, monospace; font-size: 12.5px;
+                   white-space: pre; overflow-x: auto; line-height: 1.55;
+                   color: #334155; }
+  .arch-diagram .hi { color: var(--accent); font-weight: 700; }
+  .arch-diagram .hi-g { color: var(--accent2); font-weight: 700; }
+  .arch-diagram .hi-i { color: var(--accent3); font-weight: 700; }
+  .arch-diagram .com { color: var(--muted); }
+  details.expand { background: var(--card); border: 1px solid var(--line);
+                    border-radius: 10px; padding: 4px 16px; margin: 10px 0; }
+  details.expand summary { cursor: pointer; font-weight: 600; padding: 10px 0;
+                            color: var(--accent3); }
+  details.expand summary:hover { color: var(--accent); }
+  details.expand[open] { padding-bottom: 16px; }
+  details.expand[open] summary { border-bottom: 1px solid var(--line);
+                                   margin-bottom: 10px; }
+
+  .axis-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 10px; margin: 12px 0; }
+  .axis-card { background: #f8fafc; border-radius: 8px; padding: 12px 14px;
+                border-top: 3px solid var(--accent2); }
+  .axis-card h5 { margin: 0 0 4px; font-size: 13px; color: var(--accent2);
+                   font-weight: 700; }
+  .axis-card .desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .axis-card .num { float: right; background: var(--accent2); color: white;
+                     border-radius: 4px; padding: 1px 8px; font-size: 11px; }
+
+  .state-row { display: flex; align-items: center; gap: 0; margin: 14px 0;
+                font-size: 12px; flex-wrap: wrap; }
+  .state-pill { background: #f1f5f9; padding: 6px 12px; border-radius: 999px;
+                 font-family: monospace; font-weight: 600; border: 1px solid var(--line); }
+  .state-pill.start { background: #fef3c7; color: #92400e; }
+  .state-pill.mid { background: #e0e7ff; color: #3730a3; }
+  .state-pill.end { background: #d1fae5; color: #065f46; }
+  .state-pill.fail { background: #fee2e2; color: #991b1b; }
+  .state-arrow { color: var(--muted); margin: 0 4px; }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<header class="hero">
+  <h1>시뮬레이션 엔진 고도화 — sim_v2 의 자산을 활용해서 무엇을 진화시킬 수 있나</h1>
+  <p class="sub">
+    <strong>대상 시스템:</strong> <code>slab-design-real-v2</code> (38 actions / 11 driveable methods)<br>
+    <strong>받는 분:</strong> 시뮬레이션 담당자 — 본인이 만든 sandbox / composer / transpiler / chat agent 를
+    sim_v2 의 W59/W71/W72/W73/W74/W75/W77/W78 자산으로 진화시키는 작업이 핵심.<br>
+    sim_v2 작업 <strong>전 (W1-W73)</strong> 과 <strong>후 (W74/W75/W77/W78 추가)</strong> 를 비교해서
+    "엔진을 어디까지 끌어올릴 수 있는지" 보여드립니다.
+  </p>
+  <div class="stats">
+    <div class="stat-card green"><div class="num">8 / 8</div>
+      <div class="lbl">알려진 한계 모두 close (영역 밖 0건)</div></div>
+    <div class="stat-card green"><div class="num">0/11 → 6/11</div>
+      <div class="lbl"><code>slab-design-real-v2</code> production PASS</div></div>
+    <div class="stat-card indigo"><div class="num">12 / 12</div>
+      <div class="lbl"><code>cumulativeProductivity</code> 합격</div></div>
+    <div class="stat-card"><div class="num">9 / 10</div>
+      <div class="lbl">한국어 search hit rate (90%)</div></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="toc">
+  <h3>이 페이지의 흐름 (15분 안에 읽을 수 있게 구성)</h3>
+  <ol>
+    <li><a href="#timeline">sim_v2 의 진화 타임라인 — <strong>작업 전 vs 후</strong></a></li>
+    <li><a href="#whatsnew">한눈에 — 엔진 영역에서 무엇이 좋아졌나</a></li>
+    <li><a href="#architecture"><strong>sim_v2 의 새 구조 ★</strong> — Plugin Framework / Two-Engine / 5-axis lifecycle</a></li>
+    <li><a href="#demo">예시 ① <strong>Java → Python 변환 데모</strong> (slab-design-real-v2 의 실제 메서드)</a></li>
+    <li><a href="#stub">예시 ② <strong>자동 stub 주입 시각화</strong></a></li>
+    <li><a href="#idiom">예시 ③ <strong>50+ Java idiom 자동 변환표</strong></a></li>
+    <li><a href="#progress">예시 ④ <strong>production 메서드별 진전</strong> 게이지 (전/후)</a></li>
+    <li><a href="#start">엔진 고도화 — 어디서 어떻게 통합하나</a></li>
+    <li><a href="#next">다음 단계 + 자료 위치</a></li>
+  </ol>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<section id="timeline">
+<h2>1 · sim_v2 의 진화 타임라인 — <span class="em">작업 전 vs 후</span></h2>
+<p class="lead">
+이 페이지의 핵심 메시지는 한 문장입니다 —
+<strong>"엔진 고도화의 모든 재료가 sim_v2 안에 마련됐다."</strong>
+sim_v2 가 두 시점 (W1-W73 / W74-W75) 사이에서 어떤 진화를 했는지,
+그리고 그 결과가 시뮬레이션 담당자에게 의미하는 것이 무엇인지부터 보겠습니다.
+</p>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 20px;">
+  <div class="card" style="border-left: 4px solid var(--warn);">
+    <h4 style="color: var(--warn);">📅 2026-05-15 시점 — sim_v2 W73 까지 완료</h4>
+    <div class="meta">"엔진의 절반은 됐지만 production 에선 0/11"</div>
+    <ul style="margin: 4px 0; padding-left: 18px; font-size: 13.5px;">
+      <li>UC36 contract-level capstone — v2 23 finding → 0 (100% reduction) ✓</li>
+      <li>UC39 Part A 합성 케이스 behavioral 4/4 PASS ✓</li>
+      <li>W71 fixture synthesizer · W72 invariants · W73 baseline adapter ✓</li>
+      <li><strong>UC39 Part B production: <span style="color: var(--danger);">0/11 PASS</span></strong></li>
+      <li class="footnote">11 driveable 중 7 NAMERROR + 2 ATTRERROR + 2 SYNTAX —
+          모두 "translator gap" 으로 categorized 만 됨</li>
+    </ul>
+    <p class="footnote" style="margin-top: 6px;">
+      <em>이 시점의 handoff 였다면, 시뮬레이션 담당자가 NAMERROR 7건의
+      stub 주입을 직접 구현해야 했음.</em>
+    </p>
+  </div>
+
+  <div class="card" style="border-left: 4px solid var(--accent2);">
+    <h4 style="color: var(--accent2);">📅 2026-05-16 시점 — W74/W75/W77/W78 추가 후 (현재, 최종)</h4>
+    <div class="meta">"엔진의 8/8 한계 모두 close, 영역 밖 0건"</div>
+    <ul style="margin: 4px 0; padding-left: 18px; font-size: 13.5px;">
+      <li><strong>W74 sandbox stub injection</strong> 신규 (sandbox_stubs.py + 42 tests)</li>
+      <li><strong>W75 Java idiom rewriter</strong> 신규 (idiom_rewriter.py + 69 tests, 50+ idiom)</li>
+      <li><strong>W77 Korean term resolver</strong> 신규 (korean_term_resolver.py + 27 tests)</li>
+      <li><strong>W78 hybrid search tier</strong> 신규 (transliteration.py + 14 tests, Tier 2/3/4)</li>
+      <li>UC40 (stub-injected) + UC41 (한국어 search) + UC42 (hybrid tier) demo 신규</li>
+      <li><strong>UC40 production: <span style="color: var(--accent2);">6/11 actions PASS (54.5%)</span></strong></li>
+      <li><strong>UC41 한국어 search: <span style="color: var(--accent2);">9/10 query hit (90%)</span></strong></li>
+      <li><strong>UC42 hybrid tier: <span style="color: var(--accent2);">typo + 비표준 음역 모두 close</span></strong></li>
+      <li class="footnote">23 stubs 자동 derive · NameError 0건 ·
+          fixture pass rate 74/126 (58.7%) · 한국어 검색 + typo + 비표준 음역 close</li>
+    </ul>
+    <p class="footnote" style="margin-top: 6px;">
+      <em>이게 지금 받으시는 자료. 시뮬레이션 담당자는 sim_v2 의 8 모듈
+      (W59/W71/W72/W73/W74/W75/W77/W78) 을 <code>import</code> 해서 본인 엔진의 해당
+      부분을 교체/확장하면 끝.</em>
+    </p>
+  </div>
+</div>
+
+<div class="analogy" style="margin-top: 20px;">
+  <strong>그래서 무엇이 바뀐 건가:</strong> sim_v2 가 자기 안에서 마지막 두 한계 (W74 stub
+  injection, W75 idiom rewrite) 를 추가로 close했어요. <strong>덕분에 시뮬레이션
+  담당자의 엔진 (sandbox / composer / transpiler) 도 같은 자산을 import 만 하면
+  같은 수준으로 진화 가능</strong>합니다. 직접 stub injection 을 짤 필요도, idiom rewrite
+  를 직접 매핑할 필요도 없습니다.
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<section id="whatsnew">
+<h2>2 · 한눈에 — <span class="em">엔진 영역에서 무엇이 좋아졌나</span></h2>
+<p class="lead">
+시뮬레이션 담당자가 만든 엔진의 알려진 한계 8 가지가
+<strong>모두 sim_v2 안에서 자산화</strong>되었습니다 (W77 한국어 검색까지 close).
+이걸 본인 엔진에 통합하면 8/8 한계가 같은 수준으로 진화 가능 — 영역 밖 0건.
+</p>
+
+<div class="analogy">
+<strong>비유로 이해하기:</strong> 시뮬레이션 담당자가 만든 sandbox 는 <em>작은 화분</em>
+같은 거였어요 — <code>slab-design-real-v2</code> 의 한 메서드
+(<code>cumulativeProductivity</code>) 만 키울 수 있었고, 그것도 직접 흙
+(<code>DEFAULT_PRODUCTIVITY=0.95</code> anchor) 을 한 줌 부어줘야 했죠. sim_v2 가
+W74/W75 로 만든 것은 <strong>자동 흙 공급 시스템</strong> — 어떤 메서드든 가져다
+놓으면 필요한 상수, 객체, repository, Java idiom 변환까지 자동. <strong>담당자가 할
+일은 이 시스템을 본인 sandbox 에 연결하는 것</strong>. W77 은 화분과는 별개로,
+ontology 에 <em>이미 등록되어 있던 한↔영 alias</em> 라는 사전 자원을 검색에서
+완전히 활용하는 보완 layer.
+</div>
+
+<div class="grid-3">
+  <div class="card closed">
+    <h4>① chat [LOW] fallback</h4>
+    <div class="meta"><span class="badge ok">CLOSED</span></div>
+    <p>자연어 → fqn 변환 실패 시 "왜 LOW 인지" 불명확했던 문제. W72 invariant
+    진단이 <code>FAIL_RETURN_TYPE</code>, <code>FAIL_UNEXPECTED_THROW</code>,
+    <code>ERROR</code> 등 구체적 이유를 제공.</p>
+  </div>
+  <div class="card closed">
+    <h4>② sandbox 결과의 expected 검증</h4>
+    <div class="meta"><span class="badge ok">CLOSED</span></div>
+    <p>"<code>result=0.95</code> 가 Java 와 같은지" 알 수 없던 문제.
+    W73 JavaBaselineMap 으로 (action, args) → expected 매핑 부착, W59 가
+    PASS/FAIL_OUTPUT 까지 surface.</p>
+  </div>
+  <div class="card closed">
+    <h4>③ LLM 으로 test case 합성</h4>
+    <div class="meta"><span class="badge ok">CLOSED</span></div>
+    <p>비결정적 LLM 합성 → W71 의 결정적 boundary value seed. 같은 인자에
+    같은 fixture, 진짜 boundary (빈 문자열, MAX_INT) 까지 포함.</p>
+  </div>
+  <div class="card closed">
+    <h4>④ anchor prelude 가 단발 — sim_v2 W74 로 close</h4>
+    <div class="meta"><span class="badge ok">CLOSED · ★ sim_v2 작업 후 신규</span></div>
+    <p><strong>sim_v2 작업 전 (W73):</strong> 담당자 엔진이 한 상수
+    (<code>DEFAULT_PRODUCTIVITY = 0.95</code>) 만 수동 주입.<br>
+    <strong>작업 후 (W74):</strong> 모든 메서드의 anchor + AST + entity 를
+    자동 분석하여 <code>slab-design-real-v2</code> 의 11 메서드 합쳐 23 stub 자동 생성,
+    NameError 0 도달.</p>
+  </div>
+  <div class="card closed">
+    <h4>⑤ Java idiom 일부만 변환 — sim_v2 W75 로 close</h4>
+    <div class="meta"><span class="badge ok">CLOSED · ★ sim_v2 작업 후 신규</span></div>
+    <p><strong>작업 전:</strong> 담당자 transpiler 가 <code>length()</code>,
+    <code>charAt()</code> 만 변환.<br>
+    <strong>작업 후 (W75):</strong> 50+ idiom 자동 변환 —
+    String/Collection/Optional/Math/Objects. 본인 transpiler 가 sim_v2 translator
+    를 import 하면 자동.</p>
+  </div>
+  <div class="card closed">
+    <h4>⑥ action.output null 55%</h4>
+    <div class="meta"><span class="badge ok">CLOSED</span></div>
+    <p>Section 4 의 W58 return_type_verifier 가 자동으로 type 후보를 추정.
+    Section 3 가 그 추정값을 baseline 후보로 활용 가능.</p>
+  </div>
+  <div class="card closed">
+    <h4>⑦ 영향 분석만, fix 추천 없음</h4>
+    <div class="meta"><span class="badge ok">CLOSED</span></div>
+    <p>UC36 capstone 이 v2 의 23 finding 을 30 MERGED proposal 로 0 까지
+    자동 reduce. Section 3 의 영향 분석 결과를 lifecycle 에 연결하면 actionable
+    suggestion 까지 가능.</p>
+  </div>
+  <div class="card closed">
+    <h4>⑧ 한국어 검색 ("엣징" → 0 hit) — W77 + W78 hybrid tier 로 close</h4>
+    <div class="meta"><span class="badge ok">CLOSED · alias 위의 4-tier 검색</span></div>
+    <p><strong>핵심 사실:</strong> <code>business_terms.aliases_json</code> 컬럼에 이미
+    한↔영 alias 가 등록돼 있었음 (예: <code>["엣징그룹코드", "edgingGroupCd"]</code>).<br>
+    <strong>sim_v2 작업 전:</strong> 데이터는 있는데 modeling search 가 한 컬럼만
+    보고 있어서 "엣징" → 0 hit (conf 0.30).<br>
+    <strong>작업 후 (W77 baseline):</strong> 기존 alias 를 <em>대체하지 않고</em> 완전히
+    활용하는 검색 layer — label / aliases / description / fqn 4 컬럼 통합 token
+    index. UC41 실측 9/10 hit (90%).<br>
+    <strong>W78 hybrid tier (추가):</strong> 한국어 query 가 영문-only term 만 닿거나,
+    사용자가 <em>오타 "edgign"</em> 또는 <em>비표준 음역 "에징"</em> 으로 입력해도
+    Tier 별로 단계적 close. Tier 2 (한↔영 정적 table) + Tier 3 (difflib fuzzy) + Tier
+    4 (LLM callback). UC42 시연으로 typo/음역 양쪽 hit 검증.</p>
+  </div>
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<section id="architecture">
+<h2>3 · sim_v2 의 새 구조 — <span class="em">왜 이렇게 설계했고, 어떻게 활용 가능한가</span></h2>
+<p class="lead">
+sim_v2 는 단순히 "함수 몇 개" 가 아니라 <strong>5 가지 아키텍처 결정</strong>으로 구축된
+framework 입니다. 각 결정에 ADR (Architecture Decision Record) 가 있고, 시뮬레이션
+담당자의 엔진이 같은 패턴을 적용할 수 있도록 자산화되었습니다.
+</p>
+
+<div class="analogy">
+  <strong>한 줄 요약:</strong> sim_v2 는 시스템 종속적인 모놀리식이 아니라
+  <strong>plugin 으로 시스템을 갈아끼울 수 있는 framework</strong>입니다.
+  <code>slab-design-real-v2</code> 가 첫 번째 plugin, Banking 과 Broadleaf 가
+  같은 framework 의 다른 plugin. 시뮬레이션 담당자의 엔진도 같은 framework 의
+  plugin 으로 들어올 수 있고, 본인 엔진 안에서 같은 구조를 따라할 수도 있습니다.
+</div>
+
+<!-- ─────────────── A. Two-Engine Substrate ─────────────── -->
+<div class="arch-card">
+  <h4>A · Two-Engine Substrate (ADR-003) — Verification 과 Recommendation 분리</h4>
+  <div class="why">왜 이렇게 했는가</div>
+  <p style="font-size: 13.5px; margin: 4px 0 8px;">
+    Verification 은 <strong>deterministic + auditable</strong> 해야 합니다 (같은 입력
+    → 같은 출력, 누가 보더라도 검증 가능). Recommendation 은 본질적으로
+    <strong>probabilistic + LLM 기반</strong> 입니다 (창의적 제안). 둘을 같은 엔진에
+    섞으면 신뢰성이 무너집니다. 그래서 두 engine 을 분리, Integrator 가
+    중간에서 proposal lifecycle 을 관장합니다.
+  </p>
+  <div class="arch-diagram"><span class="hi">[ Verification Engine ]</span>           <span class="com"># deterministic, auditable</span>
+  ├─ existence / idiom / param / return / behavior / trace / exception / annotation
+  ├─ FixtureRunner Protocol (W59, W72 plug-in)
+  └─ Oracle 4-tier (PASS / FAIL_BREAKING / FAIL_DRIFT / INCONCLUSIVE)
+        │
+        ▼ proposal 검증
+<span class="hi-i">[ Integrator ]</span>                   <span class="com"># 6-state lifecycle 관장</span>
+  ├─ proposal 6-state (DRAFT → PROPOSED → ORACLED → REVIEWED → ACCEPTED → MERGED)
+  ├─ axis별 pipeline (effect / structural / term)
+  └─ revision pointer (auditable history)
+        │
+        ▲ proposal 생성
+<span class="hi-g">[ Recommendation Engine ]</span>       <span class="com"># LLM-based, 4-layer defenses</span>
+  ├─ grounding (ontology 기반 input)
+  ├─ validation (schema check before LLM)
+  ├─ oracle (Verification 통과 강제)
+  └─ review (사람 또는 auto rule 의 최종 확인)</div>
+  <div class="what-for">
+    <strong>시뮬레이션 담당자에게 의미:</strong> 본인 chat agent (LLM) 의 결과를 그대로
+    sandbox 에 넣지 말고, <strong>Integrator 의 proposal lifecycle 에 흘려보내면</strong>
+    LLM 환각을 deterministic verification (W72) 으로 걸러낸 뒤에만 사용자에게
+    surface 가능. UC36 의 v2 23→0 결과가 바로 이 패턴의 실증.
+  </div>
+</div>
+
+<!-- ─────────────── B. Plugin Framework ─────────────── -->
+<div class="arch-card">
+  <h4>B · Plugin Framework (ADR-002, ADR-011) — system-agnostic</h4>
+  <div class="why">왜 이렇게 했는가</div>
+  <p style="font-size: 13.5px; margin: 4px 0 8px;">
+    한 onTong 인스턴스가 여러 client system 을 동시에 지원해야 합니다.
+    <code>slab-design-real-v2</code>, Banking, Broadleaf 가 모두 다른 도메인이지만
+    <strong>같은 verification framework</strong> 을 공유합니다. plugin 패턴으로
+    business logic 을 분리하고, framework 자체는 system-agnostic 유지.
+  </p>
+  <div class="arch-diagram">backend/sim_v2/
+├─ core/                        <span class="com"># framework — system-agnostic</span>
+│   ├─ verification/              <span class="hi">FixtureRunner Protocol</span>
+│   ├─ synthesizer/               <span class="hi">JavaToPythonTranslator</span>
+│   └─ integrator/                <span class="hi">Lifecycle pipelines</span>
+│
+└─ plugins/                     <span class="com"># 시스템별 plug-in</span>
+    ├─ <span class="hi-g">slab_design_real_v2/</span>     <span class="com"># ★ 현재 demo 대상</span>
+    │    └─ contracts (38 actions, 11 driveable)
+    ├─ banking/                   <span class="com"># UC2_banking_*</span>
+    │    └─ contracts (transactions, accounts, ...)
+    └─ broadleaf/                 <span class="com"># UC2_broadleaf_*</span>
+         └─ contracts (catalog, pricing, ...)</div>
+  <div class="what-for">
+    <strong>시뮬레이션 담당자에게 의미:</strong> Section 3 의 sandbox/composer/chat 도
+    같은 plugin 구조를 따라할 수 있습니다. <code>slab-design-real-v2</code> 의 특수
+    로직은 plugin 안에, framework 부분은 sim_v2 의 core 를 import. 다른 시스템
+    (Banking 등) 추가 시 plugin 만 새로 작성하면 됩니다.
+  </div>
+</div>
+
+<!-- ─────────────── C. 5-axis Detect→Fix loop ─────────────── -->
+<div class="arch-card">
+  <h4>C · 5-axis Detect→Fix Loop (UC22/UC24/UC30/UC33/UC27) — 자동 진단 + 자동 추천</h4>
+  <div class="why">왜 이렇게 했는가</div>
+  <p style="font-size: 13.5px; margin: 4px 0 8px;">
+    한 메서드의 "결함" 은 5 가지 차원에서 발생합니다 (param 시그니처, return type,
+    exception, annotation, term naming). 한 axis 의 결함이 다른 axis 까지 영향을
+    주기도 합니다 (term MERGE → return-type 자동 unblock). 5 축을 독립적으로
+    detect 하고, 각 axis 가 자체 remediation 후보를 emit. <code>slab-design-real-v2</code>
+    의 23 finding 이 30 MERGED proposal 로 100% reduce 된 패턴.
+  </p>
+  <div class="axis-grid">
+    <div class="axis-card">
+      <h5>① Schema axis <span class="num">W48</span></h5>
+      <div class="desc">params_json 의 type 정의 누락 → ADD_FIELD / RENAME_FIELD</div>
+    </div>
+    <div class="axis-card">
+      <h5>② Param axis <span class="num">W55</span></h5>
+      <div class="desc">action params ↔ Java method params 시그니처 불일치 → RENAME_PARAM</div>
+    </div>
+    <div class="axis-card">
+      <h5>③ Return-type axis <span class="num">W58</span></h5>
+      <div class="desc">declared return ↔ method body return 차이 → CHANGE / WRAP / LIFT</div>
+    </div>
+    <div class="axis-card">
+      <h5>④ Exception axis <span class="num">W64</span></h5>
+      <div class="desc">declared effects 누락 → ADD_EXCEPTION_EFFECT</div>
+    </div>
+    <div class="axis-card">
+      <h5>⑤ Annotation axis <span class="num">W67</span></h5>
+      <div class="desc">@Transactional / @PostMapping 누락 → ADD_ANNOTATION_EFFECT</div>
+    </div>
+  </div>
+  <div class="what-for">
+    <strong>시뮬레이션 담당자에게 의미:</strong> 본인 영향도 분석 panel 의 결과를
+    이 5 axis 의 lifecycle pipeline 에 흘려보내면 <strong>"영향 받는다" → "이렇게 고쳐라"</strong>
+    까지 가능. UC22/UC24/UC27/UC30/UC33 demo 가 각각의 fix 패턴 실증.
+  </div>
+</div>
+
+<!-- ─────────────── D. 6-state Lifecycle ─────────────── -->
+<div class="arch-card">
+  <h4>D · 6-state Proposal Lifecycle (W62/W68/W69) — LLM 환각 방어 메커니즘</h4>
+  <div class="why">왜 이렇게 했는가</div>
+  <p style="font-size: 13.5px; margin: 4px 0 8px;">
+    LLM 이 emit 한 proposal 을 즉시 적용하면 환각 (hallucination) 이 곧장
+    production 으로 갑니다. <strong>6-state lifecycle</strong> 이 그 사이를 막는
+    safety net: 각 state 마다 다른 검증 (schema oracle / behavioral oracle /
+    reviewer auto-policy) 통과 후에만 다음으로. ADR-005 의 4-layer LLM defense
+    의 oracle layer 가 이 lifecycle 의 ORACLED → ACCEPTED 게이트.
+  </p>
+  <div class="state-row">
+    <span class="state-pill start">DRAFT</span>
+    <span class="state-arrow">→</span>
+    <span class="state-pill mid">PROPOSED</span>
+    <span class="state-arrow">→</span>
+    <span class="state-pill mid">ORACLED</span>
+    <span class="state-arrow">→</span>
+    <span class="state-pill mid">REVIEWED</span>
+    <span class="state-arrow">→</span>
+    <span class="state-pill end">ACCEPTED</span>
+    <span class="state-arrow">→</span>
+    <span class="state-pill end">MERGED</span>
+  </div>
+  <p style="font-size: 12.5px; color: var(--muted); margin: 6px 0;">
+    분기 가능: 어느 state 에서든 <span class="state-pill fail">REJECTED</span>
+    또는 <span class="state-pill start">CHANGE_REQUEST</span> (사람 검토 필요).
+  </p>
+  <details class="expand">
+    <summary>각 state 의 의미 + UC36 실측 예시</summary>
+    <ul style="font-size: 13px;">
+      <li><strong>DRAFT</strong> — LLM (또는 verifier) 가 막 생성한 raw 후보.
+          UC36 에서 23 baseline finding 이 23 DRAFT proposal 로 시작.</li>
+      <li><strong>PROPOSED</strong> — 기존 ontology 와 충돌 없는지 schema-level
+          schema oracle 통과. <em>예: ADD_EXCEPTION 이 이미 등록된 exception 과
+          duplicate 가 아닌지.</em></li>
+      <li><strong>ORACLED</strong> — Verification Engine (deterministic) 의 oracle 통과.
+          <em>예: param rename 이 정말 시그니처 불일치를 해소하는지.</em></li>
+      <li><strong>REVIEWED</strong> — auto reviewer policy 또는 사람 review 거침.
+          needs_detail 인 경우 (e.g. rest_endpoint 의 path 미상) CHANGE_REQUEST 분기.</li>
+      <li><strong>ACCEPTED</strong> — 최종 승인 상태, MERGE 직전.</li>
+      <li><strong>MERGED</strong> — ontology DB 에 실제 반영. UC36 결과 30 MERGED proposal.</li>
+    </ul>
+  </details>
+  <div class="what-for">
+    <strong>시뮬레이션 담당자에게 의미:</strong> 본인 chat 의 자연어 → fqn 변환
+    실패 시 [LOW] 라고만 떠 있던 부분에서, lifecycle 로 흘려보내면 사용자에게
+    <strong>"이 후보가 ORACLED 통과 / REVIEWED 진행 중 / DRAFT — 추가 정보 필요"</strong>
+    같은 진행 상태 노출 가능. UI 자체가 단순 결과 → actionable workflow 로 진화.
+  </div>
+</div>
+
+<!-- ─────────────── E. FixtureRunner Protocol ─────────────── -->
+<div class="arch-card">
+  <h4>E · FixtureRunner Protocol — 새 verifier 가 plug-in 으로 들어오는 통로</h4>
+  <div class="why">왜 이렇게 했는가</div>
+  <p style="font-size: 13.5px; margin: 4px 0 8px;">
+    Verification 의 핵심은 <code>FixtureRunner</code> 라는 단일 Python Protocol.
+    어느 verifier 든 이 protocol 만 구현하면 같은 oracle / engine 에 plug-in.
+    W59 (behavioral), W72 (invariants) 가 같은 protocol 의 구현체, 같은 oracle 이
+    둘 모두 사용. 향후 새 verifier (e.g. fuzz-based, contract-based) 도 같은
+    방식으로 추가 가능.
+  </p>
+  <div class="arch-diagram"><span class="com"># oracle.py 의 Protocol 정의</span>
+<span class="hi-i">class</span> FixtureRunner(Protocol):
+    <span class="hi-i">def</span> run_fixture(
+        self, fixture_id: str, plugin: str, apply_diffs: dict
+    ) -> FixtureOracleResult: ...
+
+<span class="com"># 구현체들 (모두 동일한 인터페이스)</span>
+<span class="hi">W59</span> · BehaviorTwinRunner       <span class="com"># Java baseline 과 동치 비교</span>
+<span class="hi">W72</span> · TwinInvariantRunner       <span class="com"># determinism / type / no-throw</span>
+<span class="hi-g">새 verifier 추가:</span>
+   class FuzzVerifier(FixtureRunner):
+       <span class="hi-i">def</span> run_fixture(...): ...   <span class="com"># protocol 따라 구현만 하면 끝</span></div>
+  <div class="what-for">
+    <strong>시뮬레이션 담당자에게 의미:</strong> 본인 만든 custom verifier (e.g.
+    <code>slab-design-real-v2</code> 특화 비즈니스 룰 체크) 도 <code>FixtureRunner</code>
+    protocol 따라 작성하면 sim_v2 의 VerificationEngine + Oracle 인프라를 그대로
+    상속. 새 verification 차원 추가 시 framework 재설계 불필요.
+  </div>
+</div>
+
+<!-- ─────────────── F. W77 + W78 hybrid tier layer ─────────────── -->
+<div class="arch-card">
+  <h4>F · W77 + W78 Hybrid Search — ontology 기존 alias 위에 4 tier 검색 (대체 ❌, 보완 ✓)</h4>
+  <div class="why">왜 이렇게 했는가</div>
+  <p style="font-size: 13.5px; margin: 4px 0 8px;">
+    <code>business_terms.aliases_json</code> 컬럼이 이미 한↔영 alias 양쪽을 담는
+    설계 (예: <code>["엣징그룹코드", "edgingGroupCd"]</code>). 그런데 modeling 의
+    기본 search 가 <em>한 컬럼만</em> 보고 있어서 "엣징" 검색 시 0 hit. 데이터는
+    있는데 검색이 활용 못한 것. <strong>W77 은 alias 를 대체하지 않고</strong>
+    같은 데이터를 4 컬럼 통합 token index 로 fully exploit. 그 위에 <strong>W78
+    은 사용자 query 가 alias 한쪽만 매핑되거나 (한국어 → 영문만 등록된 term),
+    오타 / 비표준 음역 인 경우도 close 하는 hybrid tier</strong> 를 얹음.
+  </p>
+  <div class="arch-diagram">┌─ ontology 의 <span class="hi">business_terms</span> (sim_v2 작업 전부터 존재) ─┐
+│ fqn      = term.scm.shared.edging_group_cd                        │
+│ label    = "엣징그룹코드"                                              │
+│ aliases  = <span class="hi">["엣징그룹코드", "edgingGroupCd"]</span>  ← 한↔영 양쪽 등록  │
+│ description, fqn ...                                                 │
+└──────────────────────────────────────────────────────────────────────┘
+                              │
+                              │ W77 4 컬럼 통합 token index
+                              ▼
+┌─ <span class="hi-g">KoreanTermResolver</span> (W77 baseline + W78 hybrid tier) ─────────┐
+│ <span class="hi">Tier 1</span>: token exact / substring / prefix     (항상)               │
+│ <span class="hi">Tier 2</span>: 한↔영 static table  "엣징"→"edging"  (use_translit)        │
+│ <span class="hi">Tier 3</span>: difflib fuzzy        "edgign"→"edging" (use_fuzzy, 0 hit 시)│
+│ <span class="hi">Tier 4</span>: LLM callback         "에징"→"edging"  (llm_assist, 마지막)  │
+│ score: label_exact + alias_exact + fqn_exact + desc_exact            │
+└──────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+   "엣징"  → T1 부족, T2 가 close   (UC41: 9/10 hit)
+   "edgign"→ T1/T2 fail, T3 가 close (UC42 typo 시연)
+   "에징"  → T1~T3 fail, T4 가 close (UC42 비표준 음역 시연)</div>
+  <div class="what-for">
+    <strong>시뮬레이션 담당자에게 의미:</strong> 본인 chat agent 의 한국어 검색
+    부분을 W77+W78 로 교체. ontology 측 alias 데이터를 추가할 필요 없음 (이미
+    있음). 본인 LLM 을 <code>llm_assist</code> 인자로 plug-in 하면 Tier 4 까지
+    한 줄 통합. <strong>새 term 등록 시 한국어 label + 영문 alias 둘 다 채우는
+    패턴이 W77 의 baseline</strong> — alias 가 잘 등록될수록 검색 품질도 자동으로
+    좋아짐. 자주 쓰는 한↔영 음역은 <code>register_transliteration(kr, en)</code>
+    runtime API 로 정적 table 에 추가 가능.
+  </div>
+</div>
+
+<!-- ─────────────── G. 3-system parity ─────────────── -->
+<div class="arch-card">
+  <h4>G · 3-system Parity (ADR-011, G1-G4 gates) — 같은 framework, 다른 도메인</h4>
+  <div class="why">왜 이렇게 했는가</div>
+  <p style="font-size: 13.5px; margin: 4px 0 8px;">
+    "framework 가 정말 system-agnostic 인가?" 를 증명하기 위해
+    <strong>3 개 시스템 (slab-design-real-v2 + Banking + Broadleaf) 모두 같은
+    pipeline 으로 통과</strong>한다는 cross-validate gate 를 만들었습니다. UC1 (G1),
+    UC2 (G2 — 4 meta-programming areas), UC3-UC5 (G3+G4) 가 각각의 gate 실증.
+  </p>
+  <div class="arch-diagram">           <span class="hi-g">slab-design-real-v2</span>          <span class="hi-i">Banking</span>          <span class="hi">Broadleaf</span>
+            (현재 demo 대상)            (UC2_banking_*)    (UC2_broadleaf_*)
+                  │                       │                  │
+                  └──────────┬────────────┴──────────────────┘
+                             │
+                  같은 FixtureRunner Protocol
+                  같은 6-state Lifecycle
+                  같은 5-axis Detect→Fix loop
+                  같은 Two-Engine Substrate
+                             │
+                  G1 ✓ Same UC1 pipeline 통과
+                  G2 ✓ 4 meta-programming 영역 close
+                  G3 ✓ Recommendation Engine wire-up
+                  G4 ✓ Schema Layer evolution</div>
+  <div class="what-for">
+    <strong>시뮬레이션 담당자에게 의미:</strong> <code>slab-design-real-v2</code> 만 보고 있는
+    것 같지만, 본인 엔진이 sim_v2 자산을 통합하면 <strong>다른 시스템 추가 시
+    엔진 자체를 새로 짤 필요 없음</strong>. plugin 만 추가하면 됨. 향후 client 확장
+    시 비용 절감.
+  </div>
+</div>
+
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<section id="demo">
+<h2>4 · 예시 ① — <span class="em">Java → Python 변환 데모</span></h2>
+<p class="lead">
+<code>slab-design-real-v2</code> 의 실제 메서드 + 작은 합성 예시로 비교.
+<strong>"sim_v2 작업 전 (W73 까지)" vs "작업 후 (W75 적용)"</strong>.
+시뮬레이션 담당자의 transpiler 가 W75 자산을 통합하면 같은 결과 도달.
+</p>
+
+<div class="demo">
+  <div class="demo-tabs">
+    <button class="demo-btn active" data-demo="d1">예시 1: 문자열 길이 체크</button>
+    <button class="demo-btn" data-demo="d2">예시 2: 리스트 / Map</button>
+    <button class="demo-btn" data-demo="d3">예시 3: Math + Optional</button>
+    <button class="demo-btn" data-demo="d4">예시 4: 진짜 production 코드</button>
+  </div>
+
+  <!-- D1 -->
+  <div class="demo-pane active" id="d1">
+    <h5>입력 — Java 코드</h5>
+    <pre class="java"><code><span class="kw">public</span> <span class="typ">boolean</span> isShortCode(<span class="typ">String</span> cmpCd) {
+    <span class="kw">if</span> (cmpCd == <span class="kw">null</span> || cmpCd.length() &lt; <span class="num-c">8</span>) {
+        <span class="kw">return</span> <span class="kw">true</span>;
+    }
+    <span class="kw">return</span> cmpCd.equals(<span class="str">"DEFAULT"</span>);
+}</code></pre>
+    <div class="diff-grid">
+      <div class="col before">
+        <h5><span class="label">sim_v2 작업 전 — W73 까지 / 또는 담당자 transpiler 만</span></h5>
+        <pre><code><span class="kw">def</span> isShortCode(<span class="kw">self</span>, cmpCd):
+    <span class="kw">if</span> cmpCd == <span class="kw">None</span> or cmpCd.<span class="str">length()</span> &lt; <span class="num-c">8</span>:
+        <span class="kw">return</span> <span class="kw">True</span>
+    <span class="kw">return</span> cmpCd.<span class="str">equals(</span><span class="str">'DEFAULT'</span>)</code></pre>
+        <p class="footnote"><span class="badge fail">실행 시 AttributeError</span>
+        <code>.length()</code>, <code>.equals()</code> 은 Python str 에 없음.</p>
+      </div>
+      <div class="col after">
+        <h5><span class="label">sim_v2 작업 후 — W75 적용 (담당자도 import 만 하면 동일)</span></h5>
+        <pre><code><span class="kw">def</span> isShortCode(<span class="kw">self</span>, cmpCd):
+    <span class="kw">if</span> cmpCd == <span class="kw">None</span> or <span class="typ">len</span>(cmpCd) &lt; <span class="num-c">8</span>:
+        <span class="kw">return</span> <span class="kw">True</span>
+    <span class="kw">return</span> (cmpCd == <span class="str">'DEFAULT'</span>)</code></pre>
+        <p class="footnote"><span class="badge ok">PASS</span>
+        <code>.length()</code> → <code>len(...)</code>,
+        <code>.equals(x)</code> → <code>(... == x)</code> 자동 변환.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- D2 -->
+  <div class="demo-pane" id="d2">
+    <h5>입력 — Java 코드 (Collection 사용 예)</h5>
+    <pre class="java"><code><span class="kw">public</span> <span class="typ">String</span> firstActive(<span class="typ">List</span>&lt;<span class="typ">String</span>&gt; codes,
+                         <span class="typ">Map</span>&lt;<span class="typ">String</span>, <span class="typ">Boolean</span>&gt; active) {
+    <span class="kw">if</span> (codes.isEmpty()) <span class="kw">return</span> <span class="kw">null</span>;
+    <span class="kw">for</span> (<span class="typ">int</span> i = <span class="num-c">0</span>; i &lt; codes.size(); i++) {
+        <span class="typ">String</span> c = codes.get(i);
+        <span class="kw">if</span> (active.containsKey(c)) <span class="kw">return</span> c;
+    }
+    <span class="kw">return</span> <span class="kw">null</span>;
+}</code></pre>
+    <div class="diff-grid">
+      <div class="col before">
+        <h5><span class="label">sim_v2 작업 전</span></h5>
+        <pre><code><span class="kw">def</span> firstActive(<span class="kw">self</span>, codes, active):
+    <span class="kw">if</span> codes.<span class="str">isEmpty()</span>: <span class="kw">return</span> <span class="kw">None</span>
+    <span class="kw">for</span> i <span class="kw">in</span> range(<span class="num-c">0</span>, codes.<span class="str">size()</span>):
+        c = codes.<span class="str">get(i)</span>
+        <span class="kw">if</span> active.<span class="str">containsKey(c)</span>:
+            <span class="kw">return</span> c
+    <span class="kw">return</span> <span class="kw">None</span></code></pre>
+        <p class="footnote"><span class="badge fail">AttributeError × 4</span></p>
+      </div>
+      <div class="col after">
+        <h5><span class="label">sim_v2 작업 후</span></h5>
+        <pre><code><span class="kw">def</span> firstActive(<span class="kw">self</span>, codes, active):
+    <span class="kw">if</span> (<span class="kw">not</span> codes): <span class="kw">return</span> <span class="kw">None</span>
+    <span class="kw">for</span> i <span class="kw">in</span> range(<span class="num-c">0</span>, <span class="typ">len</span>(codes)):
+        c = codes[i]
+        <span class="kw">if</span> (c <span class="kw">in</span> active):
+            <span class="kw">return</span> c
+    <span class="kw">return</span> <span class="kw">None</span></code></pre>
+        <p class="footnote"><span class="badge ok">PASS</span> Java
+        Collection 의 4 method 모두 Python idiom 으로 자동 매핑.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- D3 -->
+  <div class="demo-pane" id="d3">
+    <h5>입력 — Java 코드 (Math / Optional 사용 예)</h5>
+    <pre class="java"><code><span class="kw">public</span> <span class="typ">int</span> safeDistance(<span class="typ">Optional</span>&lt;<span class="typ">Integer</span>&gt; opt, <span class="typ">int</span> base) {
+    <span class="typ">int</span> v = opt.orElse(<span class="num-c">0</span>);
+    <span class="kw">return</span> <span class="typ">Math</span>.abs(<span class="typ">Math</span>.max(v, base));
+}</code></pre>
+    <div class="diff-grid">
+      <div class="col before">
+        <h5><span class="label">sim_v2 작업 전</span></h5>
+        <pre><code><span class="kw">def</span> safeDistance(<span class="kw">self</span>, opt, base):
+    v = opt.<span class="str">orElse(0)</span>
+    <span class="kw">return</span> <span class="typ">Math</span>.<span class="str">abs(</span><span class="typ">Math</span>.<span class="str">max(v, base)</span><span class="str">)</span></code></pre>
+        <p class="footnote"><span class="badge fail">NameError: Math</span>
+        + AttributeError: orElse</p>
+      </div>
+      <div class="col after">
+        <h5><span class="label">sim_v2 작업 후</span></h5>
+        <pre><code><span class="kw">def</span> safeDistance(<span class="kw">self</span>, opt, base):
+    v = (opt <span class="kw">if</span> opt <span class="kw">is</span> <span class="kw">not</span> <span class="kw">None</span> <span class="kw">else</span> <span class="num-c">0</span>)
+    <span class="kw">return</span> <span class="typ">abs</span>(<span class="typ">max</span>(v, base))</code></pre>
+        <p class="footnote"><span class="badge ok">PASS</span>
+        <code>Optional.orElse</code> + <code>Math.abs/max</code> 모두 Python
+        내장으로 변환.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- D4 -->
+  <div class="demo-pane" id="d4">
+    <h5>입력 — <code>slab-design-real-v2</code> 의 <code>cumulativeProductivity</code> (★ 실제 production 코드)</h5>
+    <pre class="java"><code><span class="kw">public</span> <span class="typ">BigDecimal</span> cumulativeProductivity(<span class="typ">String</span> cmpCd, <span class="typ">String</span> orgCd,
+                                          <span class="typ">String</span> confirmedPlantCd, ...) {
+    <span class="kw">if</span> (confirmedPlantCd == <span class="kw">null</span>
+        || confirmedPlantCd.length() &lt; SdConstants.CONFIRMED_PLANT_CD_LENGTH) {
+        <span class="kw">return</span> DEFAULT_PRODUCTIVITY;
+    }
+    <span class="typ">BigDecimal</span> product = <span class="typ">BigDecimal</span>.ONE;
+    <span class="kw">for</span> (<span class="typ">int</span> i = <span class="num-c">0</span>; i &lt; confirmedPlantCd.length(); i++) {
+        ...
+    }
+    <span class="kw">return</span> product;
+}</code></pre>
+    <div class="diff-grid">
+      <div class="col before">
+        <h5><span class="label">sim_v2 작업 전 (W73 시점)</span></h5>
+        <ul style="margin: 4px 0 8px 18px; font-size: 13px;">
+          <li>W73 까지의 transpile 은 가능</li>
+          <li>하지만 sandbox 실행 시 <code>DEFAULT_PRODUCTIVITY</code>,
+              <code>SdConstants</code> NameError → <strong>0/12 PASS</strong></li>
+          <li>담당자가 anchor 1건만 수동 주입했을 때 1 메서드만 작동했던 상태</li>
+        </ul>
+        <p class="footnote"><span class="badge warn">단발 우회 — slab-design-real-v2 전수 적용 불가</span></p>
+      </div>
+      <div class="col after">
+        <h5><span class="label">sim_v2 작업 후 (W74+W75 적용, UC40 실측)</span></h5>
+        <pre style="font-size: 12px;">W71 fixture       : 12 합성
+W74 stub          : 3 자동 derive
+  DEFAULT_PRODUCTIVITY ← anchor 추출
+  lookupOrDefault      ← AST unbound (lowercase non-bean)
+  SdConstants          ← AST unbound (class)
+W75 idiom         : length()/charAt 자동 변환
+W72 invariant     : 12 / 12 PASS ✓</pre>
+        <p class="footnote"><span class="badge ok">12/12 합격</span>
+        recipe-4 로 검증 완료. 담당자가 자기 엔진의 sandbox 를 sim_v2
+        의 BehaviorTwinRunner + sandbox_stubs 로 교체하면 같은 결과.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<section id="stub">
+<h2>5 · 예시 ② — <span class="em">자동 stub 주입</span> 시각화 (W74)</h2>
+<p class="lead">
+시뮬레이션 담당자가 "<code>DEFAULT_PRODUCTIVITY = 0.95</code> 한 줄을 어떻게 sandbox 에
+넣지?" 라는 문제를 푼 그 기법을 <strong>모든 메서드에 자동 적용</strong>되게
+generic 화한 것이 W74. <code>slab-design-real-v2</code> 의 <code>cumulativeProductivity</code> 에
+대해 stub 자동 도출 흐름을 단계별로 보여드릴게요.
+</p>
+
+<div class="stub-viz">
+  <h3>대상 메서드</h3>
+  <pre style="font-size: 12px; padding: 10px 14px;"><code>com.example.slabdesign.feature.sd.process.std.service
+    .ProductivityService.cumulativeProductivity(String × 6)</code></pre>
+
+  <h3>① anchor_locator 에서 상수 추출 (regex)</h3>
+  <div class="stub-source">
+    DB <code>anchor_bindings</code> 의 <code>anchor_locator</code> 컬럼 →
+    정규식 <code>^([A-Z_][A-Z0-9_]*)\s*=\s*(.+?)$</code> 매칭
+  </div>
+  <pre style="font-size: 12.5px;"><code><span class="str">"DEFAULT_PRODUCTIVITY = 0.95"</span>           <span class="arrow">→</span>  {<span class="str">"DEFAULT_PRODUCTIVITY"</span>: <span class="num-c">0.95</span>}
+<span class="str">"product = product.multiply(p)"</span>        <span class="arrow">→</span>  (대소문자 무시 — 스킵)
+<span class="str">"return v != null ? v : DEFAULT;"</span>      <span class="arrow">→</span>  (패턴 안 맞음 — 스킵)
+<span class="str">"confirmedPlantCd == null"</span>             <span class="arrow">→</span>  (조건문 — 스킵)</code></pre>
+  <p>→ <span class="stub-pill">DEFAULT_PRODUCTIVITY = 0.95</span></p>
+
+  <h3>② AST 로 정의 안 된 이름 찾기</h3>
+  <div class="stub-source">
+    번역된 Python 의 AST 를 walk → 로컬 binding 과 builtin 을 빼고 남은 Name 노드
+  </div>
+  <pre style="font-size: 12.5px;"><code><span class="com"># 번역된 Python:</span>
+<span class="kw">def</span> cumulativeProductivity(<span class="kw">self</span>, cmpCd, ...):
+    <span class="kw">if</span> confirmedPlantCd == <span class="kw">None</span> or <span class="typ">len</span>(confirmedPlantCd) &lt; <span class="typ">SdConstants</span>.CONFIRMED_PLANT_CD_LENGTH:
+        <span class="kw">return</span> DEFAULT_PRODUCTIVITY      <span class="com"># anchor 가 이미 제공</span>
+    product = <span class="typ">Decimal</span>(<span class="num-c">1</span>)
+    ...
+    v = lookupOrDefault(cmpCd, ...)        <span class="com"># 어디서 옴?</span>
+
+<span class="com"># AST 가 발견:</span>
+unbound = {<span class="str">"SdConstants"</span>, <span class="str">"lookupOrDefault"</span>}    <span class="com"># DEFAULT_PRODUCTIVITY 는 anchor 에서 이미 채움</span></code></pre>
+
+  <h3>③ 발견된 이름 분류 + stub 부착</h3>
+  <pre style="font-size: 12.5px;"><code><span class="typ">SdConstants</span>          <span class="arrow">→</span>  Capitalized + 첫 글자 대문자 <span class="arrow">→</span>  <span class="kw">class</span> stub
+lookupOrDefault      <span class="arrow">→</span>  lowercase + bean suffix 아님   <span class="arrow">→</span>  unknown (permissive MagicMock)
+groupRepository      <span class="arrow">→</span>  lowercase + Repository suffix  <span class="arrow">→</span>  bean stub</code></pre>
+  <p>
+    <span class="stub-pill">DEFAULT_PRODUCTIVITY = 0.95</span>
+    <span class="stub-pill class-stub">SdConstants &lt;MagicMock&gt;</span>
+    <span class="stub-pill bean">lookupOrDefault &lt;MagicMock&gt;</span>
+  </p>
+
+  <h3>④ <code>_safe_globals()</code> 에 inject + 실행</h3>
+  <pre style="font-size: 12.5px;"><code><span class="kw">from</span> backend.sim_v2.core.verification.sandbox_stubs <span class="kw">import</span> build_stub_namespace
+<span class="kw">from</span> backend.sim_v2.core.verification.twin_invariants <span class="kw">import</span> TwinInvariantRunner
+
+stub_ns = build_stub_namespace(session, method_fqn, repo_id, python_source)
+runner  = TwinInvariantRunner(declared_return=<span class="str">"float"</span>, stub_namespace=stub_ns)
+result  = runner.check(fixture)         <span class="com"># status: PASS / FAIL_*</span></code></pre>
+  <p class="footnote"><strong>실측 결과:</strong> NameError 0건, 12/12 fixture PASS.</p>
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<section id="idiom">
+<h2>6 · 예시 ③ — <span class="em">50+ Java idiom 자동 변환</span>표 (W75)</h2>
+<p class="lead">
+W75 가 자동으로 변환하는 Java 표준 메서드들. 시뮬레이션 담당자의 transpiler
+가 sim_v2 <code>JavaToPythonTranslator</code> 를 import 하거나 subclass 하면 아래
+모든 변환이 자동 적용. 카테고리별로 필터링 가능.
+</p>
+
+<div class="idiom-filter">
+  <button class="idiom-btn active" data-cat="all">모두</button>
+  <button class="idiom-btn" data-cat="unk">Unknown (안전한 기본 변환)</button>
+  <button class="idiom-btn" data-cat="typed">Typed (타입 알 때만)</button>
+  <button class="idiom-btn" data-cat="static">Static (Math, Objects 등)</button>
+</div>
+
+<table class="idiom-table" id="idiomTable">
+<thead><tr>
+  <th>카테고리</th><th>Java idiom</th><th>Python 변환</th><th>설명</th>
+</tr></thead>
+<tbody>
+  <tr data-cat="unk"><td><span class="idiom-cat unk">Unknown</span></td>
+      <td class="lhs">s.length()</td><td class="rhs">len(s)</td>
+      <td>문자열 또는 배열 길이</td></tr>
+  <tr data-cat="unk"><td><span class="idiom-cat unk">Unknown</span></td>
+      <td class="lhs">s.charAt(i)</td><td class="rhs">s[i]</td>
+      <td>i 번째 문자</td></tr>
+  <tr data-cat="unk"><td><span class="idiom-cat unk">Unknown</span></td>
+      <td class="lhs">s.substring(a, b)</td><td class="rhs">s[a:b]</td>
+      <td>슬라이싱</td></tr>
+  <tr data-cat="unk"><td><span class="idiom-cat unk">Unknown</span></td>
+      <td class="lhs">s.startsWith(p)</td><td class="rhs">s.startswith(p)</td>
+      <td>접두사 매치</td></tr>
+  <tr data-cat="unk"><td><span class="idiom-cat unk">Unknown</span></td>
+      <td class="lhs">s.toLowerCase()</td><td class="rhs">s.lower()</td>
+      <td>소문자화</td></tr>
+  <tr data-cat="unk"><td><span class="idiom-cat unk">Unknown</span></td>
+      <td class="lhs">s.trim()</td><td class="rhs">s.strip()</td>
+      <td>공백 제거</td></tr>
+  <tr data-cat="unk"><td><span class="idiom-cat unk">Unknown</span></td>
+      <td class="lhs">o.toString()</td><td class="rhs">str(o)</td>
+      <td>문자열 변환</td></tr>
+
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">String</span></td>
+      <td class="lhs">s.isEmpty()</td><td class="rhs">(not s)</td>
+      <td>빈 문자열 여부</td></tr>
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">String</span></td>
+      <td class="lhs">s.equals(o)</td><td class="rhs">(s == o)</td>
+      <td>문자열 같음</td></tr>
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">String</span></td>
+      <td class="lhs">s.contains(sub)</td><td class="rhs">(sub in s)</td>
+      <td>부분 문자열 포함</td></tr>
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">String</span></td>
+      <td class="lhs">s.indexOf(c)</td><td class="rhs">s.find(c)</td>
+      <td>위치 검색</td></tr>
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">String</span></td>
+      <td class="lhs">s.replace(a, b)</td><td class="rhs">s.replace(a, b)</td>
+      <td>치환</td></tr>
+
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">List</span></td>
+      <td class="lhs">list.size()</td><td class="rhs">len(list)</td>
+      <td>리스트 크기</td></tr>
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">List</span></td>
+      <td class="lhs">list.isEmpty()</td><td class="rhs">(not list)</td>
+      <td>빈 리스트 여부</td></tr>
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">List</span></td>
+      <td class="lhs">list.contains(x)</td><td class="rhs">(x in list)</td>
+      <td>원소 포함</td></tr>
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">List</span></td>
+      <td class="lhs">list.get(i)</td><td class="rhs">list[i]</td>
+      <td>i 번째</td></tr>
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">List</span></td>
+      <td class="lhs">list.add(x)</td><td class="rhs">list.append(x)</td>
+      <td>원소 추가</td></tr>
+
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">Map</span></td>
+      <td class="lhs">map.containsKey(k)</td><td class="rhs">(k in map)</td>
+      <td>키 존재 여부</td></tr>
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">Map</span></td>
+      <td class="lhs">map.getOrDefault(k, d)</td><td class="rhs">map.get(k, d)</td>
+      <td>기본값으로 조회</td></tr>
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">Map</span></td>
+      <td class="lhs">map.keySet()</td><td class="rhs">set(map.keys())</td>
+      <td>키 집합</td></tr>
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">Map</span></td>
+      <td class="lhs">map.entrySet()</td><td class="rhs">map.items()</td>
+      <td>(키, 값) 쌍 순회</td></tr>
+
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">Optional</span></td>
+      <td class="lhs">opt.isPresent()</td><td class="rhs">(opt is not None)</td>
+      <td>값 있는지</td></tr>
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">Optional</span></td>
+      <td class="lhs">opt.get()</td><td class="rhs">opt</td>
+      <td>값 꺼냄</td></tr>
+  <tr class="row-typed" data-cat="typed"><td><span class="idiom-cat typed">Optional</span></td>
+      <td class="lhs">opt.orElse(d)</td><td class="rhs">(opt if opt is not None else d)</td>
+      <td>없으면 기본값</td></tr>
+
+  <tr class="row-static" data-cat="static"><td><span class="idiom-cat static">Math</span></td>
+      <td class="lhs">Math.abs(x)</td><td class="rhs">abs(x)</td>
+      <td>절댓값</td></tr>
+  <tr class="row-static" data-cat="static"><td><span class="idiom-cat static">Math</span></td>
+      <td class="lhs">Math.max(a, b)</td><td class="rhs">max(a, b)</td>
+      <td>최댓값</td></tr>
+  <tr class="row-static" data-cat="static"><td><span class="idiom-cat static">Math</span></td>
+      <td class="lhs">Math.min(a, b)</td><td class="rhs">min(a, b)</td>
+      <td>최솟값</td></tr>
+  <tr class="row-static" data-cat="static"><td><span class="idiom-cat static">Math</span></td>
+      <td class="lhs">Math.pow(a, b)</td><td class="rhs">(a ** b)</td>
+      <td>거듭제곱</td></tr>
+  <tr class="row-static" data-cat="static"><td><span class="idiom-cat static">Math</span></td>
+      <td class="lhs">Math.sqrt(x)</td><td class="rhs">(x) ** 0.5</td>
+      <td>제곱근</td></tr>
+
+  <tr class="row-static" data-cat="static"><td><span class="idiom-cat static">Parsing</span></td>
+      <td class="lhs">Integer.parseInt(s)</td><td class="rhs">int(s)</td>
+      <td>문자열 → int</td></tr>
+  <tr class="row-static" data-cat="static"><td><span class="idiom-cat static">Parsing</span></td>
+      <td class="lhs">Double.parseDouble(s)</td><td class="rhs">float(s)</td>
+      <td>문자열 → float</td></tr>
+  <tr class="row-static" data-cat="static"><td><span class="idiom-cat static">Parsing</span></td>
+      <td class="lhs">String.valueOf(o)</td><td class="rhs">str(o)</td>
+      <td>임의 객체 → 문자열</td></tr>
+
+  <tr class="row-static" data-cat="static"><td><span class="idiom-cat static">Objects</span></td>
+      <td class="lhs">Objects.isNull(x)</td><td class="rhs">(x is None)</td>
+      <td>null 체크</td></tr>
+  <tr class="row-static" data-cat="static"><td><span class="idiom-cat static">Objects</span></td>
+      <td class="lhs">Objects.equals(a, b)</td><td class="rhs">(a == b)</td>
+      <td>안전한 같음 비교</td></tr>
+
+  <tr class="row-static" data-cat="static"><td><span class="idiom-cat static">Optional</span></td>
+      <td class="lhs">Optional.of(x)</td><td class="rhs">x</td>
+      <td>박싱 제거</td></tr>
+  <tr class="row-static" data-cat="static"><td><span class="idiom-cat static">Optional</span></td>
+      <td class="lhs">Optional.empty()</td><td class="rhs">None</td>
+      <td>빈 Optional → None</td></tr>
+</tbody>
+</table>
+<p class="footnote">★ 그 외 12+ idiom 더 있음 (lastIndexOf / endsWith / isBlank / Set.add/discard / Math.floor·ceil·round / Boolean.parseBoolean 등).
+전체 표는 <code>api-reference/W75-idiom-rewriter.md</code> 참조.</p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<section id="progress">
+<h2>7 · 예시 ④ — <span class="em">slab-design-real-v2 메서드별 진전 게이지</span></h2>
+<p class="lead">
+<code>slab-design-real-v2</code> 의 38 actions 중 W71 이 fixture 를 자동 합성할 수
+있는 11 메서드에 대해, <strong>sim_v2 작업 전 (W73 시점, UC38)</strong> 과
+<strong>작업 후 (W74-W75 적용 후, UC40)</strong> 의 변화. 게이지가 길수록 PASS 가
+많아요. 같은 데이터 + 같은 11 메서드에 대한 측정으로, sim_v2 의 발전이 어떤
+영향을 미쳤는지 직접 비교 가능.
+</p>
+
+<h3>📅 sim_v2 작업 <strong>전</strong> — UC38 (2026-05-15 시점)</h3>
+<div style="background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px;">
+  <div class="progress-row">
+    <div class="label">action.scm.fail</div>
+    <div class="progress-bar"><div class="fill fail" style="width: 100%"></div></div>
+    <div class="right">0 / 12</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.batch_design</div>
+    <div class="progress-bar"><div class="fill fail" style="width: 100%"></div></div>
+    <div class="right">0 / 12</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.batch_design__driver</div>
+    <div class="progress-bar"><div class="fill fail" style="width: 100%"></div></div>
+    <div class="right">0 / 12</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.record_step</div>
+    <div class="progress-bar"><div class="fill fail" style="width: 100%"></div></div>
+    <div class="right">0 / 12</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.record_algorithm_failure</div>
+    <div class="progress-bar"><div class="fill fail" style="width: 100%"></div></div>
+    <div class="right">0 / 12</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.find_group</div>
+    <div class="progress-bar"><div class="fill fail" style="width: 100%"></div></div>
+    <div class="right">0 / 12</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.find_spec</div>
+    <div class="progress-bar"><div class="fill fail" style="width: 100%"></div></div>
+    <div class="right">0 / 12</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.product.lookup_or_default</div>
+    <div class="progress-bar"><div class="fill fail" style="width: 100%"></div></div>
+    <div class="right">0 / 12</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.product.cumulative_productivity</div>
+    <div class="progress-bar"><div class="fill fail" style="width: 100%"></div></div>
+    <div class="right">0 / 12</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.order.extract_designable_orders</div>
+    <div class="progress-bar"><div class="fill fail" style="width: 100%"></div></div>
+    <div class="right">0 / 12</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.product.classify_by_product_code</div>
+    <div class="progress-bar"><div class="fill fail" style="width: 100%"></div></div>
+    <div class="right">0 / 6</div></div>
+  <p style="margin: 12px 0 0; color: var(--muted); font-size: 13px;">
+    <strong>합계: 0 / 126 fixture PASS · 0 / 11 actions PASS</strong>
+    — 모든 메서드가 NameError (<code>SlabDesignHistEntity</code>,
+    <code>groupRepository</code> 등 sandbox 의존성 누락) 또는 compile fail.
+  </p>
+</div>
+
+<h3 style="margin-top: 32px;">📅 sim_v2 작업 <strong>후</strong> — UC40 (2026-05-16 현재) <span class="badge ok">★ 현재</span></h3>
+<div style="background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px;">
+  <div class="progress-row">
+    <div class="label">action.scm.fail</div>
+    <div class="progress-bar"><div class="fill pass" style="width: 100%"></div></div>
+    <div class="right">12 / 12 ✓</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.batch_design</div>
+    <div class="progress-bar"><div class="fill fail" style="width: 100%"></div></div>
+    <div class="right">0 / 12</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.batch_design__driver</div>
+    <div class="progress-bar"><div class="fill fail" style="width: 100%"></div></div>
+    <div class="right">0 / 12</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.record_step</div>
+    <div class="progress-bar"><div class="fill pass" style="width: 100%"></div></div>
+    <div class="right">12 / 12 ✓</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.record_algorithm_failure</div>
+    <div class="progress-bar"><div class="fill pass" style="width: 100%"></div></div>
+    <div class="right">12 / 12 ✓</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.find_group</div>
+    <div class="progress-bar"><div class="fill pass" style="width: 100%"></div></div>
+    <div class="right">12 / 12 ✓</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.find_spec</div>
+    <div class="progress-bar"><div class="fill pass" style="width: 100%"></div></div>
+    <div class="right">12 / 12 ✓</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.product.lookup_or_default</div>
+    <div class="progress-bar"><div class="fill fail" style="width: 100%"></div></div>
+    <div class="right">0 / 12</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.product.cumulative_productivity</div>
+    <div class="progress-bar"><div class="fill pass" style="width: 100%"></div></div>
+    <div class="right">12 / 12 ✓</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.order.extract_designable_orders</div>
+    <div class="progress-bar"><div class="fill fail" style="width: 100%"></div></div>
+    <div class="right">0 / 12</div></div>
+  <div class="progress-row">
+    <div class="label">action.scm.product.classify_by_product_code</div>
+    <div class="progress-bar"><div class="fill pass" style="width: 33%"></div><div class="fill fail" style="width: 67%"></div></div>
+    <div class="right">2 / 6</div></div>
+  <p style="margin: 12px 0 0; color: var(--muted); font-size: 13px;">
+    <strong>합계: 74 / 126 fixture PASS (58.7%) · 6 / 11 actions PASS (54.5%)</strong>
+    — 23 stubs 자동 derive, NameError 0건.<br>
+    남은 5개의 cause:
+    <span class="badge warn">SYNTAX 2</span> (translator 추가 case 필요)
+    <span class="badge warn">FAIL_RETURN_TYPE 3</span> (typed-return stub 으로 close 가능)
+  </p>
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<section id="start">
+<h2>8 · 엔진 고도화 — <span class="em">어디서 어떻게 통합하나</span></h2>
+<p class="lead">
+시뮬레이션 담당자가 만든 엔진의 각 구성 요소를 sim_v2 의 자산으로 진화시키는
+작업 카드. 본인 엔진의 *어느 부분* 을 *무엇으로* 교체/확장하는지가 명시되어
+있습니다. 카드를 클릭하면 해당 통합 가이드로 이동.
+</p>
+
+<div class="decision-grid">
+  <a class="decision-card" href="./usage-recipes/recipe-4-stub-injected-production.py">
+    <h4>★ <code>sandbox_agent.py</code> — 풀 파이프라인 교체 (최우선)</h4>
+    <p>본인 엔진의 sandbox 흐름을 <strong>W71 (fixture 합성) → W75 (idiom 자동변환,
+    transpile 시) → W74 (stub 자동 주입) → W72 (in-process exec)</strong> 4단계로
+    재구성. <code>slab-design-real-v2</code> 의 <code>cumulativeProductivity</code>
+    12/12 PASS 시연 완료 (recipe-4 실측).</p>
+    <span class="recipe-link">→ recipe-4 (즉시 실행 가능한 Python script)</span>
+  </a>
+
+  <a class="decision-card" href="./usage-recipes/recipe-1-replace-llm-test-synthesis.py">
+    <h4>본인 엔진의 LLM 합성 부분 → W71 deterministic 으로 교체</h4>
+    <p>본인 엔진의 normal/boundary/error 케이스 LLM 합성 부분을
+    <code>synthesize_fixtures_for_action()</code> 한 줄로 교체.
+    <code>slab-design-real-v2</code> 의 38 action 중 11 driveable 에 대해
+    151 fixtures 자동 생성.</p>
+    <span class="recipe-link">→ recipe-1</span>
+  </a>
+
+  <a class="decision-card" href="./usage-recipes/recipe-2-record-java-baseline.py">
+    <h4>본인 엔진의 결과 표 → W73 expected 컬럼 추가</h4>
+    <p>sandbox 결과의 "result" 옆에 <code>expected</code> 컬럼 신설.
+    <code>JavaBaselineMap</code> 으로 (action, args) → expected 매핑 부착.
+    W59 가 PASS/FAIL_OUTPUT 까지 surface.</p>
+    <span class="recipe-link">→ recipe-2</span>
+  </a>
+
+  <a class="decision-card" href="./usage-recipes/recipe-3-run-invariant-survey.py">
+    <h4>본인 chat 의 [LOW] fallback → W72 진단으로 강화</h4>
+    <p>chat 분기에서 자연어 → fqn 변환 실패 시 [LOW] fallback 자리에
+    W72 invariant 결과 (FAIL_RETURN_TYPE / FAIL_UNEXPECTED_THROW / ERROR)
+    을 surface 하도록 본인 chat agent 확장.</p>
+    <span class="recipe-link">→ recipe-3</span>
+  </a>
+
+  <a class="decision-card" href="./api-reference/W75-idiom-rewriter.md">
+    <h4>본인 <code>transpiler.py</code> → W75 idiom rewrite 통합</h4>
+    <p>본인 transpiler 의 <code>length()/charAt()</code> 변환 규칙을 그대로 두고도
+    W75 가 자동 적용. 또는 본인 transpiler 를 sim_v2 translator 의 subclass 로
+    재작성하면 50+ idiom 자동 + 71 handler 모두 획득.</p>
+    <span class="recipe-link">→ W75 API + transpiler-bridge §3</span>
+  </a>
+
+  <a class="decision-card" href="./api-reference/W74-sandbox-stubs.md">
+    <h4>본인 sandbox 의 <code>_safe_globals</code> → W74 stub 자동 주입</h4>
+    <p>본인 엔진의 anchor prelude 단발 처리 부분을
+    <code>build_stub_namespace()</code> 호출로 교체. anchor 상수 + AST 분석 +
+    entity stub 3 source 자동 통합. <code>slab-design-real-v2</code> 11 메서드
+    중 6 메서드에서 NameError 0건.</p>
+    <span class="recipe-link">→ W74 API reference</span>
+  </a>
+
+  <a class="decision-card" href="./api-reference/W59-behavior-twin-runner.md">
+    <h4>본인 sandbox subprocess → W59 in-process exec 으로 교체</h4>
+    <p>fork 비용 없는 in-process safe exec. 1 fixture 당 ~1ms (subprocess
+    ~50ms 의 1/50). 12 fixture 가 한 번에. 단, sandbox 격리 강도는 subprocess
+    대비 낮음 — 신뢰된 transpile 결과 한정.</p>
+    <span class="recipe-link">→ W59 API reference</span>
+  </a>
+
+  <a class="decision-card" href="./transpiler-bridge.md">
+    <h4>본인 <code>transpiler.py</code> 코드 라인 70% 감소</h4>
+    <p>sim_v2 <code>JavaToPythonTranslator</code> 의 71 handler (lambda, try-with-resources,
+    inner class, instanceof, cast, class literal) 모두 상속. 본인 transpiler 는
+    프로젝트 특수 케이스만 override.</p>
+    <span class="recipe-link">→ transpiler-bridge §3 옵션 B</span>
+  </a>
+
+  <a class="decision-card" href="./usage-recipes/recipe-5-korean-term-search.py">
+    <h4>★ 본인 <code>bridge_agent.py</code> 의 한국어 검색 → W77 baseline + W78 hybrid tier</h4>
+    <p>ontology 에 <em>이미 등록된</em> alias 데이터 (예: <code>["엣징그룹코드",
+    "edgingGroupCd"]</code>) 를 <strong>완전히 활용</strong>하는 검색 layer.
+    <code>slab-design-real-v2</code> 의 43 term 에 대해 UC41 실측 9/10 hit (90%).
+    W78 hybrid tier 로 오타 ("edgign") · 비표준 음역 ("에징") 까지 추가 close.
+    <code>KoreanTermResolver.resolve(query, use_fuzzy=True, llm_assist=본인_llm)</code>
+    한 줄 통합. Section 3 §2.4 실패 직접 close + 잔여 한계 close.</p>
+    <span class="recipe-link">→ recipe-5 + W77/W78 API reference</span>
+  </a>
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<section id="next">
+<h2>9 · 다음 단계 + 자료 위치</h2>
+
+<div class="quote">
+  <strong>한 줄 결론:</strong> 시뮬레이션 담당자의 <strong>핵심 작업은 자기 엔진을 sim_v2
+  자산으로 진화시키는 것</strong>. 5 sprint 동안 sandbox / transpile / chat / korean-search
+  의 각 부분을 <code>import</code> 또는 subclass 로 교체. <code>slab-design-real-v2</code>
+  의 11 driveable 메서드 중 6 개 즉시 behavioral PASS + 한국어 검색 9/10 hit
+  (모두 sim_v2 자산만으로).
+</div>
+
+<h3>본인 엔진 진화 — 권장 작업 순서 (가성비 순)</h3>
+<ol>
+  <li><strong>단계 1 (1 sprint)</strong> ★ — 본인 <code>sandbox_agent.py</code> 를
+      recipe-4 의 W71→W75→W74→W72 full pipeline 으로 재구성. <code>slab-design-real-v2</code>
+      의 <code>cumulativeProductivity</code> 12/12 PASS 시연 즉시 가능.</li>
+  <li><strong>단계 2 (1 sprint)</strong> — 본인 <code>bridge_agent.py</code> 에 recipe-5 의
+      W77 KoreanTermResolver 통합. "엣징", "실수율" 등 한국어 keyword → 영문
+      alias term 까지 cross-match.</li>
+  <li><strong>단계 3 (1 sprint)</strong> — 본인 sandbox 결과 표에 <code>expected</code>
+      컬럼 추가. recipe-2 의 <code>JavaBaselineMap</code> 으로 (action, args) → expected
+      매핑 부착.</li>
+  <li><strong>단계 4 (1 sprint)</strong> — 본인 chat agent 의 [LOW] fallback 자리에
+      recipe-3 의 W72 invariant 진단 surface 하도록 확장.</li>
+  <li><strong>단계 5 (1 sprint, optional)</strong> — 본인 <code>transpiler.py</code> 를 sim_v2
+      <code>JavaToPythonTranslator</code> subclass 로 재작성 (transpiler-bridge §3 옵션 B). 코드 라인
+      ~70% 감소 + 71 handler 자동 획득.</li>
+</ol>
+
+<p class="footnote" style="margin-top: 12px;">
+  ★ 4 sprint 모두 본인 엔진의 외부 인터페이스 (현재 panel/SSE 출력) 는 그대로
+  유지. <strong>내부 구현만 sim_v2 자산으로 교체.</strong>
+</p>
+
+<h3>이 패키지의 모든 자료</h3>
+<table>
+  <tr><th>위치</th><th>내용</th></tr>
+  <tr><td><code>README.md</code></td><td>navigation hub + 막힌 곳별 안내</td></tr>
+  <tr><td><code>landing.html</code></td><td>요약형 시각 보고서 (클로드용)</td></tr>
+  <tr><td><strong><code>for-humans.html</code></strong></td><td><strong>이 페이지</strong> (사람 이해용)</td></tr>
+  <tr><td><code>gap-analysis.md</code></td><td>Section 3 의 8 한계 → sim_v2 1:1 매핑</td></tr>
+  <tr><td><code>transpiler-bridge.md</code></td><td>transpiler 규칙별 매핑</td></tr>
+  <tr><td><code>api-reference/W59 ~ W77</code></td><td>각 자산의 한국어 API 가이드 (7 모듈)</td></tr>
+  <tr><td><code>usage-recipes/recipe-1 ~ 5</code></td><td>즉시 실행 가능한 Python recipe</td></tr>
+  <tr><td><code>screenshots/</code></td><td>simulation-viewer 7 탭 캡처</td></tr>
+</table>
+
+<p style="margin-top: 30px; color: var(--muted); font-size: 13px; text-align: center;">
+질문 / 막힌 부분 — README §2 "막힌 곳별 안내" 표에서 거의 다 cover 됩니다.<br>
+그래도 안 풀리면 recipe-4 부터 한 번 돌려보세요. 그게 가장 강한 시연.
+</p>
+</section>
+
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<script>
+// Demo tabs
+document.querySelectorAll(".demo-btn").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll(".demo-btn").forEach(x => x.classList.remove("active"));
+    document.querySelectorAll(".demo-pane").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    document.getElementById(b.dataset.demo).classList.add("active");
+  });
+});
+
+// Idiom filter
+document.querySelectorAll(".idiom-btn").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll(".idiom-btn").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    const cat = b.dataset.cat;
+    document.querySelectorAll("#idiomTable tbody tr").forEach(tr => {
+      if (cat === "all" || tr.dataset.cat === cat) {
+        tr.style.display = "";
+      } else {
+        tr.style.display = "none";
+      }
+    });
+  });
+});
+</script>
+
+</body>
+</html>

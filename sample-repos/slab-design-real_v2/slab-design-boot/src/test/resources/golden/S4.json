@@ -1,0 +1,16 @@
+{
+  "slabResults" : [ ],
+  "errorCode" : null,
+  "errorMessage" : null,
+  "trace" : [ {
+    "step" : 0,
+    "stepName" : "VALIDATION_FAILED",
+    "phase" : "PHASE_1",
+    "iteration" : 1,
+    "input" : { },
+    "output" : null,
+    "status" : "SKIP",
+    "errorCode" : null,
+    "errorMessage" : "DG004 — 설계대기량 상한 < 포장단중 하한 — 설계 가능한 양이 최소 포장 단위 미만"
+  } ]
+}
