@@ -1,6 +1,0 @@
-com\example\slabdesign\facade\exception\GlobalExceptionHandler.class
-com\example\slabdesign\facade\sd\rest\history\SdHistoryController.class
-com\example\slabdesign\facade\sd\rest\working\SdWorkingController.class
-com\example\slabdesign\facade\sd\event\SdEventListener.class
-com\example\slabdesign\facade\sd\rest\analysis\SdAnalysisController.class
-com\example\slabdesign\facade\sd\rest\std\SdStdController.class

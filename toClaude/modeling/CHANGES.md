@@ -2525,7 +2525,7 @@ bulk-add → 매핑 → 매뉴얼 작성 → 갭 큐 → 역탐색 까지 full c
 - [x] **Phase 1 연동 기능 완성**
   - Scenario A 딥링크: `done` 이벤트 + `suggested_width` → "이 주문을 Slab 설계 3D로 확인" 버튼
   - Scenario C 딥링크: `done` 이벤트 + `recommended_split_count` → "최적 분할수 N개를 3D로 확인" 버튼
-  - Scenario B 딥링크: 영향받은 슬랩 Slab 설계 3D 연결 버튼
+  - Scenario B 딥링크: 영향받은 Slab Slab 설계 3D 연결 버튼
   - 온톨로지 그래프 Order 노드 클릭 → 시뮬레이터 자동 이동 + 파라미터 로딩
   - 주문 선택 드롭다운 (`GET /api/simulation/slab/orders` → SlabParamController 상단)
 

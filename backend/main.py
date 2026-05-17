@@ -53,9 +53,10 @@ from backend.application.skill.skill_loader import UserSkillLoader
 from backend.application.skill.skill_matcher import SkillMatcher
 from backend.infrastructure.events.event_bus import event_bus
 # 2026-05-01 clean slate: backend.modeling (Section 2) 만 본 process 가 책임.
-# Section 3 (simulation) 은 plug-in 방식 — 다음 개발자가 별 PR 로 추가.
+# Section 3 (simulation) 은 plug-in 방식 — 별 PR 로 추가.
 # 인계 명세는 toClaude/modeling/handoff-spec/ 6 파일 (00 README + 01~05) 참조.
 # C2~C5 완료 (2026-05-02): Code/Domain/Mapping Layer + Query API.
+# Section 3 통합 (2026-05-10): simulation router 8종 등록 (sandbox/jobs/runs/bridge/transpile/auto_pr/differential).
 from backend.api import authoring as authoring_api
 from backend.modeling.api import ontology_router as ontology_query_api
 from backend.modeling.api import graph_api as ontology_graph_api
@@ -65,6 +66,14 @@ from backend.modeling.api import queue_actions_api
 from backend.modeling.api import recommend_api
 from backend.modeling.api import repo_import as repo_import_api
 from backend.modeling.persistence.database import bootstrap_database
+# 2026-05-12 (Phase 1): Section 3 agent 의 단일 진입점. POST /api/modeling/ontology/query
+# (intent: impact_analysis / simulate / explain) + GET /graph/stats + /term/search.
+from backend.modeling.ontology.api.ontology_router import router as modeling_ontology_query_router
+# 2026-05-12 (Phase 2): Section 3 4 agent (bridge chat / sandbox / code-impact / data-impact).
+# 모든 agent 는 위 /api/modeling/ontology/* 만 호출 (Neo4j 직접 의존 0건).
+from backend.section3.api.router import router as section3_router
+# Section 3 (simulation) — 2026-05-12 zero 재개편. 옛 simulation router 모두 삭제.
+# 새 구현은 backend/section3/ 에 들어갈 예정 (Phase 2~).
 
 setup_logging(
     level=settings.log_level,
@@ -282,6 +291,8 @@ async def lifespan(app: FastAPI):
     authoring_api.init(business_term_store=DomainLayerStore())
     logger.info("Authoring AI wired: 8 capabilities + session + cost log")
 
+    # Section 3 (Simulation) — Agent 3종 (agents_router) + SlabViewer3D 보존 라우터.
+    # 별도 init() 불필요 — OntologyClient는 in-process 모드로 Section 2를 직접 호출.
 
     # Register skills (before agents — agents may use them)
     register_all_skills()
@@ -454,6 +465,12 @@ app.include_router(perspective_api.router)
 app.include_router(queue_actions_api.router)
 # Authoring AI (2026-05-05 — B.5 prototype)
 app.include_router(authoring_api.router)
+# Section 3 (simulation) — 2026-05-12 zero 재개편. 옛 simulation router 모두 삭제.
+# 새 router 는 Phase 2 에서 backend/section3/ 신설 후 등록.
+# Phase 1 (2026-05-12): modeling 의 ontology query router 등록 — Section 3 agent 의 단일 진입점.
+app.include_router(modeling_ontology_query_router)
+# Phase 2 (2026-05-12): Section 3 4 agent — /api/section3/* (chat / sandbox / code-impact / data-impact).
+app.include_router(section3_router)
 
 
 # Global exception handler

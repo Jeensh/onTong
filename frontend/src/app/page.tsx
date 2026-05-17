@@ -16,7 +16,10 @@ import { useWorkspaceStore } from "@/lib/workspace/useWorkspaceStore";
 import { SectionNav } from "@/components/sections/SectionNav";
 import { ModelingSection } from "@/components/sections/ModelingSection";
 import { useUrlSync } from "@/components/sections/modeling/useUrlSync";
+import { Section3Section } from "@/components/section3/Section3Section";
 // 2026-05-02 C6 Phase 1: Modeling Workbench React 구현 시작.
+// 2026-05-12: Section 3 zero 재개편 — 4 agent (bridge chat / sandbox / code-impact / data-impact)
+// modeling API 응답 baseline. backend/section3/ + components/section3/ 신설.
 import { FolderTree, Sparkles, PanelRightClose, FileText, MessageSquare } from "lucide-react";
 
 function readBool(key: string, fallback: boolean): boolean {
@@ -31,6 +34,20 @@ export default function Home() {
 
   const toggle = useSearchStore((s) => s.toggle);
   const activeSection = useWorkspaceStore((s) => s.activeSection);
+  const setActiveSection = useWorkspaceStore((s) => s.setActiveSection);
+
+  // Deep-link: ?section=simulation&view=... → 시뮬레이션 섹션 강제 활성화
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const sec = params.get("section");
+    if (sec === "simulation" || sec === "modeling" || sec === "wiki") {
+      setActiveSection(sec);
+    } else if (params.get("view")) {
+      // view= 만 있고 section 미지정이면 simulation 으로 추정
+      setActiveSection("simulation");
+    }
+  }, [setActiveSection]);
 
   const treePanelRef = useRef<ImperativePanelHandle>(null);
   const aiPanelRef = useRef<ImperativePanelHandle>(null);
@@ -285,6 +302,7 @@ export default function Home() {
         ))}
 
         {activeSection === "modeling" && <ModelingSection />}
+        {activeSection === "simulation" && <Section3Section />}
       </div>
 
       {/* Floating popout AI window */}

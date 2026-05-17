@@ -234,7 +234,7 @@ class DeprecatedDocHook:
 
 --- Phase 3: 인프라 강화 (규모 확대 후) ---
 9.  세션 JSONL 영속성                             ← 장기 운영
-10. 스킬 권한 매핑                                ← 거버넌스
+10. 스킬 권한 매핑                                ← 운영
 11. PreSkill/PostSkill 훅 시스템                   ← 스킬 15개+ 시
 
 --- Phase 4: Q&A ReAct 루프 (만족도 결정적 도약) ---
