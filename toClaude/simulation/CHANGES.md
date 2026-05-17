@@ -2,6 +2,96 @@
 
 Ad-hoc change log. `[x]` = done, `[ ]` = deferred/pending.
 
+## 2026-05-16 (★ Sprint 2~5 — Section 4 인계 recipe-2/3/4/5 + 옵션 B 통합)
+
+Section 4 인계 패키지의 Sprint 2~5 통합 (Sprint 1 직후 연속 진행).
+
+### Sprint 2 — recipe-2 Java baseline 부착
+- [x] `sim_v2_bridge.run_fixtures_with_baseline()` — W73 attach_baselines + BehaviorTwinRunner
+- [x] `sim_v2_bridge.load_baseline_map(method_fqn)` — `data/baselines/{safe_fqn}.json` file-based
+- [x] `sandbox_agent._run_via_simv2` 가 baseline 파일 존재 시 자동 oracle 경로 사용
+- [x] case_result 새 필드 — `expected_value`, `actual_value`, `output_match`, `diff_summary`
+- [x] frontend `EventStreamView` — input/expected/actual 3-컬럼 grid + diff_summary 경고
+- [x] `data/baselines/README.md` 신설 (파일명 규칙 + JSON shape 문서화)
+- [x] 알려진 한계: W74 MagicMock stub 이 `BehaviorTwinRunner` 와 mismatch (UC40 FAIL_RETURN_TYPE). typed-return stub sim_v2 후속 작업이 close 예정.
+
+### Sprint 3 — recipe-3 invariant 진단 → chat fallback surface
+- [x] `sim_v2_bridge.quick_diagnose_action()` — W71→W74→W72 quick diagnose (passing/fixtures/stubs/primary_failure)
+- [x] `bridge_agent._emit_simv2_suggestions()` — `simulate` intent 의 missing target 시 호출
+- [x] 새 스트림 이벤트 `simv2_suggestions` — query / count / suggestions[]
+- [x] frontend `EventStreamView` — suggestion 카드 (label/fqn/score/diagnostic) UI
+
+### Sprint 4 — recipe-5 W77+W78 한국어 검색 → bridge 통합
+- [x] `sim_v2_bridge.find_action_candidates(user_query, repo_id, top_n)` —
+  - W77 KoreanTermResolver (한↔영 + fuzzy)
+  - `actions.declared_on_term` IN 매칭 term FQN
+  - actions LIKE 보완 (label/aliases/fqn token)
+- [x] bridge_agent 의 `simulate` 분기에서 `_emit_simv2_suggestions(user_query)` 자동 호출
+- [x] end-to-end 실측: "주문 검증" → 3 후보 (`정합성_검증`/`slab design`/`final_length_range_실행`) + invariant 진단 동봉
+
+### Sprint 5 (opt) — transpiler 옵션 B (sim_v2 subclass 화)
+- [x] `backend/section3/section3_translator.py` 신설 — sim_v2 `JavaToPythonTranslator` 의 동적 subclass
+  - `__new__` 가 sim_v2 base 와 dynamically 합성한 `Section3TranslatorImpl` 반환
+  - sim_v2 가 없으면 None 반환 (graceful)
+  - `_IDIOM_REWRITES` extension point (현재 비어 있음 — sim_v2 W75 가 50+ idiom 자동 처리)
+  - `_translate_method_invocation` override: section3 idiom 먼저 시도 → fallback super()
+- [x] `sim_v2_bridge.translate_java_to_python` 가 Section3Translator 사용
+- [x] `backend/section3/transpiler.py` (이전 자체 transpiler) 는 legacy composer 경로 호환 위해 잔존 (사용 빈도 0 — ontology.db 비어 있음)
+
+### 검증
+- [x] `tests/simulation/test_sim_v2_bridge.py` — 13 test (Sprint 1: 6 + Sprint 2: 3 + Sprint 3/4: 3 = +7)
+- [x] end-to-end cumulativeProductivity → 12/12 PASS · 3 stubs · invariant only
+- [x] end-to-end bridge `_emit_simv2_suggestions("주문 검증")` → 3 후보 + 진단 surface
+- [x] 백엔드 재기동 후 /health 200, frontend / 200
+
+### 데모 6종 (Quickstart Step 4)
+| Demo | 결과 |
+|---|---|
+| UC41 한국어 검색 | 9/10 hit (90%) |
+| UC42 hybrid tier | T1 3/3 · T2 3/4 · T3 1/2 · T4 1/1 |
+| UC40 stub-injected | 6/11 PASS (54.5%) |
+| UC37 fixture coverage | 11/38 driveable |
+| UC38 invariant survey | 0/11 baseline-free (expected) |
+| UC36 v2 capstone | FULLY CLEAN — 30 MERGED proposal |
+| bonus recipe-5 | typo + 비표준 음역 close |
+
+## 2026-05-16 (★ Sprint 1 — Section 4 인계 recipe-4 통합)
+
+Section 4 인계 패키지 (`toClaude/modeling/section4-verification/section3_handoff/`) 의 sim_v2 자산 W71→W75→W74→W72 full pipeline 을 sandbox_agent.py 에 통합.
+
+- [x] **`backend/section3/sim_v2_bridge.py` 신설** — sim_v2 자산 thin wrapper
+  - `open_sim_v2_session()` — `data/slab-v2-handoff.db` read-only Session (없으면 None, 폴백 friendly)
+  - `load_action()` — sim_v2 `ProductionAction` lookup (description 파싱으로 code_method_fqn 획득)
+  - `load_body_text()` — `code_methods.body_text` 조회
+  - `translate_java_to_python()` — sim_v2 `JavaToPythonTranslator` 래퍼 (W75 idiom 자동 적용)
+  - `synthesize_fixtures()` — W71 `synthesize_fixtures_for_action`
+  - `build_stubs()` — W74 `build_stub_namespace` (anchor + AST + entity)
+  - `run_fixtures_in_process()` / `run_in_process()` — W72 `TwinInvariantRunner.check()` 래퍼. section3 case_result shape + `invariant_status` 필드 추가
+
+- [x] **`backend/section3/agents/sandbox_agent.py` 통합**
+  - `run()` 진입 직후 `_is_action_fqn(req.target_id)` 감지 → sim_v2 직통 시도
+  - 신규 메서드 `_run_via_simv2()` — recipe-4 등가 흐름 (body → translate → fixtures → stubs → invariant)
+  - 새 스트림 이벤트: `simv2_fixtures` (count/synthesizable/skipped), `simv2_stubs` (count/sample)
+  - sim_v2 session 미사용 가능 / action 미존재 시 기존 composer+subprocess 경로로 폴백
+  - 백엔드 회귀 0건 — 기존 step/method/class 경로는 그대로
+
+- [x] **`tests/simulation/test_sim_v2_bridge.py` 신설** — 6 test
+  - bridge import / session open / build_stubs (cumulativeProductivity) / run_in_process 기본·stub·실패 분류
+  - 6/6 통과
+
+- [x] **end-to-end 실측 검증**
+  - `action.scm.product.cumulative_productivity` → **12/12 fixture PASS · 3 stubs auto-derived** (`DEFAULT_PRODUCTIVITY`, `lookupOrDefault`, `SdConstants`)
+  - 백엔드 재기동 후 `/health` HTTP 200 확인
+
+- [x] **새 contract 필드 (sandbox_result 내부)**
+  - `cases[i].invariant_status` ∈ `{PASS, FAIL_NONDETERMINISTIC, FAIL_UNEXPECTED_THROW, FAIL_RETURN_TYPE, ERROR}`
+  - `stub_summary: {count, sample[]}`
+  - `via: "sim_v2"` — 새 경로 식별자
+
+- [x] **회귀**: sim_v2 1790 passed (기존 상태 유지, 93 failed/6 errors 는 Sprint 1 무관 — schema migration/data fixture 부재)
+
+배경: `data/ontology.db` 가 비어 있어 기존 HTTP `/api/ontology/*` 경로는 데이터 부재로 동작 불가. Section 4 가 제공한 `data/slab-v2-handoff.db` (3.4MB · 38 actions · slab-design-real-v2) 가 유일한 실측 가능 데이터 소스.
+
 ## 2026-05-10 (★ STEP 3f-2 — 랜딩 페이지 재개편 + 모든 패널에 ontology evidence UI)
 
 사용자 피드백: "section3.html 눈에 안 들어오고 내용 빠짐. ontology 근거 어디서 보냐 — 모든 시뮬 기능에 적용 근거 보여야"

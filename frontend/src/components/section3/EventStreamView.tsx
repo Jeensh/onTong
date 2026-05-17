@@ -19,6 +19,10 @@ const EVENT_META: Record<string, { label: string; tone: string; icon: React.Reac
   code_gen: { label: "코드 합성", tone: "border-emerald-300 bg-emerald-50 text-emerald-700", icon: <Code2 size={14} /> },
   sandbox_run: { label: "샌드박스 실행", tone: "border-emerald-300 bg-emerald-50 text-emerald-700", icon: <Play size={14} /> },
   sandbox_result: { label: "실행 결과", tone: "border-emerald-300 bg-emerald-50 text-emerald-700", icon: <CheckCircle2 size={14} /> },
+  simv2_fixtures: { label: "W71 fixtures", tone: "border-indigo-300 bg-indigo-50 text-indigo-700", icon: <Layers size={14} /> },
+  simv2_stubs: { label: "W74 stubs", tone: "border-indigo-300 bg-indigo-50 text-indigo-700", icon: <Layers size={14} /> },
+  simv2_baseline: { label: "Java baseline", tone: "border-indigo-300 bg-indigo-50 text-indigo-700", icon: <Layers size={14} /> },
+  simv2_suggestions: { label: "sim_v2 후보", tone: "border-violet-300 bg-violet-50 text-violet-700", icon: <HelpCircle size={14} /> },
   final: { label: "최종 결과", tone: "border-primary bg-primary/5 text-primary", icon: <CheckCircle2 size={14} /> },
   error: { label: "오류", tone: "border-red-300 bg-red-50 text-red-700", icon: <AlertCircle size={14} /> },
   need_more_info: { label: "추가 정보 필요", tone: "border-amber-400 bg-amber-100 text-amber-800", icon: <HelpCircle size={14} /> },
@@ -72,6 +76,10 @@ function summarize(ev: StreamEvent): string {
     case "code_gen": return `${ev.payload.source?.split("\n").length ?? 0} 줄 Python 합성`;
     case "sandbox_run": return ev.payload.message;
     case "sandbox_result": return `${Array.isArray(ev.payload.result) ? ev.payload.result.length : 0} 케이스`;
+    case "simv2_fixtures": return `${ev.payload.count}개 (W71 합성, primitive ${ev.payload.synthesizable}/skip ${ev.payload.skipped})`;
+    case "simv2_stubs": return `${ev.payload.count}개 stub (anchor + AST + entity)`;
+    case "simv2_baseline": return `Java baseline ${ev.payload.entries}건 부착`;
+    case "simv2_suggestions": return `${ev.payload.count}개 후보`;
     case "final": return ev.payload.summary;
     case "error": return ev.payload.message;
     case "need_more_info": return ev.payload.missing_info?.reason ?? "추가 정보 필요";
@@ -114,23 +122,72 @@ function EventBody({ event }: { event: StreamEvent }) {
           <code>{event.payload.source}</code>
         </pre>
       );
+    case "simv2_suggestions":
+      return (
+        <div className="space-y-2">
+          <div className="text-[11px] text-muted-foreground">
+            자연어 query: <code>{event.payload.query}</code>
+          </div>
+          {(event.payload.suggestions ?? []).map((s: any, i: number) => (
+            <div key={i} className="rounded border bg-background p-2 text-[11px]">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold">{s.label}</span>
+                <span className="font-mono text-[10px] text-muted-foreground">{s.action_fqn}</span>
+                <span className="text-[10px] text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded">{s.matched_via}</span>
+                <span className="text-[10px] text-muted-foreground">score={s.score?.toFixed(1)}</span>
+              </div>
+              {s.code_method_fqn && (
+                <div className="mt-1 text-[10px] font-mono text-muted-foreground break-all">{s.code_method_fqn}</div>
+              )}
+              {s.diagnostic && (
+                <div className="mt-1 flex items-center gap-3 text-[10px]">
+                  <span className={s.diagnostic.passing > 0 ? "text-emerald-700" : "text-rose-700"}>
+                    invariant {s.diagnostic.passing}/{s.diagnostic.fixtures} PASS
+                  </span>
+                  <span className="text-muted-foreground">stubs {s.diagnostic.stubs}</span>
+                  {s.diagnostic.primary_failure && (
+                    <span className="text-amber-700">{s.diagnostic.primary_failure}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    case "simv2_fixtures":
+    case "simv2_stubs":
+    case "simv2_baseline":
+      return (
+        <pre className="text-[10px] font-mono whitespace-pre-wrap break-all">
+          {JSON.stringify(event.payload, null, 2)}
+        </pre>
+      );
     case "sandbox_result":
       return (
         <div className="space-y-2">
           {Array.isArray(event.payload.result) && event.payload.result.map((c: any, i: number) => (
             <div key={i} className="rounded border bg-background p-2">
-              <div className="flex items-center gap-2 text-[11px]">
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${c.case_type === 'normal' ? 'bg-emerald-100 text-emerald-700' : c.case_type === 'boundary' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{c.case_type}</span>
+              <div className="flex items-center gap-2 text-[11px] flex-wrap">
+                {c.case_type && (
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${c.case_type === 'normal' ? 'bg-emerald-100 text-emerald-700' : c.case_type === 'boundary' ? 'bg-amber-100 text-amber-700' : c.case_type === 'synthesized' ? 'bg-indigo-100 text-indigo-700' : 'bg-red-100 text-red-700'}`}>{c.case_type}</span>
+                )}
                 <span className="font-mono">{c.case_id}</span>
                 <span className={c.execution?.ok ? "text-emerald-600" : "text-red-600"}>{c.execution?.ok ? "✓ ok" : "✗ fail"}</span>
                 <span className="text-muted-foreground text-[10px]">{c.execution?.elapsed_sec}s</span>
-                {c.matched_expected === true && <span className="text-emerald-600 text-[10px]">expected 일치</span>}
-                {c.matched_expected === false && <span className="text-red-600 text-[10px]">expected 불일치</span>}
+                {c.invariant_status && (
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${c.invariant_status === 'PASS' ? 'bg-emerald-50 text-emerald-700' : c.invariant_status === 'UNVERIFIED' ? 'bg-slate-100 text-slate-600' : 'bg-rose-50 text-rose-700'}`}>{c.invariant_status}</span>
+                )}
+                {c.output_match === true && <span className="text-emerald-600 text-[10px]">expected 일치</span>}
+                {c.output_match === false && <span className="text-red-600 text-[10px]">expected 불일치</span>}
+                {c.matched_expected === true && c.output_match === undefined && <span className="text-emerald-600 text-[10px]">expected 일치</span>}
+                {c.matched_expected === false && c.output_match === undefined && <span className="text-red-600 text-[10px]">expected 불일치</span>}
               </div>
-              <div className="grid grid-cols-2 gap-1 mt-1 text-[10px]">
+              <div className="grid grid-cols-3 gap-1 mt-1 text-[10px]">
                 <div><b>input:</b> <code>{JSON.stringify(c.input)}</code></div>
-                <div><b>result:</b> <code>{JSON.stringify(c.execution?.result)}</code></div>
+                <div><b>expected:</b> <code>{c.expected_value === undefined || c.expected_value === null ? "—" : JSON.stringify(c.expected_value)}</code></div>
+                <div><b>actual:</b> <code>{c.actual_value !== undefined ? JSON.stringify(c.actual_value) : JSON.stringify(c.execution?.result)}</code></div>
               </div>
+              {c.diff_summary && <div className="mt-1 text-[9px] text-amber-700 break-all">⚠ {c.diff_summary}</div>}
               {c.execution?.stderr && <div className="mt-1 text-[9px] text-red-600 font-mono break-all">{c.execution.stderr}</div>}
             </div>
           ))}

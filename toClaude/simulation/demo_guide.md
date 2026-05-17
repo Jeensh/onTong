@@ -2,6 +2,51 @@
 
 ## 데모 시나리오
 
+### S-SPRINT1. sim_v2 직통 — cumulativeProductivity 12/12 PASS (2026-05-16)
+
+전제: 백엔드 8001 기동, `data/slab-v2-handoff.db` 존재 (3.4MB).
+
+**A. bridge 단위 검증 (pytest)**
+```bash
+venv/bin/python -m pytest tests/simulation/test_sim_v2_bridge.py -v
+# 기대: 6 passed
+```
+
+**B. agent end-to-end (Python REPL)**
+```python
+import asyncio
+from backend.section3.agents.sandbox_agent import SandboxAgent
+from backend.section3.contracts import SandboxRequest
+
+class _NoModeling:
+    async def query(self, *a, **kw):
+        return {"status": "error", "result": {"message": "no modeling"}}
+
+agent = SandboxAgent.__new__(SandboxAgent)
+agent.modeling = _NoModeling()
+agent.name = "sandbox"
+
+req = SandboxRequest(
+    target_kind="method",  # contract literal 제약 — target_id 가 action FQN 이면 sim_v2 경로
+    target_id="action.scm.product.cumulative_productivity",
+)
+
+async def main():
+    async for ev in agent.run(req):
+        print(ev.type, str(getattr(ev, "payload", ""))[:120])
+
+asyncio.run(main())
+```
+**기대 출력**:
+- `[simv2_fixtures] count=12, synthesizable=6, skipped=0`
+- `[simv2_stubs] count=3, sample=['DEFAULT_PRODUCTIVITY', 'lookupOrDefault', 'SdConstants']`
+- `[final] ok=True, summary='sim_v2 직통 — 12 fixture · PASS 12 · stubs 3'`
+
+**Troubleshooting**:
+- `code_methods.body_text 누락` → DB 가 v2 인지 확인 (`venv/bin/python -c "import sqlite3; print(sqlite3.connect('data/slab-v2-handoff.db').execute('SELECT COUNT(*) FROM code_methods').fetchone())"` → 0이 아니어야)
+- `sim_v2 translator 실패` → tree-sitter-java 미설치 가능 (`pip install tree-sitter tree-sitter-java`)
+- `W71 fixture 합성 실패` → action 의 params_json 이 모두 object_ref 인 경우 (현재 cumulativeProductivity 는 6 primitive 라 정상)
+
 ### S1. Ontology Graph 로드 확인
 ```bash
 curl -sS http://localhost:8001/api/simulation/slab/ontology | head -c 300

@@ -19,7 +19,13 @@ from typing import Any, AsyncIterator
 from backend.section3.agents.base import BaseAgent
 from backend.section3.agents.code_impact_agent import CodeImpactAgent
 from backend.section3.agents.data_impact_agent import DataImpactAgent
-from backend.section3.agents.sandbox_agent import SandboxAgent
+from backend.section3.agents.sandbox_agent import SIM_V2_REPO_ID, SandboxAgent
+from backend.section3.sim_v2_bridge import (
+    find_action_candidates,
+    load_action,
+    open_sim_v2_session,
+    quick_diagnose_action,
+)
 from backend.section3.contracts import (
     AgentFinalResult,
     ChatMessage,
@@ -74,15 +80,20 @@ class BridgeAgent(BaseAgent):
 
         if ic.modeling_intent == "simulate":
             if not target_id or kind not in ("step", "method", "class"):
-                # parameter 부족 — modeling missing_info 형식으로 사용자에게 되묻기
-                yield self.need_more_info({
-                    "reason": "어떤 step 을 시뮬할지 명시 필요 (Step 번호 또는 method 이름)",
-                    "questions": [{
-                        "field": "target",
-                        "question": "어느 step / method 를 시뮬할까요?",
-                        "input_type": "text",
-                    }],
-                })
+                # Sprint 3+4 — sim_v2 후보 검색 + invariant 진단을 먼저 surface
+                emitted_simv2 = False
+                async for ev in self._emit_simv2_suggestions(req.message):
+                    yield ev
+                    emitted_simv2 = True
+                if not emitted_simv2:
+                    yield self.need_more_info({
+                        "reason": "어떤 step 을 시뮬할지 명시 필요 (Step 번호 또는 method 이름)",
+                        "questions": [{
+                            "field": "target",
+                            "question": "어느 step / method 를 시뮬할까요?",
+                            "input_type": "text",
+                        }],
+                    })
                 return
             sb_req = SandboxRequest(
                 target_kind=kind if kind in ("step", "method", "class") else "step",
@@ -121,6 +132,78 @@ class BridgeAgent(BaseAgent):
             return
 
         yield self.error(f"지원하지 않는 intent: {ic.modeling_intent}")
+
+    async def _emit_simv2_suggestions(self, user_query: str) -> AsyncIterator[StreamEvent]:
+        """Sprint 3 + 4 — chat [LOW] fallback 자리에 sim_v2 후보 + invariant 진단 surface.
+
+        흐름:
+        1. W77+W78 KoreanTermResolver 로 user_query 매칭 term/action 찾기
+        2. actions LIKE 보완 — label/aliases token 매칭
+        3. 각 후보에 대해 W71→W74→W72 quick diagnose
+        4. 결과를 `simv2_suggestions` 이벤트로 emit
+
+        호출자가 generator 의 yield 발생 여부로 빈 결과를 감지 가능.
+        """
+        session = open_sim_v2_session()
+        if session is None:
+            return
+
+        try:
+            try:
+                candidates = find_action_candidates(
+                    session, user_query, SIM_V2_REPO_ID, top_n=3,
+                )
+            except Exception as e:
+                logger.warning("find_action_candidates 실패: %s", e)
+                candidates = []
+
+            if not candidates:
+                return
+
+            yield self.thinking(
+                f"sim_v2 후보 검색 → {len(candidates)}건. invariant 진단 진행…"
+            )
+
+            suggestions: list[dict[str, Any]] = []
+            for cand in candidates:
+                action = load_action(session, cand["fqn"], SIM_V2_REPO_ID)
+                diag = quick_diagnose_action(session, action) if action else {
+                    "ok": False, "fixtures": 0, "stubs": 0, "passing": 0,
+                    "primary_failure": "action 로드 실패",
+                }
+                suggestions.append({
+                    "action_fqn": cand["fqn"],
+                    "label": cand["label"],
+                    "code_method_fqn": cand.get("code_method_fqn"),
+                    "matched_via": cand.get("matched_via"),
+                    "score": cand["score"],
+                    "diagnostic": diag,
+                })
+
+            yield self.event(
+                "simv2_suggestions",
+                query=user_query,
+                count=len(suggestions),
+                suggestions=suggestions,
+            )
+
+            top_lines = [
+                f"{s['label']} ({s['action_fqn']}) — {s['diagnostic']['passing']}/{s['diagnostic']['fixtures']} PASS"
+                for s in suggestions
+            ]
+            yield self.final(AgentFinalResult(
+                ok=True,
+                summary="자연어 query 의 가능 후보 — invariant 진단 동봉. 원하는 action 을 명시해 주세요:\n  - " + "\n  - ".join(top_lines),
+                sandbox_result={
+                    "via": "sim_v2_suggestions",
+                    "suggestions": suggestions,
+                },
+            ).model_dump())
+        finally:
+            try:
+                session.close()
+            except Exception:
+                pass
 
     async def _handle_explain(self, message: str) -> AsyncIterator[StreamEvent]:
         """explain intent — modeling.query 직접 호출 + (필요시) legacy search 로 source_locations 보강.

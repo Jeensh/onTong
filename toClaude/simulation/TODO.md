@@ -2,6 +2,53 @@
 
 Single Source of Truth for task status. Use `[x]` (done) / `[ ]` (pending).
 
+## Section 4 인계 통합 (2026-05-16~ )
+
+Section 4 (sim_v2) → Section 3 인계 패키지 통합. 5 sprint 계획. 출처: `toClaude/modeling/section4-verification/section3_handoff/README.md` §8.5.
+
+### Sprint 1 — recipe-4 full pipeline (★ 완료, 2026-05-16)
+
+- [x] 환경 검증 (venv / slab-v2-handoff.db / sim_v2 demos / recipes / API ref)
+- [x] 인계 문서 정독 (README §8, gap-analysis, recipe-4, recipe-5, W74 API)
+- [x] 데모 sanity check — UC41 한국어 검색 9/10 hit (90%)
+- [x] 통합 plan 사용자 승인 (Strategy B: in-process W72 교체)
+- [x] `tests/simulation/test_sim_v2_bridge.py` 작성 (Smart TDD, 6 test)
+- [x] `backend/section3/sim_v2_bridge.py` 신설 (8 public 심볼)
+- [x] `backend/section3/agents/sandbox_agent.py` 통합 (`_run_via_simv2` + `_is_action_fqn` 분기)
+- [x] end-to-end 검증: `action.scm.product.cumulative_productivity` 12/12 PASS · 3 stubs
+- [x] 백엔드 재기동 + /health 200 확인
+- [x] 문서 동기화 (CHANGES / TODO / demo_guide / HANDOFF / memory)
+
+### Sprint 2 — recipe-2 baseline 부착 (★ 완료, 2026-05-16)
+
+- [x] `sim_v2_bridge.run_fixtures_with_baseline()` — BehaviorTwinRunner + attach_baselines
+- [x] `sim_v2_bridge.load_baseline_map(method_fqn)` — file-based `data/baselines/{safe}.json`
+- [x] sandbox_agent 가 baseline 파일 존재 시 자동 oracle 경로 사용
+- [x] case_result 새 필드 — expected_value / actual_value / output_match / diff_summary
+- [x] frontend EventStreamView — input/expected/actual 3-컬럼
+- [x] `data/baselines/README.md` — 파일명 규칙 + JSON shape 문서
+- [ ] (후속) W74 typed-return stub 도입으로 BehaviorTwinRunner ERROR 케이스 close (sim_v2 측 작업)
+
+### Sprint 3 — recipe-3 invariant 진단 → chat fallback (★ 완료, 2026-05-16)
+
+- [x] `sim_v2_bridge.quick_diagnose_action()` — W71→W74→W72 quick diagnose
+- [x] `bridge_agent._emit_simv2_suggestions()` — simulate intent missing target 시 호출
+- [x] `simv2_suggestions` 이벤트 + frontend 카드 UI
+- [ ] (확장) impact_analysis 의 [LOW] result 분기에도 동일 surface
+
+### Sprint 4 — recipe-5 W77+W78 한국어 검색 (★ 완료, 2026-05-16)
+
+- [x] `sim_v2_bridge.find_action_candidates()` — W77+W78 + actions LIKE 보완
+- [x] bridge_agent 자연어 query 에 자동 적용 (simulate fallback 진입점)
+- [ ] (확장) LLM assist callback 으로 비표준 음역 close (현재는 fuzzy 만)
+
+### Sprint 5 (opt) — transpiler 옵션 B (★ 완료, 2026-05-16)
+
+- [x] `backend/section3/section3_translator.py` 신설 — sim_v2 동적 subclass
+- [x] `_IDIOM_REWRITES` extension point 마련 (현재 비어 있음 — W75 가 50+ idiom 자동)
+- [x] `sim_v2_bridge.translate_java_to_python` 가 새 translator 사용
+- [ ] (후속) `backend/section3/transpiler.py` 의 legacy custom transpiler 제거 (현재 미사용, ontology.db 비어 있음)
+
 ## STEP 3 — Section 3 boilerplate (06-developer-onboarding.md)
 
 ### 3.0 폴더 신설 — 기존 simulation 코드 (sandbox/agents/jvm_bridge) 와 병존

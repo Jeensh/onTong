@@ -4,32 +4,44 @@
 쓰기 영역: `toClaude/simulation/`, `backend/simulation/`, `backend/shared/contracts/{ontology,simulation}.py`
 읽기 전용: `toClaude/wiki/`, `toClaude/modeling/`, `toClaude/_shared/`, `backend/modeling/api/{ontology_query, ontology_router}` (DTO + facade 만)
 
-## 현재 상태 (2026-05-10)
+## 현재 상태 (2026-05-16)
 
-**브랜치**: `section3-integration` — origin/main + simulation 7 commit + STEP 3a 진행 중
+**브랜치**: `section3-integration` — origin/main 머지 완료 (commit `0e72d8a`) + Sprint 1 통합 진행 후
 
-**완료**:
-- jyu 브랜치 push 완료 (오늘 작업 모두 origin/jyu)
-- main 기준 새 브랜치 `section3-integration` 생성 + simulation 6 commit cherry-pick
-- `sample-repos/` main 100% 정렬 (slab-design 폴더 제거 + scm-demo 복원, commit `2a346e3`)
-- 인계 검증 9/9 통과 (06 onboarding STEP 2)
-- **STEP 3a 완료** (2026-05-10)
-  - `backend/shared/contracts/simulation.py` 신설 — ChangeSpec / SimResult / BREvidence / AnchorEvidence / DelegationTraceFrame 등 7 Pydantic 모델 (spec 04 §1~§2 1:1)
-  - `tests/simulation/test_changespec_schema.py` 19/19 ✅
-  - 회귀: 195 passed, 17 skipped (3 failure 는 `sample-repos/slab-design/` 부재 영향, STEP 3a 무관)
+**최근 완료 (Section 4 인계 Sprint 1~5, 2026-05-16)**:
 
-**기존 작업 (jyu 시점)**:
-- 백엔드 simulation 패키지 (sandbox / agents / transpile / jvm_bridge) — 이미 동작 중
-- 프론트엔드 27 패널 + 9 lib API — 오늘 변경 모두 살아있음
-- 랜딩 페이지 (section3.html 2094줄) + slab-design 콘솔 (slab-design.html 952줄)
+| Sprint | 작업 | 상태 |
+|---|---|---|
+| 1 | recipe-4 full pipeline (W71→W75→W74→W72) | ✅ 12/12 cumulativeProductivity PASS |
+| 2 | recipe-2 Java baseline + sandbox 표 expected 컬럼 | ✅ file-based load_baseline_map + BehaviorTwinRunner 경로 |
+| 3 | recipe-3 invariant 진단 → chat fallback surface | ✅ quick_diagnose_action + simv2_suggestions 이벤트 |
+| 4 | recipe-5 W77+W78 한국어 검색 → bridge | ✅ find_action_candidates (term + LIKE) |
+| 5 (opt) | transpiler 옵션 B (sim_v2 subclass) | ✅ Section3Translator 동적 subclass |
+
+- 신설 파일: `backend/section3/sim_v2_bridge.py` (16 public 심볼) · `backend/section3/section3_translator.py` · `tests/simulation/test_sim_v2_bridge.py` (13 test) · `data/baselines/README.md`
+- 수정 파일: `backend/section3/agents/{sandbox,bridge}_agent.py` · `frontend/src/components/section3/EventStreamView.tsx`
+- 데모 6종 sanity check 완료 (UC36/37/38/40/41/42 + bonus recipe-5)
+- 백엔드 재기동 후 /health 200, 프론트 3000 동작
+
+**이전 완료 (2026-05-10)**:
+- main 머지 / sample-repos main 100% 정렬 / 인계 검증 9/9
+- STEP 3a-f 종결 (ChangeSpec/SimResult/Runner/Orchestrator/RunHandle/spec_router/ontology evidence)
+- 백엔드 simulation 패키지 (sandbox / agents / transpile / jvm_bridge) + 프론트 27 패널 + 9 lib API
 
 ## 다음 세션 첫 작업
 
-**STEP 3b 후보** (사용자 승인 후 결정):
+Section 4 인계 Sprint 1~5 모두 완료. 다음 후보:
 
-1. `backend/simulation/runner/` 폴더 신설 + 4 파일 (lookup_source / python_generator / java_sandbox / orchestrator)
-2. `backend/simulation/api/run_handle.py` + `spec_router.py` (POST /runs / GET /runs/{id}/sim-result)
-3. STEP 4.1 첫 시나리오 — `action.scm.std.match_customer_limit_for_order` ChangeSpec 작성
+1. **W74 typed-return stub** — `BehaviorTwinRunner` 의 FAIL_RETURN_TYPE 케이스 (UC40 의 5건 中 3건) close. sim_v2 측 작업이라 협업 필요.
+2. **impact_analysis [LOW] fallback** — bridge_agent 의 `impact_analysis` 분기도 `_emit_simv2_suggestions` surface (현재는 simulate 만)
+3. **legacy transpiler.py 정리** — ontology.db 비어 있어 미사용. 안전 제거 + composer 경로 deprecate
+4. **`data/ontology.db` 시드 작업** — modeling 측에 v2 데이터 import 요청 (현재 ontology.db 0 actions)
+5. **frontend SandboxPanel** — chat 이외 sandbox 직접 진입점에서 sim_v2 후보 검색 surface (현재는 BridgeChatPanel 만)
+
+데이터 사실:
+- `data/ontology.db` (316KB) — 비어 있음 (0 actions)
+- `data/slab-v2-handoff.db` (3.4MB) — slab-design-real-v2 38 actions · 유일한 실측 데이터 소스
+- legacy `/api/ontology/*` HTTP 는 빈 DB 를 가리키므로 sim_v2 직통이 사실상 primary 경로
 
 ## 환경 설정 메모
 

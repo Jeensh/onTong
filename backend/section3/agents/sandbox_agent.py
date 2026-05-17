@@ -19,16 +19,30 @@ import logging
 from typing import Any, AsyncIterator
 
 from backend.section3.agents.base import BaseAgent
-from backend.section3.composer import OntologyComposer
+from backend.section3.composer import OntologyComposer, _is_action_fqn
 from backend.section3.contracts import (
     AgentFinalResult,
     SandboxRequest,
     StreamEvent,
 )
 from backend.section3.sandbox.runner import run_python_multi
+from backend.section3.sim_v2_bridge import (
+    build_stubs,
+    load_action,
+    load_baseline_map,
+    load_body_text,
+    open_sim_v2_session,
+    run_fixtures_in_process,
+    run_fixtures_with_baseline,
+    synthesize_fixtures,
+    translate_java_to_python,
+)
 from backend.section3.transpiler import JavaToPythonTranspiler
 
 logger = logging.getLogger(__name__)
+
+# v2 통합 경로 활성화 repo — Section 4 인계 패키지가 다룬 production DB.
+SIM_V2_REPO_ID = "slab-design-real-v2"
 
 
 class SandboxAgent(BaseAgent):
@@ -38,6 +52,32 @@ class SandboxAgent(BaseAgent):
         yield self.thinking(
             f"샌드박스 — {req.target_kind}={req.target_id!r}, case_types={req.case_types}"
         )
+
+        # ─── 0. sim_v2 인계 패키지 직통 (recipe-4) — action 우선 ──────────
+        # data/slab-v2-handoff.db 에서 action 을 직접 찾으면 W71→W74→W72
+        # full pipeline 으로 in-process 실행. 실패 시 기존 legacy 경로로 폴백.
+        # 활성화 조건: target_id 가 action.* FQN 패턴 (contract 의 target_kind 가
+        # "action" 을 직접 허용하지 않으므로 target_id 패턴으로 감지).
+        if _is_action_fqn(req.target_id):
+            sim_session = open_sim_v2_session()
+            if sim_session is not None:
+                routed = False
+                try:
+                    action = load_action(sim_session, req.target_id, SIM_V2_REPO_ID)
+                    if action is not None and action.code_method_fqn:
+                        routed = True
+                        async for ev in self._run_via_simv2(req, sim_session, action):
+                            yield ev
+                except Exception as e:
+                    logger.warning("sim_v2 직통 경로 실패 → legacy 폴백: %s", e)
+                    routed = False
+                finally:
+                    try:
+                        sim_session.close()
+                    except Exception:
+                        pass
+                if routed:
+                    return
 
         # ─── 1. composer (legacy 실시간) — step 만 modeling fallback ────────
         if req.target_kind == "step":
@@ -148,6 +188,150 @@ class SandboxAgent(BaseAgent):
             generated_python=wrapped,
             sandbox_result={"cases": case_results, "ok_count": ok_count, "matched_count": matched_count},
             visualization=result.get("ontology_trace"),
+        ).model_dump())
+
+    # ─── sim_v2 인계 패키지 직통 (recipe-4 등가) ───────────────────────
+
+    async def _run_via_simv2(
+        self,
+        req: SandboxRequest,
+        session,
+        action,
+    ) -> AsyncIterator[StreamEvent]:
+        """recipe-4 full pipeline: W71 fixture → W75 translate → W74 stub → W72 invariant.
+
+        Section 4 인계 패키지 (data/slab-v2-handoff.db) 의 action 에 대해
+        in-process 안전 실행으로 PASS/FAIL_* 결과를 surface.
+        """
+        yield self.thinking(
+            f"sim_v2 직통 — action {action.fqn} → code {action.code_method_fqn}"
+        )
+
+        # 1. Java body 로드
+        body_text = load_body_text(session, action.code_method_fqn, action.repo_id)
+        if not body_text:
+            yield self.error(
+                f"sim_v2 code_methods.body_text 누락: {action.code_method_fqn}"
+            )
+            return
+
+        # 2. sim_v2 translator (W75 idiom 자동 적용)
+        yield self.thinking("Java body → sim_v2 translator (W75 idiom rewrite)")
+        translated = translate_java_to_python(body_text)
+        if translated is None:
+            yield self.error("sim_v2 translator 실패")
+            return
+        python_source, function_name = translated
+        yield self.code_gen(python_source)
+
+        # 3. W71 fixture 합성
+        yield self.thinking("W71 fixture 합성")
+        report = synthesize_fixtures(
+            session, action,
+            function_name=function_name,
+            python_source=python_source,
+        )
+        if report is None or not report.fixtures:
+            yield self.error("W71 fixture 합성 실패 (params object_ref-only 가능)")
+            return
+        yield self.event(
+            "simv2_fixtures",
+            count=len(report.fixtures),
+            synthesizable=report.synthesizable_params,
+            skipped=report.skipped_params,
+        )
+
+        # 4. W74 stub_namespace 자동 derive
+        yield self.thinking("W74 stub_namespace derive (anchor + AST + entity)")
+        stubs = build_stubs(
+            session,
+            method_fqn=action.code_method_fqn,
+            repo_id=action.repo_id,
+            python_source=python_source,
+        )
+        yield self.event(
+            "simv2_stubs",
+            count=len(stubs),
+            sample=list(stubs.keys())[:6],
+        )
+
+        if not req.run_after_generate:
+            yield self.final(AgentFinalResult(
+                ok=True,
+                summary=(
+                    f"sim_v2 합성 완료 (실행 skip) — "
+                    f"{len(report.fixtures)} fixtures · {len(stubs)} stubs"
+                ),
+                generated_python=python_source,
+            ).model_dump())
+            return
+
+        # 5a. Sprint 2 — Java baseline 부착 시도 (file-based)
+        baseline_map = load_baseline_map(action.code_method_fqn)
+        use_oracle = bool(baseline_map)
+        if use_oracle:
+            yield self.event(
+                "simv2_baseline",
+                source="file",
+                method_fqn=action.code_method_fqn,
+                entries=len(baseline_map),
+            )
+
+        # 5b. 실행 — baseline 있으면 BehaviorTwinRunner (oracle), 없으면 W72 invariant
+        if use_oracle:
+            yield self.sandbox_run(
+                f"{len(report.fixtures)} fixture · BehaviorTwinRunner (Java baseline {len(baseline_map)}건)"
+            )
+            case_results = run_fixtures_with_baseline(
+                list(report.fixtures),
+                function_name=function_name,
+                baseline_map=baseline_map,
+                stub_namespace=stubs,
+            )
+        else:
+            yield self.sandbox_run(
+                f"{len(report.fixtures)} fixture · W72 invariant (baseline 없음)"
+            )
+            case_results = run_fixtures_in_process(
+                list(report.fixtures),
+                stub_namespace=stubs,
+                declared_return="Any",
+            )
+        yield self.sandbox_result(case_results)
+
+        passing = sum(
+            1 for r in case_results if r.get("invariant_status") == "PASS"
+        )
+        matched = sum(
+            1 for r in case_results if r.get("matched_expected") is True
+        )
+        summary_oracle = (
+            f"oracle (Java baseline {len(baseline_map)}건) — matched {matched}"
+            if use_oracle else "invariant only"
+        )
+        summary = (
+            f"sim_v2 직통 — {len(case_results)} fixture · "
+            f"PASS {passing} · stubs {len(stubs)} · {summary_oracle}"
+        )
+        yield self.final(AgentFinalResult(
+            ok=passing > 0,
+            summary=summary,
+            generated_python=python_source,
+            sandbox_result={
+                "cases": case_results,
+                "ok_count": passing,
+                "matched_count": matched,
+                "stub_summary": {
+                    "count": len(stubs),
+                    "sample": list(stubs.keys())[:6],
+                },
+                "baseline_summary": {
+                    "enabled": use_oracle,
+                    "entries": len(baseline_map),
+                    "method_fqn": action.code_method_fqn,
+                },
+                "via": "sim_v2",
+            },
         ).model_dump())
 
     # ─── step kind — modeling fallback ──────────────────────────────────
