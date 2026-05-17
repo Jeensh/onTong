@@ -2,6 +2,61 @@
 
 Single Source of Truth for task status. Use `[x]` (done) / `[ ]` (pending).
 
+## Chat 멀티턴 재설계 (2026-05-17~ )
+
+브랜치: `section3/chat-agent-redesign` · spec: `CHAT_REDESIGN_SPEC.md` · 차용 원본: Section 2 `backend/application/authoring/`
+
+### Phase 0 — Spec + alignment (완료, 2026-05-17)
+- [x] 4 인계 문서 정독 (HTML report / MD report / bridge_agent.py / authoring/)
+- [x] `CHAT_REDESIGN_SPEC.md` 작성 (291 LOC, 12 섹션)
+- [x] Phase 0~4 rollout plan + 협업 요청 매트릭스
+- [x] commit `9cb354e` on `section3/chat-agent-redesign`
+- [ ] 사용자 spec 리뷰 + 4 default decision 확인
+
+### Phase 1 — 멀티턴 인프라 scaffold (대기)
+- [ ] `backend/section3/agents/multiturn/` 패키지 신설 (`__init__.py`, `agent.py`, `schemas.py`, `tools.py`, `persistence.py`)
+- [ ] `GatePayload` discriminated union (6 게이트: candidates/target/code/python/fixtures/sandbox) — `schemas.py`
+- [ ] `section3_decision_log` ORM (`backend/section3/orm.py` 신설 또는 기존 위치 협의)
+- [ ] alembic 마이그레이션 `migrations/versions/2026_05_18_006_section3_decision_log.py` (협업 요청 #3)
+- [ ] Pending action gate wiring — `backend/core/session.py:70-87` 그대로 재사용 (신규 코드 0)
+- [ ] Endpoint 4개 신설 (`backend/section3/api/multiturn.py`):
+  - `POST /api/section3/multiturn/start`
+  - `POST /api/section3/multiturn/respond/{session_id}`
+  - `POST /api/section3/multiturn/confirm/{gate_kind}/{action_id}`
+  - `GET  /api/section3/multiturn/session/{session_id}` (+ /stream)
+- [ ] Mock ontology tool wrapper 3개 (`tools.py`):
+  - `ontology.get_action_detail(id)` → sim_v2 `load_action(...)` 결과 변환
+  - `ontology.get_method_body(fqn)` → sim_v2 `load_body_text(...)`
+  - `ontology.get_entity_schema(name)` → sim_v2 fixture synth 의 schema 로직
+
+### Phase 2 — 게이트 단위 구현 (1 게이트씩, 대기)
+- [ ] Gate 1 (candidates) — sim_v2 find_action_candidates + LLM 후보 선별 + frontend `GateCandidatesCard.tsx`
+- [ ] Gate 2 (target) — 선택 검증 + action detail + `GateTargetCard.tsx`
+- [ ] Gate 3 (code) — Java 추출 + anchor highlight + `GateCodeCard.tsx`
+- [ ] Gate 4 (python) — sim_v2 W75 변환 + idiom diff + `GatePythonCard.tsx`
+- [ ] Gate 5 (fixtures) — entity schema → fixture table (수정 가능) + `GateFixturesCard.tsx`
+- [ ] Gate 6 (sandbox) — run + invariant 진단 + `GateSandboxCard.tsx`
+- [ ] `MultiturnChat.tsx` 컨테이너 + SSE 구독 + 카드 누적 렌더 + `useMultiturnSession.ts` (Zustand)
+
+### Phase 3 — 통합 + 검증 (대기)
+- [ ] End-to-end 시나리오 1: "주문 검증 액션이 뭐야" → 6 게이트 완주
+- [ ] End-to-end 시나리오 2: 세션 끊고 다음날 resume (replay)
+- [ ] End-to-end 시나리오 3: Gate 4 에서 Gate 3 으로 "다시" 분기
+- [ ] 데모 가이드 갱신 (`demo_guide.md`)
+- [ ] CHECKLIST.md 신규 시나리오 추가
+
+### Phase 4 — 옛 path deprecate (optional, 대기)
+- [ ] Frontend 토글 default 를 멀티턴으로
+- [ ] 옛 `bridge_agent.py` 의 `_handle_explain` / sandbox 분기 deprecate notice
+- [ ] retention 기간 후 옛 `POST /api/section3/chat` 제거
+
+### 협업 요청 (Section 2 owner, 대기)
+- [ ] **#1** `ontology.db` 시드 보충 — impact_analysis 게이트 활성화용 (Phase 2 후반)
+- [ ] **#2** OntologyClient 3 endpoint 신설 (Phase 1 mock 후 swap)
+- [ ] **#3** `section3_decision_log` 마이그레이션 — Section 3 가 alembic 파일 PR? 또는 Section 2 측 진행? (Phase 1 와 같이)
+
+---
+
 ## Section 4 인계 통합 (2026-05-16~ )
 
 Section 4 (sim_v2) → Section 3 인계 패키지 통합. 5 sprint 계획. 출처: `toClaude/modeling/section4-verification/section3_handoff/README.md` §8.5.

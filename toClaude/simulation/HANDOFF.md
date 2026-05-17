@@ -1,12 +1,60 @@
 # Section 3 — Simulation HANDOFF
 
 섹션 담당: 시뮬레이션 Claude 세션
-쓰기 영역: `toClaude/simulation/`, `backend/simulation/`, `backend/shared/contracts/{ontology,simulation}.py`
-읽기 전용: `toClaude/wiki/`, `toClaude/modeling/`, `toClaude/_shared/`, `backend/modeling/api/{ontology_query, ontology_router}` (DTO + facade 만)
+쓰기 영역: `toClaude/simulation/`, `backend/section3/`, `frontend/src/components/section3/`
+읽기 전용: `backend/sim_v2/`, `toClaude/modeling/`, `toClaude/wiki/`, `toClaude/_shared/`
+수정 금지: `backend/modeling/` (Section 2 영역) — 변경 필요하면 협업 요청
 
-## 현재 상태 (2026-05-16)
+---
 
-**브랜치**: `section3-integration` — origin/main 머지 완료 (commit `0e72d8a`) + Sprint 1 통합 진행 후
+## 🔴 다음 세션 첫 작업 (2026-05-17 갱신)
+
+**브랜치**: `section3/chat-agent-redesign` (origin/main 기준, 1 커밋 — 사용자 commit · push 안 됨)
+
+**진입 순서**:
+1. `toClaude/simulation/CHAT_REDESIGN_SPEC.md` 정독 — 6 게이트 멀티턴 agent 재설계 spec
+2. 사용자에게 spec 의 4 default decision 확인:
+   - 협업 요청 mock 우선 / 신규 multiturn 패키지 병행 / 멀티턴 바로 진입 / markdown spec
+3. (사용자 OK 시) **Phase 1 시작**:
+   - `backend/section3/agents/multiturn/` 패키지 scaffold
+   - `GatePayload` discriminator union schema 정의
+   - Pending action gate wiring (core/session.py 재사용)
+   - 4 endpoint 신설 (start / respond / confirm / session)
+   - Mock ontology tool wrapper 3개
+
+**병행 협업 요청 (Section 2 owner)**:
+- `section3_decision_log` 마이그레이션 (alembic) — Phase 1 와 같이
+- OntologyClient 3 endpoint (`/action/detail`, `/method/body`, `/entity/schema`) — Phase 2 진입 전
+- `ontology.db` 시드 보충 — impact_analysis 게이트 도입 시 필수
+
+세부 참조: `CHAT_REDESIGN_SPEC.md` §9 (협업 요청), §10 (Phased Rollout)
+
+---
+
+## 현재 상태 (2026-05-17) — Chat 멀티턴 재설계 진입
+
+**브랜치 신설**: `section3/chat-agent-redesign` (origin/main 기준, local-only)
+
+**Phase 0 완료** (commit `9cb354e`):
+- 4 인계 문서 정독 (HTML report / MD report / bridge_agent.py / authoring/)
+- `toClaude/simulation/CHAT_REDESIGN_SPEC.md` 작성 (291 LOC)
+  - 6 게이트 정의 + state machine + tool catalog
+  - DecisionKind 영속화 schema (`section3_decision_log`)
+  - Frontend 컴포넌트 map + endpoint surface
+  - 협업 요청 3 항목 + mock 전략
+  - Phase 0~4 rollout plan
+
+**4 default decision** (사용자 미확인):
+1. 협업 요청 → mock 으로 우선
+2. 옛 `bridge_agent.py` 보존 + 새 `multiturn/` 패키지 병행
+3. P0 quick win 스킵, 멀티턴 바로 진입
+4. spec 산출물 = markdown (HTML 아님)
+
+---
+
+## 현재 상태 (2026-05-16) — Sprint 1~5 완료
+
+**브랜치 (history)**: `section3-integration` — origin/main 머지 완료 (PR #4, commit `b8a5498`)
 
 **최근 완료 (Section 4 인계 Sprint 1~5, 2026-05-16)**:
 
@@ -28,15 +76,15 @@
 - STEP 3a-f 종결 (ChangeSpec/SimResult/Runner/Orchestrator/RunHandle/spec_router/ontology evidence)
 - 백엔드 simulation 패키지 (sandbox / agents / transpile / jvm_bridge) + 프론트 27 패널 + 9 lib API
 
-## 다음 세션 첫 작업
+## 다음 세션 후속 후보 (Phase 1 외)
 
-Section 4 인계 Sprint 1~5 모두 완료. 다음 후보:
+위 § "🔴 다음 세션 첫 작업" 의 Phase 1 진입이 primary. 그 외 backlog:
 
 1. **W74 typed-return stub** — `BehaviorTwinRunner` 의 FAIL_RETURN_TYPE 케이스 (UC40 의 5건 中 3건) close. sim_v2 측 작업이라 협업 필요.
-2. **impact_analysis [LOW] fallback** — bridge_agent 의 `impact_analysis` 분기도 `_emit_simv2_suggestions` surface (현재는 simulate 만)
-3. **legacy transpiler.py 정리** — ontology.db 비어 있어 미사용. 안전 제거 + composer 경로 deprecate
-4. **`data/ontology.db` 시드 작업** — modeling 측에 v2 데이터 import 요청 (현재 ontology.db 0 actions)
-5. **frontend SandboxPanel** — chat 이외 sandbox 직접 진입점에서 sim_v2 후보 검색 surface (현재는 BridgeChatPanel 만)
+2. **impact_analysis [LOW] fallback** — bridge_agent 의 `impact_analysis` 분기도 `_emit_simv2_suggestions` surface (멀티턴 재설계 시 자연스럽게 흡수)
+3. **legacy transpiler.py 정리** — ontology.db 비어 있어 미사용. 안전 제거 + composer 경로 deprecate (Phase 4)
+4. **`data/ontology.db` 시드 작업** — modeling 측에 v2 데이터 import 요청 (협업 요청)
+5. **frontend SandboxPanel** — chat 이외 sandbox 직접 진입점에서 sim_v2 후보 검색 surface
 
 데이터 사실:
 - `data/ontology.db` (316KB) — 비어 있음 (0 actions)

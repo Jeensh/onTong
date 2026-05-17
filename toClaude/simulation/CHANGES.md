@@ -2,6 +2,21 @@
 
 Ad-hoc change log. `[x]` = done, `[ ]` = deferred/pending.
 
+## 2026-05-17 (Chat 멀티턴 재설계 Phase 0)
+
+브랜치: `section3/chat-agent-redesign` (origin/main 기준).
+
+- [x] 4 인계 문서 정독 (HTML report § 1~10, MD report, `bridge_agent.py`, `backend/application/authoring/` 구조)
+- [x] `toClaude/simulation/CHAT_REDESIGN_SPEC.md` 작성 (291 LOC, 12 섹션)
+  - 6 게이트 정의 + state machine + tool catalog (per-gate allow-list)
+  - GatePayload discriminated union schema 설계
+  - `section3_decision_log` 테이블 schema + Phase 1~4 rollout
+  - Mock 전략 (협업 요청 미구현 항목 → sim_v2_bridge 동일 기능 wrapper)
+  - 차용 매핑 (Section 2 7 패턴 → Section 3 위치)
+- [x] commit `9cb354e` on `section3/chat-agent-redesign`
+- [ ] 사용자 spec 리뷰 + 4 default decision 확인 (다음 세션)
+- [ ] Phase 1 진입 (인프라 scaffold + 마이그레이션)
+
 ## 2026-05-16 (★ Sprint 2~5 — Section 4 인계 recipe-2/3/4/5 + 옵션 B 통합)
 
 Section 4 인계 패키지의 Sprint 2~5 통합 (Sprint 1 직후 연속 진행).
