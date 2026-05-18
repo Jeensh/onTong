@@ -650,6 +650,21 @@ class JavaParser:
                     attributes["receiver_type"] = self._resolve_type(
                         self._strip_generics(receiver_text), import_map, pkg_name,
                     )
+                # Gap 5: for `a.b().c()` capture inner call info so the
+                # importer's chain-resolution post-pass can fill receiver_type.
+                if receiver_kind == "chain":
+                    from backend.modeling.code_analysis.method_symbol_table import (
+                        extract_chain_inner,
+                    )
+                    inner_method, inner_recv = extract_chain_inner(
+                        obj_node, method_scope, class_field_scope, class_qname,
+                    )
+                    if inner_method:
+                        attributes["chain_inner_method"] = inner_method
+                    if inner_recv:
+                        attributes["chain_inner_receiver"] = self._resolve_type(
+                            self._strip_generics(inner_recv), import_map, pkg_name,
+                        )
 
                 relations.append(
                     CodeRelation(

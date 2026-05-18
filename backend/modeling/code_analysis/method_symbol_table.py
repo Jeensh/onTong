@@ -168,6 +168,9 @@ def resolve_receiver(
         return None, "field_access"
 
     if t == "method_invocation":
+        # `a.b().c()` — receiver of `c()` is `b()`. Surface the inner method's
+        # name and its receiver text so a post-pass can look up `b`'s return
+        # type and propagate it as `c`'s receiver_type.
         return None, "chain"
 
     if t == "object_creation_expression":
@@ -178,6 +181,34 @@ def resolve_receiver(
         return None, "constructor"
 
     return None, "unknown"
+
+
+def extract_chain_inner(
+    obj_node: Any,
+    method_scope: dict[str, str],
+    class_field_scope: dict[str, str],
+    class_qname: str,
+) -> tuple[str | None, str | None]:
+    """For `a.b().c()` returns (inner_method_name='b', inner_receiver_type='A').
+
+    Caller uses this to build a chain-resolution post-pass: look up
+    `(inner_receiver_type, inner_method_name) → return_type` and set that
+    as the outer call's receiver_type. Returns (None, None) when the inner
+    call shape isn't a simple method invocation we can resolve here.
+    """
+    if obj_node is None or obj_node.type != "method_invocation":
+        return None, None
+    inner_name_node = obj_node.child_by_field_name("name")
+    inner_obj_node = obj_node.child_by_field_name("object")
+    if inner_name_node is None:
+        return None, None
+    inner_method = inner_name_node.text.decode("utf-8", errors="ignore")
+    # Recursively resolve the inner receiver (may itself be chain — we still
+    # surface what we can; deeper chains stay unresolved for v1).
+    inner_recv, _ = resolve_receiver(
+        inner_obj_node, method_scope, class_field_scope, class_qname,
+    )
+    return inner_method, inner_recv
 
 
 def build_class_field_scope(class_body_node: Any) -> dict[str, str]:

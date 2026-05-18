@@ -219,20 +219,36 @@ def upsert_anchor_bindings(c, repo_id, items, *, dry_run=False):
     return n
 
 
-def upsert_call_sites(c, repo_id, items, *, dry_run=False):
-    """Natural key: (caller_method_fqn, callee_simple_name, line)."""
+def upsert_call_sites(c, repo_id, items, *, dry_run=False, hybrid=False):
+    """Natural key: (caller_method_fqn, callee_simple_name, line).
+
+    `hybrid=True` (Risk 2 fix): skip rows where the current DB already has a
+    high-confidence native classification (single_impl / annotation /
+    confidence >= 0.85). This preserves the parser-native resolution where
+    available and only applies the snapshot's manual cleanup label when the
+    importer couldn't resolve the call.
+    """
     n_match = 0
     n_miss = 0
+    n_skip_native = 0
     for it in items:
         cm = it["caller_method_fqn"]
         cn = it["callee_simple_name"]
         ln = it.get("line")
         row = c.execute("""
-            SELECT id FROM call_sites
+            SELECT id, analysis_source, confidence FROM call_sites
             WHERE caller_method_fqn=? AND callee_simple_name=? AND repo_id=?
               AND (line IS ? OR line=?)
         """, (cm, cn, repo_id, ln, ln)).fetchone()
         if row:
+            # Hybrid mode: keep native high-conf resolutions
+            if hybrid:
+                cur_src = row["analysis_source"] if hasattr(row, "__getitem__") else row[1]
+                cur_conf = row["confidence"] if hasattr(row, "__getitem__") else row[2]
+                if (cur_src in ("single_impl", "annotation")) and (cur_conf or 0) >= 0.85:
+                    n_skip_native += 1
+                    n_match += 1
+                    continue
             if not dry_run:
                 c.execute("""
                     UPDATE call_sites
@@ -248,7 +264,7 @@ def upsert_call_sites(c, repo_id, items, *, dry_run=False):
             n_match += 1
         else:
             n_miss += 1
-    return n_match, n_miss
+    return n_match, n_miss, n_skip_native
 
 
 def main():
@@ -256,6 +272,9 @@ def main():
     ap.add_argument("--db", default="data/ontology.db")
     ap.add_argument("--snapshot", required=True)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--hybrid", action="store_true",
+                    help="Preserve native high-conf call_site resolutions "
+                         "(single_impl/annotation, confidence >= 0.85)")
     args = ap.parse_args()
 
     with open(args.snapshot) as f:
@@ -273,7 +292,10 @@ def main():
         n_re = upsert_realizations(c, repo_id, snap["realizations"], dry_run=args.dry_run)
         n_tr = upsert_type_realizations(c, repo_id, snap["type_realizations"], dry_run=args.dry_run)
         n_ab = upsert_anchor_bindings(c, repo_id, snap["anchor_bindings"], dry_run=args.dry_run)
-        n_cs_match, n_cs_miss = upsert_call_sites(c, repo_id, snap["call_sites_user_confirmed"], dry_run=args.dry_run)
+        n_cs_match, n_cs_miss, n_cs_skip = upsert_call_sites(
+            c, repo_id, snap["call_sites_user_confirmed"],
+            dry_run=args.dry_run, hybrid=args.hybrid,
+        )
         if not args.dry_run:
             c.commit()
     finally:
@@ -286,7 +308,10 @@ def main():
     print(f"  realizations: {n_re}")
     print(f"  type_realizations: {n_tr}")
     print(f"  anchor_bindings: {n_ab}")
-    print(f"  call_sites: matched {n_cs_match}, missed {n_cs_miss}")
+    if args.hybrid:
+        print(f"  call_sites: matched {n_cs_match}, missed {n_cs_miss}, native_preserved {n_cs_skip}")
+    else:
+        print(f"  call_sites: matched {n_cs_match}, missed {n_cs_miss}")
 
 
 if __name__ == "__main__":

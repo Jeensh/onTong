@@ -116,10 +116,16 @@ class JavaToPythonTranslator:
         plugin_contract=None,
         type_resolver: TypeResolver | None = None,
         this_type: str | None = None,
+        class_field_scope: dict[str, str] | None = None,
     ) -> None:
         self.plugin_contract = plugin_contract
         self.type_resolver: TypeResolver = type_resolver or BigDecimalAwareResolver()
         self.this_type = this_type  # FQN of enclosing class (W21 — for `this.field` resolution)
+        # Java allows implicit-this field references (`field` instead of
+        # `this.field`). Python doesn't — bare identifier resolves to function
+        # scope. When caller supplies field names + types here, emit `self.X`
+        # for matching bare identifiers (Risk 1 fix — TraceCollector.traces case).
+        self.class_field_scope: dict[str, str] = dict(class_field_scope or {})
         self._collected_imports: set[str] = set()
         self._collected_notes: list[str] = []
         self._signature_locked = False
@@ -349,6 +355,14 @@ class JavaToPythonTranslator:
         raw = self._text(node)
         if raw in self._local_alias:
             return self._local_alias[raw]
+        # Java implicit-this field ref → Python `self.X`. Skip when name is
+        # already a local/param/loop var (those are bound in Python scope).
+        if (
+            raw in self.class_field_scope
+            and raw not in self._local_scope
+            and raw not in self._local_alias
+        ):
+            return f"self.{raw}"
         return self._safe_python_name(raw)
 
     def _translate_decimal_integer_literal(self, node, *, indent: int) -> str:

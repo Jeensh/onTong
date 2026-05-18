@@ -218,6 +218,9 @@ class RepoImporter:
         types = classify_roles(types)
 
         # 4. CallSite — 메서드 본체의 calls relation 에서 seed 추출
+        # Gap 5 chain resolution: for `a.b().c()` look up `b()`'s return type
+        # and propagate it as `c()`'s receiver_type (mutates relation attrs).
+        self._resolve_chain_receivers(results, types)
         seeds_raw = self._extract_call_seeds(results)
         # parser 의 caller_fqn (signature 없음) 을 저장된 method fqn (signature 포함) 으로 매핑
         # → CallSite.caller_method_fqn FK 가 code_methods.fqn 와 정합.
@@ -289,6 +292,65 @@ class RepoImporter:
                 picked = cands[0][0]
             out.append((picked, callee, recv, line))
         return out
+
+    @staticmethod
+    def _resolve_chain_receivers(parse_results, types) -> None:
+        """For `a.b().c()` propagate `b()`'s return type as `c()`'s receiver_type.
+
+        Walks all `calls` relations with `receiver_kind=chain` and looks up
+        `(chain_inner_receiver, chain_inner_method)` in a method_return_index
+        built from types.methods. Iterates twice to catch 2-level chains
+        (`a.b().c().d()` — first pass resolves `c`, second resolves `d`).
+        Mutates `r.attributes["receiver_type"]` in place when found.
+        """
+        # (class_fqn, simple_name) → return_type ; also (simple_class, simple_name) fallback
+        full_index: dict[tuple[str, str], str] = {}
+        simple_index: dict[tuple[str, str], list[str]] = {}
+        for t in types:
+            for m in t.methods:
+                ret = m.return_type or ""
+                if not ret:
+                    continue
+                base = m.fqn.split("(", 1)[0].split("@line", 1)[0]
+                # base = <class_fqn>.<method_name>
+                if "." not in base:
+                    continue
+                class_fqn, method_name = base.rsplit(".", 1)
+                full_index[(class_fqn, method_name)] = ret
+                simple_class = class_fqn.rsplit(".", 1)[-1]
+                simple_index.setdefault((simple_class, method_name), []).append(ret)
+
+        def _lookup(recv: str, method: str) -> str | None:
+            if not recv or not method:
+                return None
+            r = full_index.get((recv, method))
+            if r:
+                return r
+            simple = recv.rsplit(".", 1)[-1]
+            cands = simple_index.get((simple, method))
+            if cands and len(cands) == 1:
+                return cands[0]
+            return None
+
+        # Iterate twice to chain 2 levels.
+        for _ in range(2):
+            for pr in parse_results:
+                for r in pr.relations:
+                    if r.kind != "calls":
+                        continue
+                    attrs = r.attributes
+                    if not attrs or attrs.get("receiver_kind") != "chain":
+                        continue
+                    if attrs.get("receiver_type"):
+                        continue  # already resolved (e.g. by prior iter)
+                    inner_method = attrs.get("chain_inner_method")
+                    inner_recv = attrs.get("chain_inner_receiver")
+                    resolved = _lookup(str(inner_recv or ""), str(inner_method or ""))
+                    if resolved:
+                        # Mutate the attribute dict in place (CodeRelation is
+                        # frozen, but the attributes dict itself is mutable).
+                        attrs["receiver_type"] = resolved.split("<", 1)[0].strip()
+                        attrs["chain_resolved"] = True
 
     @staticmethod
     def _extract_call_seeds(
