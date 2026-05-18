@@ -19,6 +19,7 @@ Public API:
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from backend.sim_v2.core.synthesizer.bigdecimal_mapper import (
@@ -73,6 +74,9 @@ _EXPRESSION_TYPES = frozenset({
     "switch_expression",
 })
 
+_LEADING_CALL_TARGET = re.compile(r"\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+
+
 _STATEMENT_TYPES = frozenset({
     "return_statement",
     "local_variable_declaration",
@@ -84,6 +88,7 @@ _STATEMENT_TYPES = frozenset({
     "block",
     "throw_statement",
     "try_statement",
+    "try_with_resources_statement",
     "assert_statement",
     "break_statement",
     "continue_statement",
@@ -128,6 +133,11 @@ class JavaToPythonTranslator:
         # `_translate_block` immediately before the statement that registered them.
         self._pending_hoists: list[str] = []
         self._lambda_counter: int = 0
+        # When a local var `X x = x(...);` would shadow a Java helper of the
+        # same name (legal in Java, fatal in Python — local-name rule makes the
+        # RHS lookup target the unbound local), the LHS is renamed to `_x` and
+        # all subsequent identifier references are rewritten via this alias.
+        self._local_alias: dict[str, str] = {}
 
     # ─────────────────────────────────────────────────────────────────────
     # Top-level entry
@@ -148,6 +158,7 @@ class JavaToPythonTranslator:
         self._trace_counter = 0
         self._pending_hoists = []
         self._lambda_counter = 0
+        self._local_alias = {}
         source = self._dispatch(node, indent=indent)
         return TranslationResult(
             python_source=source,
@@ -335,7 +346,10 @@ class JavaToPythonTranslator:
         return type_text[:lt].strip()
 
     def _translate_identifier(self, node, *, indent: int) -> str:
-        return self._safe_python_name(self._text(node))
+        raw = self._text(node)
+        if raw in self._local_alias:
+            return self._local_alias[raw]
+        return self._safe_python_name(raw)
 
     def _translate_decimal_integer_literal(self, node, *, indent: int) -> str:
         return self._text(node).replace("_", "").rstrip("Ll")
@@ -690,6 +704,13 @@ class JavaToPythonTranslator:
                 ]
                 return "{" + ", ".join(pairs) + "}"
 
+        # Java 10+ `Collection.copyOf(x)` → immutable copy. Map to Python
+        # constructor form (`list(x)` / `set(x)` / `dict(x)`).
+        if method_name == "copyOf" and receiver_src in ("List", "Set", "Map"):
+            arg = arg_strs[0] if arg_strs else ""
+            ctor = {"List": "list", "Set": "set", "Map": "dict"}[receiver_src]
+            return f"{ctor}({arg})"
+
         # Type-aware BigDecimal dispatch — receiver type known to be BigDecimal.
         # W51 — also fire on *unambiguous* BD arithmetic method names (subtract /
         # multiply / divide / remainder) when receiver type is unknown. These
@@ -751,6 +772,12 @@ class JavaToPythonTranslator:
 
         W8: track `name → Type` in local_scope for downstream method dispatch.
         W16: when trace_active, append `_trace.step(...)` capturing newly bound var.
+
+        Java→Python shadow trap: `X x = x(...)` is legal Java (RHS resolves to a
+        helper named `x`), but Python pre-binds `x` as local so the RHS lookup
+        throws UnboundLocalError. When the RHS's first callable matches the LHS
+        name, rename LHS to `_<name>` and record an alias so later references
+        rewrite consistently.
         """
         type_node = node.child_by_field_name("type")
         declared_type = self._text(type_node) if type_node else None
@@ -762,13 +789,21 @@ class JavaToPythonTranslator:
                 name_node = child.child_by_field_name("name")
                 value_node = child.child_by_field_name("value")
                 name = self._text(name_node)
-                if declared_type:
-                    self._local_scope[name] = declared_type
-                declared_names.append(name)
                 if value_node:
                     value_src = self._dispatch(value_node, indent=0)
-                    var_lines.append(f"{self._pad(indent)}{name} = {value_src}")
+                    emit_name = name
+                    call_target = _LEADING_CALL_TARGET.match(value_src)
+                    if call_target and call_target.group(1) == name:
+                        emit_name = f"_{name}"
+                        self._local_alias[name] = emit_name
+                    if declared_type:
+                        self._local_scope[emit_name] = declared_type
+                    declared_names.append(emit_name)
+                    var_lines.append(f"{self._pad(indent)}{emit_name} = {value_src}")
                 else:
+                    if declared_type:
+                        self._local_scope[name] = declared_type
+                    declared_names.append(name)
                     var_lines.append(f"{self._pad(indent)}{name} = None  # Java default")
         emitted = "\n".join(var_lines)
         if declared_names:
@@ -1072,25 +1107,24 @@ class JavaToPythonTranslator:
     def _translate_instanceof_expression(self, node, *, indent: int) -> str:
         """Java `x instanceof T` → Python `isinstance(x, T)`.
 
-        Java 16+ pattern (`x instanceof T t`) — additional identifier child
-        becomes a separate assignment, which doesn't translate cleanly to a
-        single expression. We emit `isinstance(x, T)` and warn.
+        Java 16+ pattern (`x instanceof T t`) → walrus form:
+        `(isinstance(x, T) and (t := x))` — binds the pattern variable
+        inline so it's available in the enclosing if/elif body. Generic args
+        (`Map<?, ?> m`) are stripped before the isinstance lookup since
+        Python's isinstance can't accept parameterized generics.
         """
         children = node.named_children
         if len(children) < 2:
             self._signature_locked = True
             return "# UNMAPPED instanceof (insufficient children)"
         value_src = self._dispatch(children[0], indent=0)
-        type_text = self._text(children[1])
-        # Map Java std types to Python equivalents for isinstance
+        type_text = self._strip_generics(self._text(children[1]))
         py_type = _INSTANCEOF_TYPE_MAP.get(type_text, type_text)
-        result = f"isinstance({value_src}, {py_type})"
+        base = f"isinstance({value_src}, {py_type})"
         if len(children) >= 3:
-            # Pattern variable (Java 16+) — note ambiguity
-            self._collected_notes.append(
-                f"instanceof pattern var ({self._text(children[2])}) not bound — manual assign needed"
-            )
-        return result
+            pattern_var = self._text(children[2])
+            return f"({base} and ({pattern_var} := {value_src}))"
+        return base
 
     def _translate_assert_statement(self, node, *, indent: int) -> str:
         """Java `assert cond` or `assert cond : msg` → Python `assert cond [, msg]`."""
@@ -1374,7 +1408,12 @@ class JavaToPythonTranslator:
             for sub in r_node.named_children:
                 if sub.type == "identifier" and name is None:
                     name = self._text(sub)
-                elif sub.type not in {"type_identifier", "generic_type", "modifiers"}:
+                elif sub.type not in {
+                    "type_identifier",
+                    "scoped_type_identifier",
+                    "generic_type",
+                    "modifiers",
+                }:
                     init = sub
             if name is None or init is None:
                 self._signature_locked = True

@@ -251,14 +251,23 @@ class JavaParser:
         if body_node is None:
             return
 
+        # Pre-pass: build field name → declared type, so method bodies can
+        # resolve `this.X` and bare-name field references at call extraction.
+        from backend.modeling.code_analysis.method_symbol_table import (
+            build_class_field_scope,
+        )
+        class_field_scope = build_class_field_scope(body_node)
+
         for child in body_node.children:
             if child.type == "method_declaration":
                 self._extract_method(
-                    child, qname, fp, entities, relations, import_map, pkg_name
+                    child, qname, fp, entities, relations,
+                    import_map, pkg_name, class_field_scope,
                 )
             elif child.type == "constructor_declaration":
                 self._extract_constructor(
-                    child, qname, fp, entities, relations, import_map, pkg_name
+                    child, qname, fp, entities, relations,
+                    import_map, pkg_name, class_field_scope,
                 )
             elif child.type == "field_declaration":
                 self._extract_field(child, qname, fp, entities, relations)
@@ -281,6 +290,7 @@ class JavaParser:
         relations: list[CodeRelation],
         import_map: dict[str, str],
         pkg_name: str | None,
+        class_field_scope: dict[str, str] | None = None,
     ) -> None:
         name_node = node.child_by_field_name("name")
         if name_node is None:
@@ -416,7 +426,14 @@ class JavaParser:
         # Extract CALLS from method body
         body = node.child_by_field_name("body")
         if body:
-            self._extract_calls(body, qname, class_qname, fp, relations, import_map, pkg_name)
+            from backend.modeling.code_analysis.method_symbol_table import (
+                build_method_scope,
+            )
+            method_scope = build_method_scope(node)
+            self._extract_calls(
+                body, qname, class_qname, fp, relations,
+                import_map, pkg_name, method_scope, class_field_scope or {},
+            )
 
     def _extract_constructor(
         self,
@@ -427,6 +444,7 @@ class JavaParser:
         relations: list[CodeRelation],
         import_map: dict[str, str],
         pkg_name: str | None,
+        class_field_scope: dict[str, str] | None = None,
     ) -> None:
         name_node = node.child_by_field_name("name")
         if name_node is None:
@@ -461,7 +479,14 @@ class JavaParser:
         # Extract CALLS from constructor body
         body = node.child_by_field_name("body")
         if body:
-            self._extract_calls(body, qname, class_qname, fp, relations, import_map, pkg_name)
+            from backend.modeling.code_analysis.method_symbol_table import (
+                build_method_scope,
+            )
+            method_scope = build_method_scope(node)
+            self._extract_calls(
+                body, qname, class_qname, fp, relations,
+                import_map, pkg_name, method_scope, class_field_scope or {},
+            )
 
     def _extract_field(
         self,
@@ -580,8 +605,24 @@ class JavaParser:
         relations: list[CodeRelation],
         import_map: dict[str, str],
         pkg_name: str | None,
+        method_scope: dict[str, str] | None = None,
+        class_field_scope: dict[str, str] | None = None,
     ) -> None:
-        """Find method_invocation nodes inside a method/constructor body."""
+        """Find method_invocation nodes inside a method/constructor body.
+
+        Annotates each emitted `calls` relation with `attributes["receiver_type"]`
+        (FQN or simple name of the receiver's static type) and
+        `attributes["receiver_kind"]` (classification — see method_symbol_table
+        for the kind enum). Downstream `callsite_analyzer` consumes these to
+        dispatch between SINGLE_IMPL / ANNOTATION / EXTERNAL_LIBRARY routes
+        instead of falling through to STATIC_UNRESOLVED.
+        """
+        from backend.modeling.code_analysis.method_symbol_table import (
+            resolve_receiver,
+        )
+        method_scope = method_scope or {}
+        class_field_scope = class_field_scope or {}
+
         for node in self._walk(body):
             if node.type == "method_invocation":
                 name_node = node.child_by_field_name("name")
@@ -590,14 +631,25 @@ class JavaParser:
                     continue
                 call_name = name_node.text.decode()
 
+                # Target shape preserved for backward compat with call_resolver
+                # (which splits target on `.` to extract varname for field lookup).
                 if obj_node is None:
-                    # Unqualified call -> assume same class
                     target = f"{class_qname}.{call_name}"
                 else:
                     obj_text = obj_node.text.decode()
-                    # Try to resolve object to a fully qualified type
                     resolved = self._resolve_type(obj_text, import_map, pkg_name)
                     target = f"{resolved}.{call_name}"
+
+                # Additive enrichment: receiver_type for the analyzer.
+                receiver_text, receiver_kind = resolve_receiver(
+                    obj_node, method_scope, class_field_scope, class_qname,
+                )
+                attributes: dict[str, object] = {"receiver_kind": receiver_kind}
+                if receiver_text:
+                    attributes["receiver_text"] = receiver_text
+                    attributes["receiver_type"] = self._resolve_type(
+                        self._strip_generics(receiver_text), import_map, pkg_name,
+                    )
 
                 relations.append(
                     CodeRelation(
@@ -606,8 +658,19 @@ class JavaParser:
                         target=target,
                         file_path=fp,
                         line=node.start_point[0] + 1,
+                        attributes=attributes,
                     )
                 )
+
+    @staticmethod
+    def _strip_generics(type_text: str) -> str:
+        """Strip Java generic args — `List<Order>` → `List`, `Map<K,V>` → `Map`."""
+        if not type_text:
+            return type_text
+        lt = type_text.find("<")
+        if lt == -1:
+            return type_text
+        return type_text[:lt].strip()
 
     # -- Utility ------------------------------------------------------------
 
