@@ -118,10 +118,21 @@ def load_business_terms(session: Session, repo_id: str) -> list[BusinessTermView
 
 
 def load_actions(session: Session, repo_id: str) -> list[ActionView]:
+    # actions + realizations LEFT JOIN — description regex 가 fail 하면 realizations 의
+    # code_method_fqn 로 fallback. single_impl primary 우선 (kind ASC + MIN(fqn) 결정적).
     rows = session.execute(
         text(
-            "SELECT fqn, label, kind, declared_on_term, description, sub_actions_json "
-            "FROM actions WHERE repo_id = :rid"
+            "SELECT a.fqn, a.label, a.kind, a.declared_on_term, a.description, "
+            "       a.sub_actions_json, "
+            "       MIN(r.code_method_fqn) AS fallback_code_method "
+            "FROM actions a "
+            "LEFT JOIN realizations r "
+            "       ON r.action_fqn = a.fqn "
+            "      AND r.repo_id   = a.repo_id "
+            "      AND r.confirmed = 1 "
+            "WHERE a.repo_id = :rid "
+            "GROUP BY a.fqn, a.label, a.kind, a.declared_on_term, a.description, "
+            "         a.sub_actions_json"
         ),
         {"rid": repo_id},
     ).fetchall()
@@ -136,13 +147,15 @@ def load_actions(session: Session, repo_id: str) -> list[ActionView]:
                     sub_actions = tuple(s for s in parsed if isinstance(s, str))
             except json.JSONDecodeError:
                 pass
+        # description regex 우선 (backward compat) → realizations fallback
+        cmf = extract_method_fqn_from_description(description) or (row[6] or None)
         result.append(ActionView(
             fqn=row[0],
             label=row[1] or "",
             kind=row[2] or "",
             declared_on_term=row[3] or "",
             description=description,
-            code_method_fqn=extract_method_fqn_from_description(description),
+            code_method_fqn=cmf,
             sub_actions=sub_actions,
             repo_id=repo_id,
         ))
