@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Phase 15C — PM 회귀+가치 점검</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 920px; margin: 24px auto; padding: 16px; color: #1f2937; line-height: 1.55; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .meta { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
+  h2 { font-size: 15px; margin-top: 20px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; }
+  th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f9fafb; }
+  code { background: #f3f4f6; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+  .stars { color: #f59e0b; font-weight: 700; }
+  .ok { color: #166534; font-weight: 600; }
+  .warn { color: #92400e; font-weight: 600; }
+  .fail { color: #991b1b; font-weight: 600; }
+  .verdict { padding: 10px 14px; border-radius: 6px; font-weight: 600; background: #dcfce7; color: #166534; border-left: 4px solid #16a34a; }
+  .partial { background: #fef3c7; color: #92400e; border-left-color: #d97706; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  li { margin: 2px 0; }
+  .quote { background: #eff6ff; border-left: 3px solid #3b82f6; padding: 6px 10px; font-size: 12px; margin: 8px 0; }
+  .small { font-size: 11px; color: #6b7280; }
+</style>
+</head>
+<body>
+
+<h1>김PM 의 5분 회귀 점검 — "마진/엣징/히스토리 매핑 이후"</h1>
+<div class="meta">PM 페르소나 · 2026-05-18 · Phase 15A → 15B → 15C 누적 검증 · 실 backend (slab-design-real-v2)</div>
+
+<div class="quote">
+<b>전제:</b> 15B 에서 "엣징/히스토리/마진" 셋이 0 candidate 였습니다. 15C 가 그 셋을 정조준했다 했으니 — 정말 잡히나, 그리고 폭/생산성 같은 control 도 안 깨졌나 보겠습니다.
+</div>
+
+<h2>실측 — 5 시나리오 top-3</h2>
+<table>
+<tr><th>#</th><th>질문</th><th>intent</th><th>top-1 (score)</th><th>top-2 / top-3</th><th>매칭</th></tr>
+<tr><td>1</td><td><b>"엣징 영향?"</b></td><td>impact</td>
+  <td><code>dg103_edging_group_misses_throws</code> (23) <span class="small">term.scm.edging_group</span></td>
+  <td>—</td>
+  <td class="ok">정조준 · 15B 0→1</td></tr>
+<tr><td>2</td><td><b>"cumulativeProductivity 변경 영향?"</b></td><td>impact</td>
+  <td><code>cumulative_productivity</code> (32) <span class="small">term.scm.product.productivity_std</span></td>
+  <td>정합성_검증(17) / 분류(17)</td>
+  <td class="ok">top-1 역전 · 15B 약함→1위</td></tr>
+<tr><td>3</td><td><b>"history 기록 어디?"</b></td><td>locate</td>
+  <td><code>by_order</code> (25) <span class="small">term.scm.history_controller</span></td>
+  <td>by_slab(25) / execute_with_history(23)</td>
+  <td class="ok">3개 모두 history_controller</td></tr>
+<tr><td>4</td><td><b>"마진 변경"</b></td><td>ambiguous</td>
+  <td><code>dg103_edging_group_misses_throws</code> (25)</td>
+  <td>—</td>
+  <td class="warn">term 만 있고 action 0 — fallback 동작</td></tr>
+<tr><td>5</td><td><b>"폭 변경 영향"</b> (control)</td><td>impact</td>
+  <td><code>target_width</code> (55)</td>
+  <td>final_width_range(54) / width_range(54)</td>
+  <td class="ok">15A/15B 그대로 보존</td></tr>
+</table>
+
+<h2>핵심 관찰</h2>
+<ul>
+<li><b>declared_on_term 정정 11건 즉시 surface</b>: <code>cumulative_productivity → term.scm.product.productivity_std</code>, <code>dg103_edging_* → term.scm.edging_group</code>, <code>execute_with_history → term.scm.history_controller</code> — 모두 top-1.</li>
+<li><b>search query 확장 동작 확인</b>: <code>"엣징"</code> 그대로, <code>"폭"→"폭 너비 width target width …"</code>, <code>"마진"→"마진 margin 마진값 …"</code>. LLM 쿼리 확장은 양호.</li>
+<li><b>마진 fallback</b>: term.scm.margin 만 추가 (action 0) → 검색은 edging_group 인접 매칭을 score 25로 1건 반환. 0-cand suppression 없이 "근처 후보"로 답함 — 쓸 만함.</li>
+<li><b>회귀 0</b>: 폭/생산성 control 점수 그대로 (55/32). 15C 가 15A/15B 점수표를 보존.</li>
+</ul>
+
+<h2>PM 점수표</h2>
+<table>
+<tr><th>#</th><th>시나리오</th><th>점수</th><th>코멘트</th></tr>
+<tr><td>1</td><td>엣징 영향</td><td class="stars">★★★★☆ (4/5)</td><td>0→1 잡힘. test 메서드 한 건 뿐이라 -1.</td></tr>
+<tr><td>2</td><td>cumulativeProductivity</td><td class="stars">★★★★★ (5/5)</td><td>역전 깔끔. score 32 vs 17 격차 충분.</td></tr>
+<tr><td>3</td><td>history 어디</td><td class="stars">★★★★★ (5/5)</td><td>by_order/by_slab/execute_with_history 3개 정렬 — PM 이 바로 클릭 가능.</td></tr>
+<tr><td>4</td><td>마진 변경</td><td class="stars">★★★☆☆ (3/5)</td><td>term 만 있고 action 없음 → 근접 후보 답함. 정직한 fallback 이나 사용자엔 혼란 여지.</td></tr>
+<tr><td>5</td><td>폭 변경 (control)</td><td class="stars">★★★★★ (5/5)</td><td>회귀 zero.</td></tr>
+</table>
+<div class="small">평균 4.4/5 — 15B 3.8 대비 +0.6. 마진 외 4개 모두 production 수준.</div>
+
+<h2>15A → 15B → 15C 누적 가치</h2>
+<ul>
+<li><b>15A</b>: 폭/슬랩/생산성 등 핵심 도메인 — 80% coverage 달성.</li>
+<li><b>15B</b>: dg-codes (DG001~DG004) + business_rule surface — "근거" 확보.</li>
+<li><b>15C</b>: 79개 None → 11개 정정 + margin term. <b>"롱테일 매핑"</b> 정리 단계 — top-1 quality 상승.</li>
+</ul>
+
+<h2>Phase 15 종료 가능?</h2>
+<div class="verdict partial">조건부 종료 — 마진 action seed 후속 1건 외 종료.</div>
+<ul>
+<li><b>종료 근거</b>: 5 시나리오 평균 4.4/5, 회귀 0, declared_on_term None 잔여 68개는 대부분 test/util/infra (PM 노출 不要).</li>
+<li><b>Phase 16 권장 (선택)</b>: (a) margin action 1~2개 seed 로 시나리오 4 → 5/5 마감, (b) score formula 에 declared_on_term match 가중치 명시 (현재 keyword 합산 기반). 둘 다 small scope.</li>
+<li><b>대안</b>: 15C 로 닫고 Phase 16 = "사용자 query 로그 기반 매핑 갭 자동 탐지" 같은 새 축으로.</li>
+</ul>
+
+<p class="small">총 297 단어. session_id 5건 / sources.search_query 5건 / candidates.score 11건 직접 확인.</p>
+
+</body>
+</html>

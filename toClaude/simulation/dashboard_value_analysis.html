@@ -1,0 +1,977 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Section 3 Dashboard — 가치 분석 (인터랙티브)</title>
+<style>
+  :root {
+    --bg:       #fafaf7;
+    --fg:       #1a1a1a;
+    --muted:    #6c6c6c;
+    --line:     #e5e3dc;
+    --orange:   #d9531e;
+    --green:    #2f8f5d;
+    --indigo:   #4858a8;
+    --purple:   #8e3aa1;
+    --warn:     #b8761a;
+    --red:      #b32a2a;
+    --code-bg:  #2b2b2b;
+    --code-fg:  #f5f3ec;
+    --card-bg:  #fff;
+    --card-bg-on:  #f0faf4;
+    --card-bg-off: #fff6f0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Noto Sans KR", "Segoe UI", sans-serif;
+    line-height: 1.55;
+    margin: 0;
+    padding: 28px 24px 100px;
+    max-width: 1100px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  header.hero {
+    border-left: 6px solid var(--indigo);
+    padding: 16px 22px;
+    background: linear-gradient(90deg, rgba(72,88,168,0.10), transparent);
+    margin-bottom: 24px;
+  }
+  header.hero h1 { font-size: 23px; margin: 0 0 6px; }
+  header.hero .sub { color: var(--muted); font-size: 14px; margin: 0; }
+
+  nav.toc {
+    background: var(--card-bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 16px;
+    margin: 0 0 20px;
+    font-size: 13px;
+  }
+  nav.toc strong { color: var(--indigo); margin-right: 8px; }
+  nav.toc a {
+    color: var(--fg);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--indigo);
+    margin-right: 14px;
+    line-height: 2;
+  }
+  nav.toc a:hover { color: var(--orange); }
+
+  h2 {
+    font-size: 19px;
+    margin: 28px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+  h3 { font-size: 16px; margin: 18px 0 8px; }
+
+  p { margin: 8px 0; }
+
+  /* Sticky decision summary */
+  .summary-strip {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: #1a1a1a;
+    color: #f5f3ec;
+    padding: 10px 16px;
+    border-radius: 6px;
+    margin: 12px 0 22px;
+    font-size: 13px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  }
+  .summary-strip .label { color: #999; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .summary-strip .value { font-size: 15px; font-weight: 600; }
+  .summary-strip .value.green  { color: #6fd49a; }
+  .summary-strip .value.warn   { color: #ffba59; }
+  .summary-strip .value.muted  { color: #999; }
+
+  /* Options grid */
+  .options { display: flex; flex-direction: column; gap: 16px; }
+
+  .opt-card {
+    background: var(--card-bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 18px 20px;
+    transition: background 0.2s, border-color 0.2s;
+    position: relative;
+  }
+  .opt-card.on  { background: var(--card-bg-on);  border-color: #b6e1c6; }
+  .opt-card.off { background: var(--card-bg-off); border-color: #f2d3b6; opacity: 0.78; }
+
+  .opt-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 8px;
+  }
+  .opt-title { font-size: 17px; font-weight: 600; margin: 0; }
+  .opt-title .letter {
+    display: inline-block;
+    width: 26px; height: 26px;
+    background: var(--indigo); color: #fff;
+    border-radius: 4px;
+    text-align: center; line-height: 26px;
+    font-size: 13px;
+    margin-right: 8px;
+  }
+  .opt-card .one-liner { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+
+  /* Toggle */
+  .toggle-wrap { display: flex; align-items: center; gap: 8px; }
+  .toggle {
+    appearance: none;
+    width: 42px; height: 22px;
+    background: #d4d4d0;
+    border-radius: 12px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.18s;
+  }
+  .toggle::before {
+    content: "";
+    position: absolute;
+    width: 18px; height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    top: 2px; left: 2px;
+    transition: left 0.18s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  .toggle:checked { background: var(--green); }
+  .toggle:checked::before { left: 22px; }
+  .toggle-label { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .opt-card.on  .toggle-label { color: var(--green); }
+  .opt-card.off .toggle-label { color: var(--orange); }
+
+  /* Mockup */
+  .mockup {
+    background: #2b2b2b;
+    color: #f5f3ec;
+    border-radius: 6px;
+    padding: 14px 16px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.55;
+    margin: 10px 0 14px;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .mockup .dim    { color: #999; }
+  .mockup .accent { color: #ffba59; }
+  .mockup .ok     { color: #6fd49a; }
+  .mockup .warn   { color: #ff9b6a; }
+  .mockup .bar    { color: #6fd49a; letter-spacing: 1px; }
+
+  /* Signals row */
+  .signals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 12px 0;
+  }
+  .signal {
+    flex: 1 1 220px;
+    min-width: 200px;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  .signal .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .signal .v { font-size: 13px; font-weight: 600; }
+  .signal .v.green { color: var(--green); }
+  .signal .v.warn  { color: var(--warn); }
+  .signal .v.red   { color: var(--red); }
+  .signal .v.muted { color: var(--muted); }
+
+  /* Reasoning blocks */
+  .reasons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 10px;
+  }
+  @media (max-width: 720px) { .reasons { grid-template-columns: 1fr; } }
+  .reason {
+    border-radius: 5px;
+    padding: 10px 14px;
+    font-size: 13.5px;
+  }
+  .reason.adopt {
+    background: rgba(47,143,93,0.08);
+    border-left: 3px solid var(--green);
+  }
+  .reason.skip {
+    background: rgba(179,42,42,0.06);
+    border-left: 3px solid var(--red);
+  }
+  .reason .title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .reason.adopt .title { color: var(--green); }
+  .reason.skip .title { color: var(--red); }
+  .reason ul { margin: 4px 0 0; padding-left: 18px; }
+  .reason li { margin: 3px 0; }
+
+  /* Persona scenarios */
+  .personas {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 8px;
+  }
+  @media (max-width: 720px) { .personas { grid-template-columns: 1fr; } }
+  .persona {
+    background: var(--card-bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px;
+    font-size: 13px;
+  }
+  .persona h4 { margin: 0 0 6px; font-size: 14px; }
+  .persona .icon { font-size: 18px; margin-right: 4px; }
+  .persona .quote { color: var(--muted); font-style: italic; margin: 6px 0 8px; font-size: 12.5px; }
+  .persona .lines { font-size: 12.5px; }
+  .persona .line  { padding: 4px 0; border-top: 1px dashed var(--line); }
+  .persona .line:first-child { border-top: none; }
+  .persona .line .badge { display: inline-block; width: 22px; font-weight: 700; color: var(--indigo); }
+  .persona .line.active .badge { color: var(--green); }
+  .persona .line.inactive { opacity: 0.45; text-decoration: line-through; }
+
+  /* Scatter chart */
+  .matrix-wrap {
+    background: var(--card-bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 16px;
+    margin: 12px 0;
+  }
+  svg.matrix { width: 100%; height: 360px; display: block; }
+  .matrix-axis-label { font-size: 11px; fill: var(--muted); }
+  .matrix-tick       { font-size: 10px; fill: var(--muted); }
+  .matrix-grid       { stroke: var(--line); stroke-dasharray: 3 3; }
+  .matrix-dot        { cursor: pointer; }
+  .matrix-dot:hover  { stroke: var(--indigo); stroke-width: 2; }
+  .matrix-label      { font-size: 12px; font-weight: 600; pointer-events: none; }
+  .quadrant-label    { font-size: 10px; fill: var(--muted); font-style: italic; }
+
+  /* Final decision input */
+  .decision-box {
+    background: #fff;
+    border: 2px solid var(--orange);
+    border-radius: 8px;
+    padding: 18px 20px;
+    margin: 28px 0 14px;
+  }
+  .decision-box h3 { margin-top: 0; color: var(--orange); }
+  .decision-box textarea {
+    width: 100%;
+    min-height: 100px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 10px;
+    font: inherit;
+    font-size: 14px;
+    resize: vertical;
+  }
+  .decision-box .hint {
+    font-size: 12px; color: var(--muted); margin-top: 6px;
+  }
+
+  /* Quick presets */
+  .presets {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin: 10px 0 4px;
+  }
+  .preset-btn {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12.5px;
+    color: var(--indigo);
+    transition: background 0.15s;
+  }
+  .preset-btn:hover { background: var(--card-bg-on); }
+  .preset-btn.active {
+    background: var(--indigo); color: #fff; border-color: var(--indigo);
+  }
+
+  small.note { color: var(--muted); font-size: 12px; }
+  code.inline {
+    background: rgba(72,88,168,0.10);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 12.5px;
+  }
+
+  /* Status row in summary */
+  .opt-status-row {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin-top: 6px;
+  }
+  .opt-status-row .chip {
+    background: rgba(255,255,255,0.1);
+    padding: 3px 9px; border-radius: 11px;
+    font-size: 11px;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  .opt-status-row .chip.on  { background: rgba(111,212,154,0.2); border-color: #6fd49a; color: #6fd49a; }
+  .opt-status-row .chip.off { background: rgba(255,155,106,0.18); border-color: #ff9b6a; color: #ff9b6a; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>시뮬레이션 섹션 Dashboard — 가치 분석 (인터랙티브)</h1>
+  <p class="sub">5 가지 후보를 토글하면서 비용 / 가치 / 페르소나 별 효과를 비교해보세요. 마지막 입력칸에 선택을 적어주세요.</p>
+</header>
+
+<nav class="toc">
+  <strong>목차:</strong>
+  <a href="#context">현재 상태</a>
+  <a href="#options">5 옵션</a>
+  <a href="#personas">페르소나 시나리오</a>
+  <a href="#matrix">비용×가치 매트릭스</a>
+  <a href="#decide">결정</a>
+</nav>
+
+<!-- Sticky summary -->
+<div class="summary-strip" id="summaryStrip">
+  <div>
+    <div class="label">선택된 옵션</div>
+    <div class="value green" id="selectedCount">2 / 5</div>
+  </div>
+  <div>
+    <div class="label">예상 구현 비용</div>
+    <div class="value" id="estEffort">저 (1 phase)</div>
+  </div>
+  <div>
+    <div class="label">데이터 준비 필요</div>
+    <div class="value muted" id="estDataPrep">없음</div>
+  </div>
+  <div>
+    <div class="label">주요 수혜자</div>
+    <div class="value" id="estBeneficiary">팀 운영</div>
+  </div>
+  <div style="margin-left:auto">
+    <div class="opt-status-row" id="optStatusRow"></div>
+  </div>
+</div>
+
+<!-- ============ CONTEXT ============ -->
+<section id="context">
+  <h2>1. 현재 상태 — 짧게 짚고 가기</h2>
+  <p>
+    Section 3 의 "<b>대시보드</b>" 탭은 <b>이미 존재</b>합니다. 다만 보여주는 건 ontology 통계
+    (노드 / 관계 카운트) 뿐이라 실질적으로는 <b>landing page</b> 에 가깝습니다.
+    Multiturn Chat 이 primary 플로우이고, <b>session 누적 뷰는 없습니다</b>.
+  </p>
+  <div class="signals">
+    <div class="signal"><div class="k">현재 활성 UI</div><div class="v">Multiturn Chat · Orientation 대시보드</div></div>
+    <div class="signal"><div class="k">backend 누적 데이터</div><div class="v green">session + decision_log (SQLite)</div></div>
+    <div class="signal"><div class="k">in-memory 전용</div><div class="v warn">token, idiom, verification, proposal</div></div>
+    <div class="signal"><div class="k">Phase 7~10</div><div class="v">finalize 완료 (619 PASS)</div></div>
+  </div>
+  <p>
+    <small class="note">즉, 데이터가 일부는 이미 SQLite 에 쌓이고 있고, 일부는 저장조차 안 됩니다. 옵션별로 이 차이가 비용을 가릅니다.</small>
+  </p>
+</section>
+
+<!-- ============ OPTIONS ============ -->
+<section id="options">
+  <h2>2. 5 가지 옵션 — 토글하면서 보세요</h2>
+
+  <div class="options">
+
+    <!-- ============ OPTION A ============ -->
+    <div class="opt-card" data-key="A">
+      <div class="opt-head">
+        <div>
+          <h3 class="opt-title"><span class="letter">A</span>Orientation Dashboard (현재 것)</h3>
+          <p class="one-liner">사용자가 시뮬레이션 진입 전 시스템 규모를 인지하는 landing page.</p>
+        </div>
+        <label class="toggle-wrap">
+          <input type="checkbox" class="toggle" data-opt="A" checked>
+          <span class="toggle-label">유지</span>
+        </label>
+      </div>
+
+      <div class="mockup"><span class="dim">┌─ 시뮬레이션 시스템 ────────────┐</span>
+<span class="dim">│</span> 클래스       <span class="accent">247</span>     관계  <span class="accent">1,031</span>  <span class="dim">│</span>
+<span class="dim">│</span> 메소드       <span class="accent">985</span>     액션  <span class="accent">38</span>     <span class="dim">│</span>
+<span class="dim">│</span>                                <span class="dim">│</span>
+<span class="dim">│</span> <span class="ok">[ 시뮬레이션 시작 →  ]</span>          <span class="dim">│</span>
+<span class="dim">└────────────────────────────────┘</span>
+<span class="dim">// /api/section3/stats 1 회 호출, 1 컴포넌트</span></div>
+
+      <div class="signals">
+        <div class="signal"><div class="k">데이터 가용성</div><div class="v green">이미 있음</div></div>
+        <div class="signal"><div class="k">구현 비용</div><div class="v green">0 (현 상태 유지)</div></div>
+        <div class="signal"><div class="k">주요 수혜자</div><div class="v">신규 진입 사용자 · 데모 청중</div></div>
+      </div>
+
+      <div class="reasons">
+        <div class="reason adopt">
+          <div class="title">유지 이유</div>
+          <ul>
+            <li>이미 구현되어 있고 운영 비용 0.</li>
+            <li>multiturn chat 으로 바로 들어가면 "이 시스템이 뭘 보는지" 가 안 보이는 문제 방지.</li>
+            <li>데모에서 첫 2 초의 first impression — "Ontology 247 클래스 · 985 메소드" 가 즉시 신뢰 신호.</li>
+          </ul>
+        </div>
+        <div class="reason skip">
+          <div class="title">없애도 되는 경우</div>
+          <ul>
+            <li>multiturn chat 진입을 더 빠르게 하고 싶고, 모든 사용자가 이미 시스템 규모를 알고 있을 때.</li>
+            <li>대부분의 경우 해당 없음.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ OPTION B ============ -->
+    <div class="opt-card" data-key="B">
+      <div class="opt-head">
+        <div>
+          <h3 class="opt-title"><span class="letter" style="background:var(--green)">B</span>Session History Browser <span style="background:var(--green);color:#fff;padding:2px 8px;border-radius:3px;font-size:11px;margin-left:6px">★ 강추</span></h3>
+          <p class="one-liner">과거 multiturn 세션 목록 / 검색 / 클릭 시 replay 진입.</p>
+        </div>
+        <label class="toggle-wrap">
+          <input type="checkbox" class="toggle" data-opt="B" checked>
+          <span class="toggle-label">포함</span>
+        </label>
+      </div>
+
+      <div class="mockup"><span class="dim">┌─ 최근 세션 ─────────────────────────────────┐</span>
+<span class="dim">│</span> <span class="accent">🔍 검색:</span> <span class="dim">[                                    ]</span>  <span class="dim">│</span>
+<span class="dim">│</span>                                              <span class="dim">│</span>
+<span class="dim">│</span> <span class="ok">●</span> 2026-05-18 14:32   <span class="ok">✓ done</span>              <span class="dim">│</span>
+<span class="dim">│</span>   "UC36 capstone 검증"                       <span class="dim">│</span>
+<span class="dim">│</span>   Gate III sim · 4 turns · slab-v2           <span class="dim">│</span>
+<span class="dim">│</span> <span class="dim">───────────────────────────────────────────</span> <span class="dim">│</span>
+<span class="dim">│</span> <span class="warn">●</span> 2026-05-18 11:08   <span class="warn">⚠ stale</span>            <span class="dim">│</span>
+<span class="dim">│</span>   "VAT 변경 영향도"                          <span class="dim">│</span>
+<span class="dim">│</span>   Gate III impact · 3 turns · slab-v2        <span class="dim">│</span>
+<span class="dim">│</span> <span class="dim">───────────────────────────────────────────</span> <span class="dim">│</span>
+<span class="dim">│</span> <span class="ok">●</span> 2026-05-17 22:01   <span class="ok">✓ done</span>              <span class="dim">│</span>
+<span class="dim">│</span>   "ProductCategory term merge"               <span class="dim">│</span>
+<span class="dim">│</span>   Gate II → III sim · 4 turns                <span class="dim">│</span>
+<span class="dim">│</span>                                              <span class="dim">│</span>
+<span class="dim">│</span> ▶ <span class="accent">클릭</span> → /session/{sid}/replay              <span class="dim">│</span>
+<span class="dim">└──────────────────────────────────────────────┘</span></div>
+
+      <div class="signals">
+        <div class="signal"><div class="k">데이터 가용성</div><div class="v green">section3_session + decision_log SQLite 이미 쌓임</div></div>
+        <div class="signal"><div class="k">구현 비용</div><div class="v green">저 — 1 endpoint + 1 React 컴포넌트 (~ 0.5 phase)</div></div>
+        <div class="signal"><div class="k">주요 수혜자</div><div class="v">3 인 팀 · 운영 / 데모 둘 다</div></div>
+      </div>
+
+      <div class="reasons">
+        <div class="reason adopt">
+          <div class="title">왜 도입해야 하는가</div>
+          <ul>
+            <li><b>실제 페인 포인트</b>: 3 인 팀이 동시에 다수 세션을 띄우면 "내가 어제 한 그 분석" 을 다시 못 찾음. 현재는 sid 를 손으로 보관해야 함.</li>
+            <li><b>데이터가 이미 있음</b>: SQLite 에 session UUID + status + 결정 로그 다 들어 있음. 단지 surfacing 만 하면 됨.</li>
+            <li><b>replay 인프라가 이미 있음</b>: Phase 1 에서 <code class="inline">/session/{sid}/replay</code> 가 만들어졌으나 클릭 진입점이 없음 → 매몰 자산.</li>
+            <li><b>데모 효과</b>: "Section 3 가 그동안 N 회 검증을 돌렸다" 가 maturity signal 로 변환됨. 단발 chat 데모보다 system 운영감을 줌.</li>
+            <li><b>디버깅 가치</b>: Gate 실패 사후 분석 시 sid 가 손에 있어도 다른 세션과 비교할 방법이 없음.</li>
+          </ul>
+        </div>
+        <div class="reason skip">
+          <div class="title">보류해도 되는 경우</div>
+          <ul>
+            <li>1 인이 단발성으로만 시뮬레이션을 쓸 때. (현실: 3 인 팀이라 해당 안 됨)</li>
+            <li>이 옵션을 빼면 <b>매몰 자산 (replay endpoint)</b> 이 유저에게 영영 안 닿음.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ OPTION C ============ -->
+    <div class="opt-card" data-key="C">
+      <div class="opt-head">
+        <div>
+          <h3 class="opt-title"><span class="letter" style="background:var(--warn)">C</span>Verification Metric Dashboard</h3>
+          <p class="one-liner">8 차원 verification 결과, UC1-36 capstone 추이, framework health 시계열.</p>
+        </div>
+        <label class="toggle-wrap">
+          <input type="checkbox" class="toggle" data-opt="C">
+          <span class="toggle-label">보류</span>
+        </label>
+      </div>
+
+      <div class="mockup"><span class="dim">┌─ Verification 8 차원 (오늘) ──────────────┐</span>
+<span class="dim">│</span> behavioral   <span class="bar">██████████</span>  100%  <span class="ok">✓</span>     <span class="dim">│</span>
+<span class="dim">│</span> effect       <span class="bar">█████████</span><span class="dim">░</span>   88%  <span class="warn">△</span>     <span class="dim">│</span>
+<span class="dim">│</span> structural   <span class="bar">██████████</span>  100%  <span class="ok">✓</span>     <span class="dim">│</span>
+<span class="dim">│</span> param        <span class="bar">███████</span><span class="dim">░░░</span>   75%  <span class="warn">△</span>     <span class="dim">│</span>
+<span class="dim">│</span> exception    <span class="bar">██████████</span>  100%  <span class="ok">✓</span>     <span class="dim">│</span>
+<span class="dim">│</span> annotation   <span class="bar">██████████</span>  100%  <span class="ok">✓</span>     <span class="dim">│</span>
+<span class="dim">│</span> rest_endpoint <span class="bar">████</span><span class="dim">██████</span>   40%  <span class="warn">!</span>     <span class="dim">│</span>
+<span class="dim">│</span> term         <span class="bar">██████████</span>  100%  <span class="ok">✓</span>     <span class="dim">│</span>
+<span class="dim">│</span> <span class="dim">─────────────────────────────────────────</span> <span class="dim">│</span>
+<span class="dim">│</span> UC36 추이:  <span class="warn">23</span> → <span class="warn">18</span> → <span class="warn">9</span> → <span class="ok">0</span>  ↓ ✓        <span class="dim">│</span>
+<span class="dim">│</span> 최근 capstone 빌드: 2026-05-18 13:04 ✓     <span class="dim">│</span>
+<span class="dim">└────────────────────────────────────────────┘</span></div>
+
+      <div class="signals">
+        <div class="signal"><div class="k">데이터 가용성</div><div class="v red">없음 — OracleResult 가 in-memory 만, pytest snapshot 뿐</div></div>
+        <div class="signal"><div class="k">구현 비용</div><div class="v warn">고 — DB 테이블 신설 + CI hook 연동 + UI</div></div>
+        <div class="signal"><div class="k">주요 수혜자</div><div class="v">엔진 개발자 · 발표 청중 (capstone story)</div></div>
+      </div>
+
+      <div class="reasons">
+        <div class="reason adopt">
+          <div class="title">도입해야 하는 강력한 이유 (있다면)</div>
+          <ul>
+            <li><b>UC36 0 remaining findings 가 invisible</b>: 메모리 기준 framework 최대 실증인데, 데모에서 청중이 인지할 채널이 없음.</li>
+            <li><b>Regression 감시</b>: 누군가 idiom_rewriter 를 깨면 UC36 이 다시 비어버리는 걸 dashboard 가 알려줘야 함.</li>
+            <li><b>발표 가치</b>: "8 차원 verification 이 살아 있다" 를 1 컷 캡처로 증빙 가능.</li>
+          </ul>
+        </div>
+        <div class="reason skip">
+          <div class="title">보류 이유 (현 시점)</div>
+          <ul>
+            <li><b>저장층이 통째로 없음</b>: OracleResult / HealthReport 가 in-memory 종료 → DB schema 부터 설계해야 함.</li>
+            <li><b>CI hook 결합 필요</b>: capstone snapshot 누적 = pytest run 마다 DB 에 적재해야 함. 즉 한 phase 으로 안 끝남.</li>
+            <li><b>당장 안 보여도 시스템은 계속 돈다</b>: pytest 619 PASS 가 단일 진실 — dashboard 는 "더 잘 보여주는 것" 이지 동작 차이 없음.</li>
+            <li>풀 데모 시연 시 multiturn chat + history browser 가 이미 검증 자체를 라이브로 보여줌.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ OPTION D ============ -->
+    <div class="opt-card" data-key="D">
+      <div class="opt-head">
+        <div>
+          <h3 class="opt-title"><span class="letter" style="background:var(--warn)">D</span>Proposal Pipeline Dashboard</h3>
+          <p class="one-liner">DRAFT → IN_REVIEW → MERGED 흐름, NO_ACTION_PARAMS / PROPOSE_NEW_TERM 분류 카운트.</p>
+        </div>
+        <label class="toggle-wrap">
+          <input type="checkbox" class="toggle" data-opt="D">
+          <span class="toggle-label">보류</span>
+        </label>
+      </div>
+
+      <div class="mockup"><span class="dim">┌─ Proposal 파이프라인 ─────────────────────────┐</span>
+<span class="dim">│</span>                                                 <span class="dim">│</span>
+<span class="dim">│</span>   <span class="warn">DRAFT</span>     →     <span class="accent">REVIEW</span>     →     <span class="ok">MERGED</span>   <span class="dim">│</span>
+<span class="dim">│</span>    <span class="warn">▪ ▪ ▪ ▪</span>          <span class="accent">▪ ▪</span>            <span class="ok">▪ ▪ ▪ ▪ ▪</span>      <span class="dim">│</span>
+<span class="dim">│</span>      <span class="warn">4</span>               <span class="accent">2</span>                <span class="ok">12</span>        <span class="dim">│</span>
+<span class="dim">│</span>                                                 <span class="dim">│</span>
+<span class="dim">│</span> <span class="dim">분류:</span>                                          <span class="dim">│</span>
+<span class="dim">│</span>   • <span class="warn">NO_ACTION_PARAMS</span>          30 건           <span class="dim">│</span>
+<span class="dim">│</span>   • <span class="warn">PROPOSE_NEW_TERM</span>          13 건 (2 cascade) <span class="dim">│</span>
+<span class="dim">│</span>   • <span class="ok">EFFECT_AXIS resolved</span>       16              <span class="dim">│</span>
+<span class="dim">│</span>   • <span class="ok">STRUCTURAL resolved</span>        13              <span class="dim">│</span>
+<span class="dim">└────────────────────────────────────────────────┘</span></div>
+
+      <div class="signals">
+        <div class="signal"><div class="k">데이터 가용성</div><div class="v red">없음 — ProposalEvent persistence 미구현</div></div>
+        <div class="signal"><div class="k">구현 비용</div><div class="v warn">고 — proposal_audit_log 테이블 + integrator hook</div></div>
+        <div class="signal"><div class="k">주요 수혜자</div><div class="v">Section 2 ↔ Section 3 협업 시 PM 역할</div></div>
+      </div>
+
+      <div class="reasons">
+        <div class="reason adopt">
+          <div class="title">도입해야 하는 강력한 이유 (있다면)</div>
+          <ul>
+            <li><b>모델링 측 작업량 가시화</b>: Section 2 가 proposal 을 수용 / 거절하는 흐름이 일상이 되었을 때, "오늘 처리 큐" 가 dashboard 에서 보임.</li>
+            <li><b>Q5 "빠진 대로" 의 실증 통계</b>: PROPOSE_NEW_TERM 누적이 "uncovered area 를 시뮬레이션이 발견한다" 의 누적 증거.</li>
+          </ul>
+        </div>
+        <div class="reason skip">
+          <div class="title">보류 이유 (현 시점)</div>
+          <ul>
+            <li><b>모델링 측 proposal 워크플로우가 아직 정착 안 됨</b>: dashboard 가 보여줄 "현실의 운영 흐름" 이 아직 적음. 데이터가 적은 dashboard 는 빈 화면 인상.</li>
+            <li><b>persistence 신규 작업</b>: ProposalEvent 가 in-memory 종료 → 저장층 신설 비용이 Option C 와 동급.</li>
+            <li>실 사용 흐름이 누적되기 전에 만들면 <b>"왜 만들었지?" 의 빈 dashboard</b> 가 됨.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ OPTION E ============ -->
+    <div class="opt-card" data-key="E">
+      <div class="opt-head">
+        <div>
+          <h3 class="opt-title"><span class="letter" style="background:var(--muted)">E</span>Cost / Latency Monitoring</h3>
+          <p class="one-liner">세션 별 토큰 사용량, LLM provider 비용, gate 별 latency p50/p95.</p>
+        </div>
+        <label class="toggle-wrap">
+          <input type="checkbox" class="toggle" data-opt="E">
+          <span class="toggle-label">보류</span>
+        </label>
+      </div>
+
+      <div class="mockup"><span class="dim">┌─ 비용 / 응답시간 ──────────────────┐</span>
+<span class="dim">│</span> 오늘 토큰 사용 :  <span class="accent">234,512</span>              <span class="dim">│</span>
+<span class="dim">│</span> 세션 평균 비용 :  <span class="accent">$0.42</span>                <span class="dim">│</span>
+<span class="dim">│</span> 일일 누적 비용 :  <span class="accent">$ 8.96</span>               <span class="dim">│</span>
+<span class="dim">│</span>                                       <span class="dim">│</span>
+<span class="dim">│</span> Latency:                              <span class="dim">│</span>
+<span class="dim">│</span>   Gate I    p50 0.8s  p95 1.5s        <span class="dim">│</span>
+<span class="dim">│</span>   Gate II   p50 3.2s  p95 7.8s        <span class="dim">│</span>
+<span class="dim">│</span>   Gate III  p50 4.2s  p95 <span class="warn">11.8s</span>       <span class="dim">│</span>
+<span class="dim">└───────────────────────────────────────┘</span></div>
+
+      <div class="signals">
+        <div class="signal"><div class="k">데이터 가용성</div><div class="v red">LLMResponse 가 in-memory 만</div></div>
+        <div class="signal"><div class="k">구현 비용</div><div class="v warn">중 — llm_call_log 테이블 + provider wrap</div></div>
+        <div class="signal"><div class="k">주요 수혜자</div><div class="v muted">예산 담당 / 성능 튜닝 (아직 큰 이슈 없음)</div></div>
+      </div>
+
+      <div class="reasons">
+        <div class="reason adopt">
+          <div class="title">도입해야 하는 강력한 이유 (있다면)</div>
+          <ul>
+            <li><b>비용 폭주 사전 감지</b>: provider rate 가 급증하면 dashboard 가 첫 신호.</li>
+            <li><b>Gate II 가 느린 이유 분석</b>: synth + translate + fixture 가 묶인 무거운 게이트 — p95 가 11s 넘으면 사용자가 체감.</li>
+          </ul>
+        </div>
+        <div class="reason skip">
+          <div class="title">보류 이유 (현 시점)</div>
+          <ul>
+            <li><b>현 단계에서 비용이 안 큰 문제</b>: 데모 / 내부 사용 위주라 OpenAI 청구가 위협 수준 아님.</li>
+            <li><b>성능 이슈 보고가 없음</b>: 사용자 / 팀이 latency 로 인한 페인 포인트를 아직 호소 안 했음.</li>
+            <li>"필요해지면" 만드는 게 합리적. 지금 만들면 빈 차트.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ PERSONAS ============ -->
+<section id="personas">
+  <h2>3. 페르소나 시나리오 — 같은 사람이 어떤 옵션 조합에서 어떻게 일하는지</h2>
+  <p>옵션을 토글하면 각 페르소나의 라인 중 활성/비활성이 바뀝니다. <b>줄이 흐려질수록 그 페르소나가 해결 못 하는 일</b>이에요.</p>
+  <div class="personas">
+
+    <div class="persona">
+      <h4><span class="icon">🎤</span>데모 발표자</h4>
+      <p class="quote">"Section 3 가 뭘 보여주죠?"</p>
+      <div class="lines">
+        <div class="line" data-opt="A"><span class="badge">A</span>"이 시스템은 247 클래스 / 985 메소드 를 다룹니다" (1 컷)</div>
+        <div class="line" data-opt="B"><span class="badge">B</span>"이미 누적 N 개 세션을 돌렸어요" → maturity 신호</div>
+        <div class="line" data-opt="C"><span class="badge">C</span>"8 차원 검증 / UC36 0 remaining" capstone 자랑</div>
+        <div class="line" data-opt="D"><span class="badge">D</span>"12 개 proposal 이 merge 되었어요" 누적 증거</div>
+        <div class="line" data-opt="E"><span class="badge">E</span>(데모에서 코스트는 거의 안 묻음)</div>
+      </div>
+    </div>
+
+    <div class="persona">
+      <h4><span class="icon">👥</span>3 인 팀 운영자</h4>
+      <p class="quote">"어제 그 분석 어디 갔지?"</p>
+      <div class="lines">
+        <div class="line" data-opt="A"><span class="badge">A</span>landing 에서 매번 시작 (낮은 빈도)</div>
+        <div class="line" data-opt="B"><span class="badge">B</span>"VAT 변경 영향도" session 검색 → replay (핵심)</div>
+        <div class="line" data-opt="C"><span class="badge">C</span>(엔진 개발자만 본다, 운영자엔 약함)</div>
+        <div class="line" data-opt="D"><span class="badge">D</span>"오늘 처리해야 할 proposal" 큐 확인</div>
+        <div class="line" data-opt="E"><span class="badge">E</span>(운영자엔 약함)</div>
+      </div>
+    </div>
+
+    <div class="persona">
+      <h4><span class="icon">🐛</span>디버거 / 엔진 작업자</h4>
+      <p class="quote">"왜 이 session 이 Gate II 에서 막혔지?"</p>
+      <div class="lines">
+        <div class="line" data-opt="A"><span class="badge">A</span>(디버깅엔 약함)</div>
+        <div class="line" data-opt="B"><span class="badge">B</span>같은 repo 다른 session 들과 결정 비교</div>
+        <div class="line" data-opt="C"><span class="badge">C</span>capstone snapshot 추이 → "언제 깨졌지?" 회귀 추적 (강함)</div>
+        <div class="line" data-opt="D"><span class="badge">D</span>특정 proposal 의 lifecycle 추적</div>
+        <div class="line" data-opt="E"><span class="badge">E</span>Gate II p95 가 갑자기 늘면 발견 (성능 회귀)</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ MATRIX ============ -->
+<section id="matrix">
+  <h2>4. 비용 × 가치 매트릭스</h2>
+  <p>X 축 = 구현 비용, Y 축 = 가치. 좌상단 (저비용 · 고가치) 가 명확히 도입해야 하는 영역.</p>
+  <div class="matrix-wrap">
+    <svg viewBox="0 0 700 360" class="matrix">
+      <!-- Grid -->
+      <line class="matrix-grid" x1="60" y1="40"  x2="660" y2="40" />
+      <line class="matrix-grid" x1="60" y1="120" x2="660" y2="120" />
+      <line class="matrix-grid" x1="60" y1="200" x2="660" y2="200" />
+      <line class="matrix-grid" x1="60" y1="280" x2="660" y2="280" />
+      <line class="matrix-grid" x1="180" y1="40" x2="180" y2="320" />
+      <line class="matrix-grid" x1="360" y1="40" x2="360" y2="320" />
+      <line class="matrix-grid" x1="540" y1="40" x2="540" y2="320" />
+
+      <!-- Axes -->
+      <line x1="60"  y1="320" x2="660" y2="320" stroke="#1a1a1a" stroke-width="1.5"/>
+      <line x1="60"  y1="40"  x2="60"  y2="320" stroke="#1a1a1a" stroke-width="1.5"/>
+
+      <!-- Tick labels -->
+      <text class="matrix-tick" x="60"  y="338" text-anchor="middle">0</text>
+      <text class="matrix-tick" x="180" y="338" text-anchor="middle">저</text>
+      <text class="matrix-tick" x="360" y="338" text-anchor="middle">중</text>
+      <text class="matrix-tick" x="540" y="338" text-anchor="middle">고</text>
+
+      <text class="matrix-tick" x="52" y="320" text-anchor="end">0</text>
+      <text class="matrix-tick" x="52" y="200" text-anchor="end">중</text>
+      <text class="matrix-tick" x="52" y="120" text-anchor="end">고</text>
+      <text class="matrix-tick" x="52" y="44"  text-anchor="end">최고</text>
+
+      <!-- Axis labels -->
+      <text class="matrix-axis-label" x="360" y="355" text-anchor="middle">구현 비용 →</text>
+      <text class="matrix-axis-label" x="20" y="180" text-anchor="middle" transform="rotate(-90 20 180)">가치 →</text>
+
+      <!-- Quadrant labels -->
+      <text class="quadrant-label" x="120" y="60"  text-anchor="middle">★ 즉시 도입</text>
+      <text class="quadrant-label" x="600" y="60"  text-anchor="middle">조건부 도입</text>
+      <text class="quadrant-label" x="120" y="305" text-anchor="middle">선택</text>
+      <text class="quadrant-label" x="600" y="305" text-anchor="middle">보류</text>
+
+      <!-- Dots (positioned by cost x, value y) -->
+      <!-- A: cost 0, value middle -->
+      <circle class="matrix-dot" cx="80"  cy="180" r="14" fill="#999"      data-key="A"/>
+      <text class="matrix-label" x="80"  y="184" text-anchor="middle" fill="#fff">A</text>
+
+      <!-- B: cost low, value highest -->
+      <circle class="matrix-dot" cx="180" cy="75"  r="18" fill="#2f8f5d"   data-key="B"/>
+      <text class="matrix-label" x="180" y="80"  text-anchor="middle" fill="#fff">B</text>
+
+      <!-- C: cost high, value high -->
+      <circle class="matrix-dot" cx="540" cy="110" r="14" fill="#b8761a"   data-key="C"/>
+      <text class="matrix-label" x="540" y="114" text-anchor="middle" fill="#fff">C</text>
+
+      <!-- D: cost high, value mid -->
+      <circle class="matrix-dot" cx="510" cy="220" r="14" fill="#b8761a"   data-key="D"/>
+      <text class="matrix-label" x="510" y="224" text-anchor="middle" fill="#fff">D</text>
+
+      <!-- E: cost mid, value low -->
+      <circle class="matrix-dot" cx="360" cy="270" r="14" fill="#6c6c6c"   data-key="E"/>
+      <text class="matrix-label" x="360" y="274" text-anchor="middle" fill="#fff">E</text>
+    </svg>
+  </div>
+  <p>
+    <small class="note">
+      좌상단의 <b>B</b> 가 압도적으로 우월한 위치. <b>A</b> 는 이미 무료라 유지. <b>C/D</b> 는 가치는 있지만
+      backend persistence 가 깔린 뒤에 다시 평가하는 게 합리적. <b>E</b> 는 현재 페인이 없어 후순위.
+    </small>
+  </p>
+</section>
+
+<!-- ============ DECIDE ============ -->
+<section id="decide">
+  <h2>5. 결정 — 어느 조합으로 갈까요?</h2>
+  <p>아래 프리셋 중 가까운 걸 클릭하거나, 옵션을 직접 토글해서 조합을 만들고 코멘트를 남겨주세요.</p>
+
+  <div class="presets">
+    <button class="preset-btn" data-preset="hold">보류 (A만)</button>
+    <button class="preset-btn active" data-preset="min">최소: A + B (권장)</button>
+    <button class="preset-btn" data-preset="medium">중간: A + B + D</button>
+    <button class="preset-btn" data-preset="full">풀: A + B + C + D + E</button>
+  </div>
+
+  <div class="decision-box">
+    <h3>한 줄 결정</h3>
+    <textarea id="decisionInput" placeholder="예: B 만 우선 만들자. C 는 backend persistence 깔린 후로. / 혹은 A + B + D 로 가자, 이유는…"></textarea>
+    <p class="hint">현재 토글: <b id="currentToggles">A, B</b>. 위 텍스트를 적어두면 다음 세션에서 이 HTML 을 다시 열어 확인할 수 있습니다.</p>
+  </div>
+
+  <h3>참고 — 옵션별 1 줄 요약</h3>
+  <table style="width:100%; border-collapse:collapse; font-size:13.5px;">
+    <tr style="background:#f0ede4">
+      <th style="text-align:left; padding:8px; border:1px solid var(--line); width:40px">#</th>
+      <th style="text-align:left; padding:8px; border:1px solid var(--line)">이름</th>
+      <th style="text-align:left; padding:8px; border:1px solid var(--line); width:90px">비용</th>
+      <th style="text-align:left; padding:8px; border:1px solid var(--line); width:90px">데이터</th>
+      <th style="text-align:left; padding:8px; border:1px solid var(--line)">한 줄</th>
+    </tr>
+    <tr>
+      <td style="padding:8px; border:1px solid var(--line)"><b>A</b></td>
+      <td style="padding:8px; border:1px solid var(--line)">Orientation</td>
+      <td style="padding:8px; border:1px solid var(--line); color:var(--green)">0</td>
+      <td style="padding:8px; border:1px solid var(--line); color:var(--green)">있음</td>
+      <td style="padding:8px; border:1px solid var(--line)">이미 있음. 유지.</td>
+    </tr>
+    <tr>
+      <td style="padding:8px; border:1px solid var(--line)"><b>B</b></td>
+      <td style="padding:8px; border:1px solid var(--line)">Session History</td>
+      <td style="padding:8px; border:1px solid var(--line); color:var(--green)">저</td>
+      <td style="padding:8px; border:1px solid var(--line); color:var(--green)">있음</td>
+      <td style="padding:8px; border:1px solid var(--line)"><b>★ 강추</b>. 매몰된 replay 자산을 살리고 운영 실제 페인 해결.</td>
+    </tr>
+    <tr>
+      <td style="padding:8px; border:1px solid var(--line)"><b>C</b></td>
+      <td style="padding:8px; border:1px solid var(--line)">Verification Metric</td>
+      <td style="padding:8px; border:1px solid var(--line); color:var(--warn)">고</td>
+      <td style="padding:8px; border:1px solid var(--line); color:var(--red)">없음</td>
+      <td style="padding:8px; border:1px solid var(--line)">데모용 capstone story 매력. backend persistence 깔린 후 재평가.</td>
+    </tr>
+    <tr>
+      <td style="padding:8px; border:1px solid var(--line)"><b>D</b></td>
+      <td style="padding:8px; border:1px solid var(--line)">Proposal Pipeline</td>
+      <td style="padding:8px; border:1px solid var(--line); color:var(--warn)">고</td>
+      <td style="padding:8px; border:1px solid var(--line); color:var(--red)">없음</td>
+      <td style="padding:8px; border:1px solid var(--line)">모델링 측 proposal 운영이 정착된 후에. 지금은 빈 dashboard 위험.</td>
+    </tr>
+    <tr>
+      <td style="padding:8px; border:1px solid var(--line)"><b>E</b></td>
+      <td style="padding:8px; border:1px solid var(--line)">Cost / Latency</td>
+      <td style="padding:8px; border:1px solid var(--line); color:var(--warn)">중</td>
+      <td style="padding:8px; border:1px solid var(--line); color:var(--red)">없음</td>
+      <td style="padding:8px; border:1px solid var(--line)">현 단계 페인 없음. 비용 폭주 / latency 이슈 발생 시 도입.</td>
+    </tr>
+  </table>
+</section>
+
+<script>
+  // ===== State =====
+  const state = { A: true, B: true, C: false, D: false, E: false };
+
+  const PRESETS = {
+    hold:   { A: true,  B: false, C: false, D: false, E: false },
+    min:    { A: true,  B: true,  C: false, D: false, E: false },
+    medium: { A: true,  B: true,  C: false, D: true,  E: false },
+    full:   { A: true,  B: true,  C: true,  D: true,  E: true  },
+  };
+
+  // ===== Render =====
+  function render() {
+    // Toggle UI on cards
+    document.querySelectorAll('.opt-card').forEach(card => {
+      const key = card.dataset.key;
+      card.classList.toggle('on',  state[key]);
+      card.classList.toggle('off', !state[key]);
+      const tog = card.querySelector('.toggle');
+      tog.checked = state[key];
+      const label = card.querySelector('.toggle-label');
+      label.textContent = state[key] ? '포함' : '보류';
+    });
+
+    // Persona lines
+    document.querySelectorAll('.persona .line').forEach(line => {
+      const k = line.dataset.opt;
+      const active = state[k];
+      line.classList.toggle('active', active);
+      line.classList.toggle('inactive', !active);
+    });
+
+    // Matrix dots opacity
+    document.querySelectorAll('.matrix-dot').forEach(dot => {
+      const k = dot.dataset.key;
+      dot.setAttribute('opacity', state[k] ? '1' : '0.28');
+    });
+    document.querySelectorAll('.matrix-label').forEach(lbl => {
+      const k = lbl.previousElementSibling.dataset.key;
+      lbl.setAttribute('opacity', state[k] ? '1' : '0.4');
+    });
+
+    // Sticky summary
+    const sel = Object.entries(state).filter(([_, v]) => v).map(([k]) => k);
+    document.getElementById('selectedCount').textContent = `${sel.length} / 5`;
+    document.getElementById('currentToggles').textContent = sel.join(', ') || '(없음)';
+
+    // Effort estimate
+    let effort = 0; // A=0, B=1, C=3, D=3, E=2
+    if (state.B) effort += 1;
+    if (state.C) effort += 3;
+    if (state.D) effort += 3;
+    if (state.E) effort += 2;
+    const effortEl = document.getElementById('estEffort');
+    if (effort === 0)        effortEl.textContent = '0 (현 상태)';
+    else if (effort <= 1)    effortEl.textContent = '저 (~ 0.5 phase)';
+    else if (effort <= 3)    effortEl.textContent = '중 (1 phase)';
+    else if (effort <= 5)    effortEl.textContent = '고 (2 phase)';
+    else                     effortEl.textContent = '최고 (3+ phase)';
+    effortEl.className = 'value ' + (effort <= 1 ? 'green' : effort <= 3 ? '' : 'warn');
+
+    // Data prep
+    const needsPrep = ['C','D','E'].filter(k => state[k]);
+    const prep = document.getElementById('estDataPrep');
+    if (needsPrep.length === 0) {
+      prep.textContent = '없음';
+      prep.className = 'value muted';
+    } else {
+      const tableNames = [];
+      if (needsPrep.includes('C')) tableNames.push('verification_result');
+      if (needsPrep.includes('D')) tableNames.push('proposal_audit_log');
+      if (needsPrep.includes('E')) tableNames.push('llm_call_log');
+      prep.textContent = `신규 ${needsPrep.length} 테이블 (${tableNames.join(', ')})`;
+      prep.className = 'value warn';
+    }
+
+    // Beneficiary
+    const ben = document.getElementById('estBeneficiary');
+    const benList = [];
+    if (state.A) benList.push('진입자');
+    if (state.B) benList.push('팀 운영');
+    if (state.C) benList.push('엔진 개발');
+    if (state.D) benList.push('PM/Sec2');
+    if (state.E) benList.push('성능 튜닝');
+    ben.textContent = benList.join(' · ') || '—';
+
+    // Chip row
+    const chips = document.getElementById('optStatusRow');
+    chips.innerHTML = '';
+    ['A','B','C','D','E'].forEach(k => {
+      const chip = document.createElement('span');
+      chip.className = 'chip ' + (state[k] ? 'on' : 'off');
+      chip.textContent = k + (state[k] ? ' ✓' : ' —');
+      chips.appendChild(chip);
+    });
+
+    // Preset highlight
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      const p = PRESETS[btn.dataset.preset];
+      const match = ['A','B','C','D','E'].every(k => p[k] === state[k]);
+      btn.classList.toggle('active', match);
+    });
+  }
+
+  // ===== Events =====
+  document.querySelectorAll('.toggle').forEach(tog => {
+    tog.addEventListener('change', e => {
+      const opt = e.target.dataset.opt;
+      state[opt] = e.target.checked;
+      render();
+    });
+  });
+
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = PRESETS[btn.dataset.preset];
+      Object.assign(state, p);
+      render();
+    });
+  });
+
+  // Local persistence of textarea
+  const ta = document.getElementById('decisionInput');
+  const KEY = 'ontong_dashboard_decision';
+  ta.value = localStorage.getItem(KEY) || '';
+  ta.addEventListener('input', () => localStorage.setItem(KEY, ta.value));
+
+  render();
+</script>
+
+</body>
+</html>

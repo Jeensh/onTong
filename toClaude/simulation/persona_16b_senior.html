@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Phase 16B — Senior Backend Review</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 940px; margin: 24px auto; padding: 16px; color: #1f2937; line-height: 1.55; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .meta { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
+  h2 { font-size: 15px; margin-top: 20px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; }
+  th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f9fafb; }
+  code { background: #f3f4f6; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+  .ok { color: #166534; font-weight: 600; }
+  .warn { color: #92400e; font-weight: 600; }
+  .fail { color: #991b1b; font-weight: 600; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  .verdict { padding: 10px 14px; border-radius: 6px; font-weight: 600; background: #ecfdf5; color: #065f46; border-left: 4px solid #10b981; margin: 12px 0; }
+  .gap { padding: 10px 14px; border-radius: 6px; background: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b; margin: 12px 0; }
+  .small { font-size: 11px; color: #6b7280; }
+</style>
+</head>
+<body>
+
+<h1>Phase 16B 검증 — 시니어 백엔드 평가 (16A 갭 직격 후속)</h1>
+<div class="meta">10년차 시니어 · 2026-05-18 · backend 8001 라이브 · repo <code>slab-design-real-v2</code></div>
+
+<h2>실측 4 시나리오</h2>
+<table>
+<tr><th>#</th><th>질의 / 분류</th><th>target</th><th>cond.var</th><th>16A baseline</th><th>16B 실측</th><th>delta</th></tr>
+<tr>
+  <td>S2</td><td>두께 0.1mm 슬라브 검증 실패? <br><code>hypothesis</code></td>
+  <td><code>SdThicknessAction.execute</code></td><td>"두께"</td>
+  <td class="warn"><code>likely_no</code> / 0.55<br>body miss</td>
+  <td class="ok"><code>yes</code> / 0.75<br>matched_var=<strong>thickness</strong></td>
+  <td class="ok">갭 직격 해결</td>
+</tr>
+<tr>
+  <td>S1</td><td>주문 수량이 0 이면? <br><code>hypothesis</code></td>
+  <td><code>SdOrderValidator.validate</code></td><td>"주문 수량"</td>
+  <td class="ok"><code>yes</code> / 0.85</td>
+  <td class="ok"><code>yes</code> / —<br>matched_var=Order, fixture ok</td>
+  <td class="ok">회귀 0</td>
+</tr>
+<tr>
+  <td>S3</td><td>주문 검증 시뮬 <br><code>simulate</code></td>
+  <td><code>SdOrderValidator.validate</code></td><td>—</td>
+  <td class="ok"><code>bundle_prepared</code> java 431</td>
+  <td class="ok"><code>bundle_prepared</code> java OK · fixtures 1</td>
+  <td class="ok">회귀 0</td>
+</tr>
+<tr>
+  <td>S4</td><td>compileTime이 1 이면? <br><code>hypothesis</code> (negative)</td>
+  <td><code>SdHistoryController.byOrder</code></td><td>"compileTime"</td>
+  <td>—</td>
+  <td class="warn"><code>likely_no</code><br>fixture fail "var ['compileTime'] 매칭 안 됨"</td>
+  <td class="ok">기존 동작 유지</td>
+</tr>
+</table>
+
+<div class="verdict">S2 — 16A 갭 직격 해결 (시니어 권고대로 ~30 LOC fix 가 정확히 박힘)</div>
+<p class="small">
+  16A 의 <code>likely_no / 0.55</code> → 16B 의 <code>yes / 0.75</code>. reasoning 에 <code>matched var='thickness'</code> 가 명시. <code>_expand_var_to_aliases("두께")</code> 가 BusinessTerm row "두께/Thickness" 를 조회해 alias list 빌드 → <code>_infer_verdict</code> 의 (a) AND-token + (d) expression regex 양쪽이 영문 candidate <em>thickness</em> 로 hit. <code>fixture_compat=ok matched=['slab']</code> 도 surface — body 매칭과 fixture 매칭이 <strong>동일 alias bridge 위에서 일관</strong>. 16A 가 절반만 잡던 비대칭 종결.
+</p>
+
+<div class="verdict">한·영 alias 갭 — 16A + 16B 결합으로 사실상 종결</div>
+<p class="small">
+  16A: <code>_check_fixture_compat(repo_id=...)</code> alias 확장 → param 매칭 false negative 해결.
+  16B: <code>_infer_verdict(var_aliases_per_cond=...)</code> body var matching + expression regex 도 alias 통합.
+  두 코드 패스 (fixture vs body) 가 동일 alias source (<code>business_terms.aliases_json</code>) 위에서 평행 진화 → 비대칭 갭 닫힘. S1/S2 모두 <strong>verdict + reasoning + matched_var + fixture_compat 4 필드가 모순 없이 일치</strong>.
+</p>
+
+<div class="verdict">회귀 영향 — 0</div>
+<p class="small">
+  S1 (한국어 var "주문 수량" → matched_var=Order) 와 S3 (simulate 본궤도) 모두 16A 대비 결과 동일. S4 negative control: "compileTime" 영문 var alias 없음 → <code>likely_no</code> + fixture fail 로 기존 동작 유지 (alias list 가 base [var] 만 → 노이즈 hit 없음). backward compat 명세 (<code>var_aliases_per_cond=None</code> 시 legacy) 도 16A 테스트들에서 자동 만족.
+</p>
+
+<h2>다음 Phase 16+ 우선순위 (권고)</h2>
+<ul>
+  <li><strong>16C — verdict-fixture cross-check assertion</strong> (TOP). 4 필드가 일치하는 회로가 완성됐으니, <em>일치하지 않을 때</em> (예: body=yes / fixture=fail) sources 에 <code>integrity_warning</code> Provenance 를 항상 surface. 시니어 트러스트 신호.</li>
+  <li><strong>16D — multi-cond 가설</strong>. S5 후보 "두께 0.1mm 이면서 폭 1000mm 이면?" 같은 AND 가설. 현 <code>conditions</code> 는 list 지만 <code>verdict</code> 통합 로직은 OR-friendly. AND-fold 추가.</li>
+  <li>16E — alias source 확장: 현재 BusinessTerm 만. CodeMethod / Action 의 <code>annotations_json</code> 까지 흡수 시 도메인 어휘 미등록 var 도 회수.</li>
+</ul>
+
+<p class="small">결론: <strong>16B 는 ship.</strong> 시니어 권고가 1:1 로 박혔고 회귀 0, S2 갭 완전 해결, 한·영 alias 비대칭 종결. 다음은 16C (cross-check trust 회로).</p>
+
+</body>
+</html>

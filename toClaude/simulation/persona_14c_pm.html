@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>김PM 페르소나 검증 — Phase 14C (suggestion 1-click + read-only card)</title>
+<style>
+  body { font-family: -apple-system, "Apple SD Gothic Neo", sans-serif; max-width: 880px; margin: 32px auto; padding: 0 24px; color: #1a1a1a; line-height: 1.55; }
+  h1 { font-size: 22px; border-bottom: 2px solid #1a73e8; padding-bottom: 6px; }
+  h2 { font-size: 16px; margin-top: 26px; color: #1a73e8; }
+  h3 { font-size: 14px; margin: 14px 0 6px; }
+  .pass { color: #1b873f; font-weight: 600; }
+  .fail { color: #c5221f; font-weight: 600; }
+  .warn { color: #b06000; font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 8px 0; }
+  th, td { border: 1px solid #d0d7de; padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: #f5f7fa; }
+  code { background: #f0f1f3; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+  .verdict { background: #e8f5e9; border: 1px solid #1b873f; padding: 12px 14px; border-radius: 6px; margin: 16px 0; }
+  .verdict.warn { background: #fff8e1; border-color: #b06000; }
+  .score { font-size: 18px; font-weight: 700; color: #1a73e8; }
+  ul { margin: 4px 0 8px 18px; }
+  li { margin: 3px 0; }
+  .small { color: #555; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>김PM 페르소나 — Phase 14C 검증 (2026-05-18)</h1>
+<p class="small">제조 IT PM 5년차. 13b 검증에서 직접 요청한 0-cand "1-click auto-search" 가 도착함. 백엔드 <code>localhost:8001</code> 실측.</p>
+
+<h2>1. 3 시나리오 실측 요약</h2>
+<table>
+<thead><tr><th>#</th><th>질문 / 흐름</th><th>결과</th><th>판정</th></tr></thead>
+<tbody>
+<tr><td>S1</td><td>"엣징 마진 변경" → SID1 cand=0, suggestions=<code>[엣징그룹코드, edgingGroupCd]</code> → chip 클릭(=새 세션) → 두 가지 모두 재시도</td><td>두 chip 모두 cand=0, suggestions 동일하게 재생산</td><td class="fail">루프</td></tr>
+<tr><td>S2</td><td>"주문 수량이 0이면 어떤 에러" → SID3 hypothesis cand 5+ → confirm → turn 3 <code>executed_hypothesis</code></td><td>verdict=<code>likely_yes</code>, conditions 1, evidence 5 rule, body_text, confidence 0.75 모두 채움</td><td class="pass">통과</td></tr>
+<tr><td>S3</td><td>"validateOrder 어디?" → SID4 locate cand 5+ → confirm → turn 3 <code>executed_lookup</code></td><td>body_text + file_path + linked_term <code>term.scm.order.order</code> + callers 3 (match_kind 포함) + business_rules 5 채움</td><td class="pass">통과</td></tr>
+</tbody>
+</table>
+
+<h2>2. Suggestion 1-click — PM 가치 (이전 vs 이후)</h2>
+<p><b>이전</b>: cand=0 → 회색 panel만 + "다시 시작" 안내. 사용자 좌절 → 영업/제조 PM 이탈.<br>
+<b>이후</b>: chip 보이고, 클릭 = reset + 새 start 자동 호출 (<code>onSuggestionClick → reset() → start(suggestion, repo)</code>). 손목 1번 동작.</p>
+<p><b>판정</b>: <span class="pass">UX flow 자체는 ★★★★☆</span> — 보이고/누르면/돌아감. 다만 <span class="warn">현재 추천된 chip 값(엣징그룹코드 / edgingGroupCd)이 ontology 에 매치 안 되어 다시 0 으로 떨어짐</span>. 클릭은 했지만 같은 자리. <b>1-click "auto-research" UX 는 완성, "auto-resolve" 는 미완.</b></p>
+
+<h2>3. Hypothesis / Lookup 카드 렌더 fix — production-ready 여부</h2>
+<p>이전엔 frontend 가 <code>kind="executed_hypothesis|lookup"</code> 페이로드를 silently null 렌더 (빈 화면). 이번 <code>GateExecutedReadOnlyCard</code> 가 verdict + reasoning + evidence (hypothesis) / linked_term + callers + business_rules (lookup) 를 모두 surface.</p>
+<p>S2/S3 payload 검증 통과 — 카드가 받을 데이터는 백엔드에서 정상. <b>판정: production-ready <span class="pass">YES</span></b>. PM 시연 가능 수준.</p>
+
+<h2>4. 회귀 우려 (2건)</h2>
+<ul>
+  <li><span class="warn">R1 — suggestion chip 무한 루프 가능</span>: chip 값이 candidate 검색 0 으로 떨어지면 같은 chip 이 또 추천된다 (S1 실측). 동일 query 가 N 회 반복되는 dead-end. <b>완화</b>: chip 표시 시 "이미 시도한 항목" 제외 또는 chip 클릭 시 dictionary lookup 으로 별칭 확장.</li>
+  <li><span class="warn">R2 — confirm + respond 2-step 의존</span>: locate/hypothesis turn 3 진입에 <code>/confirm</code> + <code>/respond</code> 두 호출 필요. frontend 자동 chain 정상 동작 확인됐지만 네트워크 끊김 시 turn 3 페이로드 유실 가능 (사용자가 reload 하면 turn 2 의 cand 만 보임). <b>완화</b>: confirm 응답에 turn 3 가 함께 포함되는 단일 endpoint 검토.</li>
+</ul>
+
+<div class="verdict">
+<span class="score">종합: 8.0 / 10</span> — PM 데모 진행 가능. Hypothesis/Lookup 카드 fix 는 즉시 production. Suggestion 1-click 은 mechanic <span class="pass">완성</span>이나 chip 후보 품질이 다음 마일스톤. 13b 에서 요청한 "PM 이 막혀도 다음 행동을 1번에 한다" 의 절반은 달성. 다음 단계는 chip → ontology alias 매핑.
+</div>
+
+</body>
+</html>

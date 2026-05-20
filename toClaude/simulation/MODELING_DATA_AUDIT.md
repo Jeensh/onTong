@@ -21,11 +21,11 @@
 | type_realizations | 41/41 |
 | anchor_bindings | 163/163 |
 
-### actions verification_level 분포
+### actions verification_level 분포 (Phase E-C 완료 후)
 | level | n | 의미 |
 |---|---|---|
-| **sim_verified** | **124** | ✨ sim_v2 fixture PASS 검증 완료 (95.4%) |
-| signature_locked | 6 | sim ERROR (java_translator 의 deferred 패턴: try-with-resources / generic instanceof) |
+| **sim_verified** | **130** | ✨ **100%** (E-C3 translator fix + E-C4 promote 후) |
+| signature_locked | 0 | (Phase E-C3 translator 5 patches 로 해소) |
 | body_anchored | 0 | (모두 promoted) |
 
 ### call_sites 분포 (2,298 → 51 pending, **97.8% 감소**)
@@ -191,5 +191,49 @@ aliases: ["주문", "Order", "SDOrderEntity", "주문 엔티티", "order entity"
 ## 백업 + 복구 정보
 
 - 작업 전 backup: `data/ontology.db.bak-pre-enrichment-20260518-152543` (5MB)
-- 백업 복구: `cp data/ontology.db.bak-pre-enrichment-20260518-152543 data/ontology.db` (서버 재기동 필수)
-- 코드 변경은 git diff 로 추적 가능 (java_translator.py + production_domain_loader.py)
+- E-C 작업 전 backup: `data/ontology.db.bak-pre-reimport-20260518-201243` (5.4MB)
+- 최신 snapshot: `data/enrichment_snapshot_slab_design_real_v2_20260518_111338.json` (1.8MB)
+- 백업 복구: `cp <bak> data/ontology.db` (서버 재기동 필수)
+- snapshot 복구: `.venv/bin/python scripts/reapply_modeling_enrichment.py --db data/ontology.db --snapshot <snapshot>.json`
+- 코드 변경은 git diff 로 추적 가능 (commits: `9a6a6a8`, `f449355`)
+
+---
+
+## Phase E-C — Parser root fix + translator rework (2026-05-18 종료)
+
+**Goal**: 6 stuck actions 도 sim_verified 로 + 향후 re-import 시 enrichment 손실 방지 + parser 단계에서 call_site 분류 자동화
+
+### E-C1 (commit `9a6a6a8`) — safety net
+- `scripts/export_modeling_enrichment.py` + `scripts/reapply_modeling_enrichment.py`
+- ID-independent natural-key UPSERT (call_sites = caller+callee+line, realizations = action_fqn+code_method_fqn+applies_to_code_type_fqn, ...)
+- round-trip verified: strip → reapply → exact match 모든 7 테이블
+
+### E-C2 (commit `f449355`) — parser symbol table
+- 신규 `backend/modeling/code_analysis/method_symbol_table.py` (190 LOC)
+- params + locals + for-each + try-with-resources + catch + Java 16 instanceof pattern var + class field 모두 추적
+- `java_parser._extract_calls` 가 `attributes["receiver_type"]` + `receiver_kind` additive 부착 (target shape 보존 — call_resolver backward-compat)
+- 결과: **2,114/2,448 calls (86%) 가 receiver_type 자동 채움**
+- 새 parser native 분류: single_impl 1,183 + annotation 252 = **1,435 high-conf (수동 cleanup의 524 unique-owner 대비 2.7배)**
+
+### E-C3 (commit `f449355`) — translator 5 patches
+| # | 패턴 | 해소 action |
+|---|---|---|
+| 1 | `try_with_resources_statement` → `_STATEMENT_TYPES` | SeedService.reset |
+| 2 | `instanceof T t` → walrus `(isinstance(x, T) and (t := x))` + strip generics | TraceCollector.wrap |
+| 3 | `List/Set/Map.copyOf(x)` → `list/set/dict(x)` | TraceCollector.traces |
+| 4 | LHS shadowing 방지: `X x = x(...)` → `_x = x(...)` + alias map | 3 SdSplitRangeActionTest |
+| 5 | resource skip-set `scoped_type_identifier` | (hardening) |
+- 회귀 0 (synthesizer 399/399 + parser 47 + code_layer 64 + spring analyzer 60+ all PASS)
+
+### E-C4 — re-import + reapply + promote
+- backend stop → 직접 `RepoImporter().run()` (fresh code)
+- import 656ms, mapping/domain 보존 (delete_repo는 code_layer만 wipe)
+- reapply 2,298/2,298 매칭, missed 0
+- 6 actions SQL 승격 → verification_level='sim_verified', confirmed_by='translator_e_c3'
+- **130/130 sim_verified 100% 달성**
+
+### 다음 import 의 보장
+이제 다른 repo 를 import 해도:
+1. parser 가 86% receiver_type 자동 채움 → analyzer 1,435 high-conf 자동 분류
+2. translator 가 6 가지 Java 패턴 추가 처리
+3. enrichment 작업 후 export → 재import 시 reapply 로 무손실 복구

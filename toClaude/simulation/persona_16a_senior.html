@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Phase 16A — Senior Backend Review</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 920px; margin: 24px auto; padding: 16px; color: #1f2937; line-height: 1.55; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .meta { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
+  h2 { font-size: 15px; margin-top: 18px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; }
+  th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f9fafb; }
+  code { background: #f3f4f6; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+  .ok { color: #166534; font-weight: 600; }
+  .warn { color: #92400e; font-weight: 600; }
+  .fail { color: #991b1b; font-weight: 600; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  .verdict { padding: 10px 14px; border-radius: 6px; font-weight: 600; background: #ecfdf5; color: #065f46; border-left: 4px solid #10b981; margin: 12px 0; }
+  .gap { padding: 10px 14px; border-radius: 6px; background: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b; margin: 12px 0; }
+  .small { font-size: 11px; color: #6b7280; }
+</style>
+</head>
+<body>
+
+<h1>Phase 16A 검증 — 시니어 백엔드 평가 (14B 잔여 직격)</h1>
+<div class="meta">10년차 시니어 · 2026-05-18 · backend 8001 라이브 · repo <code>slab-design-real-v2</code></div>
+
+<h2>실측 3 시나리오</h2>
+<table>
+<tr><th>#</th><th>질의</th><th>target (top-1)</th><th>conds.var</th><th>14B baseline</th><th>16A 실측</th><th>delta</th></tr>
+<tr>
+  <td>S1</td><td>주문 수량이 0 이면 어떤 에러?</td>
+  <td><code>SdOrderValidator.validate</code></td><td>"주문 수량"</td>
+  <td><code>likely_yes</code> / 0.75</td>
+  <td class="ok"><code>yes</code> / 0.85</td>
+  <td class="ok">개선</td>
+</tr>
+<tr>
+  <td>S2</td><td>두께 0.1mm 인 슬라브 검증 실패?</td>
+  <td><code>SdThicknessAction.execute</code></td><td>"두께"</td>
+  <td>(미측정)</td>
+  <td class="warn"><code>likely_no</code> / 0.55</td>
+  <td class="warn">부분</td>
+</tr>
+<tr>
+  <td>S3</td><td>주문 검증 시뮬해줘 (회귀)</td>
+  <td><code>SdOrderValidator.validate</code></td><td>—</td>
+  <td><code>bundle_prepared</code> / 0.85</td>
+  <td class="ok"><code>bundle_prepared</code> / 0.85 · java 431 / py 416 / fixtures 1</td>
+  <td class="ok">동일</td>
+</tr>
+</table>
+
+<div class="verdict">S1 — 14B false negative 직격 해결</div>
+<p class="small">
+응답에 <code>fixture_compat=ok matched_params=['order']</code> surface (14B 는 var miss 로 fail). reasoning: "한·영 alias 갭 가능 이나 <strong>business_rule 4 행 → rule 기반 추정</strong>" — alias bridge (<code>_check_fixture_compat</code>) + rule-driven verdict (L717) 양쪽 발화. evidence 5 행 (DG001~DG005) 그대로.
+</p>
+
+<div class="gap">S2 — 16A 가 절반만 잡음 (시니어 발견 잔존 갭)</div>
+<p class="small">
+SdThicknessAction body 는 <code>spec.getSlabThickness()</code>, <code>slab.setSlabThickness(...)</code> 등 영문 <strong>"thickness"</strong> 명시 포함. <code>term.scm.thickness</code> (label=두께, aliases=["thickness","thk",...]) 존재. 그러나 <code>_infer_verdict</code> (L587-748) 는 raw <code>var.lower()="두께"</code> 로만 <code>body_lower</code> 검색 — alias 미적용. body_signals=0, evidence=0, verdict=<code>likely_no</code>.
+fixture_compat 은 <code>ok matched_params=['slab']</code> 으로 alias bridge 동작했으나, verdict 강화 분기 (L107-113) 는 <code>likely_yes → yes</code> 만 처리. likely_no 보정 없음. <strong>16A 가 fixture-compat 쪽만 손대고 verdict 추론 쪽은 그대로 둠.</strong>
+</p>
+
+<h2>회귀 평가 (15A/B/C 영향)</h2>
+<ul>
+  <li class="ok">S3 simulate 분기 — bundle_prepared/0.85, java 431, python 416, fixtures 1, idiom_diffs 0 — Phase 15B baseline 동일.</li>
+  <li class="ok">candidate ranking (Phase 12 activation boost) — SdOrderValidator/SdThicknessAction 모두 top-1 (score 29/50) 유지. role/parent_role/annotations 4 필드 정상.</li>
+  <li class="ok">evidence/anchor_bindings/sources provenance schema — 무변경. 14F anchor_bindings 5 행 surface 동작.</li>
+</ul>
+
+<h2>다음 Phase 16B 우선순위 (시니어 권고)</h2>
+<ol>
+  <li><strong>16B: <code>_infer_verdict</code> 에도 alias bridge 적용</strong> — body_text 검색 전에 <code>_expand_var_to_aliases(var, repo_id)</code> 호출하여 모든 alias 로 OR 매칭. S2 ("두께" → "thickness") 가 즉시 likely_yes/yes 로 상승. <strong>최대 ROI</strong>. ~30 LOC.</li>
+  <li>16C: business_rules 검색에도 alias 적용 (<code>_fetch_rule_evidence</code> 가 linked_term FQN 기반이라 alias 미필요할 수 있음 — audit 후 결정).</li>
+  <li>16D: fixture_compat fail + var miss 경고를 sources Provenance 에 surface (현재 silent). senior 인 확인 가능하도록.</li>
+</ol>
+<p class="small">결론: 14B false negative <strong>S1 케이스는 완전 해결</strong> (0.75→0.85 + verdict 강화). 그러나 S2 가 보여주듯 <strong>alias bridge 가 verdict 추론 경로에는 미적용</strong> — 한국어 var + 영문 body 코드 조합 (실 코베이스의 디폴트) 에서 false negative 잔존. 16B 즉시 실행 권고.</p>
+
+</body>
+</html>

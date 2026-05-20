@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>최QA — Phase 16F multi-cond AND 검증</title>
+<style>
+  body{font-family:-apple-system,Segoe UI,sans-serif;max-width:980px;margin:24px auto;padding:0 16px;color:#1f2937;line-height:1.55}
+  h1{font-size:22px;margin:0 0 4px}
+  h2{font-size:16px;margin:18px 0 8px;border-left:3px solid #4f46e5;padding-left:8px}
+  .tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-right:4px}
+  .ok{background:#dcfce7;color:#166534}
+  .warn{background:#fef3c7;color:#92400e}
+  .err{background:#fee2e2;color:#991b1b}
+  table{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px}
+  th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left;vertical-align:top}
+  th{background:#f3f4f6}
+  code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:11.5px}
+  .score{font-size:28px;font-weight:700;color:#b91c1c}
+  .lede{color:#475569;font-size:13px;margin:0 0 8px}
+</style>
+</head>
+<body>
+<h1>최QA — Phase 16F multi-cond AND 검증</h1>
+<p class="lede">시니어 16B 권고로 배포된 AND semantic. 3 시나리오 실측 + 직접 unit 검증 결과 — 단위 PASS 인데 production 에서 미동작 패턴 발견.</p>
+
+<h2>1. LLM multi-cond 추출 신뢰성 (turn 2)</h2>
+<table>
+<tr><th>QA 질문</th><th>intent</th><th>conds 추출</th><th>적중도</th></tr>
+<tr><td>두께 0.1mm <b>이고</b> 폭 1000mm 이상이면?</td><td><span class="tag ok">hypothesis</span></td><td><b>2</b> (두께==0.1mm, 폭&gt;=1000mm)</td><td><span class="tag ok">HIT</span> top=final_width_range</td></tr>
+<tr><td>두께 0.1mm <b>일 때만</b> 검증 실패?</td><td><span class="tag ok">hypothesis</span></td><td><b>1</b> (두께==0.1mm)</td><td><span class="tag ok">HIT</span> top=thickness_실행</td></tr>
+<tr><td>중량 100kg 이상 <b>+</b> 길이 1m 미만일 때?</td><td><span class="tag ok">hypothesis</span></td><td><b>2</b> (중량&gt;=100, 길이&lt;1)</td><td><span class="tag ok">HIT</span> top=first_weight_실행</td></tr>
+</table>
+<p style="font-size:12px;color:#64748b;margin:6px 0">결론: LLM conds 추출 3/3 정확. op (이상→&gt;=, 미만→&lt;), unit (mm/kg/m), value 모두 정상. "+" / "이고" / "일 때만" 자연어 패턴 모두 다중 cond 로 분리.</p>
+
+<h2>2. AND semantic 동작 검증 (turn 3) — <span class="score">FAIL</span></h2>
+<table>
+<tr><th>시나리오</th><th>matched</th><th>verdict</th><th>reasoning 의 N/M suffix?</th></tr>
+<tr><td>S1 final_width body (값 미포함, var alias 만 hit)</td><td>~partial</td><td>yes (fixture boost)</td><td><span class="tag err">MISSING</span> "body 안에 변수+값/연산자 시그널 2 발견 …"</td></tr>
+<tr><td>S2 single cond (backward compat)</td><td>1/1</td><td>yes</td><td><span class="tag ok">OK</span> 단일이라 suffix 정상 부재</td></tr>
+<tr><td>S3 first_weight body (값 미포함)</td><td>~partial</td><td>yes (fixture boost)</td><td><span class="tag err">MISSING</span> "body 안에 변수+값/연산자 시그널 2 발견 …"</td></tr>
+</table>
+
+<h2>3. 근본 원인 — cond_match_suffix 가 dead code</h2>
+<p style="font-size:12.5px;margin:4px 0"><code>gate_hypothesis.py:875-898</code>. <code>cond_match_suffix</code> 가 계산은 되지만 <b><code>has_expression_match</code> 분기 (line 898) 에서만 reasoning 에 부착</b>됨. 나머지 6 branch (body_signals/rule_signals/unknown) 는 <code>+ cond_match_suffix</code> 누락. 직접 호출 검증:</p>
+<table>
+<tr><th>입력 body</th><th>verdict</th><th>reasoning</th></tr>
+<tr><td><code>if (thickness==0.1 && width&gt;=1000) throw;</code></td><td>likely_yes</td><td>… "정확한 expression … 매칭 발견 <b>· 조건 2/2 매칭 (모든 조건)</b>"  → suffix OK</td></tr>
+<tr><td>실측 final_width body (alias hit, 값 미포함)</td><td>likely_yes</td><td>"body 안에 변수+값/연산자 시그널 2 발견" → <b>suffix 누락</b></td></tr>
+<tr><td><code>if (thickness==0.1) compute();</code> (partial)</td><td>likely_yes</td><td>"body 변수/값 co-occurrence + 시그널 6 강함" → <b>suffix 누락</b></td></tr>
+<tr><td>무관 body (zero)</td><td>unknown</td><td>"body / business_rules 모두에서 … 못 찾음" → <b>suffix 누락</b></td></tr>
+</table>
+<p style="font-size:12px;color:#b91c1c;margin:6px 0"><b>AND 약화 로직 (line 891-892) 은 동작</b> — partial 시 likely_yes 로 캡. 그러나 fixture-compat boost (line 121-122) 가 likely_yes→yes 로 다시 끌어올려 약화 효과를 무력화. 또한 reasoning 의 N/M 정보가 surface 안 돼 QA 가 partial 여부 판단 불가.</p>
+
+<h2>4. 평가 <span class="score">3 / 10</span> + 16G 권고</h2>
+<ol style="margin:4px 0 0 20px;font-size:13px">
+<li><b>16G-#1 (P0, blocking)</b>: <code>cond_match_suffix</code> 를 6 branch 모두에 부착. reasoning 후처리 (line 944-946) 직전에 <code>if cond_match_suffix and "조건" not in reasoning: reasoning += cond_match_suffix</code> 1-line 추가.</li>
+<li><b>16G-#2 (P0)</b>: fixture-compat boost (line 121) 에 <i>multi-cond AND guard</i>. <code>matched_cond_count &lt; total</code> 이면 likely_yes→yes 승격 금지. 현재는 partial 도 fixture OK 면 yes 됨.</li>
+<li><b>16G-#3 (P1)</b>: 16F unit test 가 모두 <code>has_expression_match</code> 분기만 cover — 7 PASS 가 false confidence. 실제 production 분기 (body_signals 경로) test 추가 필수. <code>var_aliases_per_cond</code> + 값 미포함 body fixture 로 partial 검증.</li>
+<li><b>16G-#4 (P2)</b>: confidence 도 N/M 반영. 현재 partial 도 0.85 고정. <code>confidence *= matched/total</code> 로 약화하면 QA 가 confidence 만 봐도 partial 인지 추정 가능.</li>
+</ol>
+<p style="font-size:11.5px;color:#475569;margin-top:8px"><b>요약</b>: 16F LLM cond 추출 = 완벽. AND verdict 약화 = 부분 동작 (fixture boost 가 무력화). N/M 정보 surface = 거의 동작 안 함 (1/4 branch). 단위 테스트 7 PASS 인데 production 8001 에선 N/M 안 보임 → 16G 진입 권고.</p>
+
+</body></html>

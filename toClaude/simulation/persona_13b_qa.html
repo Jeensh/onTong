@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>최QA — Phase 13b 페르소나 검증</title>
+<style>
+  body{font-family:-apple-system,Segoe UI,sans-serif;max-width:980px;margin:24px auto;padding:0 16px;color:#1f2937;line-height:1.55}
+  h1{font-size:22px;margin:0 0 4px}
+  h2{font-size:16px;margin:18px 0 8px;border-left:3px solid #4f46e5;padding-left:8px}
+  .tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-right:4px}
+  .ok{background:#dcfce7;color:#166534}
+  .warn{background:#fef3c7;color:#92400e}
+  .err{background:#fee2e2;color:#991b1b}
+  table{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px}
+  th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left;vertical-align:top}
+  th{background:#f3f4f6}
+  code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:12px}
+  .score{font-size:28px;font-weight:700;color:#4f46e5}
+  .lede{color:#475569;font-size:13px;margin:0 0 8px}
+</style>
+</head>
+<body>
+<h1>최QA — Phase 13b 페르소나 검증</h1>
+<p class="lede">QA 엔지니어 8년차. 3개 boundary value 질문을 멀티턴 API 에 직접 던져 본 결과.</p>
+
+<h2>1. 실측 결과 (turn 2 = Gate I real)</h2>
+<table>
+<tr><th>QA 질문</th><th>intent</th><th>cands</th><th>적중도</th></tr>
+<tr><td>엣징 마진 <b>1.0 미만</b>이면?</td><td><span class="tag warn">explain</span></td><td>0</td><td><span class="tag err">FAIL</span> ontology 0.0 / sim_v2 0.3. suggestions 만 ["엣징그룹코드","edgingGroupCd"] — 검증 로직 미접근</td></tr>
+<tr><td>두께 <b>0.1mm</b> 슬라브 검증 실패?</td><td><span class="tag ok">impact</span></td><td>3</td><td><span class="tag ok">HIT</span> <code>SdOrderValidator.validate()</code> #1. <code>checkStockOrder/checkOrderSize</code> 라인 발견</td></tr>
+<tr><td>주문 수량 <b>0</b> 이면 에러?</td><td><span class="tag warn">explain</span></td><td>4</td><td><span class="tag err">MISS</span> 모두 <code>FinalLengthRange/Width/FirstWeight/InitialSlabWgt.execute</code> (계산 로직). 실제 qty 검증인 <code>checkOrderSize</code> 못 잡음</td></tr>
+</table>
+
+<h2>2. Phase 13b 평가: <span class="score">2.5 / 5</span></h2>
+<ul style="margin:4px 0 4px 18px">
+<li><b>+</b> search_terms 추출은 동작 — "엣징/마진", "두께/검증", "주문/수량" 다 뽑힘.</li>
+<li><b>+</b> Q2 는 진짜 검증 클래스 정확히 surface. 0-cand suggestions fallback (Q1) 도 의미 있음.</li>
+<li><b>-</b> 치명적: <b>boundary value (1.0, 0.1mm, 0) 자체가 search_terms 에서 의도적으로 누락</b> — prompt 가 "검색 토큰만" 으로 제약. QA 가 던지는 핵심 조건이 사라짐.</li>
+<li><b>-</b> Q1·Q3 모두 <span class="tag warn">explain</span> 으로 분류 → Gate II/III 안 거치고 <code>gate_executed_lookup</code> 경로로 빠져 method body 만 던짐. "1.0 미만일 때 ValidationResult 가 fail() 인가 pass() 인가" 같은 <i>조건→결과</i> 추론 0건.</li>
+</ul>
+
+<h2>3. 핵심 갭 — Phase 13c (hypothesis intent) 부재의 구체 피해</h2>
+<table>
+<tr><th>예시</th><th>현 13b 답변</th><th>QA 가 원하는 것</th></tr>
+<tr><td>"마진 0.99 면?"</td><td><code>explain</code> → 0 cand, "엣징그룹코드" 어휘 추천</td><td>"0.99 &lt; 1.0 임계값 → <code>checkEdgingMargin</code> 이 <code>fail("EDG_001", ...)</code> 반환. 정상 케이스는 ≥1.0"</td></tr>
+<tr><td>"두께 0.1mm"</td><td><code>impact</code> → validate() body 통째</td><td>"0.1mm 입력 시 <code>checkOrderSize</code> 분기에서 min=2.0mm 위반 → false 반환. 0.1mm 케이스 실행 trace 보여줘"</td></tr>
+<tr><td>"qty=0"</td><td><code>explain</code> → 무관한 계산 액션 4개</td><td>"qty=0 시 <code>BigDecimal.divide</code> 에서 ArithmeticException 위험. 또는 <code>checkOrderSize</code> 가 사전 차단"</td></tr>
+</table>
+
+<h2>4. Phase 13c 가 추가해야 할 것 (QA 우선순위)</h2>
+<ol style="margin:4px 0 0 20px">
+<li><b>hypothesis intent</b> 신설 — "X 가 Y 값일 때 Z 되나?" 패턴 인식. 숫자/단위/연산자 (<, =, ≥) 가 query 에 보이면 hypothesis 로 우선 라우팅.</li>
+<li><b>boundary value 추출 필드</b> — search_terms 외에 <code>conditions: [{var, op, value, unit}]</code> 분리. 예: <code>[{var:"thickness", op:"=", value:0.1, unit:"mm"}]</code>. Gate III sim 에 fixture 로 주입.</li>
+<li><b>conditional execution oracle</b> — 추출한 condition 으로 Gate III sim 의 fixture 생성 → sandbox 실행 → "이 입력일 때 return = fail('XXX_001')" 형태로 응답. method body 던지기 X.</li>
+</ol>
+
+</body></html>

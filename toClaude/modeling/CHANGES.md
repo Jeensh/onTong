@@ -6,6 +6,302 @@
 
 ---
 
+## 2026-05-18 (cross-section: Phase E-C — Parser + Translator rework)
+
+> Section 3 (simulation) 세션이 cross-section 권한으로 modeling 코드 수정.
+> 상세 분해 + 카운트 변화는 `../simulation/log/step_ec_parser_translator_rework.md` 참조.
+
+### 추가/수정 (modeling 영역만)
+- [x] `backend/modeling/code_analysis/method_symbol_table.py` (신규 190 LOC) — params/locals/for-each/try-with-resources/catch/instanceof pattern var/class field 추적
+- [x] `backend/modeling/code_analysis/java_parser.py` — `_extract_calls` 가 `attributes["receiver_type"]` + `receiver_kind` + `receiver_text` 를 additive 부착. **target shape 보존** (call_resolver backward-compat OK).
+- [x] `scripts/export_modeling_enrichment.py` + `scripts/reapply_modeling_enrichment.py` — re-import safety net (round-trip verified)
+
+### Importer 영향
+- 다음 import 부터 자동으로 `receiver_type` 채움 → `analyze_call_sites` 가 single_impl/annotation 으로 native 분류 (이전: 모두 static_unresolved)
+- slab-design-real-v2 기준: 2,448 raw calls 중 2,114 (86%) 가 receiver_type 자동 채움, 1,435 (≥0.85 confidence) 가 native high-conf 분류
+
+### 회귀 검증 (modeling 측)
+- `tests/test_java_parser_basic.py` 19 PASS
+- `tests/test_java_parser_annotations.py` 14 PASS (3 skipped)
+- `tests/test_java_parser_field_attributes.py` 14 PASS (3 skipped)
+- `tests/code_layer/` 64 PASS (2 pre-existing FK 실패는 무관)
+- `tests/test_spring_*_analyzer.py` 60+ PASS (call_resolver qualifier 테스트도 OK)
+
+### 커밋
+- `9a6a6a8` feat(modeling): enrichment export/re-apply safety net
+- `f449355` fix(modeling+sim_v2): receiver-type symbol table + 5 translator gaps
+
+---
+
+## 2026-05-18 (Graph Redesign — Option 3 Coverage + Impact 분업)
+
+사용자 결정: 옵션 3 (B Coverage daily + A Impact event) + d/a/a + b/a 로 확정.
+"확실한 가치와 목표를 정하고 가줘" → 두 모드 분업으로 일상 진척률 모니터링 + 변경 영향 분석을 분리.
+
+- [x] **Backend audit 테이블** — `backend/modeling/audit/{__init__,orm,store}.py` 신설.
+      `EntityChangeLogRow` PK=autoincrement + 복합 인덱스 (repo_id, changed_at) / (entity_kind, entity_id).
+      `log_change`, `log_changes_bulk`, `count_recent_changes`, `recently_changed_ids` 헬퍼.
+      `queue_actions_api.py` confirm/reject/unconfirm/patch 모든 분기에 hook + `recommend_api.py` persist 시 bulk hook.
+- [x] **Coverage 엔드포인트** — `GET /api/ontology/repos/{repo_id}/graph/coverage`
+      도메인 grid heatmap (term/action/code_type by domain — code_type 는 package 마지막 2 segment).
+      `+ /coverage/{domain}/priority?lens=draft,orphan,recent&limit=50&recent_days=7`
+      우선 처리 entity 리스트 (priority_score + reasons). 2026-05-18 후속: code_type branch 추가
+      (예: `domain.logic` 같은 code_type-only 도메인이 0 hits 였던 문제 해결 — **백엔드 재시작 필요**).
+- [x] **Impact 엔드포인트** — `GET /api/ontology/repos/{repo_id}/graph/impact?focus=...&focus_kind=...&hops=2&direction=both`
+      양방향 BFS, match_kind 5단계 strength (receiver_exact/short/runtime_type/package_proximity/name_only)
+      기반 risk_score = 10 × strength / (distance+1). risk_top + re_verify_targets (confirmed anchor)
+      + expand_method_targets. `+ /impact/expand-method?code_type_fqn=...` 클래스 lazy method 펴기.
+      `_forward_neighbors` self-join SQL bug 수정 (ambiguous column name).
+- [x] **Frontend store** — `graphTopMode: coverage|impact|explore`, `coverageLenses[]`,
+      `coverageExpandedDomain`, `impactFocusFqn`, `impactFocusKind`, `impactHops`, `impactDirection`,
+      `impactMinStrength`, `impactIncludeMethods`, `impactExpandedTypes[]` + setters/toggles + `jumpToImpact()`.
+- [x] **Frontend API client** — `lib/api/ontology.ts` 에 `getCoverage`, `getCoveragePriority`, `getImpact`,
+      `expandImpactMethods` + 대응 DTO (`CoverageResponseDTO`, `DomainCellDTO`, `PriorityResponseDTO`,
+      `ImpactResponseDTO`, `ImpactNodeDTO`, `ImpactEdgeDTO`, `MethodNodeDTO`, `ExpandMethodResponseDTO`).
+- [x] **Frontend URL sync** — `useUrlSync.ts` 에 `graph_mode`, `lenses`, `impact_focus`, `impact_kind`,
+      `hops`, `dir` 양방향 sync 추가. Explore 모드는 기존 `mode/focus/target/n_max/p/compound` 유지.
+- [x] **GraphMode.tsx** — top-level 3-mode switcher (Coverage / Impact / Explore) + 한 줄 hint.
+      Esc 닫기는 유지.
+- [x] **CoverageView.tsx** — lens 토글 (☑/☐ Draft / Orphan / Recent) + recent_days select (1/3/7/14/30d)
+      + stalled 6 / 완료율 % 헤더 + ratio 색조 cell (green/amber/rose) + cell click → priority panel
+      펼침. entity hover → "Impact" 버튼 노출 → `jumpToImpact(fqn, kind)` 로 Impact mode 진입.
+- [x] **ImpactView.tsx** — focus chip + 5단계 strength 색 엣지 (sky/cyan/emerald/amber/red-400) + xyflow
+      canvas (distance 기반 layout: focus 중앙, backward 좌측, forward 우측) + 사이드 패널
+      (Summary / 위험 Top 12 / 재검증 대상 / 메서드 확장 (lazy ExpandMethodRow)).
+- [x] **E2E 검증** — `view=graph` 진입 → Coverage 39 도메인 grid 정상 렌더 + lens 토글 ☑/☐ 작동
+      + cell click → 패널 펼침 (term/action 도메인 = 0 candidates because all confirmed; code_type
+      도메인은 backend 재시작 후 작동). Impact `?graph_mode=impact&impact_focus=...&impact_kind=action`
+      URL 진입 → focus chip + risk Top (5.00 execute / 4.50 BR original_equals_adjusted 등) +
+      재검증 대상 (SdSlabSaveAction.execute, SlabNoSequence.next) 정상.
+- [ ] **백엔드 재시작 후 확인** — `domain.logic`, `working.action` 같은 code_type-only 도메인의
+      priority 패널이 entity 리스트를 채우는지. (현재 코드는 패치 완료, uvicorn `--reload` 없이
+      실행 중이라 hot pickup 안 됨.)
+
+### 2026-05-18 후속: CodeType detail 메서드 inline expand
+
+사용자 flag: "큐 → code type → 메서드 클릭 무반응".
+
+- [x] **method row → 펼침 토글** — `MainPanel.tsx CodeTypeDetail` 의 method 렌더가 `<div>` (onClick
+  X) 였음. `<button>` 으로 교체 + `expandedMethods: Set<string>` state + `ChevronRight` 회전.
+  `m.body_text` 가 이미 CodeTypeDTO 에 포함되어 있어 추가 fetch 없이 inline `JavaCode` 렌더.
+  body 가 없는 (abstract/interface/parser 누락) method 는 `disabled + opacity-30 chevron` 으로
+  명시. line 정보 + anchor count header 도 펼친 코드 위에 표시.
+
+### 2026-05-18 후속: 큐 미리보기 색상 통일 + 정보 완전성
+
+사용자 피드백: "색상때문에 글자 안 보임 + 의미있는 작업 도달 가능?" → 3개 항목.
+
+- [x] **색상 통일 (single accent)** — violet/emerald/rose 의 혼재 제거. Header `bg-violet-500/10 +
+  text-violet-300` → `bg-muted/40 + bullet primary dot + text-foreground`. Confirm 버튼
+  `bg-emerald-500/20 text-emerald-200` (저대비) → 기본 `<Button>` (solid primary). Reject 는
+  `text-destructive border-destructive/40 hover:bg-destructive/10` 로 idle 상태에서도 의미 노출.
+  Selected QueueRow / 추천 버튼 / 새 entity 버튼 모두 `text-primary + bg-primary/10 + border-primary` 로 통일.
+- [x] **Action preview realizations/params/effects 상위 3개** — `ListSection` 컴포넌트 신설.
+  count 만 보이던 `Params · 4`, `Effects · 2`, `Realizations · 3` 영역에 각각 상위 3개 압축
+  list (main / sub 2-line) + `+ N more (Detail 탭에서 전체 확인)` 표시. 의사결정 직전 충분한
+  근거 노출.
+- [x] **Realization preview 양쪽 context** — code_type + term 을 concurrent fetch
+  (`Promise.all`). 상단에 `code_type → term` 매핑 헤더 + scope chip (primary/muted) + confidence.
+  아래에 `ContextCard` 2개: (1) Code type — simple_name / package / kind / role / 메서드 상위 4 +
+  +N more, (2) Term — label / kind / domain / aliases / root flag / description block. rationale
+  은 별도 Block. "이 매핑 맞아?" 판단 정보 완전화.
+- [x] **공통 building blocks** — `Field` (label/value grid), `Block` (description/rationale 박스),
+  `ListSection` (top-3 + rest), `ContextCard` (heading + loading + empty) 4개 small components
+  로 분리. 시각 위계 통일.
+
+### 2026-05-18 후속: 새 entity 생성 + 큐 미리보기 결함 일괄 수리
+
+사용자 피드백: "사용성/UI 버그 + Code 큐 여전히 무반응". 검토 후 6개 항목 수리.
+
+- [x] **Code (legacy) section row 클릭 원활화** — `LeftPanel.tsx:258-321` 의 `<div>` 를
+  `<button>` 으로 교체. ambig callsite → caller method 의 parent type 으로, unmapped method →
+  `code_method.parent_type_fqn` 으로 `setSelectedCodeType` + `setLeftTab("code")`. selected 시
+  violet 좌측 border. (사용자 flag — Code 큐 53개 항목 무반응 해결)
+- [x] **NewEntityModal kind 전환 시 state reset** — `switchKind(k)` 헬퍼가 reset 호출 후 setKind.
+  Term → Action 전환 시 fqn/label/domain/aliases 다 초기화 → 잘못된 entity 로 submit 위험 제거.
+- [x] **Modal backdrop click 제한** — `hasInput` 가드. 입력 있을 때 backdrop 클릭 무시. X 버튼
+  또는 "취소" 버튼으로만 닫힘. 실수로 입력 손실 방지.
+- [x] **"+ 새로" 버튼 재배치** — 탭 strip 안 misalignment 제거. 별도 toolbar 로 분리 (탭 strip
+  위에 우측 정렬, violet 테두리 + "새 entity 추가" full label).
+- [x] **QueuePreviewPanel → Detail 이동 시 leftTab 동기화** — Term/Action 선택 시
+  `setLeftTab("ontology")`, Realization 의 code_type 선택 시 `setLeftTab("code")`. tree 와 detail
+  panel 의 entity kind 일치.
+- [x] **Anchor 입력 search picker** — `SearchPicker` 컴포넌트 신설. `code_method_fqn` /
+  `target_action_fqn` 필드를 backend `/api/ontology/search` 호출 autocomplete 로 교체. kind filter
+  (code_method 또는 action) + debounced 200ms + 외부 클릭 시 dropdown 닫힘 + 매칭 없으면 직접
+  입력 fallback. 사용자가 손으로 FQN 타이핑 부담 제거.
+
+### 2026-05-18 후속: 새 entity 생성 진입점 + 큐 미리보기 패널
+
+사용자 결정 (브리핑 후): 새 entity 생성 = 전용 모달 / 큐 row 클릭 = RightPanel preview.
+
+**새 entity 직접 추가**
+- [x] **Backend `entity_create_api.py`** — 4개 POST 엔드포인트 신설:
+  - `POST /api/ontology/repos/{repo_id}/terms` (TermCreateBody)
+  - `POST /api/ontology/repos/{repo_id}/actions` (ActionCreateBody)
+  - `POST /api/ontology/repos/{repo_id}/business-rules` (BusinessRuleCreateBody)
+  - `POST /api/ontology/repos/{repo_id}/anchor-bindings` (AnchorBindingCreateBody)
+
+  모두 `confirmed=False` + audit log `changed_by="user"` + 충돌 시 HTTP 409.
+  Anchor 는 `sha1(method|locator|action|slot)[:16]` 으로 id 자동 계산.
+  `main.py` 의 `include_router(entity_create_api.router)` 등록.
+- [x] **Frontend `NewEntityModal.tsx`** — `LeftPanel` 상단 우측 `+ 새로` 버튼 → modal. Kind selector
+  (Term/Action/BR/Anchor) + kind 별 필수 필드 (FQN/Label/Statement/anchor locator 등) + radio pill
+  (atomic/composite, pure/effectful/workflow, hard/soft) + 검증 에러 표시. 성공 시 적절한
+  `setSelectedXxx` + `bumpQueueRefresh` + 모달 닫기.
+- [x] **API client 확장** — `ontology.ts` 에 `createTerm / createAction / createBusinessRule /
+  createAnchorBinding` + DTO (`TermCreateBody / ActionCreateBody / BusinessRuleCreateBody /
+  AnchorBindingCreateBody / CreateResult`).
+
+**큐 row 클릭 → RightPanel 미리보기**
+- [x] **`selectedQueueItem` store state** — `{kind: "term"|"action"|"realization", id}` + setter.
+- [x] **`QueueRow` 클릭 영역** — title/subtitle/tag block 을 `<button>` 으로 감싸 `onSelect` 호출.
+  `selected={true}` 시 violet 좌측 border + 배경. confirm/reject 버튼은 별도 영역 유지.
+- [x] **`QueuePreviewPanel.tsx`** — RightPanel 자리에 표시되는 별도 컴포넌트. Term/Action 은 detail
+  fetch + 기본 필드 요약 (FQN/Label/Kind/Domain/Aliases/Description), Realization 은 queue list
+  에서 다시 찾아 code_type/term/scope/confidence 표시. 하단에 "Detail 탭으로 이동" + Confirm /
+  Reject mirror 버튼. ESC 또는 X 로 닫으면 평소 RightPanel 복귀.
+- [x] **RightPanel 분기** — `selectedQueueItem` 이 truthy 면 평소 tab/breadcrumb 자리에 `QueuePreviewPanel`
+  full takeover. 우측 panel drag handle 만 유지.
+
+### 2026-05-18 후속: 모델링 섹션 전체 inventory + 정리 (확장 라운드)
+
+사용자 결정 (브리핑 후 다중 선택): 검색 통합 + dead code 청소 + UX 수리 모두 채택.
+
+**검색 수리**
+- [x] **Cmd+K 전 kind navigate** — `code_type / term / code_method / rule` 클릭 시 적절한
+      `setSelectedXxxFqn` 호출. code_method 는 parent type FQN 으로 fallback. 이전엔 `action`
+      만 navigate 가능했음. `CmdKPalette.tsx:55-72`
+- [x] **BR 클릭 원활화** — ModuleTree `onPickSearchHit` + Cmd+K 모두 `kind==="rule"` 시
+      `setSelectedRule(fqn)` 호출. backend 응답에 BR 포함되어도 클릭이 무반응이던 문제 해결.
+- [x] **검색 정렬 tie-break** — `ontology_query.py:_KIND_RANK` 추가. 같은 score 안에서
+      `term > action > code_type > code_method > rule` 우선순위. Python dict 순서 의존 제거.
+- [x] **Graph cluster mode 에서 검색 노출** — `mode !== "cluster"` 가드 제거. cluster supernode
+      도 검색 결과에 노출, 클릭 시 `pkg:` prefix 감지해 `setMode("neighborhood") + setFocus(members[0])`
+      로 자동 expand. `OntologyGraph.tsx:193-220`
+
+**Dead code 청소**
+- [x] **BackwardMode.tsx + Direction toggle 제거** — `BackwardMode.tsx` 파일 삭제, `MainPanel.tsx`
+      의 fwd/bwd 토글 + `direction === "bwd" && <BackwardMode />` 분기 제거. `store.ts` 의 `Direction`
+      타입 + `direction` state + `setDirection` 제거. `StatusBar.tsx` 의 "Forward/Backward 모드" footer 제거.
+      "Simulation Engine — 다음 phase" 표시는 의도된 dead UX 였음.
+- [x] **LeftPanel V6 잔재 함수 제거** — `MapTab` / `CodeTreeTab` / `DomainTreeTab` /
+      `ActionTreeTab` 4개 함수 (~235줄) 제거. 실제 사용 컴포넌트는 `ModuleTree` / `OntologyTab`
+      / `QueueTab` 만. unused DTO type imports 동시 정리.
+- [x] **RightPanel `_CodeViewUnused`** — 조사 결과 실제로 존재하지 않음 (audit agent 오인). 패스.
+
+**UX 수리**
+- [x] **Manual Re-recommend 버튼** — `LeftPanel.tsx` 의 QueueTab 상단에 `Sparkles` 아이콘 버튼
+      추가. 클릭 시 `ontologyApi.recommendForRepo(repo, {persist: true})` + queue reload.
+      에러 시 빨간 배너 표시. Import 후 매핑 보정 → 재추천 시나리오 해금.
+- [x] **Authoring confirm → Queue 자동 refresh** — workbench store 에 `queueRefreshTick` +
+      `bumpQueueRefresh()` 추가. authoring/store 의 `runConfirm` 성공 후 호출. QueueTab 의
+      `useEffect` deps 에 `queueRefreshTick` 추가 → 자동 reload. cross-store 신호 패턴.
+- [x] **Split mode anchor scroll** — `MainPanel.tsx` 의 Static Parser Anchors 12개 limit + "…N
+      더" 메시지 제거. `max-h-48 overflow-y-auto pr-1` 로 전체 anchor scroll 가능.
+- [x] **StatusBar 카운터 검증** — `/queue/verification-progress/slab-design-real-v2` HTTP 200
+      `{total_actions: 130, by_level: {sim_verified: 124, signature_locked: 6}}`. UI 도 정확히
+      반영 (`U 0 / D 0 / SL 6 / BA 0 / SV 124 / PR 0 · 총 130`). 이전 "모두 0" 은 백엔드 미시드 상태였음.
+
+### 2026-05-18 후속: 그래프 perf 조치 + 기능 정리
+
+사용자 결정 (브리핑 후): backend `_importance_neighborhood` 최적화 + Impact 더블클릭 렉 완화 +
+lens="verify" / Compound / Path 제거 + Cluster supernode expand 수리.
+
+- [x] **`lens="verify"` dead code 제거** — `store.ts` 의 `Lens` 타입 + `lens` state + `setLens`,
+      `TopBar.tsx` 의 "Lens: verify" crumb 제거. V7 잔재 청소.
+- [x] **Compound mode 제거** — `graphCompound` state + ELK `INCLUDE_CHILDREN` 옵션 + Domain box
+      nesting 전부 정리. `useUrlSync` 의 `compound=1` URL param 제거. `PerspectiveDropdown` 의
+      compound 표시 + spec 저장 시 `compound: false` 로 고정 (backend 스키마 backward-compat).
+- [x] **Path mode UI 제거** — `OntologyGraph` 에서 "경로" ModeButton, target 검색 input, target
+      chip, `searchTargetQ`/`targetHits` state 제거. `mode === "path"` 분기 → neighborhood 으로
+      coerce. `GraphViewMode` 타입은 `"path"` 유지 (저장된 Perspective backward-compat).
+- [x] **백엔드 `_importance_neighborhood` 힙 최적화** — `graph_api.py` 의 `max()` 풀스캔
+      (O(selected × |pool|)) → max-heap (O((selected+frontier) log frontier)). 합성 5K node /
+      40K edge 그래프에서 ~9ms (n_max=600). 옛 로직은 5K 규모에서 추정 1초 이상.
+- [x] **Impact 더블클릭 렉 완화** — `ImpactCanvas` 가 `key={data.focus.fqn}` 로 re-mount
+      (xyflow 1K+ 노드 diff 비용 회피). `FIT_VIEW_OPTS` 정적화 (`duration: 0`). edges > 200
+      이면 label/animated/markerEnd (약한 엣지) 비활성 — dense paint 비용 절감.
+- [x] **Cluster `pkg:` supernode expand 수리** — `OntologyGraph.tsx:179` 의 click ignore 제거.
+      backend `_cluster_by_package` 가 supernode `extra.members[]` (max 50) 채움. 프론트 click →
+      `setMode("neighborhood") + setFocus(members[0])` 로 패키지 내부 진입. R4-T3.3 미완성 TODO 종결.
+
+### 2026-05-18 후속: ontology.db 스키마-데이터 정합성 마이그레이션
+
+증상: 우측 트리 로드 실패 — `API 400: 2 validation errors for ActionEffect target_term Field
+required ... target Extra inputs are not permitted ...`. listActions 가 ORM row → Pydantic
+DTO 직렬화 시 invariant 어김.
+
+- [x] **legacy effect shape 변환** — 52 rows. `{op, target, description}` → `{op, target_term,
+      target_attr, description}`. "Term.attr" 는 split, "Term (모든 필드)" 는 suffix 를 description
+      으로 보존. 백업: `data/ontology.db.bak-effect-migration-20260518-162547`.
+- [x] **op='emit' 19개 → 'create'** — emit (exception 발생 / enum 출력 반환) 은 `ActionEffectOp`
+      enum 에 없음. 의미상 "결과 instance 생성" 이라 create 가 가장 가까움.
+- [x] **pure_function with effects 24개 → effectful** — schema invariant
+      (`pure_function MUST NOT have effects`) 충족. 실제로 term read + exception emit 하는 게 다수.
+- [x] **workflow with realization 1개 → effectful** — `action.scm.슬랩설계_실행__designer` 가
+      sub_actions=[] + realizations=1 이라 mis-classification. canonical workflow
+      `action.scm.슬랩설계_실행` 은 sub_actions 21 + realizations 0 으로 유지.
+- [x] **결과** — `GET /actions?repo_id=slab-design-real-v2` HTTP 200. by_kind = workflow 1 /
+      effectful 128 / pure_function 1, effects 가진 action 52 개. 좌측 트리 정상 로드 (150 CodeType
+      + package breakdown).
+
+### 2026-05-18 후속: 모델링 섹션 전체 텍스트 overflow sweep
+
+사용자 호소: "전체적으로 모든 섹션 설명이 막 섹션안에 갇혀서 짤리기도 하고, 영역을 텍스트가
+벗어나기도하고 문제가 많아 전체 작업해줘". audit agent 가 ~25 spots 식별 → 4개 공통 패턴
+도출 후 7개 파일에 일괄 적용.
+
+**Pattern A — `flex + truncate` 깨짐 (`min-w-0` 누락)**
+- [x] `MainPanel.tsx` Action FQN row (`line 210`) / Term FQN row (`line 833`) / CodeType package row
+      (`line 974`) — truncate span 에 `min-w-0 flex-1` 부여. flex 부모가 자식 너비를 강제 축소
+      하지 않으면 truncate 가 안 먹는 root cause.
+- [x] `OntologyTab.tsx` TermRow/ActionRow/BRRow/AnchorRow 의 4개 row 모두 (line 315/334/357/374) —
+      label/FQN 영역 span 에 `min-w-0` 추가. 좌측 트리 항목이 컨테이너 밖으로 새어나가던 증상 해결.
+- [x] `NodePreviewPanel.tsx` 헤더 label span (`line 178`) — `truncate flex-1 min-w-0` 로 그래프
+      노드 hover 박스의 긴 FQN 짤림 처리.
+- [x] `QueuePreviewPanel.tsx` realization mapping header 의 양쪽 FQN span — `min-w-0` + outer flex
+      `min-w-0`. code type method list (line 347) 도 동일.
+
+**Pattern B — description/rationale 등 textarea readonly 영역 break-words 누락**
+- [x] `InlineEdit.tsx InlineEditTextArea` 의 non-editing 블록 (`line 230~237`) — wrapper 에
+      `min-w-0`, value div 에 `flex-1 min-w-0 whitespace-pre-wrap break-words`. 이 컴포넌트가
+      Term description / Action description / BR rationale / Anchor description 모두에 쓰이므로
+      한 군데 수정으로 전체 cascading. 긴 한국어 문장이 컨테이너 폭을 강제 확장하던 문제 해결.
+- [x] `OntologyTab.tsx` BR row statement line-clamp-1 에 `break-words` 추가.
+- [x] `MainPanel.tsx` BR statement line-clamp-2 (`line 643`) 에도 `break-words`.
+
+**Pattern C — 한국어 label grid 폭 부족 (`[100-110px_1fr]`)**
+- [x] `MainPanel.tsx` Action Composition rows (`grid-cols-[110px_1fr_60px]`) + Term Composition rows
+      — 모두 `[140px_1fr_60px]`. "이 Action 의 Params 중에 …" 같은 label 이 잘리던 문제.
+- [x] `MainPanel.tsx KV` helper grid (`line 1348`) — `[140px_1fr]` + label `truncate min-w-0 title`
+      + value `min-w-0 break-words`. Anchor/BR/Action detail 의 모든 key-value 표시에 cascading.
+- [x] `MainPanel.tsx` params grid + BR enforced_by grid (`line 662 area`) — `[100~120px_1fr]` →
+      `[120px_1fr] min-w-0` + value span `truncate min-w-0` + title attribute.
+- [x] `QueuePreviewPanel.tsx Field` helper — `[72px_1fr]` → `[88px_1fr] min-w-0`, label/value 모두
+      truncate + title.
+
+**Pattern D — Section/Card 래퍼 자체가 overflow 누락**
+- [x] `MainPanel.tsx Section` 컴포넌트 (`line 378-386`) — `<section>` 에 `min-w-0 overflow-hidden`,
+      `<h3>` 에 `flex items-center justify-between gap-2 min-w-0` + title span `truncate min-w-0`
+      + action 영역 `shrink-0`, children wrapper 에 `min-w-0`. 긴 section title 이 옆 action 버튼을
+      밀어내던 증상 해결.
+- [x] `QueuePreviewPanel.tsx Block` / `ListSection` / `ContextCard` 세 building block 모두 `min-w-0`
+      + 내용 `break-words`. 큐 미리보기 우측 패널의 카드 자체가 부모 폭을 무시하던 문제 해결.
+- [x] `NewEntityModal.tsx SearchPicker` dropdown row — `min-w-0` + fqn tail `shrink-0`. 긴 FQN
+      autocomplete 결과가 modal 우측을 침범하던 문제 해결.
+
+**검증**
+- [x] TypeScript `./node_modules/.bin/tsc --noEmit --pretty false` — 0 errors.
+- [x] 7개 파일 약 25 spots 수정. (`MainPanel.tsx` 11 / `InlineEdit.tsx` 1 / `OntologyTab.tsx` 4 /
+      `NodePreviewPanel.tsx` 1 / `QueuePreviewPanel.tsx` 6 / `NewEntityModal.tsx` 1 / `LeftPanel.tsx`
+      audit-only)
+- [ ] **브라우저 시각 검증** — 사용자 잔여. localhost:3000 에서 modeling 진입 후 (1) 좌측 트리 긴
+      한국어 항목, (2) 우측 큐 미리보기 description, (3) Term/Action detail 의 KV row, (4) BR
+      statement 의 line-clamp, (5) Anchor list 항목이 컨테이너 안에 잘 갇혀 있는지 확인.
+
+---
+
 ## 2026-05-13 (Authoring Phase C-3a/b/c)
 
 사용자 요청 (연속): Authoring 모드 JPO-only 한계 → JPA/Service/Action 풀 지원 확장.

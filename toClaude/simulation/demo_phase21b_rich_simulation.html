@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Phase 21b — Rich Simulation Demo Guide</title>
+<style>
+  :root {
+    --bg:#0a0e1a; --panel:#0f1626; --border:#1e2738; --text:#e1e5ee; --muted:#7a8499;
+    --primary:#5b9bff; --success:#48d39c; --warn:#f7b955; --error:#ff6b8a;
+    --code-bg:#070a13; --pink:#ff7eb6; --purple:#b794ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px}
+  h1{font-size:22px;margin:0 0 4px}
+  h2{font-size:15px;margin:0 0 8px;color:var(--primary)}
+  h3{font-size:13px;margin:12px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .subtitle{color:var(--muted);font-size:13px;margin-bottom:24px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;margin:10px 0}
+  .stage{position:relative;padding-left:48px}
+  .stage::before{content:attr(data-step);position:absolute;left:8px;top:14px;width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+  .stage.done::before{background:var(--success)}
+  pre{margin:0;padding:10px 12px;background:var(--code-bg);border-radius:5px;overflow-x:auto;font:12px/1.45 SF Mono,Menlo,monospace}
+  pre.diff-row{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;background:transparent}
+  pre.diff-row > div{padding:10px 12px;background:var(--code-bg)}
+  pre.diff-row > .java{border-right:1px solid var(--border)}
+  pre.diff-row .label{color:var(--muted);font-size:10px;letter-spacing:.05em;margin-bottom:6px;text-transform:uppercase}
+  .kv{display:grid;grid-template-columns:140px 1fr;gap:4px 16px;font-family:SF Mono,Menlo,monospace;font-size:12px}
+  .kv .k{color:var(--muted)}
+  .pill{display:inline-block;padding:2px 8px;border-radius:11px;font-size:10px;font-family:SF Mono,Menlo,monospace;background:var(--border);color:var(--text)}
+  .pill.simulate{background:rgba(183,148,255,.18);color:var(--purple)}
+  .pill.impact{background:rgba(247,185,85,.18);color:var(--warn)}
+  .pill.pass{background:rgba(72,211,156,.18);color:var(--success)}
+  .pill.intent{background:rgba(91,155,255,.18);color:var(--primary)}
+  .pill.role{background:rgba(255,126,182,.14);color:var(--pink)}
+  table{width:100%;border-collapse:collapse;font:12px SF Mono,Menlo,monospace}
+  th,td{padding:6px 10px;border-bottom:1px solid var(--border);text-align:left}
+  th{color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+  td.status-pass{color:var(--success)}
+  td.num{text-align:right;color:var(--muted)}
+  .action-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:5px;background:var(--primary);color:#fff;border:0;cursor:pointer;font-size:12px;font-weight:600;text-decoration:none}
+  .action-btn:hover{filter:brightness(1.15)}
+  .action-btn.ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
+  .info-line{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:8px 0}
+  .info-line span{font-size:11px;color:var(--muted)}
+  .info-line .val{color:var(--text);font-family:SF Mono,Menlo,monospace}
+  details{margin-top:8px}
+  summary{cursor:pointer;color:var(--muted);font-size:11px;padding:4px 0}
+  summary:hover{color:var(--text)}
+  .hint{background:rgba(91,155,255,.06);border-left:2px solid var(--primary);padding:10px 14px;margin:10px 0;font-size:12px;color:var(--text);border-radius:0 5px 5px 0}
+  .warn{background:rgba(247,185,85,.06);border-left:2px solid var(--warn);padding:10px 14px;margin:10px 0;font-size:12px;border-radius:0 5px 5px 0}
+  .interactive{background:#0f1928;border:1px solid var(--primary);border-radius:8px;padding:14px;margin:14px 0}
+  textarea{width:100%;background:var(--code-bg);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:10px;font:12px SF Mono,Menlo,monospace;resize:vertical}
+  .output-box{background:var(--code-bg);border-radius:5px;padding:12px;margin-top:8px;min-height:60px;font:12px SF Mono,Menlo,monospace;white-space:pre-wrap}
+  .nav{position:sticky;top:0;background:rgba(10,14,26,.92);backdrop-filter:blur(6px);padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:14px;z-index:10}
+  .nav a{color:var(--muted);text-decoration:none;font-size:11px;margin-right:14px}
+  .nav a:hover{color:var(--text)}
+  code.fqn{font-family:SF Mono,Menlo,monospace;color:var(--purple);font-size:11px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Phase 21b — Rich Simulation Demo</h1>
+<div class="subtitle">
+  <code class="fqn">SelectedHrTgtWidthResolver.resolve(SDOrderEntity)</code> — Java switch expression + 한국어 주석 + idiom rewrite + 5 fixture 코드 경로 검증.
+</div>
+
+<div class="nav">
+  <a href="#access">진입</a>
+  <a href="#stage1">1️⃣ 의도 분류</a>
+  <a href="#stage2">2️⃣ 후보 선택</a>
+  <a href="#stage3-bundle">3️⃣ Bundle 합성</a>
+  <a href="#stage3-exec">3️⃣ Sim 실행</a>
+  <a href="#stage3-custom">3️⃣+ Custom 실행</a>
+  <a href="#try">직접 따라하기</a>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────── -->
+<div id="access" class="panel">
+  <h2>📍 라이브 세션 진입</h2>
+  <div class="info-line">
+    <span>session_id</span>
+    <span class="val" id="session-id">28470197-a460-40f1-a145-8f2d436bcc62</span>
+  </div>
+  <div class="info-line">
+    <span>repo_id</span>
+    <span class="val">slab-design-real-v2</span>
+    <span style="margin-left:auto"></span>
+    <span class="pill pass">status=done</span>
+  </div>
+  <div class="info-line">
+    <span>user_query</span>
+    <span class="val">"열연 폭 결정 로직 시뮬해줘"</span>
+  </div>
+  <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+    <a class="action-btn" href="http://localhost:3000/?view=multiturn&amp;sid=28470197-a460-40f1-a145-8f2d436bcc62" target="_blank">
+      🔗 브라우저에서 열기 (Frontend)
+    </a>
+    <a class="action-btn ghost" href="http://localhost:8001/api/section3/multiturn/session/28470197-a460-40f1-a145-8f2d436bcc62" target="_blank">
+      🔌 Raw JSON (Backend)
+    </a>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────── -->
+<div id="stage1" class="panel stage done" data-step="1">
+  <h2>Stage 1 — 의도 파악 (Phase 21b 새 step)</h2>
+  <div class="hint">
+    🆕 <b>Phase 21b 의 가장 큰 변화</b>: 후보를 검색하기 <b>전에</b> agent 가 의도를 분류하고 사용자에게 <b>"맞아?"</b> 묻는다. 잘못된 의도면 candidates 보기 전에 catch.
+  </div>
+
+  <h3>turn 2 payload: <span class="pill">kind=intent_classified</span></h3>
+  <div class="kv">
+    <div class="k">intent</div><div><span class="pill simulate">simulate</span></div>
+    <div class="k">search_terms</div><div>['열연 폭', '결정 로직']</div>
+    <div class="k">conditions</div><div>[]</div>
+    <div class="k">reasoning</div><div style="color:var(--muted)">"열연 폭 결정 로직을 시뮬해달라는 요청이므로 simulate 로 분류"</div>
+    <div class="k">provenance</div><div><span class="pill">llm_inference</span> confidence=1.0</div>
+  </div>
+
+  <details>
+    <summary>UI 흐름 (브라우저에서 본 것)</summary>
+    <pre>┌─ Stage 1 — 의도 파악 ────────────────────────┐
+│ 의도 분류: 시뮬레이션                                            │
+│ 원본 질문: "열연 폭 결정 로직 시뮬해줘"                            │
+│ provenance: llm_inference — intent='simulate' ...               │
+│                                                                  │
+│ [✓ 맞아 → 후보 찾기]    [↻ 다른 의도로]                          │
+└──────────────────────────────────────────────┘</pre>
+  </details>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────── -->
+<div id="stage2" class="panel stage done" data-step="2">
+  <h2>Stage 2 — 후보 선택 (4 candidates)</h2>
+  <p style="color:var(--muted);font-size:12px;margin:0 0 10px">
+    LLM 추출 search_terms → ontology 검색 + sim_v2 후보 + ranking boost (role/parent_role/annotations/FQN substring) → 후보 합쳐 정렬.
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>#</th><th>label</th><th class="num">score</th><th>role</th><th>FQN (short)</th><th>declared_on_term</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>0</td><td>final_width_range_실행</td><td class="num">26.0</td><td><span class="pill role">business</span></td><td>SdFinalWidthRangeAction.execute</td><td>term.scm.order.order</td></tr>
+      <tr><td>1</td><td>target_width_실행</td><td class="num">26.0</td><td><span class="pill role">business</span></td><td>SdTargetWidthAction.execute</td><td>term.scm.order.order</td></tr>
+      <tr><td>2</td><td>width_range_실행</td><td class="num">26.0</td><td><span class="pill role">business</span></td><td>SdWidthRangeAction.execute</td><td>term.scm.order.order</td></tr>
+      <tr style="background:rgba(91,155,255,.06)"><td><b>3 ✓</b></td><td><b>결정</b></td><td class="num">23.0</td><td><span class="pill role">business</span></td><td><b>SelectedHrTgtWidthResolver.resolve</b></td><td>term.scm.order.order</td></tr>
+    </tbody>
+  </table>
+
+  <div class="hint" style="margin-top:12px">
+    이 데모에서는 <b>#3 (SelectedHrTgtWidthResolver.resolve)</b> 선택. 데이터 풍부 = 한국어 주석 + Java 14 switch expression + 다양한 분기.
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────── -->
+<div id="stage3-bundle" class="panel stage done" data-step="3">
+  <h2>Stage 3a — Bundle 합성 (Java → Python + Schema + Fixtures)</h2>
+  <div class="info-line">
+    <span class="pill">kind=bundle_prepared</span>
+    <span>confidence=0.85</span>
+    <span>fixtures=1</span>
+    <span>idiom_diffs=2</span>
+  </div>
+
+  <h3>Java ↔ Python 비교</h3>
+  <pre class="diff-row">
+<div class="java"><div class="label">JAVA (원본 15 lines)</div>public BigDecimal resolve(SDOrderEntity order) {
+    if (order == null) return null;
+    String confirmed = order.getConfirmedPlantCd();
+    if (confirmed == null || confirmed.length() < 2)
+        return null;
+
+    char hrChar = confirmed.charAt(1);
+    // 0=제강, 1=열연 위치
+    return switch (hrChar) {
+        case '1' -> order.getHrTgtWidth1();
+        case '2' -> order.getHrTgtWidth2();
+        case '3' -> order.getHrTgtWidth3();
+        case '4' -> order.getHrTgtWidth4();
+        case '5' -> order.getHrTgtWidth5();
+        default -> null;
+    };
+}</div>
+<div class="python"><div class="label">PYTHON (translate 결과)</div>def resolve(self, order):
+    if order == None:
+        return None
+    confirmed = order.getConfirmedPlantCd()
+    if confirmed == None or len(confirmed) < 2:
+        return None
+    hrChar = confirmed[1]
+    # 0=제강, 1=열연 위치
+    return None  # UNMAPPED switch arrow-form</div>
+  </pre>
+
+  <h3>Idiom rewrites (2건)</h3>
+  <table>
+    <thead><tr><th>idiom</th><th>Java</th><th>Python</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill">length</span></td><td><code>confirmed.length()</code></td><td><code>len(confirmed)</code></td></tr>
+      <tr><td><span class="pill">charAt</span></td><td><code>confirmed.charAt(1)</code></td><td><code>confirmed[1]</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="warn">
+    ⚠ <b>switch arrow-form (Java 14+)</b> 은 현재 translator 가 매핑 못 함 → <code>return None  # UNMAPPED</code> 로 graceful fallback. <br>
+    아래 <b>Stage 3+ Custom 실행</b> 에서 사용자가 직접 dict mapping 으로 보정한 Python 으로 분기 동작을 검증할 수 있다.
+  </div>
+
+  <details>
+    <summary>Schema (sec2 시드 갭)</summary>
+    <p style="color:var(--muted);font-size:11px;margin:8px 0">
+      <code>SDOrderEntity</code> 에 50개 fields 가 있지만 sec2 entity_schemas endpoint 가 아직 비어 있음 (modeling team 시드 미완).
+      → 자동 fixture 1개만 (<code>args={arg0:None, arg1:None}</code>). custom fixture 로 다양한 입력 모사 가능.
+    </p>
+  </details>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────── -->
+<div id="stage3-exec" class="panel stage done" data-step="3">
+  <h2>Stage 3b — 자동 Sim 실행 (1 fixture)</h2>
+  <div class="info-line">
+    <span class="pill">kind=executed_simulation</span>
+    <span>invariant=<span class="pill pass">clean</span></span>
+  </div>
+  <table>
+    <thead><tr><th>fixture</th><th>status</th><th>output</th></tr></thead>
+    <tbody>
+      <tr><td>action.scm.결정#0 (auto)</td><td class="status-pass">PASS</td><td>None</td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--muted);font-size:11px;margin:8px 0">
+    <code>order=None</code> → 첫 guard 에 걸려 즉시 <code>return None</code>. 이게 invariant 위반 아님 → clean.
+  </p>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────── -->
+<div id="stage3-custom" class="panel stage" data-step="✦" style="border-color:var(--purple)">
+  <h2 style="color:var(--purple)">Stage 3+ Custom 실행 — 5 fixture 분기 검증 ★ 데모 핵심</h2>
+  <p style="color:var(--text);font-size:12px;margin:0 0 12px">
+    같은 함수 (Python 손질본) 로 5 fixture 돌려 4 코드 경로 검증. <code>POST /run-custom</code> endpoint.
+  </p>
+
+  <h3>Python (사용자 손질 — switch 를 dict.get 로 보정)</h3>
+  <pre>def resolve(self, order):
+    if order is None:
+        return None
+    confirmed = order.get("confirmedPlantCd")
+    if confirmed is None or len(confirmed) < 2:
+        return None
+    hrChar = confirmed[1]
+    mapping = {
+        '1': order.get('hrTgtWidth1'),
+        '2': order.get('hrTgtWidth2'),
+        '3': order.get('hrTgtWidth3'),
+        '4': order.get('hrTgtWidth4'),
+        '5': order.get('hrTgtWidth5'),
+    }
+    return mapping.get(hrChar)</pre>
+
+  <h3>Fixtures × 결과 (실측, 5/5 PASS)</h3>
+  <table>
+    <thead>
+      <tr><th>fixture_id</th><th>입력 (order dict)</th><th>예상</th><th>실측 output</th><th>status</th><th>elapsed</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>null_order</td>
+        <td><code>None</code></td>
+        <td>None</td>
+        <td>None</td>
+        <td class="status-pass">PASS</td>
+        <td class="num">1.4ms</td>
+      </tr>
+      <tr>
+        <td>stockcode_order</td>
+        <td><code>{confirmedPlantCd: None}</code></td>
+        <td>None</td>
+        <td>None</td>
+        <td class="status-pass">PASS</td>
+        <td class="num">0.5ms</td>
+      </tr>
+      <tr style="background:rgba(72,211,156,.06)">
+        <td>rolling_pos_1</td>
+        <td><code>{confirmedPlantCd:"P1", hrTgtWidth1:"1250.0"}</code></td>
+        <td>1250.0</td>
+        <td><b>"1250.0"</b></td>
+        <td class="status-pass">PASS</td>
+        <td class="num">0.1ms</td>
+      </tr>
+      <tr style="background:rgba(72,211,156,.06)">
+        <td>rolling_pos_3</td>
+        <td><code>{confirmedPlantCd:"M3", hrTgtWidth3:"1500.5"}</code></td>
+        <td>1500.5</td>
+        <td><b>"1500.5"</b></td>
+        <td class="status-pass">PASS</td>
+        <td class="num">0.1ms</td>
+      </tr>
+      <tr>
+        <td>unmapped_pos_9</td>
+        <td><code>{confirmedPlantCd:"X9"}</code></td>
+        <td>None</td>
+        <td>None</td>
+        <td class="status-pass">PASS</td>
+        <td class="num">0.1ms</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="hint">
+    💡 <b>4 코드 경로</b> 모두 검증: (1) null 가드, (2) confirmedPlantCd 누락 가드, (3) hrChar='1' 분기, (4) hrChar='3' 분기, (5) 매핑 외 hrChar default None.
+  </div>
+
+  <!-- INTERACTIVE: live custom run -->
+  <div class="interactive" id="custom-runner">
+    <h3 style="color:var(--purple);margin-top:0">🎮 직접 실행 — 입력 수정 후 [Run] 클릭</h3>
+    <p style="color:var(--muted);font-size:11px">
+      backend <code>POST /api/section3/multiturn/run-custom</code> 에 요청. CORS 미설정이면 브라우저 콘솔 에러 → 아래 [curl 명령 복사] 로 터미널 실행 권장.
+    </p>
+    <label style="font-size:11px;color:var(--muted)">REQUEST BODY (JSON)</label>
+    <textarea id="custom-body" rows="22">{
+  "python_source": "def resolve(self, order):\n    if order is None:\n        return None\n    confirmed = order.get(\"confirmedPlantCd\")\n    if confirmed is None or len(confirmed) < 2:\n        return None\n    hrChar = confirmed[1]\n    mapping = {\n        '1': order.get('hrTgtWidth1'),\n        '2': order.get('hrTgtWidth2'),\n        '3': order.get('hrTgtWidth3'),\n        '4': order.get('hrTgtWidth4'),\n        '5': order.get('hrTgtWidth5'),\n    }\n    return mapping.get(hrChar)\n",
+  "function_name": "resolve",
+  "declared_return": "Decimal",
+  "fixtures": [
+    {"fixture_id": "test_my_value", "input_args": [null, {"confirmedPlantCd": "P2", "hrTgtWidth2": "1380.0"}], "input_kwargs": {}, "expected_output": "1380.0"}
+  ]
+}</textarea>
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button class="action-btn" onclick="runCustom()">▶ Run</button>
+      <button class="action-btn ghost" onclick="copyCurl()">📋 curl 명령 복사</button>
+    </div>
+    <div class="output-box" id="custom-output">결과가 여기에 표시됩니다.</div>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────────────── -->
+<div id="try" class="panel">
+  <h2>🚀 직접 따라하기 (3분)</h2>
+
+  <h3>Option A — 브라우저 UI (가장 쉬움)</h3>
+  <ol style="margin:8px 0 12px;font-size:12px">
+    <li><a href="http://localhost:3000/?view=multiturn" target="_blank" style="color:var(--primary)">http://localhost:3000/?view=multiturn</a> 열기</li>
+    <li>아래 입력창에 <code>"열연 폭 결정 로직 시뮬해줘"</code> 입력 → <b>시작</b></li>
+    <li>turn 2 에 <b>의도 = 시뮬레이션</b> 표시 → <b>[✓ 맞아 → 후보 찾기]</b> 클릭</li>
+    <li>turn 3 에 4 candidates → <b>#3 (SelectedHrTgtWidthResolver)</b> 선택</li>
+    <li>turn 4 의 Java/Python diff + idiom 확인 → <b>[실행]</b> 클릭</li>
+    <li>turn 5 결과 = PASS · invariant=clean 확인</li>
+  </ol>
+
+  <h3>Option B — 다른 intent 시도</h3>
+  <table>
+    <thead><tr><th>query 예시</th><th>intent</th><th>최종 turn</th><th>핵심 결과</th></tr></thead>
+    <tbody>
+      <tr><td>"cumulativeProductivity 바꾸면 어디 영향?"</td><td><span class="pill impact">impact</span></td><td>3</td><td>affected_methods + caller graph (Gate II skip)</td></tr>
+      <tr><td>"두께 0.1mm 이하일 때 검증 실패하나?"</td><td><span class="pill" style="background:rgba(255,126,182,.18);color:var(--pink)">hypothesis</span></td><td>3</td><td>verdict + reasoning + business_rules evidence</td></tr>
+      <tr><td>"주문 검증 룰이 어디 있어?"</td><td><span class="pill" style="background:rgba(91,155,255,.18);color:var(--primary)">locate</span></td><td>3</td><td>body + file + caller + linked term</td></tr>
+      <tr><td>"SdThicknessAction 이 뭐 하는 거야?"</td><td><span class="pill pass">explain</span></td><td>3</td><td>body + business rules</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Option C — Backend 직접 호출 (CLI)</h3>
+  <pre id="curl-flow"># 1. 세션 시작 (stub)
+SID=$(curl -s -X POST localhost:8001/api/section3/multiturn/start \
+  -H 'Content-Type: application/json' \
+  -d '{"user_query":"열연 폭 결정 로직 시뮬해줘","repo_id":"slab-design-real-v2"}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['session_id'])")
+
+# 2. /respond → turn 2 intent_classified
+curl -s -X POST localhost:8001/api/section3/multiturn/respond/$SID \
+  -d '{"message":"열연 폭 결정 로직 시뮬해줘"}' -H 'Content-Type: application/json'
+
+# 3. /confirm intent
+curl -s -X POST localhost:8001/api/section3/multiturn/confirm/$SID/2 \
+  -d '{"action":"confirm","user_response":{}}' -H 'Content-Type: application/json'
+
+# 4. /respond → turn 3 target_selected (candidates 5건)
+curl -s -X POST localhost:8001/api/section3/multiturn/respond/$SID \
+  -d '{"message":"list"}' -H 'Content-Type: application/json'
+
+# 5. /confirm pick #3
+curl -s -X POST localhost:8001/api/section3/multiturn/confirm/$SID/3 \
+  -d '{"action":"confirm","user_response":{"selected_index":3}}' -H 'Content-Type: application/json'
+
+# 6. /respond → turn 4 bundle_prepared (Java + Python + fixtures)
+curl -s -X POST localhost:8001/api/section3/multiturn/respond/$SID \
+  -d '{"message":"build"}' -H 'Content-Type: application/json'
+
+# 7. /confirm bundle → 8. /respond → turn 5 executed_simulation
+curl -s -X POST localhost:8001/api/section3/multiturn/confirm/$SID/4 \
+  -d '{"action":"confirm","user_response":{}}' -H 'Content-Type: application/json'
+curl -s -X POST localhost:8001/api/section3/multiturn/respond/$SID \
+  -d '{"message":"run"}' -H 'Content-Type: application/json'</pre>
+</div>
+
+<div class="panel" style="margin-top:20px;background:transparent;border:0">
+  <p style="color:var(--muted);font-size:11px;text-align:center">
+    Phase 21b · 2026-05-19 · tests/simulation 348 PASS · TS clean<br>
+    이 HTML 은 정적이지만 [Run] / [curl 복사] 버튼은 라이브 백엔드 (<code>localhost:8001</code>) 와 직접 통신합니다.
+  </p>
+</div>
+
+</div>
+<script>
+async function runCustom() {
+  const out = document.getElementById('custom-output');
+  out.textContent = '⏳ 요청 중...';
+  let body;
+  try { body = JSON.parse(document.getElementById('custom-body').value); }
+  catch(e) { out.textContent = '✗ JSON parse error: ' + e.message; return; }
+  try {
+    const r = await fetch('http://localhost:8001/api/section3/multiturn/run-custom', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await r.json();
+    if (data.blocked) {
+      out.textContent = `🚫 blocked: ${data.block_reason}`;
+      return;
+    }
+    let txt = `function=${data.function_name}  stub_ns=${data.stub_namespace_size}\n\n`;
+    for (const c of data.cases) {
+      const mark = c.status === 'PASS' || c.status === 'clean' ? '✓' : '·';
+      txt += `${mark} ${c.fixture_id.padEnd(20)} status=${c.status.padEnd(15)} output=${c.output_repr}\n`;
+      if (c.error) txt += `   error: ${c.error.slice(0,160)}\n`;
+    }
+    out.textContent = txt;
+  } catch(e) {
+    out.textContent = `✗ fetch error: ${e.message}\n\nCORS 차단일 수 있음. [curl 복사] 로 터미널에서 실행 권장.`;
+  }
+}
+function copyCurl() {
+  const body = document.getElementById('custom-body').value;
+  const cmd = `curl -s -X POST http://localhost:8001/api/section3/multiturn/run-custom \\\n  -H 'Content-Type: application/json' \\\n  -d '${body.replace(/'/g, "'\\''")}' | python3 -m json.tool`;
+  navigator.clipboard.writeText(cmd).then(() => {
+    const out = document.getElementById('custom-output');
+    const prev = out.textContent;
+    out.textContent = '📋 curl 명령 복사 완료. 터미널에 붙여넣기.';
+    setTimeout(() => out.textContent = prev, 2000);
+  });
+}
+</script>
+</body>
+</html>

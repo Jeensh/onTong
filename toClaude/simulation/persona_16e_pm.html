@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Phase 16E PM 검증 — Integrity Warning 칩</title>
+<style>
+  body { font-family: -apple-system, "Helvetica Neue", sans-serif; max-width: 880px; margin: 32px auto; padding: 0 20px; color: #1f2328; line-height: 1.5; }
+  h1 { border-bottom: 2px solid #d0d7de; padding-bottom: 8px; font-size: 22px; }
+  h2 { font-size: 17px; margin-top: 22px; color: #24292f; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 10px 0; }
+  th, td { border: 1px solid #d0d7de; padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; }
+  .ok { color: #1a7f37; font-weight: 600; }
+  .miss { color: #9a6700; font-weight: 600; }
+  .chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; border: 1px solid; margin-right: 4px; }
+  .chip.red { background: #fff1f2; color: #b91c1c; border-color: #fda4af; }
+  .chip.orange { background: #fff7ed; color: #c2410c; border-color: #fdba74; }
+  .chip.amber { background: #fffbeb; color: #b45309; border-color: #fcd34d; }
+  .chip.yellow { background: #fefce8; color: #a16207; border-color: #fde047; }
+  .verdict { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+  .verdict.no { background: #fef2f2; color: #b91c1c; }
+  .verdict.amber { background: #fffbeb; color: #b45309; }
+  .verdict.green { background: #ecfdf5; color: #047857; }
+  code { background: #f6f8fa; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+  .verdict-block { background: #f6f8fa; border-left: 4px solid #6e7781; padding: 10px 14px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .pass { border-left-color: #1a7f37; }
+  .rec { border-left-color: #bf8700; }
+</style>
+</head>
+<body>
+
+<h1>Phase 16E PM 검증 — Integrity Warning 칩</h1>
+<p><b>역할</b>: 김PM (5년차, 자바 코드 못 읽음). <b>날짜</b>: 2026-05-18. <b>방식</b>: API 응답 + frontend 파싱 코드 정합성.</p>
+
+<h2>1. 시나리오 결과 (API)</h2>
+<table>
+  <tr><th>#</th><th>질의</th><th>verdict</th><th>conf</th><th>API source detail</th><th>예상 칩</th><th>판정</th></tr>
+  <tr>
+    <td>S1</td>
+    <td>엣징 그룹코드 누락 에러?</td>
+    <td><span class="verdict amber">likely_no</span></td>
+    <td>0.55</td>
+    <td><code>integrity_warning=target_is_test</code> (FQN=<code>SdWidthRangeActionTest.dg103_…</code>)</td>
+    <td><span class="chip red">🧪 Test 의심</span></td>
+    <td class="ok">정확</td>
+  </tr>
+  <tr>
+    <td>S2</td>
+    <td>주문 수량 0 에러?</td>
+    <td><span class="verdict green">yes</span></td>
+    <td>0.75</td>
+    <td>warning 없음 (FQN=<code>SdOrderValidator.validate</code>, anchor 5건 + fixture OK)</td>
+    <td>없음</td>
+    <td class="ok">정확</td>
+  </tr>
+  <tr>
+    <td>S3</td>
+    <td>compileTime -1?</td>
+    <td><span class="verdict amber">likely_no</span></td>
+    <td>0.55</td>
+    <td>warning 없음 (fixture_compat=fail 로 충분히 신호)</td>
+    <td>없음</td>
+    <td class="ok">정확</td>
+  </tr>
+</table>
+
+<h2>2. Frontend 파싱 코드 검증</h2>
+<p><code>parseIntegrityWarnings</code> 가 <code>/integrity_warning=([a-z_]+)/</code> 로 정확히 <code>target_is_test</code> 캡쳐. <code>WARNING_META</code> 6종 (target_is_test / body_unsupported_alias_gap / body_unsupported_no_rule / body_unsupported_rule_only / no_strong_evidence / cross_evidence_mismatch) 모두 등록 — <b>S1 의 detail 이 그대로 칩으로 변환</b>. tooltip 에 원본 detail 노출 (PM 이 호버하면 "target … 가 Test/Mock 패턴 — ranking 이 production code 대신 테스트…" 풀 문구 확인 가능).</p>
+
+<h2>3. PM 입장 평가</h2>
+<div class="verdict-block pass">
+  <b>즉시 도움 — YES.</b> S1 처럼 verdict 자체는 likely_no (애매) 인데 <span class="chip red">🧪 Test 의심</span> 빨간 칩이 헤더 바로 아래에 떠서 "어, agent 가 production 코드가 아니라 테스트 코드를 짚었네 — verdict 무시하고 다른 후보 보자" 라는 판단이 코드 한 줄 안 읽고 가능. 16D 가 지적한 W4 문제가 PM 시야에서 가시화됨.
+</div>
+<div class="verdict-block pass">
+  <b>색상 분리 — 직관적.</b> 빨강(치명: 잘못된 타겟) / 주황(번역 갭: alias 가 못 풀림) / 노랑(근거 약함: rule/evidence 부족·충돌) 3단 계층이 신호등 메타포와 맞음. PM 도 빨강만 보면 멈추고 노랑은 "참고만" 으로 처리할 수 있어 인지 부담 감소.
+</div>
+
+<h2>4. 추가 UX 권장</h2>
+<ol>
+  <li><b>빨간 칩 클릭 → "다른 후보 보기" CTA</b>. S1 의 경우 W4 가 떴으면 ranking 2위 (production class) 가 옳을 가능성이 높음. 칩이 단순 표시가 아니라 <b>"이 verdict 신뢰 못 하니 다른 후보로 재질의"</b> 액션 트리거가 되면 PM 이 사이드바 안 열고 즉시 회복 가능.</li>
+  <li><b>verdict 신뢰도와 칩 조합 룰</b>: 빨강 칩 1개 이상 → verdict % 텍스트에 취소선·회색 처리. 현재는 confidence 55% 와 빨강 칩이 시각적으로 동등하게 경쟁 — 칩이 떴으면 confidence 를 demoted 해야 메시지가 일관됨.</li>
+  <li><b>칩 그룹화</b>: 노랑 3종 (no_rule / rule_only / no_strong_evidence) 이 동시에 떴을 때 3개 다 깔리면 사이드바 좁아짐. "근거 약함 ×3" 처럼 카운트 배지로 묶고 호버 시 풀어주기.</li>
+  <li><b>대시보드 집계</b>: 최근 세션 중 "🧪 Test 의심" 발화율 % — modeling 시드 품질 지표로 surface. PM 이 데이터 품질 회귀를 한 눈에.</li>
+</ol>
+
+<p style="font-size: 11px; color: #6e7781; margin-top: 24px;">검증 SID: S1=<code>52afc57b…</code> · S2=<code>d86be28f…</code> · S3=<code>c71e112d…</code> (2026-05-18)</p>
+</body>
+</html>

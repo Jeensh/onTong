@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Phase 13b — 시니어 검증</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1.5rem; color: #1a1a1a; line-height: 1.55; }
+  h1 { border-bottom: 2px solid #0066cc; padding-bottom: 0.3rem; }
+  h2 { color: #0066cc; margin-top: 1.6rem; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; font-size: 0.92rem; }
+  th, td { border: 1px solid #ccc; padding: 6px 9px; vertical-align: top; }
+  th { background: #f0f4ff; text-align: left; }
+  code { background: #eef; padding: 1px 5px; border-radius: 3px; font-size: 0.88em; }
+  .ok { color: #1a8a3a; font-weight: 600; }
+  .miss { color: #c8351c; font-weight: 600; }
+  .meh { color: #aa7a00; font-weight: 600; }
+  .verdict { background: #f8f9fc; border-left: 4px solid #0066cc; padding: 0.7rem 1rem; margin: 1rem 0; }
+  .finding { background: #fff7d6; border-left: 4px solid #d4a300; padding: 0.6rem 1rem; margin: 0.8rem 0; }
+</style>
+</head>
+<body>
+
+<h1>Phase 13b — 시니어 페르소나 검증</h1>
+<p><b>repo:</b> <code>slab-design-real-v2</code> · 130 actions / 1081 methods / 76 terms</p>
+
+<h2>시나리오 결과</h2>
+<table>
+<tr><th>Q</th><th>질문</th><th>intent</th><th>search_terms</th><th>top cand</th><th>turn 3</th></tr>
+<tr><td>1</td><td>엣징그룹코드 변경 → SdEdging* 영향?</td><td class="ok">impact</td><td><code>엣징그룹코드 SdEdging</code></td><td class="meh">batch_design (score 12, SdEdging 매칭 X)</td><td>affected_methods=[], fixtures 12/12 pass</td></tr>
+<tr><td>2</td><td>calculateMargin 어떻게/어디서?</td><td class="ok">explain</td><td><code>calculateMargin</code></td><td class="miss">0-cand (실제 메서드 미존재)</td><td>suggestions 비어있음</td></tr>
+<tr><td>3</td><td>두께 검증 로직 simulate</td><td class="ok">simulate</td><td><code>두께 검증</code></td><td class="miss">SdOrderValidator.validate (검증만 매칭)</td><td>simulation PASS — <b>틀린 target</b></td></tr>
+</table>
+
+<h2>search_terms 정제: Yes/No</h2>
+<div class="verdict">
+<b>Yes, 도움 됨</b>. LLM 이 풀 자연어 → 핵심 키워드만 뽑아주는 게 옳다. Q1 의 "변경하면…어디서 깨지나" 가 <code>엣징그룹코드 SdEdging</code> 으로 정제된 게 정확성에 +. <b>단, 한계 명확</b>: Q3 에서 <code>두께 검증</code> 두 토큰 동등 가중 → 인덱스가 풍부한 <code>검증</code> 쪽이 압승. <b>도메인 토큰 가중치 부재가 문제의 본질</b> — search_terms 추출 자체는 잘 되고 있음.
+</div>
+
+<h2>흥미로운 발견</h2>
+<div class="finding">
+<b>Q3 의 "두께 검증" 미스가 진짜 흥미.</b> SdThicknessAction.execute, action <code>action.scm.thickness_실행</code> 이 실재한다. 하지만 label/alias 가 <code>thickness_실행</code> 이라 한글 "두께" 와 매칭 실패. 결과적으로 score 23 의 SdOrderValidator.validate 가 1위. <b>simulate 가 PASS 로 통과해서 사용자는 "두께 검증 시뮬한 줄 안다"</b> — 실제론 주문 정합성 검증을 시뮬. silent wrong target 이 가장 위험. Phase 12 의 ranking boost 도 한·영 alias gap 은 못 메움.
+</div>
+
+<h2>Phase 13c (boundary value / hypothesis tool) 가치</h2>
+<table>
+<tr><th>가치</th><th>시니어 입장</th></tr>
+<tr><td class="ok">High</td><td>"엣징그룹코드 null/빈문자/9999 일 때 어떻게?" 자동 fixture — Q3 같은 silent miss 가 있어도 <b>경계값 결과로 target 적합성 sanity check</b> 가능</td></tr>
+<tr><td class="ok">High</td><td>quick_diagnose 가 12/12 PASS 만 보여주는 건 정보 부족 (Q1). hypothesis 가 <b>"이 조건에서 fail 한다"</b> 를 줘야 디버깅 시작점이 됨</td></tr>
+<tr><td class="meh">Med</td><td>한·영 alias gap 은 13c 가 아닌 별도 (term 보강) 작업 — 13c 가 미스를 <b>드러내는</b> 역할은 함</td></tr>
+</table>
+
+<p style="font-size:0.85em; color:#666; margin-top:2rem;">검증 시각 2026-05-18 · 세션 b5ed2b12 / d5cc1b4a / 7788c949</p>
+</body>
+</html>

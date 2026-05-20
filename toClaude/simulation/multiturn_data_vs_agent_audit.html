@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>멀티턴 agent — 데이터 있나 / agent 가 안 쓰나 정밀 감사</title>
+<style>
+  :root {
+    --bg:#fafaf7; --fg:#1a1a1a; --muted:#6c6c6c; --line:#e5e3dc;
+    --orange:#d9531e; --green:#2f8f5d; --indigo:#4858a8; --purple:#8e3aa1;
+    --warn:#b8761a; --red:#b32a2a; --card-bg:#fff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Noto Sans KR", "Segoe UI", sans-serif;
+    line-height: 1.55; margin: 0; padding: 28px 24px 100px;
+    max-width: 1180px; margin-left: auto; margin-right: auto;
+  }
+  header.hero {
+    border-left: 6px solid var(--green);
+    padding: 16px 22px;
+    background: linear-gradient(90deg, rgba(47,143,93,0.10), transparent);
+    margin-bottom: 22px;
+  }
+  header.hero h1 { font-size: 23px; margin: 0 0 6px; }
+  header.hero .sub { color: var(--muted); font-size: 14px; margin: 0; }
+  nav.toc {
+    background: var(--card-bg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 10px 16px; margin: 0 0 22px; font-size: 13px;
+  }
+  nav.toc strong { color: var(--indigo); margin-right: 8px; }
+  nav.toc a {
+    color: var(--fg); text-decoration: none;
+    border-bottom: 1px dashed var(--indigo);
+    margin-right: 14px; line-height: 2;
+  }
+  nav.toc a:hover { color: var(--orange); }
+  h2 {
+    font-size: 19px; margin: 28px 0 12px;
+    padding-bottom: 6px; border-bottom: 1px solid var(--line);
+  }
+  h3 { font-size: 16px; margin: 18px 0 8px; }
+  p { margin: 8px 0; }
+  small.note { color: var(--muted); font-size: 12px; }
+  code.inline {
+    background: rgba(72,88,168,0.10);
+    padding: 1px 6px; border-radius: 3px; font-size: 12.5px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  .verdict {
+    background: #1a1a1a; color: #f5f3ec;
+    padding: 16px 20px; border-radius: 8px; margin: 0 0 22px;
+    border-left: 6px solid #6fd49a;
+  }
+  .verdict h2 {
+    color: #6fd49a; margin: 0 0 8px;
+    border: none; padding: 0; font-size: 17px;
+  }
+  .verdict p { margin: 4px 0; font-size: 14px; color: #f5f3ec; }
+  .verdict .big {
+    font-size: 28px; font-weight: 700; color: #6fd49a;
+    margin: 4px 0;
+  }
+  .verdict code.inline {
+    background: rgba(111,212,154,0.18); color: #6fd49a;
+  }
+
+  /* Data inventory table */
+  table.inv {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+    margin: 10px 0;
+  }
+  table.inv th, table.inv td {
+    border: 1px solid var(--line); padding: 8px 10px;
+    vertical-align: top; text-align: left;
+  }
+  table.inv th { background: #f0ede4; }
+  table.inv td.yes { color: var(--green); font-weight: 700; }
+  table.inv td.partial { color: var(--warn); font-weight: 700; }
+  table.inv td.no { color: var(--red); font-weight: 700; }
+  table.inv tr.used     { background: rgba(47,143,93,0.04); }
+  table.inv tr.unused   { background: rgba(179,42,42,0.05); }
+  table.inv tr.partial-use { background: rgba(184,118,26,0.05); }
+
+  /* Pain root cause matrix */
+  .pain-rows { display: flex; flex-direction: column; gap: 10px; }
+  .pain-row {
+    background: var(--card-bg); border: 1px solid var(--line); border-radius: 6px;
+    display: grid; grid-template-columns: 1fr 1.5fr auto; gap: 14px;
+    padding: 12px 14px; align-items: center;
+  }
+  @media (max-width: 720px) { .pain-row { grid-template-columns: 1fr; } }
+  .pain-row .title { font-size: 14px; }
+  .pain-row .title .id {
+    display: inline-block; background: rgba(0,0,0,0.06);
+    padding: 1px 8px; border-radius: 9px; margin-right: 6px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11px;
+  }
+  .pain-row .root { font-size: 12.5px; color: var(--muted); }
+  .pain-row .root strong { color: var(--fg); }
+  .pain-row .cat {
+    font-size: 11px; padding: 4px 10px; border-radius: 12px;
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+    text-align: center; white-space: nowrap;
+  }
+  .pain-row .cat.unused   { background: rgba(179,42,42,0.12);  color: var(--red);    border: 1px solid var(--red); }
+  .pain-row .cat.partial  { background: rgba(184,118,26,0.12); color: var(--warn);   border: 1px solid var(--warn); }
+  .pain-row .cat.logic    { background: rgba(72,88,168,0.12);  color: var(--indigo); border: 1px solid var(--indigo); }
+  .pain-row .cat.engine   { background: rgba(142,58,161,0.12); color: var(--purple); border: 1px solid var(--purple); }
+  .pain-row .cat.datagap  { background: rgba(108,108,108,0.12); color: var(--muted); border: 1px solid var(--muted); }
+
+  /* Shock findings */
+  .shock {
+    background: rgba(179,42,42,0.05);
+    border-left: 4px solid var(--red);
+    padding: 12px 14px; margin: 12px 0; border-radius: 4px;
+    font-size: 13.5px;
+  }
+  .shock h4 { margin: 0 0 4px; color: var(--red); font-size: 14px; }
+  .shock .where {
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11px;
+    color: var(--muted);
+  }
+  .shock pre {
+    background: rgba(0,0,0,0.04); padding: 6px 8px; border-radius: 4px;
+    font-size: 11.5px; margin: 6px 0; overflow-x: auto;
+  }
+
+  /* Distribution chart */
+  .dist {
+    display: flex; height: 30px; border-radius: 4px; overflow: hidden;
+    border: 1px solid var(--line); margin: 8px 0;
+  }
+  .dist .seg { color: #fff; font-size: 11px; padding: 7px 8px; font-weight: 600; }
+  .dist .seg.unused   { background: var(--red); }
+  .dist .seg.partial  { background: var(--warn); }
+  .dist .seg.logic    { background: var(--indigo); }
+  .dist .seg.engine   { background: var(--purple); }
+  .dist .seg.datagap  { background: var(--muted); }
+  .dist-legend { display: flex; gap: 12px; font-size: 11px; flex-wrap: wrap; }
+  .dist-legend .chip {
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .dist-legend .chip .dot {
+    width: 10px; height: 10px; border-radius: 3px;
+  }
+
+  /* Recommendation cards */
+  .rec-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  .rec {
+    background: var(--card-bg); border: 1px solid var(--line);
+    border-radius: 8px; padding: 14px 18px;
+    border-left: 4px solid var(--green);
+  }
+  .rec.shift { border-left-color: var(--orange); }
+  .rec h4 { margin: 0 0 6px; font-size: 15px; }
+  .rec .badge {
+    display: inline-block; padding: 2px 10px; border-radius: 10px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba(47,143,93,0.12); color: var(--green);
+    margin-left: 8px;
+  }
+  .rec.shift .badge { background: rgba(217,83,30,0.12); color: var(--orange); }
+  .rec .desc { font-size: 13px; margin: 4px 0; }
+  .rec .one-line {
+    background: #1a1a1a; color: #f5f3ec; padding: 8px 10px; border-radius: 4px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px;
+    margin: 6px 0; overflow-x: auto; white-space: pre;
+  }
+
+  .decision-box {
+    background: #fff; border: 2px solid var(--green);
+    border-radius: 8px; padding: 18px 20px; margin: 28px 0 14px;
+  }
+  .decision-box h3 { margin-top: 0; color: var(--green); }
+  .decision-box textarea {
+    width: 100%; min-height: 100px; padding: 10px;
+    border: 1px solid var(--line); border-radius: 4px;
+    font: inherit; font-size: 14px; resize: vertical;
+  }
+  .decision-box .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>멀티턴 agent — 데이터 부재인가, agent 미활용인가</h1>
+  <p class="sub">
+    사용자 가설 ("모델링 그래프가 잘 되어있는데 agent 가 못 쓰는 것 아닌가") 을 검증하기 위해 4 갈래 정밀 감사:
+    데이터 인벤토리 / 검색·랭킹 알고리즘 / Gate III impact trace / intent + candidate schema.
+  </p>
+</header>
+
+<div class="verdict">
+  <h2>★ 결론 ★</h2>
+  <p>사용자 가설 = <b>압도적으로 사실</b>. 모델링 그래프는 풍부하게 채워져 있고, agent 가 거의 사용 안 함.</p>
+  <div class="big">10 마찰점 중 6 개 = 순수 agent 활용 부재</div>
+  <p>새 기능 추가 (Phase 12 "Operator Mode" / Phase 13 "Vocabulary") 보다 <b>기존 agent 의 재배선</b> 이 본질적 우선.
+     특히 <code class="inline">SimV2BackedOntologyClient.get_caller_graph</code> 가 <code class="inline">return []</code> 으로 stub 되어 있어 1 줄 fix 로 Gate III impact 절반이 살아남.</p>
+</div>
+
+<nav class="toc">
+  <strong>목차:</strong>
+  <a href="#inventory">데이터 인벤토리</a>
+  <a href="#matrix">10 마찰점 분류</a>
+  <a href="#shocks">충격적 발견</a>
+  <a href="#shift">전략 전환</a>
+  <a href="#decide">결정</a>
+</nav>
+
+<!-- ============= -->
+<section id="inventory">
+  <h2>1. 모델링 그래프 — 실제 적재 상태</h2>
+  <p>repo <code class="inline">slab-design-real-v2</code> 의 ontology.db SQLite 직접 query 결과. 모든 수치 인용 가능.</p>
+  <table class="inv">
+    <tr>
+      <th style="width:25%">영역</th>
+      <th style="width:12%">데이터?</th>
+      <th>실 데이터 증거 (sql 결과)</th>
+      <th style="width:18%">Agent 활용</th>
+    </tr>
+    <tr class="partial-use">
+      <td>F1. 한↔영 도메인 사전</td>
+      <td class="yes">YES</td>
+      <td>
+        <code class="inline">business_terms.aliases_json</code> 48/48 (100%) 채움.<br>
+        샘플: <code class="inline">검증결과 → ["검증 결과","ValidationResult","Validator 결과"]</code><br>
+        <code class="inline">EDGING그룹 → ["EDGING_GROUP","EdgingGroupEntity","에징 그룹"]</code><br>
+        <code class="inline">actions.aliases_json</code> 130/130. 한국어 label 22 개.
+      </td>
+      <td>일부 활용 (KoreanTermResolver). 검색 시 사용하나 ranking boost 부족.</td>
+    </tr>
+    <tr class="unused">
+      <td>F2. 도메인 액션 vs helper 시그널</td>
+      <td class="yes">YES</td>
+      <td>
+        <code class="inline">code_methods.role</code> 분포: adapter=900 / business=136 / helper=18 / unknown=27 (97.5% typed)<br>
+        <code class="inline">code_types.role</code> 분포: domain=106 / infra=41 / framework=3 (100%)<br>
+        <code class="inline">annotations_json</code>: @Component=39, @Service=13, @Override=22, @Transactional=7
+      </td>
+      <td><b>0% 활용</b>. 랭킹이 helper/adapter 와 business 를 같은 점수로 매김.</td>
+    </tr>
+    <tr class="partial-use">
+      <td>F3. 풍부화 재료 (body / rules)</td>
+      <td class="yes">YES</td>
+      <td>
+        <code class="inline">code_methods.body_text</code> 1032/1081 (95.5%)<br>
+        <code class="inline">line_start/end</code> 100% / <code class="inline">code_types.source_file</code> 100%<br>
+        <code class="inline">business_rules</code> 17 자연어 (e.g. "실수율 범위 0.5 ≤ p ≤ 1.0, cumulativeProductivity 안전 영역")
+      </td>
+      <td>body_text 만 fetch 시 활용. business_rules statement 가 chat evidence 로 미노출.</td>
+    </tr>
+    <tr class="partial-use">
+      <td>F4. impact (call_sites)</td>
+      <td class="partial">PARTIAL</td>
+      <td>
+        2298 row 중 <code class="inline">callee_receiver_static_type</code> 565 (24.6%) typed. 1733 untyped.<br>
+        Phase 10 의 5 단계 match_kind 가 untyped 도 fallback 으로 surface.<br>
+        <code class="inline">realizations</code> 135 row 매핑은 confidence 1.0 으로 클린.
+      </td>
+      <td>typed 24.6% 는 정확. untyped 75% 는 name_only/package_proximity 로 떨어짐 — 데이터 측 한계.</td>
+    </tr>
+    <tr class="unused">
+      <td>F5. anchor / fragment-level mapping</td>
+      <td class="yes">YES (가장 강력)</td>
+      <td>
+        <code class="inline">anchor_bindings</code> 163 row, 75 distinct target_slot.<br>
+        샘플: <code class="inline">"DEFAULT_PRODUCTIVITY = 0.95" → rule.scm.std.productivity_safe_range.fallback @ line 24</code><br>
+        <code class="inline">"product = product.multiply(p)" → aggregation.multiply @ line 73</code><br>
+        source: <b>manual=111 + user=29</b> (사람 확정)
+      </td>
+      <td><b>0% 활용</b>. multiturn 의 어떤 게이트도 anchor_bindings 호출 0 회.</td>
+    </tr>
+  </table>
+  <p>
+    <small class="note">사용된 SQL: <code class="inline">SELECT role, count(*) FROM code_methods WHERE repo_id='slab-design-real-v2' GROUP BY role</code> 등. agent grep 결과: <code class="inline">multiturn/</code> 전체에서 <code class="inline">anchor_bindings</code> 호출 0 hit.</small>
+  </p>
+</section>
+
+<!-- ============= -->
+<section id="matrix">
+  <h2>2. 10 마찰점 — 원인 카테고리 분류</h2>
+  <p>이전 페르소나 분석에서 도출한 10 개 개선 방향을 4 갈래 audit 결과와 대조해 재분류.</p>
+
+  <div class="dist">
+    <div class="seg unused" style="width:50%">데이터 있는데 agent 미활용 (5)</div>
+    <div class="seg partial" style="width:10%">부분활용 (1)</div>
+    <div class="seg logic" style="width:20%">agent 로직 (2)</div>
+    <div class="seg engine" style="width:10%">엔진 한계 (1)</div>
+    <div class="seg datagap" style="width:10%">데이터 갭 (1)</div>
+  </div>
+  <div class="dist-legend">
+    <span class="chip"><span class="dot" style="background:var(--red)"></span>미활용</span>
+    <span class="chip"><span class="dot" style="background:var(--warn)"></span>부분활용</span>
+    <span class="chip"><span class="dot" style="background:var(--indigo)"></span>agent 로직</span>
+    <span class="chip"><span class="dot" style="background:var(--purple)"></span>엔진 한계</span>
+    <span class="chip"><span class="dot" style="background:var(--muted)"></span>데이터 갭</span>
+  </div>
+
+  <div class="pain-rows">
+    <div class="pain-row">
+      <div class="title"><span class="id">A</span>도메인 사전 (한↔영)</div>
+      <div class="root">
+        <strong>데이터</strong>: business_terms.aliases_json 48/48 + actions 130/130. KoreanTermResolver 존재.<br>
+        <strong>근본</strong>: 매칭은 되지만 score 부스트 약함. 0-cand 일 때 동의어 제안 0.
+      </div>
+      <div class="cat partial">부분활용</div>
+    </div>
+
+    <div class="pain-row">
+      <div class="title"><span class="id">B</span>Ambiguous = 출구 없음</div>
+      <div class="root">
+        <strong>데이터</strong>: 무관. <strong>근본</strong>: state machine 의 ambiguous 진입 시 같은 session 재분류 path 부재. 순수 agent 로직.
+      </div>
+      <div class="cat logic">agent 로직</div>
+    </div>
+
+    <div class="pain-row">
+      <div class="title"><span class="id">C</span>Intent 3 종 너무 좁음 (locate/explain/question 없음)</div>
+      <div class="root">
+        <strong>데이터</strong>: 무관. <strong>근본</strong>: <code class="inline">intent.py</code> system prompt 가 simulate/impact/ambiguous 3 분기만 인코딩.
+        <b>v1 prompt 에는 explain 이 있었으나 v2 에서 제거됨</b>. 의도적이지만 사용자 좌절.
+      </div>
+      <div class="cat logic">agent 로직</div>
+    </div>
+
+    <div class="pain-row">
+      <div class="title"><span class="id">D</span>거짓 PASS (MagicMock-blind)</div>
+      <div class="root">
+        <strong>데이터</strong>: 무관. <strong>근본</strong>: sandbox stub 동작 — MagicMock 반환 시 status PASS 부여. 엔진 행동 변경 필요.
+      </div>
+      <div class="cat engine">엔진 한계</div>
+    </div>
+
+    <div class="pain-row">
+      <div class="title"><span class="id">E</span>Gate III impact 빈 결과 + confidence 1.0</div>
+      <div class="root">
+        <strong>데이터</strong>: caller_endpoint 호출하면 SdDesigner.design 1 행 surface. <strong>근본</strong>:
+        <code class="inline">SimV2BackedOntologyClient.get_caller_graph</code> 가 <code class="inline">return []</code> stub (Phase 4 미완성).
+        env 변수 <code class="inline">ONTONG_SECTION2_API_URL</code> 미설정 → SimV2-only client 선택 → stub 호출됨.
+      </div>
+      <div class="cat unused">미활용</div>
+    </div>
+
+    <div class="pain-row">
+      <div class="title"><span class="id">F</span>랭킹 helper 가 도메인 액션 위로</div>
+      <div class="root">
+        <strong>데이터</strong>: code_methods.role / code_types.role / annotations 모두 typed.
+        <strong>근본</strong>: <code class="inline">_match_score</code> 가 string substring 만 사용. role/annotations <b>0% 활용</b>.
+      </div>
+      <div class="cat unused">미활용</div>
+    </div>
+
+    <div class="pain-row">
+      <div class="title"><span class="id">G</span>FQN 부분 매칭 무시</div>
+      <div class="root">
+        <strong>데이터</strong>: actions.fqn / code_methods.fqn 모두 검색 가능.
+        <strong>근본</strong>: <code class="inline">. 또는 PascalCase</code> 시그널 감지 + boost 코드 부재. 순수 agent 로직 / 데이터 활용 부재.
+      </div>
+      <div class="cat unused">미활용</div>
+    </div>
+
+    <div class="pain-row">
+      <div class="title"><span class="id">H</span>한글 label / file_path 미surface</div>
+      <div class="root">
+        <strong>데이터</strong>: actions.label 한국어 22, code_types.source_file 150/150, line_start 100%.
+        <strong>근본</strong>: <code class="inline">_enrich_candidates</code> 가 sec2 API 미설정 시 location 빈 채로 두고, candidate schema 에 role/annotations 7+ 필드 누락.
+      </div>
+      <div class="cat unused">미활용</div>
+    </div>
+
+    <div class="pain-row">
+      <div class="title"><span class="id">I</span>가설값 fixture 반영 안 됨</div>
+      <div class="root">
+        <strong>데이터</strong>: <code class="inline">anchor_bindings</code> 163 row (사람 확정), atomic-level slot 다수 (예: <code class="inline">atomic.confirmed_plant_cd.invalid_check</code>).
+        <strong>근본</strong>: synthesize_fixtures 가 anchor_bindings 미활용 + 자연어 boundary 키워드 매핑 없음. 데이터 + 엔진 둘 다 보강 필요하나, <b>anchor_bindings 활용만으로도 80% 해결 가능</b>.
+      </div>
+      <div class="cat unused">미활용</div>
+    </div>
+
+    <div class="pain-row">
+      <div class="title"><span class="id">J</span>0-cand silent fallback</div>
+      <div class="root">
+        <strong>데이터</strong>: business_terms 가 알 수 있음 (검색했지만 안 나왔다는 사실 자체를 surface 안 함).
+        <strong>근본</strong>: agent UX 로직 — 빈 cand 응답 시 동의어 추천 / 인접 키워드 / browse 모드 부재.
+      </div>
+      <div class="cat logic">agent 로직</div>
+    </div>
+
+    <div class="pain-row">
+      <div class="title"><span class="id">K</span>(추가) callee_receiver_static_type 75% 비어있음</div>
+      <div class="root">
+        <strong>데이터</strong>: 1733/2298 행에 receiver type 없음. <strong>근본</strong>: modeling parser 한계. Section 2 측 작업.
+      </div>
+      <div class="cat datagap">데이터 갭</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============= -->
+<section id="shocks">
+  <h2>3. 충격적 발견 — "데이터는 풍부, agent 가 무시"</h2>
+
+  <div class="shock">
+    <h4>① <code class="inline">SimV2BackedOntologyClient.get_caller_graph</code> 가 그냥 <code class="inline">return []</code> stub</h4>
+    <div class="where">backend/section3/agents/multiturn/ontology_client.py:464-467</div>
+    <pre>async def get_caller_graph(self, code_method_fqn: str, *, repo_id: str) -> list[Caller]:
+    # TODO: Phase 4 에서 sec2 API + caller graph
+    return []   # ← 빈 배열 무조건 반환</pre>
+    <p>현 backend 의 env 에 <code class="inline">ONTONG_SECTION2_API_URL</code> 가 없어서 default 가 SimV2-only client → stub 호출 → Gate III impact 가 caller endpoint 의 실 데이터 1+ 행을 못 봄.
+    <code class="inline">HybridOntologyClient.get_caller_graph</code> (lines 356-387) 는 정상 wire 되어 caller endpoint 호출함. <b>env 변수 1 줄 + stub 1 줄 fix 만으로 즉시 살아남.</b></p>
+  </div>
+
+  <div class="shock">
+    <h4>② 검색 랭킹이 <code class="inline">role</code> / <code class="inline">annotations_json</code> 시그널 0% 활용</h4>
+    <div class="where">backend/section3/agents/multiturn/ontology_client.py:148-177 + backend/section3/sim_v2_bridge.py:465-559</div>
+    <p>code_methods.role 가 1054/1081 (97.5%) 타입화 되어 있고 (business=136 / adapter=900 / helper=18), code_types.role 도 100% (domain=106 / infra=41 / framework=3) 인데도 <code class="inline">_match_score</code> 함수는 label/aliases substring 만 본다. <b>이백호의 "thickness 검증" 쿼리에서 ValidationResult.pass (helper score 9.0) 가 SdThicknessAction.execute (business score 3.0) 위로 랭크된 직접적 원인.</b></p>
+  </div>
+
+  <div class="shock">
+    <h4>③ <code class="inline">anchor_bindings</code> 163 행 — multiturn 어디서도 호출 0</h4>
+    <div class="where">multiturn/ 디렉토리 전체 grep 결과: 0 hit</div>
+    <p>사람이 확정한 (manual=111 + user=29) fragment-level 매핑 163 행. 코드 라인 ↔ business rule / term 라인-레벨 ground truth. fixture synthesis 의 황금 재료인데 어디서도 query 0. QA 페르소나의 "boundary value fixture" wish 가 이 데이터로 80% 해결 가능 — 새 엔진 기능이 아니라 <b>기존 데이터 깨우기</b>.</p>
+  </div>
+
+  <div class="shock">
+    <h4>④ <code class="inline">business_rules</code> 17 자연어 statement — chat evidence 로 미노출</h4>
+    <div class="where">backend/modeling/.../business_rules + multiturn 응답 schema 미포함</div>
+    <p>실 statement: <code class="inline">"실수율 범위 (0.5 ≤ p ≤ 1.0). cumulativeProductivity 결과의 안전 영역"</code>, <code class="inline">"재고주문 (STOCK_CODE=1) 은 설계 대상 아님. (DG001)"</code>. 김PM 가 가장 원하는 "왜 이렇게 되나" 의 자연어 evidence. agent 응답에 포함만 시키면 즉시 surface.</p>
+  </div>
+
+  <div class="shock">
+    <h4>⑤ candidate 응답 schema 가 ontology 7+ 필드 누락</h4>
+    <div class="where">backend/section3/agents/multiturn/schemas.py:47-61</div>
+    <p>ActionCandidate 가 누락하는 필드: <code class="inline">code_methods.role</code> / <code class="inline">code_types.role</code> (parent kind) / <code class="inline">annotations_json</code> / <code class="inline">is_abstract / is_constructor / is_override</code> / <code class="inline">analysis_source</code> / <code class="inline">declared_on_term</code>. 박주니어가 file_path 빈 상태로 본 것 + 김PM 이 한글 단서 부족하다 한 것 모두 schema 의 의도적 stripped scope 때문. <b>schema 확장만으로 frontend 가 풍부 표시 가능.</b></p>
+  </div>
+
+  <div class="shock">
+    <h4>⑥ intent prompt 가 v1 에서 v2 로 가면서 <code class="inline">explain</code> 분류 제거됨</h4>
+    <div class="where">backend/section3/agents/multiturn/intent.py:19-20, 96-110</div>
+    <p>이전 v1 bridge_agent intent_classifier 에는 explain ("X 가 어디서 계산되나") 분기가 있었으나 v2 multiturn 에서 simulate/impact/ambiguous 3 종으로 축소. 박주니어 "validateOrder 뭐함?" / "cumulativeProductivity 어디서 계산?" 가 모두 impact 또는 simulate 로 강제 분류되어 사용자가 원한 "본문 + caller" 응답 못 받음. <b>의도적 축소이나 결과는 사용 불가 수준.</b></p>
+  </div>
+</section>
+
+<!-- ============= -->
+<section id="shift">
+  <h2>4. 전략 전환 — 새 기능 추가가 아니라 "기존 데이터 깨우기"</h2>
+  <p>이전 분석의 Phase 12 "Operator Mode" / Phase 13 "Vocabulary Expansion" 추천을 다음과 같이 재배치.</p>
+
+  <div class="rec-grid">
+    <div class="rec">
+      <h4>Phase 12 (재배치) — Activation: 기존 데이터 깨우기 <span class="badge">최우선</span></h4>
+      <p class="desc">새 기능 0. 다 있는 데이터를 agent 가 활용하도록 재배선. backend 위주.</p>
+      <ol style="margin: 6px 0; padding-left: 20px; font-size: 13px;">
+        <li><b>get_caller_graph stub fix</b> — <code class="inline">SimV2BackedOntologyClient.get_caller_graph</code> 가 HybridOntologyClient 와 동일한 sec2 endpoint 호출하도록 본문 교체 (또는 default 를 HybridOntologyClient(base_url="http://localhost:8001", fallback=...) 로). <br>→ <b>Pain E 즉시 해결</b></li>
+        <li><b>랭킹 boost</b> — <code class="inline">_match_score</code> 에 <code class="inline">role=business/domain</code> +5 / <code class="inline">helper/adapter</code> -3 / <code class="inline">annotations</code> +2 / FQN substring +15. <br>→ <b>Pain F, G 즉시 해결</b></li>
+        <li><b>ActionCandidate schema 확장</b> — role / parent_role / annotations / is_constructor / declared_on_term 7 필드 추가. frontend 에서 한글 라벨 / 도메인 배지 / 어노테이션 칩 표시. <br>→ <b>Pain H 해결</b></li>
+        <li><b>business_rules evidence 노출</b> — Gate I/II 응답 sources 에 관련 자연어 statement 추가. <br>→ <b>Pain A 부분 + 김PM 의 "왜" 의문 해소</b></li>
+        <li><b>impact confidence 식 수정</b> — caller_count 가 0 일 때 confidence 자동 0. <code class="inline">gate_iii_impact.py:152-173</code> 한 줄. <br>→ <b>Pain E 보조</b></li>
+      </ol>
+      <p style="font-size:12px; color:var(--muted)">예상 비용: backend ~5 파일 / frontend ~2 컴포넌트 + 2 schema 갱신. 1 phase 분량. <b>새 LLM prompt / 새 알고리즘 0.</b></p>
+    </div>
+
+    <div class="rec">
+      <h4>Phase 13 (재배치) — Anchor 활용 + 도메인 사전 부스트 <span class="badge">2 순위</span></h4>
+      <p class="desc">사람이 확정한 anchor_bindings 163 행을 fixture synthesis / oracle 결합에 도입.</p>
+      <ol style="margin: 6px 0; padding-left: 20px; font-size: 13px;">
+        <li><b>synthesize_fixtures 에 anchor_bindings inject</b> — 사람 확정 anchor 의 atomic slot 별 boundary 값을 fixture variant 로 추가. <br>→ <b>Pain I 80% 해결 (새 엔진 X)</b></li>
+        <li><b>KoreanTermResolver 의 score 를 ranking 에 합산</b> — 현재 detect 만 함. weight 도입. <br>→ <b>Pain A 본격 해결</b></li>
+        <li><b>0-cand 시 동의어 / aliases 인접어 제안</b> — business_terms.aliases_json 기반. <br>→ <b>Pain J 해결</b></li>
+      </ol>
+      <p style="font-size:12px; color:var(--muted)">예상 비용: backend ~3 파일. anchor → fixture 매핑 코드만 신규.</p>
+    </div>
+
+    <div class="rec shift">
+      <h4>Phase 14 (의도적 축소) — Intent vocab 확장 <span class="badge">3 순위</span></h4>
+      <p class="desc">이전 분석에서 1 순위였던 항목. 그러나 Phase 12 가 candidate response 풍부화하면 박주니어 "validateOrder 뭐함?" 같은 explain 의도도 simulate 분기로 가도 충분한 정보 받음. <b>intent 확장은 surface UX 개선 정도.</b></p>
+      <ul style="margin: 6px 0; padding-left: 20px; font-size: 13px;">
+        <li>v1 의 explain 분류 복원 + locate intent 신설</li>
+        <li>question (yes/no) intent 신설</li>
+        <li>simulate_hypothesis intent — boundary value 자동 inject 와 결합</li>
+      </ul>
+    </div>
+
+    <div class="rec shift">
+      <h4>Phase 15 (별도 phase) — Engine 한계 보강 <span class="badge">독립</span></h4>
+      <p class="desc">데이터 / agent 와 무관한 엔진 동작 변경. 별도 sprint.</p>
+      <ul style="margin: 6px 0; padding-left: 20px; font-size: 13px;">
+        <li>MagicMock-blind PASS 수정 (Pain D)</li>
+        <li>callee_receiver_static_type 1733 행 — Section 2 parser 측 작업 (Pain K)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============= -->
+<section id="decide">
+  <h2>5. 결정</h2>
+  <p>사용자 가설 검증 후 추천 변경:</p>
+  <ul>
+    <li><b>이전 추천</b> (multiturn_ux_analysis.html): Phase 12 "Operator Mode" — ambiguous 출구 + truthful PASS + impact no_data + 랭킹 부스트</li>
+    <li><b>지금 추천</b>: Phase 12 "Activation" — <b>새 기능 0, 기존 데이터 깨우기</b> 5 항목. 1 줄짜리 stub fix 부터.</li>
+  </ul>
+
+  <p><strong>가장 첫 한 줄 (15 분 안에 검증 가능)</strong>:</p>
+  <pre style="background: #1a1a1a; color: #f5f3ec; padding: 10px 14px; border-radius: 4px; font-size: 12px; overflow-x: auto;">
+# backend/section3/agents/multiturn/ontology_client.py:464
+# return []
+# ↓
+return await HybridOntologyClient.get_caller_graph(self, code_method_fqn, repo_id=repo_id)
+# (또는 SimV2 client 의 base_url 받아 sec2 caller endpoint 호출)
+  </pre>
+
+  <p>이 한 줄로 이백호 페르소나의 "Gate III impact 빈 결과 + confidence 1.0" critical 가 즉시 해결. 효과 검증 후 나머지 4 항목 (랭킹 boost / schema 확장 / business_rules evidence / confidence 식) 차례로.</p>
+
+  <div class="decision-box">
+    <h3>다음 행동 결정</h3>
+    <textarea id="decisionInput" placeholder="예: Phase 12 Activation 5 항목 1 부터 순차 진행. / 또는 한 줄 fix 만 먼저 verify 후 나머지 결정."></textarea>
+    <p class="hint">localStorage 자동 저장.</p>
+  </div>
+</section>
+
+<script>
+  const ta = document.getElementById('decisionInput');
+  const KEY = 'ontong_data_vs_agent_audit_decision';
+  if (ta) {
+    ta.value = localStorage.getItem(KEY) || '';
+    ta.addEventListener('input', () => localStorage.setItem(KEY, ta.value));
+  }
+</script>
+
+</body>
+</html>
