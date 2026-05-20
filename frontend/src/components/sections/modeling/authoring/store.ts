@@ -10,6 +10,7 @@
  */
 
 import { create } from "zustand";
+import { useWorkbench } from "../store";
 import {
   authoringApi,
   type AbsorbedAnswers,
@@ -460,16 +461,12 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         }),
       );
       const out = trace.output as Hypothesis;
-      // Phase C-2 boundary: the store's `hypothesis` field still types as
-      // EntityHypothesis because downstream caps (interview/gaps/options)
-      // are JPO-only until Phase C-3. Service/Action hypotheses display in
-      // chat but don't trigger downstream — preserves current pipeline
-      // semantics while letting users exercise the new hypothesis surface.
-      if (out.kind === "entity") {
-        set(() => ({ hypothesis: out, turnNo: turn }));
-      } else {
-        set(() => ({ turnNo: turn }));
-      }
+      // Phase C-3a: interview accepts all hypothesis kinds (entity/service/
+      // action) via the Hypothesis union. Downstream caps (options/gaps/
+      // naming) remain entity-only and are gated separately by `isEntityKind`
+      // in the toolbar, so it's safe to surface service/action hypotheses
+      // here without breaking the pipeline.
+      set(() => ({ hypothesis: out, turnNo: turn }));
       pushMessage(set, "assistant", "hypothesis", out, {
         toolTrace: trace.completed,
       });
@@ -511,10 +508,8 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
         }),
       );
       const out = trace.output as Hypothesis;
-      // See runHypothesize — narrow to EntityHypothesis for the store field.
-      const narrowedHypothesis = out.kind === "entity" ? out : get().hypothesis;
       set(() => ({
-        hypothesis: narrowedHypothesis,
+        hypothesis: out,
         turnNo: turn,
         // Clear everything downstream of hypothesis so the user can re-run.
         optionTable: null,
@@ -1082,6 +1077,8 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
       });
       set(() => ({ persistedFqns: out.persisted_fqns, turnNo: turn }));
       pushMessage(set, "assistant", "confirmed", out);
+      // Queue 가 새 confirmed entity 를 즉시 surface 하도록 trigger.
+      try { useWorkbench.getState().bumpQueueRefresh(); } catch { /* ignore */ }
       await get().refreshCost();
     });
   },
@@ -1127,11 +1124,10 @@ export const useAuthoring = create<AuthoringState>((set, get) => ({
           }),
         );
         const out = trace.output as Hypothesis;
-        // Narrow for store (downstream caps still JPO-only in Phase C-2).
-        const narrowed = out.kind === "entity" ? out : hypothesis;
-        // Clear everything downstream of hypothesis.
+        // Phase C-3a: surface all hypothesis kinds (interview accepts the union).
+        // Downstream entity-only caps are gated by `isEntityKind` in the toolbar.
         set(() => ({
-          hypothesis: narrowed,
+          hypothesis: out,
           turnNo: turn,
           batch: null,
           answers: null,
