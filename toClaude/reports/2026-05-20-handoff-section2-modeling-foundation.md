@@ -7,7 +7,7 @@
 
 ## 한 줄 요약
 
-slab-design-real-v2 기준 **136/136 actions sim_verified, 1,472 high-conf call_sites, 76 confirmed terms, 148 realizations** 까지 정리 완료. parser 가 import 시 86% receiver_type 자동 채움 + translator 5 patches + re-import safety net + Authoring 인터뷰 flow 안정화. 본인 에이전트를 Section 3 탭으로 추가 시 base 로 가져다 쓸 수 있는 상태.
+slab-design-real-v2 기준 **136/136 actions sim_verified, 1,472 high-conf call_sites, 83 confirmed terms (한국어 alias bridge 7건 포함), 22 confirmed rules (slab invariant 5건 포함), 148 realizations** 까지 정리 완료. parser 가 import 시 86% receiver_type 자동 채움 + translator 5 patches + re-import safety net + Authoring 인터뷰 flow 안정화. 본인 에이전트를 Section 3 탭으로 추가 시 base 로 가져다 쓸 수 있는 상태.
 
 ---
 
@@ -43,8 +43,8 @@ slab-design-real-v2 기준 현재 카운트:
 | code_methods | 1,081 |
 | call_sites | 2,298 (needs_user_confirm 51 = 외부 JDK only) |
 | **actions** | **136 / 136 sim_verified (100%)** |
-| business_terms | 76 (all confirmed) |
-| business_rules | 17 (all confirmed) |
+| business_terms | 83 (all confirmed — Phase 15 한국어 alias bridge 7건 포함) |
+| business_rules | 22 (all confirmed — Phase 16 slab invariant 5건 포함) |
 | realizations | 148 |
 | type_realizations | 69 |
 | anchor_bindings | 163 |

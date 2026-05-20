@@ -92,8 +92,8 @@ print('import done')
 | code_methods | 1,081 |
 | call_sites | 2,298 (needs_user_confirm 51 = 외부 JDK only) |
 | **actions** | **136 / 136 sim_verified (100%)** |
-| business_terms | 76 |
-| business_rules | 17 |
+| business_terms | 83 |
+| business_rules | 22 |
 | realizations | 148 |
 | anchor_bindings | 163 |
 
