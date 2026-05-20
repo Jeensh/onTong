@@ -228,8 +228,8 @@ export function InlineEditTextArea({
     );
   }
   return (
-    <div className={cn("group flex items-start gap-1", className)}>
-      <div className={cn("flex-1 whitespace-pre-wrap", !value && "text-zinc-400 italic")}>
+    <div className={cn("group flex items-start gap-1 min-w-0", className)}>
+      <div className={cn("flex-1 min-w-0 whitespace-pre-wrap break-words", !value && "text-zinc-400 italic")}>
         {value || placeholder || "—"}
       </div>
       <EditPencil onClick={s.start} />

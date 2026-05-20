@@ -17,8 +17,9 @@ from backend.modeling.domain_layer.store import DomainLayerStore
 from backend.modeling.mapping_layer.store import MappingLayerStore
 from backend.shared.contracts.ontology_query import (
     ActionDTO, AmbiguousCallSiteDTO, AnchorBindingDTO, BusinessRuleDTO,
-    CallSiteDTO, CodeTypeDTO, CompositionDTO, RealizationDTO, SearchHitDTO,
-    TermDTO, UnmappedMethodDTO, VerificationLevel, VerificationProgressDTO,
+    CallSiteDTO, CodeMethodDTO, CodeTypeDTO, CompositionDTO, RealizationDTO,
+    SearchHitDTO, TermDTO, UnmappedMethodDTO, VerificationLevel,
+    VerificationProgressDTO,
 )
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,139 @@ def effective_parts(term_fqn: str, repo_id: str | None = None) -> list[Compositi
             response_model=list[CallSiteDTO])
 def get_call_sites(caller_method_fqn: str) -> list[CallSiteDTO]:
     return _q().get_call_sites(caller_method_fqn)
+
+
+@router.get("/code-methods/{code_method_fqn:path}/body",
+            response_model=dict[str, Any])
+def get_method_body(code_method_fqn: str) -> dict[str, Any]:
+    """sec3 multiturn Gate II body 소스 — Section 3 협업 (Phase 4)."""
+    method = _q().get_method(code_method_fqn)
+    if method is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"code_method not found: {code_method_fqn}",
+        )
+    return {
+        "fqn": method.fqn,
+        "body_text": method.body_text or "",
+        "line_start": method.line_start,
+        "line_end": method.line_end,
+        "return_type": method.return_type,
+    }
+
+
+_MATCH_STRENGTH = {
+    "receiver_exact":     0.95,
+    "receiver_short":     0.85,
+    "runtime_type":       0.85,
+    "package_proximity":  0.70,
+    "name_only":          0.50,
+}
+
+
+@router.get("/code-methods/{callee_method_fqn:path}/callers",
+            response_model=dict[str, Any])
+def get_method_callers(
+    callee_method_fqn: str,
+    repo_id: str | None = Query(None),
+    min_strength: float = Query(
+        0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "match strength 의 최소값. 0.0 = 모두, 0.5 = name_only 포함, "
+            "0.7 = package_proximity 이상, 0.85 = receiver/runtime, 0.95 = exact 만."
+        ),
+    ),
+) -> dict[str, Any]:
+    """역방향 caller 검색 — Section 3 Gate III impact 협업 (Phase 4 + Phase 10).
+
+    반환: `{"callers": [{"fqn", "distance", "via", "match_kind", "strength"}, ...]}`
+
+    Phase 10 — `match_kind` 5종 (receiver_exact > receiver_short ≈ runtime_type >
+    package_proximity > name_only) + `strength` (0.50~0.95) 노출. caller 중복은
+    가장 강한 match_kind 만 surface.
+    """
+    pairs = _q_with_match(callee_method_fqn, repo_id)
+    # 같은 caller 중복 — 가장 강한 match 만 keep
+    by_caller: dict[str, tuple[Any, str]] = {}
+    for cs, mk in pairs:
+        prev = by_caller.get(cs.caller_method_fqn)
+        if prev is None or _MATCH_STRENGTH.get(mk, 0.0) > _MATCH_STRENGTH.get(prev[1], 0.0):
+            by_caller[cs.caller_method_fqn] = (cs, mk)
+
+    out: list[dict[str, Any]] = []
+    for fqn, (cs, mk) in by_caller.items():
+        strength = _MATCH_STRENGTH.get(mk, 0.0)
+        if strength < min_strength:
+            continue
+        src = (
+            cs.analysis_source if isinstance(cs.analysis_source, str)
+            else cs.analysis_source.value
+        )
+        via = "interface_impl" if ("interface" in src or "impl" in src) else "direct_caller"
+        out.append({
+            "fqn": fqn,
+            "distance": 1,
+            "via": via,
+            "match_kind": mk,
+            "strength": strength,
+        })
+    # 강한 신호 먼저
+    out.sort(key=lambda x: -x["strength"])
+    return {"callers": out}
+
+
+def _q_with_match(callee_method_fqn: str, repo_id: str | None):
+    """Best-effort fallback — sec2 store 인 경우 with_match 사용, 아니면 wrap."""
+    q = _q()
+    code_store = getattr(q, "code", None)
+    if code_store is not None and hasattr(code_store, "get_method_callers_with_match"):
+        return code_store.get_method_callers_with_match(
+            callee_method_fqn, repo_id=repo_id,
+        )
+    # Fallback — match_kind 정보 없음, name_only 로 균등 태깅
+    callsites = q.get_method_callers(callee_method_fqn, repo_id=repo_id)
+    return [(cs, "name_only") for cs in callsites]
+
+
+@router.get("/entities/{entity_name}/schema",
+            response_model=dict[str, Any])
+def get_entity_schema(
+    entity_name: str,
+    repo_id: str | None = Query(None),
+) -> dict[str, Any]:
+    """entity 의 schema (CodeType.fields) — Section 3 Gate II 협업 (Phase 4).
+
+    entity_name 매칭: simple_name 또는 fqn 의 마지막 segment.
+    반환: {"entity_name", "fields": [{"name","type_name","nullable"}, ...]}
+    """
+    # simple_name 매칭 — list_code_types 후 일치 검색
+    matches = []
+    for ct in _q().list_code_types(repo_id=repo_id):
+        if ct.simple_name == entity_name or ct.fqn == entity_name:
+            matches.append(ct)
+            break
+        if ct.fqn.endswith("." + entity_name):
+            matches.append(ct)
+    if not matches:
+        raise HTTPException(
+            status_code=404, detail=f"entity not found: {entity_name}",
+        )
+    ct = matches[0]
+    return {
+        "entity_name": ct.simple_name,
+        "fqn": ct.fqn,
+        "fields": [
+            {
+                "name": f.name,
+                "type_name": f.type,
+                "nullable": "Nullable" in f.annotations
+                            or f.type.startswith("Optional<"),
+            }
+            for f in ct.fields
+        ],
+    }
 
 
 @router.get("/actions/{action_fqn}/realizations-for-input",
@@ -180,6 +314,16 @@ def search(
     limit: int = Query(20, ge=1, le=200),
 ) -> list[SearchHitDTO]:
     return _q().search(q, repo_id=repo_id, limit=limit)
+
+
+@router.get("/search/suggest", response_model=list[SearchHitDTO])
+def search_suggest(
+    q: str = Query(..., min_length=1),
+    repo_id: str | None = Query(None),
+    n: int = Query(5, ge=1, le=10),
+) -> list[SearchHitDTO]:
+    """Did-you-mean — search() 가 0 hit 일 때 호출하는 fuzzy label 추천."""
+    return _q().suggest(q, repo_id=repo_id, n=n)
 
 
 # ---------------------------------------------------------------------------

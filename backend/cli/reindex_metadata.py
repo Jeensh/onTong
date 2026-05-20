@@ -105,7 +105,10 @@ async def main(args: argparse.Namespace) -> int:
 
     chroma = ChromaWrapper()
     chroma.connect()
-    indexer = WikiIndexer(chroma)
+    from backend.core.backends import get_fulltext_search
+    _ft_profile = settings.resolve_profile()
+    fulltext = get_fulltext_search(_ft_profile, es_url=settings.es_url)
+    indexer = WikiIndexer(chroma, fulltext)
 
     # 1) Rebuild MetadataIndex with new fields
     meta_index = MetadataIndex(str(wiki_dir))

@@ -189,15 +189,18 @@ def _row_to_ab(row: AnchorBindingRow) -> AnchorBinding:
 class MappingLayerStore:
     # ---- TypeRealization ----
     def upsert_type_realizations(
-        self, repo_id: str, items: Iterable[TypeRealization],
+        self, repo_id: str, items: Iterable[TypeRealization], *, force: bool = False,
     ) -> int:
+        """기본은 confirmed=True 행 보존 (덮어쓰기 차단). force=True 면 무조건 교체.
+
+        Why: recommend persist 같은 자동 호출이 사용자가 confirm 한 매핑을 wipe 하는 사고 방지.
+        """
         count = 0
         with session_scope() as s:
             for it in items:
                 d = it.model_dump()
                 d["repo_id"] = repo_id
                 it = TypeRealization(**d)
-                # 같은 (code_type, term, scope) 있으면 replace
                 existing = s.execute(
                     select(TypeRealizationRow).where(
                         TypeRealizationRow.code_type_fqn == it.code_type_fqn,
@@ -206,6 +209,8 @@ class MappingLayerStore:
                     )
                 ).scalar_one_or_none()
                 if existing is not None:
+                    if existing.confirmed and not force:
+                        continue
                     s.delete(existing)
                     s.flush()
                 s.add(_tr_to_row(it))
@@ -231,32 +236,36 @@ class MappingLayerStore:
             return _row_to_tr(row) if row else None
 
     # ---- Action ----
-    def upsert_action(self, repo_id: str, action: Action) -> Action:
-        """Action 저장 + realizations 별도 테이블에 분리 저장 → 반환은 합친 Action."""
+    def upsert_action(self, repo_id: str, action: Action, *, force: bool = False) -> Action:
+        """Action 저장 + realizations 별도 테이블에 분리 저장 → 반환은 합친 Action.
+
+        기본은 confirmed_by IS NOT NULL 행 보존. force=True 면 무조건 교체.
+        """
         with session_scope() as s:
             a_dict = action.model_dump()
             a_dict["repo_id"] = repo_id
             action = Action(**a_dict)
 
-            # delete existing
             existing = s.get(ActionRow, action.fqn)
+            if existing is not None and existing.confirmed_by is not None and not force:
+                # 사용자가 confirm 한 row 는 그대로 둠. realizations 도 안 건드림.
+                got = self.get_action(action.fqn)
+                return got if got is not None else action
             if existing is not None:
                 s.delete(existing)
                 s.flush()
-            # 기존 realizations 도 삭제
-            s.execute(delete(RealizationRow).where(RealizationRow.action_fqn == action.fqn))
+                s.execute(delete(RealizationRow).where(RealizationRow.action_fqn == action.fqn))
 
             s.add(_action_to_row(action))
             for r in action.realizations:
                 s.add(_real_to_row(action.fqn, repo_id, r))
-        # 반환 시 다시 조회해 일관성 보장
         got = self.get_action(action.fqn)
         return got if got is not None else action
 
-    def upsert_actions(self, repo_id: str, actions: Iterable[Action]) -> int:
+    def upsert_actions(self, repo_id: str, actions: Iterable[Action], *, force: bool = False) -> int:
         c = 0
         for a in actions:
-            self.upsert_action(repo_id, a)
+            self.upsert_action(repo_id, a, force=force)
             c += 1
         return c
 

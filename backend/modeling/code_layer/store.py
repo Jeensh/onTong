@@ -347,5 +347,119 @@ class CodeLayerStore:
                 stmt = stmt.where(CallSiteRow.repo_id == repo_id)
             return [_row_to_cs(r) for r in s.execute(stmt).scalars()]
 
+    def get_method_callers(
+        self,
+        callee_method_fqn: str,
+        repo_id: str | None = None,
+    ) -> list[CallSite]:
+        """역방향 caller 검색 — callee 의 method_fqn 을 호출하는 CallSite 들.
+
+        Phase 10: `get_method_callers_with_match` 의 thin wrapper — CallSite 만.
+        """
+        return [
+            cs for cs, _ in self.get_method_callers_with_match(
+                callee_method_fqn, repo_id=repo_id,
+            )
+        ]
+
+    def get_method_callers_with_match(
+        self,
+        callee_method_fqn: str,
+        repo_id: str | None = None,
+    ) -> list[tuple[CallSite, str]]:
+        """역방향 caller 검색 + match-kind tag.
+
+        반환: `[(CallSite, match_kind), ...]`. match_kind ∈
+          - "receiver_exact"     : callee_receiver_static_type == receiver_fqn (FQN)
+          - "receiver_short"     : callee_receiver_static_type 가 receiver 의 short name
+          - "runtime_type"       : possible_runtime_types 중 fqn / short_name 매칭
+          - "package_proximity"  : receiver/caller package 가 동일 (parser 가 receiver 못 잡았을 때)
+          - "name_only"          : simple_name 만 일치 (best-effort, 가장 약한 신호)
+
+        Phase 10 추가 heuristic:
+          - receiver short-name 비교 ("OrderService" vs fqn-tail "OrderService")
+          - package proximity — receiver 의 패키지 prefix 가 caller_method_fqn 의 패키지 prefix
+            와 같으면 "name_only" 보다 우선 surface.
+        """
+        simple_name = _extract_method_simple_name(callee_method_fqn)
+        receiver_fqn = _extract_method_receiver(callee_method_fqn)
+        if not simple_name:
+            return []
+        receiver_short = receiver_fqn.rsplit(".", 1)[-1] if receiver_fqn else ""
+        receiver_package = (
+            receiver_fqn.rsplit(".", 1)[0] if "." in receiver_fqn else ""
+        )
+
+        with session_scope() as s:
+            stmt = select(CallSiteRow).where(
+                CallSiteRow.callee_simple_name == simple_name,
+            )
+            if repo_id is not None:
+                stmt = stmt.where(CallSiteRow.repo_id == repo_id)
+            rows = list(s.execute(stmt).scalars())
+
+        out: list[tuple[CallSite, str]] = []
+        for row in rows:
+            cs = _row_to_cs(row)
+            if not receiver_fqn:
+                out.append((cs, "name_only"))
+                continue
+
+            # 1) receiver FQN exact match
+            if cs.callee_receiver_static_type == receiver_fqn:
+                out.append((cs, "receiver_exact"))
+                continue
+            # 2) receiver short-name match (parser 가 short name 만 잡은 경우)
+            if (
+                receiver_short
+                and cs.callee_receiver_static_type == receiver_short
+            ):
+                out.append((cs, "receiver_short"))
+                continue
+            # 3) possible_runtime_types — FQN 또는 short-name 매칭
+            if any(
+                c.code_type_fqn == receiver_fqn
+                or (
+                    receiver_short
+                    and c.code_type_fqn.rsplit(".", 1)[-1] == receiver_short
+                )
+                for c in cs.possible_runtime_types
+            ):
+                out.append((cs, "runtime_type"))
+                continue
+            # 4) parser 가 receiver type 못 잡았을 때 — package proximity 우선,
+            #    실패 시 name_only 로 fallback.
+            if not cs.callee_receiver_static_type and not cs.possible_runtime_types:
+                caller_package = (
+                    cs.caller_method_fqn.split("(", 1)[0].rsplit(".", 2)[0]
+                    if cs.caller_method_fqn.count(".") >= 2
+                    else ""
+                )
+                if (
+                    receiver_package
+                    and caller_package
+                    and caller_package == receiver_package
+                ):
+                    out.append((cs, "package_proximity"))
+                else:
+                    out.append((cs, "name_only"))
+        return out
+
+
+def _extract_method_simple_name(fqn: str) -> str:
+    """`com.X.Y.foo(Bar)` → `foo`. 시그니처 잘려도 동작."""
+    head = fqn.split("(", 1)[0]
+    if "." not in head:
+        return head
+    return head.rsplit(".", 1)[1]
+
+
+def _extract_method_receiver(fqn: str) -> str:
+    """`com.X.Y.foo(Bar)` → `com.X.Y`. dot 없으면 빈 문자열."""
+    head = fqn.split("(", 1)[0]
+    if "." not in head:
+        return ""
+    return head.rsplit(".", 1)[0]
+
 
 __all__ = ("CodeLayerStore",)

@@ -49,7 +49,7 @@ class RealizationScope(StrEnum):
 
 
 class DispatchSource(StrEnum):
-    """Realization 이 어떻게 결정됐는가 (D3 7-case + 사용자/모호)."""
+    """Realization 이 어떻게 결정됐는가 (D3 7-case + 사용자/모호 + 수동 audit)."""
     SINGLE_IMPL       = "single_impl"
     INSTANCEOF_GUARD  = "instanceof_guard"
     ANNOTATION        = "annotation"
@@ -59,6 +59,7 @@ class DispatchSource(StrEnum):
     REFLECTION        = "reflection"
     USER_CONFIRMED    = "user_confirmed"
     STATIC_UNRESOLVED = "static_unresolved"
+    AUDIT             = "audit"   # 수동 audit 스크립트로 채워진 realization (Risk N 분석 등)
 
 
 class VerificationLevel(StrEnum):

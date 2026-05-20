@@ -23,10 +23,21 @@ proceeds without NameError; the actual return value is dominated by primitive
 arg paths (which W71 controls). For deeper fidelity W76 will record real Java
 return values into `JavaBaselineMap`.
 
+Phase 9 — typed-return stubs (FAIL_RETURN_TYPE reduction):
+    Stub method calls like `repo.findById(...)` would otherwise return a
+    `MagicMock` instance, which fails W72's `_output_type_ok` check when the
+    enclosing method has a typed return (String/int/BigDecimal/...). The
+    `derive_method_return_defaults` helper builds a global short-name ↦
+    typed-default map from `code_methods.return_type`, and the stub builders
+    install those defaults on freshly-created MagicMocks. Caller methods see
+    type-shaped values (`""` for String, `Decimal("0")` for BigDecimal, ...)
+    when invoking stubbed beans.
+
 Public API:
     - derive_anchor_constants(session, method_fqn, repo_id)  → dict
     - derive_class_stub(name, fields=None)                   → MagicMock
     - derive_repository_stub(name)                           → MagicMock
+    - derive_method_return_defaults(session, repo_id)        → dict[str, Any]
     - build_stub_namespace(session, method_fqn, repo_id,
                            python_source)                    → dict
 """
@@ -124,13 +135,20 @@ def derive_anchor_constants(
 
 
 def derive_class_stub(
-    name: str, fields: list[str] | None = None,
+    name: str,
+    fields: list[str] | None = None,
+    *,
+    method_return_defaults: dict[str, Any] | None = None,
 ) -> MagicMock:
     """Build a `MagicMock` impersonating a Java class.
 
     `fields` (optional) constrains instances (the result of calling the stub)
     to those attribute names — anything else raises AttributeError. Useful for
     catching typos. Without `fields`, the stub and instances are permissive.
+
+    `method_return_defaults` (Phase 9 — W74 typed-return): installs typed
+    defaults on the *instance* returned by `klass(...)` so e.g. an entity
+    stub's `getCmpCd()` yields `""` instead of a raw MagicMock.
     """
     klass = MagicMock(name=name)
     if fields:
@@ -138,11 +156,14 @@ def derive_class_stub(
         klass.return_value = MagicMock(name=f"{name}()", spec_set=fields)
     else:
         klass.return_value = MagicMock(name=f"{name}()")
+    _install_typed_returns(klass.return_value, method_return_defaults)
     return klass
 
 
 def derive_entity_stub_from_code_types(
     session: Session, class_fqn: str, repo_id: str,
+    *,
+    method_return_defaults: dict[str, Any] | None = None,
 ) -> MagicMock:
     """Look up `code_types.fields_json` and build a stub with that spec."""
     row = session.execute(
@@ -164,7 +185,11 @@ def derive_entity_stub_from_code_types(
         except (json.JSONDecodeError, AttributeError):
             pass
     short_name = class_fqn.rsplit(".", 1)[-1]
-    return derive_class_stub(short_name, fields=fields if fields else None)
+    return derive_class_stub(
+        short_name,
+        fields=fields if fields else None,
+        method_return_defaults=method_return_defaults,
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -187,9 +212,122 @@ def is_bean_name(name: str) -> bool:
     return any(name.endswith(s) for s in _BEAN_SUFFIXES)
 
 
-def derive_repository_stub(name: str) -> MagicMock:
-    """Spring bean placeholder. Method calls return MagicMock cascades."""
-    return MagicMock(name=name)
+def derive_repository_stub(
+    name: str,
+    *,
+    method_return_defaults: dict[str, Any] | None = None,
+) -> MagicMock:
+    """Spring bean placeholder. Method calls return MagicMock cascades.
+
+    `method_return_defaults` (Phase 9 — W74 typed-return): when provided,
+    sets `stub.METHOD.return_value` for every short name in the map so callers
+    that consume the return value see a type-shaped default (e.g. `""` for
+    String, `Decimal("0")` for BigDecimal) instead of a raw MagicMock.
+    """
+    stub = MagicMock(name=name)
+    _install_typed_returns(stub, method_return_defaults)
+    return stub
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3b) Phase 9 — typed-return defaults (W74 FAIL_RETURN_TYPE reduction)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _typed_default_for(return_type: str) -> Any:
+    """Map a Java return-type string → a type-shaped Python default value.
+
+    Returns `None` when the declared type is `void`, unknown, or genuinely
+    ambiguous (caller should fall back to a permissive MagicMock).
+    """
+    if not return_type:
+        return None
+    rt = return_type.strip()
+    # void → None
+    if rt == "void":
+        return None
+    # generics — strip outer angle brackets for the base type
+    base = rt.split("<", 1)[0].strip()
+    if base in ("String",):
+        return ""
+    if base in ("boolean", "Boolean"):
+        return False
+    if base in ("int", "Integer", "long", "Long", "short", "Short", "byte", "Byte"):
+        return 0
+    if base in ("float", "Float", "double", "Double"):
+        return 0.0
+    if base in ("BigDecimal", "BigInteger"):
+        from decimal import Decimal
+        return Decimal("0")
+    if base in ("LocalDate", "LocalDateTime", "OffsetDateTime", "ZonedDateTime", "Instant"):
+        return None
+    if base in ("List", "ArrayList", "LinkedList", "Set", "HashSet"):
+        return []
+    if base in ("Map", "HashMap", "LinkedHashMap", "TreeMap"):
+        return {}
+    if base in ("Optional",):
+        return None
+    # Object_ref / domain types — leave None so caller falls back to permissive mock
+    return None
+
+
+def derive_method_return_defaults(
+    session: Session, repo_id: str,
+) -> dict[str, Any]:
+    """Build short-name → typed-default map from `code_methods.return_type`.
+
+    Reads every method in the repo and groups by simple name. If multiple
+    methods share a name (overload / different classes) but agree on the
+    return-type family, the typed default is kept. Conflicting families
+    drop out (no entry) — caller's MagicMock fallback handles it.
+    """
+    rows = session.execute(
+        text(
+            "SELECT fqn, return_type FROM code_methods "
+            "WHERE repo_id = :r AND return_type IS NOT NULL AND return_type != ''"
+        ),
+        {"r": repo_id},
+    ).fetchall()
+
+    # Group simple_name → set of typed defaults (deduped via repr to handle
+    # Decimal/0 / 0.0 / "" — heterogenous but hashable via repr).
+    candidates: dict[str, dict[str, Any]] = {}
+    for fqn, rt in rows:
+        if not fqn:
+            continue
+        # simple_name = the part between the last "." and "(" in fqn
+        # fqn shape: a.b.Class.method(arg1,arg2,...)
+        head = fqn.split("(", 1)[0]
+        simple_name = head.rsplit(".", 1)[-1]
+        if not simple_name:
+            continue
+        default = _typed_default_for(rt)
+        if default is None and rt != "void":
+            # Unknown / object_ref — leave as MagicMock
+            continue
+        if rt == "void":
+            # void return — don't override (MagicMock default is fine)
+            continue
+        bucket = candidates.setdefault(simple_name, {})
+        bucket[repr(default)] = default
+
+    # Only keep entries where the family is unambiguous (one repr value).
+    out: dict[str, Any] = {}
+    for sn, bucket in candidates.items():
+        if len(bucket) == 1:
+            out[sn] = next(iter(bucket.values()))
+    return out
+
+
+def _install_typed_returns(
+    stub: MagicMock, defaults: dict[str, Any] | None,
+) -> None:
+    """Configure `stub.METHOD.return_value` for each entry in `defaults`."""
+    if not defaults:
+        return
+    for method_name, default in defaults.items():
+        # `stub.foo` creates a child MagicMock automatically — set its return_value.
+        getattr(stub, method_name).return_value = default
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -282,6 +420,7 @@ def build_stub_namespace(
     python_source: str,
     *,
     code_types_lookup_fqns: dict[str, str] | None = None,
+    method_return_defaults: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the complete stub namespace for one method translation.
 
@@ -290,6 +429,11 @@ def build_stub_namespace(
 
     `code_types_lookup_fqns` (optional) lets the caller pass short_name → FQN
     mappings so entity stubs can be spec'd from `code_types.fields_json`.
+
+    `method_return_defaults` (Phase 9 — W74 typed-return): when None, derived
+    from `derive_method_return_defaults(session, repo_id)`. Pass an explicit
+    `{}` to disable. The map is installed on every class/bean/permissive stub
+    so callers reading their return values see type-shaped defaults.
     """
     ns: dict[str, Any] = {}
 
@@ -301,7 +445,14 @@ def build_stub_namespace(
     # Don't overwrite anchor consts; only stub names not already provided.
     refs -= set(ns.keys())
 
-    # (c) stub each reference
+    # (c) typed-return defaults — autoload if not supplied
+    if method_return_defaults is None:
+        try:
+            method_return_defaults = derive_method_return_defaults(session, repo_id)
+        except Exception:
+            method_return_defaults = {}
+
+    # (d) stub each reference
     lookup = code_types_lookup_fqns or {}
     for name in refs:
         cls = classify_unbound(name)
@@ -310,15 +461,22 @@ def build_stub_namespace(
             if class_fqn:
                 ns[name] = derive_entity_stub_from_code_types(
                     session, class_fqn, repo_id,
+                    method_return_defaults=method_return_defaults,
                 )
             else:
-                ns[name] = derive_class_stub(name)
+                ns[name] = derive_class_stub(
+                    name, method_return_defaults=method_return_defaults,
+                )
         elif cls == "bean":
-            ns[name] = derive_repository_stub(name)
+            ns[name] = derive_repository_stub(
+                name, method_return_defaults=method_return_defaults,
+            )
         else:
             # Lowercase non-bean reference (e.g. helper function "lookup")
             # → permissive MagicMock so the exec doesn't fail.
-            ns[name] = MagicMock(name=name)
+            stub = MagicMock(name=name)
+            _install_typed_returns(stub, method_return_defaults)
+            ns[name] = stub
 
     return ns
 
@@ -328,6 +486,7 @@ __all__ = [
     "derive_anchor_constants",
     "derive_class_stub",
     "derive_entity_stub_from_code_types",
+    "derive_method_return_defaults",
     "derive_repository_stub",
     "find_unbound_names",
     "is_bean_name",

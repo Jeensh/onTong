@@ -124,6 +124,10 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     label: "Verification Level",
     short: "Action 의 신뢰 단계. UNMAPPED → DRAFT → SIGNATURE_LOCKED → BODY_ANCHORED → SIM_VERIFIED → PR_PROVEN. 자동 진급 + 외부 신호.",
   },
+  unmapped: {
+    label: "UNMAPPED",
+    short: "아직 어떤 Java code_method 에도 매핑되지 않은 Action. 초기 추천 단계 또는 사용자가 직접 추가한 후 매핑 대기 상태.",
+  },
   signature_locked: {
     label: "SIGNATURE_LOCKED",
     short: "Action 의 입력/출력 type 이 코드 method signature 와 정합. params_json + output_json 채워짐. (현 Phase 의 default 진급 단계.)",
@@ -175,6 +179,30 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   draft: {
     label: "Draft",
     short: "추천 또는 자동 생성 직후 상태. 사용자 합의 대기 중. confirmed=false 와 동의어로 쓰임.",
+  },
+
+  // ───────── 매핑 큐 (좌측 ‘큐’ 탭) ─────────
+  queue_term: {
+    label: "큐 · Term",
+    short: "이 repo 에 자동 추천된 BusinessTerm 중 사용자 confirm 대기 중인 항목. confirm 시 즉시 온톨로지에 편입되고 큐에서 빠짐. reject 하면 draft 가 제거됨.",
+    example: "예: term.scm.shared.grade 추천 → confirm → 다른 Action 에서 참조 가능",
+  },
+  queue_action: {
+    label: "큐 · Action",
+    short: "Java method 분석으로 추출된 Action 후보. realization (어떤 method 가 이 Action 의 구현인지) 까지 함께 추천. confirm 시 verification_level 이 draft → signature_locked 으로 진급.",
+  },
+  queue_realization: {
+    label: "큐 · Type Realization",
+    short: "Term ↔ CodeType (Java class) 자동 매핑 후보. primary (1:1 default 매칭) 와 partial (특정 subtype/조건만) 두 종류. confidence 높은 순으로 정렬.",
+  },
+  queue_legacy_code: {
+    label: "큐 · Code (legacy)",
+    short: "정적 분석으로 결정 못 한 코드 큐. (1) Unmapped Method — 어떤 Action 으로도 매핑 안 된 method, (2) Ambiguous Call Site — interface 다중 구현 등으로 dispatch 모호한 호출. 사용자가 수동 결정.",
+  },
+  recommend: {
+    label: "추천 (Recommend) 재실행",
+    short: "자동 매핑 추천 알고리즘을 다시 돌립니다. confirmed=True 인 entity 는 보존 (idempotent). 새로 import 한 코드 / glossary 수정 / 매핑 보정 후 큐 재생성 용도.",
+    example: "예: 코드 import 직후 → 추천 → 큐 차오름 → confirm 반복",
   },
 
   // ───────── Composition / Inheritance ─────────

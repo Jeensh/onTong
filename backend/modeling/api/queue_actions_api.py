@@ -22,6 +22,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import delete, select
 
+from backend.modeling.audit.store import log_change
 from backend.modeling.domain_layer.orm import BusinessRuleRow, BusinessTermRow
 from backend.modeling.mapping_layer.orm import (
     ActionRow,
@@ -167,6 +168,7 @@ def confirm_term(repo_id: str, fqn: str) -> ActionResult:
             raise HTTPException(status_code=404, detail=f"term not found: {fqn}")
         row.confirmed = True
         row.source = "user"
+    log_change(repo_id, "term", fqn, "confirm", changed_by="user")
     return ActionResult(ok=True, action="confirmed", target=fqn)
 
 
@@ -187,6 +189,7 @@ def reject_term(repo_id: str, fqn: str) -> ActionResult:
         )
         if (result.rowcount or 0) == 0:
             raise HTTPException(status_code=404, detail=f"term not found: {fqn}")
+    log_change(repo_id, "term", fqn, "reject", changed_by="user")
     return ActionResult(ok=True, action="rejected", target=fqn)
 
 
@@ -204,6 +207,7 @@ def confirm_action(repo_id: str, fqn: str, by: str = Query("user")) -> ActionRes
         # verification 진척: draft → signature_locked (이미 더 높은 단계면 그대로)
         if row.verification_level == "draft" or row.verification_level == "unmapped":
             row.verification_level = "signature_locked"
+    log_change(repo_id, "action", fqn, "confirm", changed_by=by)
     return ActionResult(ok=True, action="confirmed", target=fqn)
 
 
@@ -222,6 +226,7 @@ def reject_action(repo_id: str, fqn: str) -> ActionResult:
         )
         if (result.rowcount or 0) == 0:
             raise HTTPException(status_code=404, detail=f"action not found: {fqn}")
+    log_change(repo_id, "action", fqn, "reject", changed_by="user")
     return ActionResult(ok=True, action="rejected", target=fqn)
 
 
@@ -238,6 +243,7 @@ def confirm_realization(repo_id: str, tr_id: int) -> ActionResult:
         row.confirmed = True
         row.confirmed_by = "user"
         row.source = "user"
+    log_change(repo_id, "type_realization", str(tr_id), "confirm", changed_by="user")
     return ActionResult(ok=True, action="confirmed", target=str(tr_id))
 
 
@@ -251,6 +257,7 @@ def reject_realization(repo_id: str, tr_id: int) -> ActionResult:
         )
         if (result.rowcount or 0) == 0:
             raise HTTPException(status_code=404, detail=f"realization not found: {tr_id}")
+    log_change(repo_id, "type_realization", str(tr_id), "reject", changed_by="user")
     return ActionResult(ok=True, action="rejected", target=str(tr_id))
 
 
@@ -274,6 +281,7 @@ def confirm_business_rule(repo_id: str, fqn: str) -> ActionResult:
             raise HTTPException(status_code=404, detail=f"business rule not found: {fqn}")
         row.confirmed = True
         row.source = "user"
+    log_change(repo_id, "business_rule", fqn, "confirm", changed_by="user")
     return ActionResult(ok=True, action="confirmed", target=fqn)
 
 
@@ -289,6 +297,7 @@ def unconfirm_business_rule(repo_id: str, fqn: str) -> ActionResult:
         if row is None:
             raise HTTPException(status_code=404, detail=f"business rule not found: {fqn}")
         row.confirmed = False
+    log_change(repo_id, "business_rule", fqn, "unconfirm", changed_by="user")
     return ActionResult(ok=True, action="unconfirmed", target=fqn)
 
 
@@ -307,6 +316,7 @@ def confirm_anchor_binding(repo_id: str, anchor_id: str) -> ActionResult:
             raise HTTPException(status_code=404, detail=f"anchor not found: {anchor_id}")
         row.confirmed = True
         row.source = "user"
+    log_change(repo_id, "anchor_binding", anchor_id, "confirm", changed_by="user")
     return ActionResult(ok=True, action="confirmed", target=anchor_id)
 
 
@@ -322,6 +332,7 @@ def unconfirm_anchor_binding(repo_id: str, anchor_id: str) -> ActionResult:
         if row is None:
             raise HTTPException(status_code=404, detail=f"anchor not found: {anchor_id}")
         row.confirmed = False
+    log_change(repo_id, "anchor_binding", anchor_id, "unconfirm", changed_by="user")
     return ActionResult(ok=True, action="unconfirmed", target=anchor_id)
 
 
@@ -339,6 +350,7 @@ def unconfirm_term(repo_id: str, fqn: str) -> ActionResult:
         if row is None:
             raise HTTPException(status_code=404, detail=f"term not found: {fqn}")
         row.confirmed = False
+    log_change(repo_id, "term", fqn, "unconfirm", changed_by="user")
     return ActionResult(ok=True, action="unconfirmed", target=fqn)
 
 
@@ -360,6 +372,7 @@ def unconfirm_action(repo_id: str, fqn: str) -> ActionResult:
         if row.verification_level in ("signature_locked", "body_anchored"):
             row.verification_level = "draft"
         row.confirmed_by = None
+    log_change(repo_id, "action", fqn, "unconfirm", changed_by="user")
     return ActionResult(ok=True, action="unconfirmed", target=fqn)
 
 
@@ -395,6 +408,8 @@ def patch_term(repo_id: str, fqn: str, patch: TermPatch) -> ActionResult:
         if patch.unit is not None:        row.unit = patch.unit
         if patch.enum_values is not None:
             row.enum_values_json = json.dumps(patch.enum_values, ensure_ascii=False)
+    log_change(repo_id, "term", fqn, "update", changed_by="user",
+               details={k: v for k, v in patch.model_dump().items() if v is not None})
     return ActionResult(ok=True, action="patched", target=fqn)
 
 
@@ -417,6 +432,8 @@ def patch_action(repo_id: str, fqn: str, patch: ActionPatch) -> ActionResult:
         if patch.label is not None:       row.label = patch.label
         if patch.aliases is not None:     row.aliases_json = json.dumps(patch.aliases, ensure_ascii=False)
         if patch.description is not None: row.description = patch.description
+    log_change(repo_id, "action", fqn, "update", changed_by="user",
+               details={k: v for k, v in patch.model_dump().items() if v is not None})
     return ActionResult(ok=True, action="patched", target=fqn)
 
 
@@ -439,6 +456,8 @@ def patch_business_rule(repo_id: str, fqn: str, patch: BRPatch) -> ActionResult:
             raise HTTPException(status_code=404, detail=f"business rule not found: {fqn}")
         if patch.statement is not None: row.statement = patch.statement
         if patch.severity is not None:  row.severity = patch.severity
+    log_change(repo_id, "business_rule", fqn, "update", changed_by="user",
+               details={k: v for k, v in patch.model_dump().items() if v is not None})
     return ActionResult(ok=True, action="patched", target=fqn)
 
 
@@ -461,4 +480,6 @@ def patch_anchor_binding(repo_id: str, anchor_id: str, patch: AnchorPatch) -> Ac
         if patch.anchor_locator is not None: row.anchor_locator = patch.anchor_locator
         if patch.target_slot is not None:    row.target_slot = patch.target_slot
         if patch.rationale is not None:      row.rationale = patch.rationale
+    log_change(repo_id, "anchor_binding", anchor_id, "update", changed_by="user",
+               details={k: v for k, v in patch.model_dump().items() if v is not None})
     return ActionResult(ok=True, action="patched", target=anchor_id)

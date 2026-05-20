@@ -31,20 +31,27 @@ export function RepoImportModal({
 }) {
   const setRepoId = useWorkbench((s) => s.setRepoId);
 
-  const [repoPath, setRepoPath] = useState("sample-repos/slab-design-real");
-  const [repoId, setRepoIdInput] = useState("slab-design-real");
+  const [repoPath, setRepoPath] = useState("sample-repos/slab-design-real_v2");
+  const [repoId, setRepoIdInput] = useState("slab-design-real-v2");
+  const [repoIdManuallyEdited, setRepoIdManuallyEdited] = useState(false);
   const [phase, setPhase] = useState<Phase>("form");
   const [status, setStatus] = useState<RepoImportStatusDTO | null>(null);
   const [recommendation, setRecommendation] = useState<RecommendationResponseDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
 
-  // 자동 repo_id 추출 — path 변경 시 basename
+  // 자동 repo_id 추출 — path basename. underscore/특수문자 → dash 로 normalize
+  // (sim_v2 테스트 & handoff DB 가 dash 컨벤션이라 충돌 방지).
+  // 사용자가 직접 편집했으면 더 이상 덮어쓰지 않음.
   useEffect(() => {
     if (phase !== "form") return;
+    if (repoIdManuallyEdited) return;
     const last = repoPath.split("/").filter(Boolean).pop();
-    if (last) setRepoIdInput(last);
-  }, [repoPath, phase]);
+    if (last) {
+      const normalized = last.replace(/[_\s]+/g, "-").replace(/[^a-zA-Z0-9-]/g, "-");
+      setRepoIdInput(normalized);
+    }
+  }, [repoPath, phase, repoIdManuallyEdited]);
 
   // 모달 닫힐 때 SSE 정리
   useEffect(() => {
@@ -161,7 +168,7 @@ export function RepoImportModal({
               <Input
                 value={repoPath}
                 onChange={(e) => setRepoPath(e.target.value)}
-                placeholder="sample-repos/slab-design-real"
+                placeholder="sample-repos/slab-design-real_v2"
                 className="font-mono text-xs"
               />
             </label>
@@ -169,7 +176,10 @@ export function RepoImportModal({
               <span className="text-xs text-muted-foreground mb-1 block">Repo ID (저장 키)</span>
               <Input
                 value={repoId}
-                onChange={(e) => setRepoIdInput(e.target.value)}
+                onChange={(e) => {
+                  setRepoIdInput(e.target.value);
+                  setRepoIdManuallyEdited(true);
+                }}
                 className="font-mono text-xs"
               />
               <span className="text-[10px] text-muted-foreground mt-1 block">

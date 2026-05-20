@@ -15,7 +15,7 @@ import {
   MarkerType,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Loader2, Search, X, Target, Network, GitFork, Boxes, Link2, Check } from "lucide-react";
+import { Loader2, Search, X, Target, Network, Boxes, Link2, Check } from "lucide-react";
 
 // ELK dynamic import (R4-T1.3 안건 1 micro-decision = B 풀 마이그). Next 가 main entry
 // 의 'web-worker' 의존을 직접 못 import → web worker 로 lazy load. public/elk-worker.min.js.
@@ -57,22 +57,19 @@ import { useWorkbench, type GraphViewMode } from "./store";
 
 export function OntologyGraph({ repoId }: { repoId: string }) {
   // R4-T2.3 — graph state 가 store 로 이동 (URL sync 가능). UI input 만 local.
-  const mode = useWorkbench((s) => s.graphMode);
+  // path mode 가 store 에 있어도 UI 는 더 이상 노출 안 함. neighborhood 으로 coerce.
+  const storeMode = useWorkbench((s) => s.graphMode);
+  const mode: "neighborhood" | "cluster" = storeMode === "cluster" ? "cluster" : "neighborhood";
   const focus = useWorkbench((s) => s.graphFocus);
-  const target = useWorkbench((s) => s.graphTarget);
   const nMax = useWorkbench((s) => s.graphNMax);
-  const compound = useWorkbench((s) => s.graphCompound);
   const setMode = useWorkbench((s) => s.setGraphViewMode);
   const setFocus = useWorkbench((s) => s.setGraphFocus);
-  const setTarget = useWorkbench((s) => s.setGraphTarget);
   const setNMax = useWorkbench((s) => s.setGraphNMax);
-  const setCompound = useWorkbench((s) => s.setGraphCompound);
 
   const [data, setData] = useState<OntologyGraphDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [searchQ, setSearchQ] = useState("");
-  const [searchTargetQ, setSearchTargetQ] = useState("");
   // R4-T2.1 — bottom preview panel
   const [previewNode, setPreviewNode] = useState<GraphNodeDTO | null>(null);
   const [pinned, setPinned] = useState(false);
@@ -87,18 +84,10 @@ export function OntologyGraph({ repoId }: { repoId: string }) {
   // 데이터 로드
   useEffect(() => {
     let cancelled = false;
-    // path mode 는 focus + target 둘 다 있어야 backend 가 정상 응답 (400 방지)
-    if (mode === "path" && (!focus || !target)) {
-      setData(null);
-      setErr(null);
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     setErr(null);
     const opts: Parameters<typeof ontologyApi.getOntologyGraph>[1] = { mode, n_max: nMax };
     if (focus) opts.focus_fqn = focus;
-    if (mode === "path" && target) opts.target_fqn = target;
     ontologyApi.getOntologyGraph(repoId, opts)
       .then((g) => {
         if (cancelled) return;
@@ -125,7 +114,7 @@ export function OntologyGraph({ repoId }: { repoId: string }) {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [repoId, mode, focus, target, nMax, reloadTick]);
+  }, [repoId, mode, focus, nMax, reloadTick]);
 
   // ELK layout (async). data 변화 시 재계산.
   const [rfNodes, setRfNodes] = useState<Node[]>([]);
@@ -138,7 +127,7 @@ export function OntologyGraph({ repoId }: { repoId: string }) {
       return;
     }
     setLayoutBusy(true);
-    void buildLayout(data.nodes, data.edges, compound).then((out) => {
+    void buildLayout(data.nodes, data.edges).then((out) => {
       if (cancelled) return;
       setRfNodes(out.rfNodes);
       setRfEdges(out.rfEdges);
@@ -150,9 +139,9 @@ export function OntologyGraph({ repoId }: { repoId: string }) {
       }
     });
     return () => { cancelled = true; };
-  }, [data, compound]);
+  }, [data]);
 
-  // 검색 매치 (focus + target 공용)
+  // 검색 매치 (focus 노드 선택)
   const searchHits = useMemo(() => {
     if (!searchQ.trim() || !data) return [];
     const q = searchQ.trim().toLowerCase();
@@ -160,31 +149,25 @@ export function OntologyGraph({ repoId }: { repoId: string }) {
       .filter((n) => n.label.toLowerCase().includes(q) || n.id.toLowerCase().includes(q))
       .slice(0, 20);
   }, [searchQ, data]);
-  const targetHits = useMemo(() => {
-    if (!searchTargetQ.trim() || !data) return [];
-    const q = searchTargetQ.trim().toLowerCase();
-    return data.nodes
-      .filter((n) => n.label.toLowerCase().includes(q) || n.id.toLowerCase().includes(q))
-      .slice(0, 20);
-  }, [searchTargetQ, data]);
 
   const onNodeClick = useCallback((_e: React.MouseEvent, node: Node) => {
-    if (mode === "path") {
-      // path mode: 첫 클릭 = focus, 두 번째 = target. preview 안 띄움.
-      if (!focus) setFocus(node.id);
-      else if (!target && node.id !== focus) setTarget(node.id);
-      else { setFocus(node.id); setTarget(null); }
+    // Cluster supernode click → expand: 패키지 안으로 진입 (neighborhood + 첫 member focus).
+    if (node.id.startsWith("pkg:")) {
+      const dto = (node.data as { node?: GraphNodeDTO } | undefined)?.node;
+      const members = (dto?.extra as { members?: string[] } | undefined)?.members ?? [];
+      if (members.length === 0) return;
+      setMode("neighborhood");
+      setFocus(members[0]);
       return;
     }
-    if (node.id.startsWith("pkg:")) return;     // cluster supernode 무시 (다음 phase: expand)
-    // 신규: 클릭 = bottom preview panel. focus 변경은 panel 의 "이 노드 중심" 버튼 또는 검색.
+    // 클릭 = bottom preview panel. focus 변경은 panel 의 "이 노드 중심" 버튼 또는 검색.
     const dto = (node.data as { node?: GraphNodeDTO } | undefined)?.node;
     if (!dto) return;
     if (pinned && previewNode && previewNode.id !== dto.id) return;  // 고정 시 갈아치움 X
     setPreviewNode(dto);
     // hover tooltip clear when commitment landed via click
     setHoverNode(null);
-  }, [mode, focus, target, pinned, previewNode]);
+  }, [pinned, previewNode, setMode, setFocus]);
 
   const onNodeMouseEnter = useCallback((e: React.MouseEvent, node: Node) => {
     if (node.id.startsWith("pkg:")) return;
@@ -203,91 +186,59 @@ export function OntologyGraph({ repoId }: { repoId: string }) {
       <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 border-b border-border bg-card text-[11px]">
         {/* Mode toggle */}
         <div className="flex bg-muted rounded border border-border overflow-hidden">
-          <ModeButton current={mode} value="neighborhood" label="이웃" icon={<Network className="w-3 h-3" />} onClick={() => { setMode("neighborhood"); setTarget(null); }} />
-          <ModeButton current={mode} value="path" label="경로" icon={<GitFork className="w-3 h-3" />} onClick={() => setMode("path")} />
-          <ModeButton current={mode} value="cluster" label="클러스터" icon={<Boxes className="w-3 h-3" />} onClick={() => { setMode("cluster"); setFocus(null); setTarget(null); }} />
+          <ModeButton current={mode} value="neighborhood" label="이웃" icon={<Network className="w-3 h-3" />} onClick={() => setMode("neighborhood")} />
+          <ModeButton current={mode} value="cluster" label="클러스터" icon={<Boxes className="w-3 h-3" />} onClick={() => { setMode("cluster"); setFocus(null); }} />
         </div>
 
-        {/* 검색 #1 (focus / path source) */}
-        {mode !== "cluster" && (
-          <div className="relative flex-1 min-w-[180px] max-w-xs">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-            <Input
-              value={searchQ}
-              onChange={(e) => setSearchQ(e.target.value)}
-              placeholder={mode === "path" ? "출발 노드" : "중심 노드 검색"}
-              className="pl-7 h-7 text-xs"
-            />
-            {searchHits.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-card border border-border rounded shadow-lg max-h-60 overflow-auto z-30">
-                {searchHits.map((n) => (
-                  <button
-                    key={n.id}
-                    onClick={() => { setFocus(n.id); setSearchQ(""); }}
-                    className="w-full text-left px-2 py-1 text-[11px] hover:bg-muted flex items-center gap-1 border-b border-border last:border-b-0"
-                  >
-                    <KindDot kind={n.kind} />
-                    <span className="truncate">{n.label}</span>
-                    <span className="ml-auto text-muted-foreground text-[10px]">{n.kind}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {/* 검색 (focus 노드 선택) — cluster mode 에서도 supernode 검색 가능 */}
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+          <Input
+            value={searchQ}
+            onChange={(e) => setSearchQ(e.target.value)}
+            placeholder={mode === "cluster" ? "패키지/노드 검색" : "중심 노드 검색"}
+            className="pl-7 h-7 text-xs"
+          />
+          {searchHits.length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-1 bg-card border border-border rounded shadow-lg max-h-60 overflow-auto z-30">
+              {searchHits.map((n) => (
+                <button
+                  key={n.id}
+                  onClick={() => {
+                    // cluster mode 의 supernode (pkg:...) 는 setFocus 대신 expand → neighborhood
+                    if (n.id.startsWith("pkg:")) {
+                      const members = (n.extra as { members?: string[] } | undefined)?.members ?? [];
+                      if (members[0]) {
+                        setMode("neighborhood");
+                        setFocus(members[0]);
+                      }
+                    } else {
+                      setFocus(n.id);
+                    }
+                    setSearchQ("");
+                  }}
+                  className="w-full text-left px-2 py-1 text-[11px] hover:bg-muted flex items-center gap-1 border-b border-border last:border-b-0"
+                >
+                  <KindDot kind={n.kind} />
+                  <span className="truncate">{n.label}</span>
+                  <span className="ml-auto text-muted-foreground text-[10px]">{n.kind}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
-        {/* 검색 #2 (path target) */}
-        {mode === "path" && focus && (
-          <div className="relative flex-1 min-w-[180px] max-w-xs">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-            <Input
-              value={searchTargetQ}
-              onChange={(e) => setSearchTargetQ(e.target.value)}
-              placeholder="도착 노드"
-              className="pl-7 h-7 text-xs"
-            />
-            {targetHits.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-card border border-border rounded shadow-lg max-h-60 overflow-auto z-30">
-                {targetHits.map((n) => (
-                  <button
-                    key={n.id}
-                    onClick={() => { setTarget(n.id); setSearchTargetQ(""); }}
-                    className="w-full text-left px-2 py-1 text-[11px] hover:bg-muted flex items-center gap-1 border-b border-border last:border-b-0"
-                  >
-                    <KindDot kind={n.kind} />
-                    <span className="truncate">{n.label}</span>
-                    <span className="ml-auto text-muted-foreground text-[10px]">{n.kind}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Focus / Target chip */}
+        {/* Focus chip */}
         {focus && (
           <span className="flex items-center gap-1">
             <Target className="w-3 h-3 text-primary" />
             <code className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded">
               {data?.nodes.find((n) => n.id === focus)?.label ?? focus.slice(-24)}
             </code>
-            <button onClick={() => { setFocus(null); setTarget(null); }} className="text-muted-foreground hover:text-foreground">
+            <button onClick={() => setFocus(null)} className="text-muted-foreground hover:text-foreground">
               <X className="w-3 h-3" />
             </button>
           </span>
-        )}
-        {mode === "path" && target && (
-          <>
-            <span className="text-muted-foreground">→</span>
-            <span className="flex items-center gap-1">
-              <code className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded">
-                {data?.nodes.find((n) => n.id === target)?.label ?? target.slice(-24)}
-              </code>
-              <button onClick={() => setTarget(null)} className="text-muted-foreground hover:text-foreground">
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          </>
         )}
 
         {/* n_max slider — neighborhood only */}
@@ -309,21 +260,6 @@ export function OntologyGraph({ repoId }: { repoId: string }) {
 
         {/* Perspective dropdown — R4-T3.4 */}
         <PerspectiveDropdown repoId={repoId} />
-
-        {/* Compound 토글 — R4-T3.3 */}
-        <label
-          className="flex items-center gap-1 text-[11px] cursor-pointer"
-          title="Domain (Java 패키지) 노드 안에 자식 클래스 nest"
-        >
-          <input
-            type="checkbox"
-            checked={compound}
-            onChange={(e) => setCompound(e.target.checked)}
-            className="cursor-pointer"
-          />
-          <Boxes className="w-3 h-3" />
-          <span>패키지 묶음</span>
-        </label>
 
         {/* Copy URL — R4-T2.3 */}
         <CopyUrlButton />
@@ -374,8 +310,8 @@ export function OntologyGraph({ repoId }: { repoId: string }) {
           </div>
         )}
         <ReactFlow
-          // mode / focus / target / nMax / repo 변경 시 remount → fitView 재실행.
-          key={`${repoId}|${mode}|${focus ?? ""}|${target ?? ""}|${nMax}|${rfNodes.length}`}
+          // mode / focus / nMax / repo 변경 시 remount → fitView 재실행.
+          key={`${repoId}|${mode}|${focus ?? ""}|${nMax}|${rfNodes.length}`}
           nodes={rfNodes}
           edges={rfEdges}
           nodeTypes={NODE_TYPES}
@@ -443,53 +379,11 @@ type ElkOut = {
 async function buildLayout(
   nodes: GraphNodeDTO[],
   edges: GraphEdgeDTO[],
-  compound: boolean,
 ): Promise<{ rfNodes: Node[]; rfEdges: Edge[] }> {
   const elk = await getElk();
 
-  // compound 시: Domain 노드의 members → 그 노드의 children. contains edge 제외.
-  let elkChildren: ElkChild[];
-  let elkEdges: { id: string; sources: string[]; targets: string[] }[];
-
-  if (compound) {
-    const memberSet = new Set<string>();
-    const domainNodes = nodes.filter((n) => n.kind === "domain");
-    const childMap: Record<string, string[]> = {};
-    for (const d of domainNodes) {
-      const members = ((d.extra as { members?: string[] } | undefined)?.members) ?? [];
-      childMap[d.id] = members.filter((m) => nodes.some((n) => n.id === m));
-      childMap[d.id].forEach((m) => memberSet.add(m));
-    }
-    const childById = new Map(nodes.map((n) => [n.id, n] as const));
-
-    elkChildren = [
-      // Domain compound nodes
-      ...domainNodes.map<ElkChild>((d) => ({
-        id: d.id,
-        layoutOptions: {
-          "elk.algorithm": "layered",
-          "elk.direction": "DOWN",
-          "elk.padding": "[top=28,left=8,bottom=8,right=8]",
-          "elk.spacing.nodeNode": "20",
-        },
-        children: (childMap[d.id] ?? []).map((cid) => {
-          const dto = childById.get(cid);
-          return { id: cid, width: NODE_W, height: dto ? NODE_H : NODE_H };
-        }),
-      })),
-      // 나머지 (Term / Action / 미nest CodeType) 은 root level
-      ...nodes
-        .filter((n) => n.kind !== "domain" && !memberSet.has(n.id))
-        .map<ElkChild>((n) => ({ id: n.id, width: NODE_W, height: NODE_H })),
-    ];
-    // contains edge 는 nesting 으로 충분 — visualization 제외
-    elkEdges = edges
-      .filter((e) => e.kind !== "contains")
-      .map((e, i) => ({ id: `e${i}`, sources: [e.source], targets: [e.target] }));
-  } else {
-    elkChildren = nodes.map((n) => ({ id: n.id, width: NODE_W, height: NODE_H }));
-    elkEdges = edges.map((e, i) => ({ id: `e${i}`, sources: [e.source], targets: [e.target] }));
-  }
+  const elkChildren: ElkChild[] = nodes.map((n) => ({ id: n.id, width: NODE_W, height: NODE_H }));
+  const elkEdges = edges.map((e, i) => ({ id: `e${i}`, sources: [e.source], targets: [e.target] }));
 
   const root = {
     id: "root",
@@ -499,7 +393,6 @@ async function buildLayout(
       "elk.layered.spacing.nodeNodeBetweenLayers": "70",
       "elk.spacing.nodeNode": "32",
       "elk.padding": "[top=12,left=12,bottom=12,right=12]",
-      "elk.hierarchyHandling": "INCLUDE_CHILDREN",
     },
     children: elkChildren,
     edges: elkEdges,
@@ -508,44 +401,24 @@ async function buildLayout(
   const result = (await elk.layout(root)) as ElkOut;
 
   const rfNodes: Node[] = [];
-  const visit = (laid: ElkOut, parentId?: string) => {
+  const visit = (laid: ElkOut) => {
     if (laid.id === "root") {
-      laid.children?.forEach((c) => visit(c, undefined));
+      laid.children?.forEach((c) => visit(c));
       return;
     }
     const dto = nodes.find((n) => n.id === laid.id);
     if (!dto) return;
-    if (dto.kind === "domain" && compound && (laid.children?.length ?? 0) > 0) {
-      // group node — 자식 위치는 ELK 가 부모 기준 상대좌표
-      rfNodes.push({
-        id: laid.id,
-        type: "domainGroup",
-        position: { x: laid.x ?? 0, y: laid.y ?? 0 },
-        data: { node: dto, kind: "domain" },
-        style: { width: laid.width ?? NODE_W, height: laid.height ?? NODE_H, zIndex: -1 },
-        parentId,
-        extent: parentId ? "parent" : undefined,
-        draggable: true,
-        selectable: true,
-      });
-      laid.children?.forEach((c) => visit(c, laid.id));
-    } else {
-      rfNodes.push({
-        id: laid.id,
-        type: "ontology",
-        position: { x: laid.x ?? 0, y: laid.y ?? 0 },
-        data: { node: dto, kind: dto.kind },
-        parentId,
-        extent: parentId ? "parent" : undefined,
-        draggable: true,
-      });
-    }
+    rfNodes.push({
+      id: laid.id,
+      type: "ontology",
+      position: { x: laid.x ?? 0, y: laid.y ?? 0 },
+      data: { node: dto, kind: dto.kind },
+      draggable: true,
+    });
   };
   visit(result);
 
-  const rfEdges: Edge[] = edges
-    .filter((e) => !compound || e.kind !== "contains")  // compound 시 contains 제외
-    .map((e) => ({
+  const rfEdges: Edge[] = edges.map((e) => ({
       id: e.id,
       source: e.source,
       target: e.target,
