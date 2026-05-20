@@ -63,6 +63,16 @@ _SSE_HEADERS = {
 }
 
 
+_V1_CHAT_DEPRECATION_HEADERS = {
+    **_SSE_HEADERS,
+    "X-Deprecated": "true",
+    # RFC 7234 §5.5 — Warning 299 "Miscellaneous persistent warning"
+    "Warning": '299 - "Section 3 chat v1 is deprecated; migrate to /api/section3/multiturn/* (Phase 1~6 complete)"',
+    "X-Deprecation-Date": "2026-05-18",
+    "X-Replacement": "/api/section3/multiturn/start",
+}
+
+
 # ─── endpoints ────────────────────────────────────────────────
 
 
@@ -71,9 +81,18 @@ async def chat(
     req: ChatRequest,
     modeling: ModelingClient = Depends(get_modeling_client),
 ):
-    """온톨로지 브릿지 chat — bridge agent SSE streaming."""
+    """온톨로지 브릿지 chat — bridge agent SSE streaming (DEPRECATED 2026-05-18).
+
+    응답 header 에 `X-Deprecated: true` + RFC 7234 `Warning: 299` 포함.
+    신 endpoint: `/api/section3/multiturn/start` (Phase 1~6 production).
+    """
+    logger.warning("/api/section3/chat (v1 bridge_agent) 호출 — multiturn v2 로 마이그레이션 권장")
     agent = BridgeAgent(modeling=modeling)
-    return StreamingResponse(_sse(agent.run(req)), media_type="text/event-stream", headers=_SSE_HEADERS)
+    return StreamingResponse(
+        _sse(agent.run(req)),
+        media_type="text/event-stream",
+        headers=_V1_CHAT_DEPRECATION_HEADERS,
+    )
 
 
 @router.post("/sandbox/run")
@@ -119,6 +138,61 @@ async def term_search(
 ):
     """modeling 의 term/search forward — autocomplete."""
     return {"items": await modeling.term_search(q)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# /repos — per-repo summary for Section 3 dashboard (Phase 11)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@router.get("/repos")
+def list_repos() -> dict:
+    """SQLite ontology.db 의 repo 별 카운트 요약.
+
+    반환:
+      `{"repos": [{"repo_id": ..., "counts": {...}}]}`
+    counts 8 종 (actions / code_methods / code_types / business_terms /
+    business_rules / realizations / call_sites / sessions).
+    repo_id 알파벳 정렬. 어느 한 테이블이라도 repo 가 등장하면 surface.
+    """
+    from sqlalchemy import distinct, func, select
+    from backend.modeling.persistence.database import session_scope
+    from backend.modeling.code_layer.orm import CodeMethodRow, CodeTypeRow, CallSiteRow
+    from backend.modeling.domain_layer.orm import BusinessRuleRow, BusinessTermRow
+    from backend.modeling.mapping_layer.orm import ActionRow, RealizationRow
+    from backend.section3.agents.multiturn.orm import Section3SessionRow
+
+    counters: list = [
+        ("actions",        ActionRow),
+        ("code_methods",   CodeMethodRow),
+        ("code_types",     CodeTypeRow),
+        ("business_terms", BusinessTermRow),
+        ("business_rules", BusinessRuleRow),
+        ("realizations",   RealizationRow),
+        ("call_sites",     CallSiteRow),
+        ("sessions",       Section3SessionRow),
+    ]
+
+    with session_scope() as s:
+        # 어떤 테이블이든 등장한 repo_id 집합 — SQL UNION 보다 Python set 이 단순
+        repo_ids: set[str] = set()
+        for _, table in counters:
+            for (rid,) in s.execute(select(distinct(table.repo_id))).all():
+                if rid:
+                    repo_ids.add(rid)
+        all_repos: list[str] = sorted(repo_ids)
+
+        out: list[dict] = []
+        for repo_id in all_repos:
+            counts: dict[str, int] = {}
+            for key, table in counters:
+                n = s.execute(
+                    select(func.count()).where(table.repo_id == repo_id),
+                ).scalar() or 0
+                counts[key] = int(n)
+            out.append({"repo_id": repo_id, "counts": counts})
+
+        return {"repos": out}
 
 
 __all__ = ["router"]

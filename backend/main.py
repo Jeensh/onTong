@@ -62,6 +62,10 @@ from backend.modeling.api import ontology_router as ontology_query_api
 from backend.modeling.api import graph_api as ontology_graph_api
 from backend.modeling.api import modules_api as ontology_modules_api
 from backend.modeling.api import perspective_api
+from backend.modeling.api import coverage_api
+from backend.modeling.api import entity_create_api
+from backend.modeling.api import impact_api
+from backend.modeling.api import memo_api
 from backend.modeling.api import queue_actions_api
 from backend.modeling.api import recommend_api
 from backend.modeling.api import repo_import as repo_import_api
@@ -72,6 +76,7 @@ from backend.modeling.ontology.api.ontology_router import router as modeling_ont
 # 2026-05-12 (Phase 2): Section 3 4 agent (bridge chat / sandbox / code-impact / data-impact).
 # 모든 agent 는 위 /api/modeling/ontology/* 만 호출 (Neo4j 직접 의존 0건).
 from backend.section3.api.router import router as section3_router
+from backend.section3.api.multiturn_router import router as section3_multiturn_router
 # Section 3 (simulation) — 2026-05-12 zero 재개편. 옛 simulation router 모두 삭제.
 # 새 구현은 backend/section3/ 에 들어갈 예정 (Phase 2~).
 
@@ -281,7 +286,10 @@ async def lifespan(app: FastAPI):
     from backend.modeling.domain_layer import orm as _domain_orm  # noqa: F401
     from backend.modeling.mapping_layer import orm as _mapping_orm  # noqa: F401
     from backend.modeling.view_layer import orm as _view_orm  # noqa: F401
+    from backend.modeling.memos import orm as _memos_orm  # noqa: F401
+    from backend.modeling.audit import orm as _audit_orm  # noqa: F401
     from backend.application.authoring import orm as _authoring_orm  # noqa: F401
+    from backend.section3.agents.multiturn import orm as _section3_multiturn_orm  # noqa: F401
     bootstrap_database()
     ontology_query_api.init()
     logger.info("Ontology Core wired: Code/Domain/Mapping Layer + Query API")
@@ -463,6 +471,10 @@ app.include_router(ontology_graph_api.router)
 app.include_router(ontology_modules_api.router)
 app.include_router(perspective_api.router)
 app.include_router(queue_actions_api.router)
+app.include_router(memo_api.router)
+app.include_router(coverage_api.router)
+app.include_router(impact_api.router)
+app.include_router(entity_create_api.router)
 # Authoring AI (2026-05-05 — B.5 prototype)
 app.include_router(authoring_api.router)
 # Section 3 (simulation) — 2026-05-12 zero 재개편. 옛 simulation router 모두 삭제.
@@ -471,6 +483,7 @@ app.include_router(authoring_api.router)
 app.include_router(modeling_ontology_query_router)
 # Phase 2 (2026-05-12): Section 3 4 agent — /api/section3/* (chat / sandbox / code-impact / data-impact).
 app.include_router(section3_router)
+app.include_router(section3_multiturn_router)
 
 
 # Global exception handler

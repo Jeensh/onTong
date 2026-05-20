@@ -14,8 +14,13 @@ export function useAuth() {
     if (cachedUser) return;
     fetchCurrentUser()
       .then((u) => {
-        cachedUser = u;
-        setUser(u);
+        if (u) {
+          cachedUser = u;
+          setUser(u);
+        }
+      })
+      .catch((e) => {
+        console.warn("auth fetch failed:", e);
       })
       .finally(() => setLoading(false));
   }, []);

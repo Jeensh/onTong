@@ -224,10 +224,14 @@ def load_body_text(session, code_method_fqn: str, repo_id: str) -> Optional[str]
         return None
 
 
-def translate_java_to_python(body_text: str) -> Optional[tuple[str, str]]:
+def translate_java_to_python(
+    body_text: str,
+) -> Optional[tuple[str, str, list[dict]]]:
     """Java body_text → Section3Translator (sim_v2 subclass, W75 idiom 자동 + section3 idiom patch).
 
-    반환: (python_source, function_name) 또는 None (파싱/번역 실패).
+    반환: `(python_source, function_name, idiom_rewrites)` 또는 None (파싱/번역 실패).
+    `idiom_rewrites` (Phase 8): W75 가 다시 쓴 Java idiom 의 trace —
+    `[{idiom_name, java_snippet, python_snippet, tier, arity}, ...]`. 빈 리스트 가능.
     """
     try:
         import tree_sitter_java as tsjava
@@ -273,7 +277,7 @@ def translate_java_to_python(body_text: str) -> Optional[tuple[str, str]]:
     if not first.startswith("def "):
         return None
     fn = first[4:].split("(", 1)[0].strip()
-    return src, fn
+    return src, fn, list(getattr(result, "idiom_rewrites", []) or [])
 
 
 def synthesize_fixtures(
@@ -593,7 +597,7 @@ def quick_diagnose_action(
             "ok": False, "fixtures": 0, "stubs": 0, "passing": 0,
             "primary_failure": "translate 실패",
         }
-    py_src, fn_name = translated
+    py_src, fn_name, _idiom_rewrites = translated
     report = synthesize_fixtures(
         session, action, function_name=fn_name, python_source=py_src,
     )

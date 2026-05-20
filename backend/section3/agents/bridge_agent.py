@@ -1,14 +1,19 @@
-"""온톨로지 브릿지 (chat) — Section 3 의 메인 entry.
+"""온톨로지 브릿지 (chat) — Section 3 v1 (DEPRECATED 2026-05-18).
 
-흐름:
+⚠️ DEPRECATED — multiturn v2 로 마이그레이션 권장 (Phase 1~6 완료).
+- 신 path: `backend/section3/agents/multiturn/` + `/api/section3/multiturn/*`
+- 신 UI:  `frontend/src/components/section3/multiturn/MultiturnChat.tsx`
+- 신 진입: `http://localhost:3000/?view=multiturn`
+
+본 v1 (`/api/section3/chat`) 는 backward-compat 유지 — 호출하면 deprecation
+warning header (`X-Deprecated`, `Warning`) 가 응답에 포함됨. v2 가 모든 기능을
+대체하면 v1 path 완전 제거 예정.
+
+이력 (v1):
 1. 사용자 자연어 message + history
 2. LLM 으로 intent 분류 (impact_analysis / simulate / explain)
-3. 적절한 task agent 호출 (또는 explain 은 자체 처리 — modeling.query 직접)
-4. task agent 의 streaming events 를 그대로 forward + chat assistant message 부착
-
-원칙:
-- bridge agent 는 LLM 으로 자연어 → intent 만 변환. 도메인 지식 hardcoded 0건.
-- explain intent 는 task agent 없이 modeling.query 직접 호출 + layer 스캔만 표시.
+3. 적절한 task agent 호출 (또는 explain 은 자체 처리)
+4. task agent 의 streaming events 를 forward
 """
 
 from __future__ import annotations
