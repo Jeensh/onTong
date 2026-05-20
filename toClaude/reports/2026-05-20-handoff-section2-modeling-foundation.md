@@ -52,7 +52,7 @@ slab-design-real-v2 기준 현재 카운트:
 백업:
 - `data/ontology.db.bak-pre-reimport-20260518-201243` — re-import 직전
 - `data/ontology.db.bak-pre-hybrid-*` — hybrid reapply 직전
-- `data/enrichment_snapshot_slab_design_real_v2_20260518_115945.json` — 최신 snapshot (모든 enrichment + sim_verified state)
+- `data/enrichment_snapshot_slab_design_real_v2_20260520_152937.json` — 최신 snapshot (모든 enrichment + sim_verified state)
 
 ---
 

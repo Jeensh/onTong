@@ -80,7 +80,7 @@ print('import done')
 # (c) snapshot reapply — 136/136 sim_verified 복구
 .venv/bin/python scripts/reapply_modeling_enrichment.py \
   --db data/ontology.db \
-  --snapshot data/enrichment_snapshot_slab_design_real_v2_20260518_115945.json \
+  --snapshot data/enrichment_snapshot_slab_design_real_v2_20260520_152937.json \
   --hybrid
 ```
 
