@@ -322,23 +322,27 @@ function _FullDesignView({ payload }: { payload: Record<string, unknown> }) {
   const errorMessage = payload.error_message as string | null;
   const ok = payload.ok as boolean;
 
-  // 슬랩 결과의 핵심 필드만 추려서 highlight
-  const HIGHLIGHT_FIELDS: { key: string; label: string; unit?: string }[] = [
-    { key: "slabThickness", label: "두께", unit: "mm" },
-    { key: "slabWidth",     label: "폭",   unit: "mm" },
-    { key: "slabLength",    label: "길이", unit: "mm" },
-    { key: "slabWgt",       label: "단중", unit: "kg" },
-    { key: "splitCount",    label: "분할수" },
-    { key: "designStatus",  label: "상태" },
-    { key: "slabNo",        label: "슬랩번호" },
-  ];
+  const statusCounts: Record<string, number> = {};
+  for (const t of trace) {
+    const s = String(t.status);
+    statusCounts[s] = (statusCounts[s] || 0) + 1;
+  }
 
   return (
     <>
-      <div className="text-sm">
-        <span className="font-semibold">주문 </span>
-        <code className="text-emerald-700">{orderNo}</code>
-        <span className="text-gray-500 ml-2">→ 슬랩 {slabResults.length}매 설계</span>
+      <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-lg p-3 shadow">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-[10px] uppercase tracking-wide opacity-80">주문</div>
+            <div className="text-lg font-mono font-bold">{orderNo}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] uppercase tracking-wide opacity-80">설계 결과</div>
+            <div className="text-lg font-bold">
+              {ok && !errorCode ? `Slab ${slabResults.length}매 SUCCESS` : `FAIL ${errorCode || ""}`}
+            </div>
+          </div>
+        </div>
       </div>
 
       {!ok && errorCode && (
@@ -348,98 +352,214 @@ function _FullDesignView({ payload }: { payload: Record<string, unknown> }) {
       )}
 
       {slabResults.map((slab, i) => (
-        <div key={i} className="border-2 border-emerald-300 rounded-lg bg-emerald-50/30">
-          <div className="px-3 py-2 bg-emerald-100 border-b border-emerald-300 flex items-center justify-between">
-            <strong className="text-emerald-900 text-xs">슬랩 #{i + 1}</strong>
-            <code className="text-[10px] text-emerald-700">slabNo {String(slab.slabNo)}</code>
-          </div>
-          <div className="grid grid-cols-4 gap-2 p-3">
-            {HIGHLIGHT_FIELDS.map((f) => {
-              const v = slab[f.key];
-              if (v === undefined || v === null) return null;
-              return (
-                <div key={f.key} className="text-center">
-                  <div className="text-[10px] text-gray-500">{f.label}</div>
-                  <div className={"text-sm font-mono mt-0.5 " + (
-                    f.key === "designStatus" && v === "SUCCESS" ? "text-emerald-700 font-semibold" :
-                    f.key === "designStatus" ? "text-red-700 font-semibold" : "text-gray-900"
-                  )}>
-                    {typeof v === "number" ? v.toLocaleString(undefined, {maximumFractionDigits: 2}) : String(v)}
-                    {f.unit && <span className="text-[10px] text-gray-400 ml-0.5">{f.unit}</span>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <details className="border-t border-emerald-200">
-            <summary className="px-3 py-1.5 text-[11px] text-emerald-800 cursor-pointer hover:bg-emerald-100/50">
-              전체 필드 보기 ({Object.keys(slab).length}건)
-            </summary>
-            <div className="p-2 max-h-64 overflow-auto">
-              <table className="w-full text-[10px]">
-                <tbody>
-                  {Object.entries(slab).map(([k, v]) => (
-                    <tr key={k} className="border-b border-emerald-100">
-                      <td className="py-0.5 pr-2 text-gray-500 font-mono">{k}</td>
-                      <td className="py-0.5 font-mono text-gray-800">
-                        {v === null ? <span className="text-gray-300">null</span> :
-                         typeof v === "number" ? v.toLocaleString(undefined, {maximumFractionDigits: 6}) :
-                         String(v)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </details>
-        </div>
+        <_SlabResultCard key={i} slab={slab} index={i + 1} />
       ))}
 
       {trace.length > 0 && (
-        <details open className="border border-gray-200 rounded">
-          <summary className="px-3 py-2 bg-gray-50 border-b border-gray-200 cursor-pointer text-xs font-semibold text-gray-800">
-            21-step 실행 trace ({trace.length} rows)
-          </summary>
-          <div className="max-h-72 overflow-auto">
-            <table className="w-full text-[10px] border-collapse">
-              <thead className="sticky top-0 bg-gray-50">
-                <tr className="border-b border-gray-200">
-                  <th className="p-1.5 text-left text-gray-600">step</th>
-                  <th className="p-1.5 text-left text-gray-600">action</th>
-                  <th className="p-1.5 text-left text-gray-600">phase</th>
-                  <th className="p-1.5 text-right text-gray-600">iter</th>
-                  <th className="p-1.5 text-left text-gray-600">status</th>
-                  <th className="p-1.5 text-left text-gray-600">error</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trace.map((t, i) => {
-                  const status = String(t.status);
-                  return (
-                    <tr key={i} className="border-b border-gray-100">
-                      <td className="p-1 font-mono">{String(t.step)}</td>
-                      <td className="p-1 text-gray-800">{String(t.stepName)}</td>
-                      <td className="p-1 text-gray-500">{String(t.phase)}</td>
-                      <td className="p-1 text-right text-gray-500">{String(t.iteration)}</td>
-                      <td className={"p-1 font-semibold " + (
-                        status === "OK" ? "text-emerald-700" :
-                        status === "RETRY" ? "text-amber-700" :
-                        status === "FAIL" ? "text-red-700" : "text-gray-500"
-                      )}>{status}</td>
-                      <td className="p-1 text-red-600 font-mono">{t.errorCode ? String(t.errorCode) : ""}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <div className="border border-gray-200 rounded">
+          <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+            <strong className="text-xs text-gray-800">21-step 알고리즘 실행 진행도</strong>
+            <div className="flex gap-1.5 text-[10px]">
+              {Object.entries(statusCounts).map(([s, n]) => (
+                <span key={s} className={
+                  "px-1.5 py-0.5 rounded font-semibold " + (
+                    s === "OK" ? "bg-emerald-100 text-emerald-800" :
+                    s === "RETRY" ? "bg-amber-100 text-amber-800" :
+                    s === "FAIL" ? "bg-red-100 text-red-800" :
+                    s === "SKIP" ? "bg-gray-100 text-gray-600" : "bg-gray-100 text-gray-600"
+                  )
+                }>{s} {n}</span>
+              ))}
+            </div>
           </div>
-        </details>
+          <_TraceGantt trace={trace} />
+        </div>
       )}
 
       <div className="text-[10px] text-gray-400 mt-2">
-        Java :8080 의 /api/sd/working/single?trace=true 호출 결과. 21-step 알고리즘 전체 실행.
+        Java :8080 /api/sd/working/single?trace=true · 21-step 알고리즘 전체 실행
       </div>
     </>
+  );
+}
+
+/** Slab 1매 — SVG 원면도 + KPI 4종 + 허용범위 미니바 + 전체 필드. */
+function _SlabResultCard({ slab, index }: { slab: Record<string, unknown>; index: number }) {
+  const thickness = Number(slab.slabThickness ?? 0);
+  const width = Number(slab.slabWidth ?? 0);
+  const length = Number(slab.slabLength ?? 0);
+  const wgt = Number(slab.slabWgt ?? 0);
+  const splitCount = Number(slab.splitCount ?? 0);
+  const status = String(slab.designStatus ?? "?");
+
+  const maxDim = Math.max(width, length, 1);
+  const scale = 200 / maxDim;
+  const l = length * scale;
+  const w = Math.max(width * scale * 0.3, 20);
+  const t = Math.max(thickness * 0.06, 6);
+
+  const RangeBar = ({ label, value, low, high, unit }: {
+    label: string; value: number; low: number; high: number; unit: string;
+  }) => {
+    const range = high - low || 1;
+    const pct = Math.max(0, Math.min(100, ((value - low) / range) * 100));
+    return (
+      <div>
+        <div className="flex items-baseline justify-between text-[10px]">
+          <span className="text-gray-500">{label}</span>
+          <span className="text-emerald-700 font-mono font-semibold">
+            {value.toLocaleString(undefined,{maximumFractionDigits:1})}{unit}
+          </span>
+        </div>
+        <div className="h-2 bg-gray-100 rounded relative">
+          <div className="absolute h-2 bg-emerald-500 rounded-sm" style={{ left: `${pct}%`, width: 4 }} />
+        </div>
+        <div className="flex justify-between text-[9px] text-gray-400 font-mono mt-0.5">
+          <span>{low.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+          <span>{high.toLocaleString(undefined,{maximumFractionDigits:0})}{unit}</span>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="border-2 border-emerald-300 rounded-lg bg-white shadow-sm">
+      <div className="px-3 py-2 bg-emerald-50 border-b border-emerald-200 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <strong className="text-emerald-900 text-sm">Slab #{index}</strong>
+          <code className="text-[10px] text-emerald-700">slabNo {String(slab.slabNo)}</code>
+        </div>
+        <span className={
+          "text-[10px] px-2 py-0.5 rounded font-semibold " +
+          (status === "SUCCESS" ? "bg-emerald-600 text-white" : "bg-red-600 text-white")
+        }>{status}</span>
+      </div>
+
+      <div className="grid grid-cols-[210px_1fr] gap-3 p-3">
+        <div className="flex flex-col items-center">
+          <svg viewBox="0 0 240 200" width="200" height="170">
+            <defs>
+              <linearGradient id={`g${index}`} x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#fbbf24" />
+                <stop offset="100%" stopColor="#d97706" />
+              </linearGradient>
+            </defs>
+            <rect x={(240 - l) / 2} y="70" width={l} height={t} fill={`url(#g${index})`} stroke="#92400e" strokeWidth="1" />
+            <text x="120" y="66" textAnchor="middle" fontSize="9" fill="#92400e">길이 {length.toLocaleString()} mm</text>
+            <text x={(240 - l) / 2 - 3} y={75 + t / 2} textAnchor="end" fontSize="8" fill="#92400e">↑{thickness}mm</text>
+            <rect x={(240 - l) / 2} y="105" width={l} height={w} fill="#fef3c7" stroke="#92400e" strokeWidth="1" strokeDasharray="2 2" />
+            <text x="120" y={105 + w + 12} textAnchor="middle" fontSize="9" fill="#92400e">폭 {width.toLocaleString()} mm</text>
+          </svg>
+          <div className="text-[9px] text-gray-400 mt-1">schematic · 비율 아님</div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="bg-amber-50 rounded p-2 border border-amber-200">
+              <div className="text-[9px] text-amber-700">두께</div>
+              <div className="text-sm font-mono font-bold text-amber-900">{thickness}</div>
+              <div className="text-[9px] text-amber-600">mm</div>
+            </div>
+            <div className="bg-sky-50 rounded p-2 border border-sky-200">
+              <div className="text-[9px] text-sky-700">폭</div>
+              <div className="text-sm font-mono font-bold text-sky-900">{width.toLocaleString()}</div>
+              <div className="text-[9px] text-sky-600">mm</div>
+            </div>
+            <div className="bg-violet-50 rounded p-2 border border-violet-200">
+              <div className="text-[9px] text-violet-700">길이</div>
+              <div className="text-sm font-mono font-bold text-violet-900">{length.toLocaleString()}</div>
+              <div className="text-[9px] text-violet-600">mm</div>
+            </div>
+            <div className="bg-emerald-50 rounded p-2 border border-emerald-200">
+              <div className="text-[9px] text-emerald-700">단중</div>
+              <div className="text-sm font-mono font-bold text-emerald-900">
+                {wgt.toLocaleString(undefined,{maximumFractionDigits:1})}
+              </div>
+              <div className="text-[9px] text-emerald-600">kg · {splitCount}분할</div>
+            </div>
+          </div>
+
+          {slab.slabWidthLow !== undefined && slab.slabWidthHigh !== undefined && (
+            <RangeBar label="폭 허용범위 안 위치" value={width}
+              low={Number(slab.slabWidthLow)} high={Number(slab.slabWidthHigh)} unit="mm" />
+          )}
+          {slab.slabWgtLow !== undefined && slab.slabWgtHigh !== undefined && (
+            <RangeBar label="단중 허용범위 안 위치" value={wgt}
+              low={Number(slab.slabWgtLow)} high={Number(slab.slabWgtHigh)} unit="kg" />
+          )}
+        </div>
+      </div>
+
+      <details className="border-t border-emerald-200">
+        <summary className="px-3 py-1.5 text-[11px] text-emerald-800 cursor-pointer hover:bg-emerald-50/80">
+          전체 필드 보기 ({Object.keys(slab).length}건)
+        </summary>
+        <div className="p-2 max-h-64 overflow-auto">
+          <table className="w-full text-[10px]">
+            <tbody>
+              {Object.entries(slab).map(([k, v]) => (
+                <tr key={k} className="border-b border-emerald-100">
+                  <td className="py-0.5 pr-2 text-gray-500 font-mono">{k}</td>
+                  <td className="py-0.5 font-mono text-gray-800">
+                    {v === null ? <span className="text-gray-300">null</span> :
+                     typeof v === "number" ? v.toLocaleString(undefined,{maximumFractionDigits:6}) :
+                     String(v)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+/** 21-step gantt 스타일 진행도. */
+function _TraceGantt({ trace }: { trace: Array<Record<string, unknown>> }) {
+  type StepBar = { step: number; stepName: string; rows: Array<Record<string, unknown>>; finalStatus: string };
+  const byStep: Record<number, StepBar> = {};
+  for (const t of trace) {
+    const n = Number(t.step);
+    if (!byStep[n]) byStep[n] = { step: n, stepName: String(t.stepName), rows: [], finalStatus: String(t.status) };
+    byStep[n].rows.push(t);
+    byStep[n].finalStatus = String(t.status);
+  }
+  const steps = Object.values(byStep).sort((a, b) => a.step - b.step);
+
+  return (
+    <div className="p-2 space-y-0.5 max-h-72 overflow-y-auto">
+      {steps.map((s) => {
+        const color =
+          s.finalStatus === "OK" ? "bg-emerald-500" :
+          s.finalStatus === "RETRY" ? "bg-amber-500" :
+          s.finalStatus === "FAIL" ? "bg-red-500" :
+          s.finalStatus === "SKIP" ? "bg-gray-300" : "bg-gray-400";
+        const hasRetry = s.rows.length > 1;
+        return (
+          <div key={s.step} className="flex items-center gap-2 text-[10px]" title={s.stepName}>
+            <code className="w-7 text-right text-gray-500">{s.step}</code>
+            <div className="w-40 truncate text-gray-700">{s.stepName.replace(/Action$/, "")}</div>
+            <div className="flex-1 h-3 rounded bg-gray-100 relative overflow-hidden">
+              <div className={"h-full " + color} style={{ width: "100%" }} />
+              {hasRetry && (
+                <div className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-white">
+                  {s.rows.length}× iter
+                </div>
+              )}
+            </div>
+            <span className={
+              "w-12 text-right font-semibold " + (
+                s.finalStatus === "OK" ? "text-emerald-700" :
+                s.finalStatus === "RETRY" ? "text-amber-700" :
+                s.finalStatus === "FAIL" ? "text-red-700" :
+                s.finalStatus === "SKIP" ? "text-gray-400" : "text-gray-500"
+              )
+            }>{s.finalStatus}</span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
