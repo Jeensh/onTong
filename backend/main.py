@@ -77,8 +77,9 @@ from backend.modeling.ontology.api.ontology_router import router as modeling_ont
 # 모든 agent 는 위 /api/modeling/ontology/* 만 호출 (Neo4j 직접 의존 0건).
 from backend.section3.api.router import router as section3_router
 from backend.section3.api.multiturn_router import router as section3_multiturn_router
-# Section 3 (simulation) — 2026-05-12 zero 재개편. 옛 simulation router 모두 삭제.
-# 새 구현은 backend/section3/ 에 들어갈 예정 (Phase 2~).
+from backend.section3.api.simulation_router import router as section3_simulation_router
+# Section 3 (simulation) — 2026-05-21 신규 탭 (SIMULATION_AGENT_RFC.md).
+# multiturn 보존, 새 탭은 별도 router + 별도 decision_log 테이블.
 
 setup_logging(
     level=settings.log_level,
@@ -290,6 +291,7 @@ async def lifespan(app: FastAPI):
     from backend.modeling.audit import orm as _audit_orm  # noqa: F401
     from backend.application.authoring import orm as _authoring_orm  # noqa: F401
     from backend.section3.agents.multiturn import orm as _section3_multiturn_orm  # noqa: F401
+    from backend.section3.agents.simulation import orm as _section3_simulation_orm  # noqa: F401
     bootstrap_database()
     ontology_query_api.init()
     logger.info("Ontology Core wired: Code/Domain/Mapping Layer + Query API")
@@ -484,6 +486,7 @@ app.include_router(modeling_ontology_query_router)
 # Phase 2 (2026-05-12): Section 3 4 agent — /api/section3/* (chat / sandbox / code-impact / data-impact).
 app.include_router(section3_router)
 app.include_router(section3_multiturn_router)
+app.include_router(section3_simulation_router)
 
 
 # Global exception handler

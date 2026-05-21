@@ -10,18 +10,20 @@
  */
 
 import { useEffect, useState } from "react";
-import { MessageSquare, Beaker, Flame, Database, Zap, Activity, Sparkles } from "lucide-react";
+import { MessageSquare, Beaker, Flame, Database, Zap, Activity, Sparkles, Workflow } from "lucide-react";
 import { BridgeChatPanel } from "./BridgeChatPanel";
 import { SandboxPanel } from "./SandboxPanel";
 import { CodeImpactPanel } from "./CodeImpactPanel";
 import { DataImpactPanel } from "./DataImpactPanel";
 import { DashboardPanel } from "./DashboardPanel";
 import { MultiturnChat } from "./multiturn/MultiturnChat";
+import { SimulationChat } from "./simulation/SimulationChat";
 
-type View = "dashboard" | "multiturn" | "bridge" | "sandbox" | "code-impact" | "data-impact";
+type View = "dashboard" | "multiturn" | "simulation" | "bridge" | "sandbox" | "code-impact" | "data-impact";
 
 /** Primary 화면 — 사용자 진입 경로. */
 const NAV: Array<{ id: View; label: string; icon: React.ReactNode; description: string }> = [
+  { id: "simulation", label: "시뮬레이션 에이전트", icon: <Workflow size={16} />, description: "IT 운영자용 — 5 시나리오 · 6 intent · 변경 전·후 비교" },
   { id: "multiturn", label: "멀티턴 agent", icon: <Sparkles size={16} />, description: "자연어 → 후보 → 코드 검토 → 시뮬레이션 / 영향도" },
   { id: "dashboard", label: "대시보드", icon: <Activity size={16} />, description: "ontology 통계 + 빠른 진입" },
 ];
@@ -29,14 +31,14 @@ const NAV: Array<{ id: View; label: string; icon: React.ReactNode; description: 
 /** Hidden — URL `?view=...` 로만 접근 가능 (deprecated / debug). */
 const HIDDEN_VIEWS = new Set<View>(["bridge", "sandbox", "code-impact", "data-impact"]);
 
-const VALID: View[] = ["dashboard", "multiturn", "bridge", "sandbox", "code-impact", "data-impact"];
+const VALID: View[] = ["dashboard", "multiturn", "simulation", "bridge", "sandbox", "code-impact", "data-impact"];
 
 function readInitial(): View {
-  if (typeof window === "undefined") return "multiturn";
+  if (typeof window === "undefined") return "simulation";
   const params = new URLSearchParams(window.location.search);
   const v = params.get("view");
   if (v && (VALID as string[]).includes(v)) return v as View;
-  return "multiturn";
+  return "simulation";
 }
 
 function readInitialSid(): string | null {
@@ -153,6 +155,13 @@ export function Section3Section() {
             onNewSession={clearSid}
             defaultRepoId={selectedRepo}
             onOpenSession={openSession}
+          />
+        )}
+        {active === "simulation" && (
+          <SimulationChat
+            initialSid={initialSid}
+            onNewSession={clearSid}
+            defaultRepoId={selectedRepo}
           />
         )}
         {active === "bridge" && <BridgeChatPanel />}
