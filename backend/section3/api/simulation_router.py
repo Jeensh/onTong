@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, TypeAdapter
 
 from backend.section3.agents.multiturn.gate_i import build_gate_i
+from backend.section3.agents.multiturn.gate_ii import build_gate_ii
 from backend.section3.agents.multiturn.intent import (
     MultiturnIntentClassifier,
     OpenAIIntentClassifier,
@@ -30,7 +31,7 @@ from backend.section3.agents.multiturn.ontology_client import (
     SimV2BackedOntologyClient,
 )
 from backend.section3.agents.simulation import persistence as p
-from backend.section3.agents.simulation.schemas import GateTarget
+from backend.section3.agents.simulation.schemas import ActionRef, GateTarget
 
 logger = logging.getLogger(__name__)
 
@@ -268,33 +269,55 @@ async def respond(
                 status_code=422, detail=f"selected_index 범위 밖: {req.selected_index}",
             )
         selected = target.candidates[req.selected_index]
-        # Phase D 에서 Gate II 실제 구현. 지금은 placeholder.
         intent = target.intent
+        action_ref = ActionRef(
+            action_id=selected.action_id,
+            code_method_fqn=selected.code_method_fqn,
+            repo_id=sess.repo_id,
+            location=selected.location,
+        )
+
         if intent in ("simulate", "hypothesis"):
-            stub_payload = {
-                "kind": "bundle_prepared_stub",
-                "intent": intent,
-                "selected_candidate": selected.model_dump(),
-                "note": "Phase D 에서 Java→Python + fixture 합성 구현 예정",
-            }
+            # Phase D — Gate II 실제 동작 (Java body → Python → fixture 합성)
+            try:
+                bundle = await build_gate_ii(
+                    target=action_ref, repo_id=sess.repo_id,
+                    ontology_client=ontology_client,
+                )
+                payload = bundle.model_dump()
+            except Exception as e:  # noqa: BLE001
+                logger.exception("Gate II 빌드 실패")
+                payload = {
+                    "kind": "bundle_prepared",
+                    "target": action_ref.model_dump(),
+                    "error": f"bundle 합성 실패: {e}",
+                    "java_source": "", "python_source": "",
+                    "idiom_diffs": [], "fixtures": [],
+                    "schema_summary": {"entity_name": "", "fields": [], "primary_key": None},
+                    "sources": [], "confidence": 0.0,
+                }
             next_gate = "bundle_prepared"
         else:
-            # impact / locate / explain → Gate II skip, Gate III 직진
-            stub_payload = {
+            # impact / locate / explain → Gate II skip → Phase E executed
+            payload = {
                 "kind": "executed_stub",
                 "intent": intent,
-                "selected_candidate": selected.model_dump(),
+                "target": action_ref.model_dump(),
                 "note": "Phase E 에서 intent 별 실행 분기 구현 예정",
             }
             next_gate = "executed"
 
         new_turn = p.add_gate_decision(
-            session_id, gate_kind=next_gate, payload=stub_payload,
+            session_id, gate_kind=next_gate, payload=payload,
         )
         return RespondResponse(
             session_id=session_id, turn_no=new_turn,
-            next_gate=next_gate, payload=stub_payload,
-            message=f"intent={intent} → {next_gate} 진행 (Phase D/E 에서 실제 구현)",
+            next_gate=next_gate, payload=payload,
+            message=(
+                f"intent={intent} → bundle 합성 ({payload.get('confidence', 0):.2f})"
+                if next_gate == "bundle_prepared"
+                else f"intent={intent} → Phase E 에서 실행"
+            ),
         )
 
     raise HTTPException(status_code=400, detail=f"알 수 없는 action: {req.action}")
