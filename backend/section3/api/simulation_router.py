@@ -96,14 +96,17 @@ class RespondRequest(BaseModel):
     action: Literal[
         "select_candidate", "request_other", "clarify_intent",
         "confirm_bundle", "rerun", "compare_with_overrides",
-        "run_full_design", "abort",
+        "run_full_design",
+        "confirm_change_target", "pick_order",  # impact 단계화
+        "abort",
     ]
     selected_index: int | None = None
     intent: str | None = None  # clarify_intent 시
     overrides: dict | None = None  # compare_with_overrides 시 (변경 후 값)
-    order_no: str | None = None    # run_full_design 시 (없으면 query 에서 추출)
+    order_no: str | None = None    # run_full_design / pick_order 시
     cmp_cd: str | None = None
     org_cd: str | None = None
+    change_target: dict | None = None  # confirm_change_target 시 (table/column/before/after)
     note: str | None = None
 
 
@@ -529,6 +532,27 @@ async def start(
     )
 
 
+def _detect_intent_focus(user_query: str) -> str:
+    """질문에서 '어떤 X 가 영향?' 의 X 추출.
+
+    Returns one of: step / method / action / api / rule / order / code (default).
+    """
+    q = user_query.lower()
+    # 우선순위: 구체 → 추상
+    patterns = [
+        ("step", ["step", "단계"]),
+        ("api",  ["api", "endpoint", "rest", "controller"]),
+        ("action", ["action", "동작", "액션"]),
+        ("method", ["method", "메서드", "메소드", "함수"]),
+        ("rule", ["rule", "룰", "규칙", "조건", "business rule", "business_rule"]),
+        ("order", ["주문", "order_no", "ord2", "ord3"]),
+    ]
+    for kind, kws in patterns:
+        if any(kw in q for kw in kws):
+            return kind
+    return "code"
+
+
 def _enrich_impact_payload(payload: dict, *, user_query: str, repo_id: str) -> None:
     """impact intent 의 payload 에 (detected_terms, target_change, affected_orders,
     affected_rules) 를 in-place 추가.
@@ -680,6 +704,72 @@ def _enrich_impact_payload(payload: dict, *, user_query: str, repo_id: str) -> N
             pass
     if rules:
         payload["_affected_rules"] = rules
+
+    # 5) intent_focus — 질문에서 어떤 entity kind 를 묻는지
+    focus = _detect_intent_focus(user_query)
+    payload["_intent_focus"] = focus
+
+    # 6) affected_actions — ontology actions 매칭 (detected_terms 와 연결된 action)
+    try:
+        from sqlalchemy import select
+        from backend.modeling.persistence.database import session_scope as _ss
+        from backend.modeling.mapping_layer.orm import ActionRow
+        affected_actions: list[dict] = []
+        if detected_fqns:
+            with _ss() as s:
+                rows = s.execute(
+                    select(ActionRow).where(ActionRow.repo_id == repo_id)
+                ).scalars().all()
+                for r in rows:
+                    if r.declared_on_term and r.declared_on_term in detected_fqns:
+                        affected_actions.append({
+                            "fqn": r.fqn, "label": r.label,
+                            "kind": r.kind, "declared_on_term": r.declared_on_term,
+                        })
+                        if len(affected_actions) >= 8: break
+        if affected_actions:
+            payload["_affected_actions"] = affected_actions
+    except Exception:
+        pass
+
+    # 7) affected_steps — code_methods 중 SdXxxAction 패턴 (slab-design 21-step)
+    try:
+        steps: list[dict] = []
+        methods = payload.get("affected_methods") or []
+        # SdXxxAction 클래스의 메서드 → step
+        STEP_MAP = {
+            "SdThicknessAction": 1, "SdWidthRangeAction": 2, "SdLengthRangeAction": 3,
+            "SdFirstWeightAction": 4, "SdSecondWgtLowAction": 5, "SdSecondWgtHighAction": 6,
+            "SdMaxSplitCountAction": 7, "SdSplitRangeAction": 8, "SdSlabCountAction": 9,
+            "SdInitialSlabWgtAction": 10, "SdFinalWidthRangeAction": 16,
+            "SdFinalLengthRangeAction": 17, "SdTargetWidthAction": 18,
+            "SdTargetLengthAction": 19, "SdSlabSaveAction": 20,
+        }
+        seen_steps: set[int] = set()
+        for m in methods:
+            fqn = str(m.get("fqn", ""))
+            for cls, step in STEP_MAP.items():
+                if cls in fqn and step not in seen_steps:
+                    seen_steps.add(step)
+                    steps.append({"step": step, "action_class": cls, "method_fqn": fqn})
+        if steps:
+            payload["_affected_steps"] = sorted(steps, key=lambda x: x["step"])
+    except Exception:
+        pass
+
+    # 8) affected_apis — Spring controller annotation 매칭 (간단 — controller fqn 추출)
+    try:
+        apis: list[dict] = []
+        methods = payload.get("affected_methods") or []
+        for m in methods:
+            fqn = str(m.get("fqn", ""))
+            if "Controller" in fqn or "controller" in fqn:
+                apis.append({"controller": fqn.split(".")[-2] if "." in fqn else fqn,
+                             "method_fqn": fqn})
+        if apis:
+            payload["_affected_apis"] = apis[:6]
+    except Exception:
+        pass
 
 
 async def _execute_hypothesis_from_query(
@@ -1323,6 +1413,31 @@ async def get_domain_table(table_name: str, limit: int = 100) -> DomainTableDeta
         rows=[r.values for r in rows],
         row_count_total=domain_data.table_row_count(t.table_name),
     )
+
+
+class SessionSummary(BaseModel):
+    session_id: str
+    repo_id: str
+    intent: str | None = None
+    status: str
+    user_query: str | None = None
+    created_at: str
+    last_activity_at: str
+
+
+@router.get("/sessions", response_model=list[SessionSummary])
+async def list_sessions(limit: int = 30) -> list[SessionSummary]:
+    """최근 대화 이력 list. 사용자가 과거 대화로 재진입 가능."""
+    sessions = p.list_sessions(limit=limit)
+    return [
+        SessionSummary(
+            session_id=s.id, repo_id=s.repo_id, intent=s.intent,
+            status=s.status, user_query=s.user_query,
+            created_at=s.created_at.isoformat(),
+            last_activity_at=s.last_activity_at.isoformat(),
+        )
+        for s in sessions
+    ]
 
 
 @router.get("/replay/{session_id}", response_model=ReplayResponse)

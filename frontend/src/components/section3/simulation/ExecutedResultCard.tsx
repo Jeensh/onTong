@@ -136,12 +136,15 @@ function _SimulateView({ payload }: { payload: Record<string, unknown> }) {
 
 function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
   const methods = (payload.affected_methods as Array<Record<string, unknown>> | undefined) ?? [];
-  const findings = (payload.sim_v2_findings as Array<Record<string, unknown>> | undefined) ?? [];
   const confidence = (payload.confidence as number | undefined) ?? 0;
   const detectedTerms = (payload._detected_terms as Array<Record<string, unknown>> | undefined) ?? [];
   const targetChange = payload._target_change as Record<string, unknown> | undefined;
   const affectedOrders = (payload._affected_orders as Array<Record<string, unknown>> | undefined) ?? [];
   const affectedRules = (payload._affected_rules as Array<Record<string, unknown>> | undefined) ?? [];
+  const affectedSteps = (payload._affected_steps as Array<Record<string, unknown>> | undefined) ?? [];
+  const affectedActions = (payload._affected_actions as Array<Record<string, unknown>> | undefined) ?? [];
+  const affectedApis = (payload._affected_apis as Array<Record<string, unknown>> | undefined) ?? [];
+  const intentFocus = (payload._intent_focus as string) || "code";
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggle = (fqn: string) => {
@@ -295,18 +298,59 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
         </div>
       )}
 
-      {/* SECTION 5: sim_v2 findings (technical) */}
-      {findings.length > 0 && (
-        <details className="text-[11px]">
-          <summary className="cursor-pointer text-gray-600">sim_v2 findings ({findings.length})</summary>
-          <ul className="mt-2 space-y-1">
-            {findings.slice(0, 5).map((f, i) => (
-              <li key={i} className="text-gray-700">
-                <code className="bg-amber-50 px-1 rounded">{String(f.kind ?? "?")}</code> · {String(f.message ?? "")}
+      {/* SECTION 5: affected_steps (intent_focus=step 또는 항상 표시) */}
+      {affectedSteps.length > 0 && (
+        <div className="border border-violet-200 bg-violet-50/40 rounded p-2">
+          <div className="text-[11px] font-semibold text-violet-800 mb-1 flex items-center gap-1">
+            🪜 영향받는 21-step ({affectedSteps.length})
+            {intentFocus === "step" && <span className="text-[9px] bg-violet-600 text-white px-1.5 py-0.5 rounded">질문 의도</span>}
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {affectedSteps.map((s, i) => (
+              <span key={i} title={String(s.method_fqn)}
+                className="text-[10px] px-2 py-1 rounded border border-violet-300 bg-white font-mono">
+                Step {String(s.step)} · {String(s.action_class).replace(/Action$/, "")}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 6: affected_actions (ontology actions) */}
+      {affectedActions.length > 0 && (
+        <div className="border border-indigo-200 bg-indigo-50/40 rounded p-2">
+          <div className="text-[11px] font-semibold text-indigo-800 mb-1 flex items-center gap-1">
+            ⚙ 영향받는 ontology actions ({affectedActions.length})
+            {intentFocus === "action" && <span className="text-[9px] bg-indigo-600 text-white px-1.5 py-0.5 rounded">질문 의도</span>}
+          </div>
+          <ul className="text-[10px] space-y-0.5">
+            {affectedActions.map((a, i) => (
+              <li key={i}>
+                <code className="text-indigo-700 font-mono">{String(a.fqn)}</code>
+                <span className="text-gray-500 ml-1">· {String(a.label ?? "")}</span>
+                {a.kind ? <span className="text-[9px] ml-1 bg-indigo-100 text-indigo-700 px-1 rounded">{String(a.kind)}</span> : null}
               </li>
             ))}
           </ul>
-        </details>
+        </div>
+      )}
+
+      {/* SECTION 7: affected_apis */}
+      {affectedApis.length > 0 && (
+        <div className="border border-cyan-200 bg-cyan-50/40 rounded p-2">
+          <div className="text-[11px] font-semibold text-cyan-800 mb-1 flex items-center gap-1">
+            🔌 영향받는 API ({affectedApis.length})
+            {intentFocus === "api" && <span className="text-[9px] bg-cyan-600 text-white px-1.5 py-0.5 rounded">질문 의도</span>}
+          </div>
+          <ul className="text-[10px] space-y-0.5">
+            {affectedApis.map((a, i) => (
+              <li key={i}>
+                <code className="text-cyan-700 font-mono">{String(a.controller)}</code>
+                <span className="text-gray-500 ml-1">· {String(a.method_fqn).split(".").pop()}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </>
   );

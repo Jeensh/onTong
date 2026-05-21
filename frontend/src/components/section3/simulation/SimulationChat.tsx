@@ -15,6 +15,7 @@ import { ExecutedResultCard } from "./ExecutedResultCard";
 import { OntologyGraphPanel } from "./OntologyGraphPanel";
 import { DomainDataPanel } from "./DomainDataPanel";
 import { DetectedTermsPanel } from "./DetectedTermsPanel";
+import { SessionHistoryPanel } from "./SessionHistoryPanel";
 
 interface Props {
   initialSid: string | null;
@@ -178,6 +179,11 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
           )}
           <span className="text-xs text-gray-400 ml-auto">{repo}</span>
         </div>
+
+        <SessionHistoryPanel
+          currentSid={sid}
+          onPick={(picked) => { setSid(picked); _refresh(picked); }}
+        />
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {!sid && (() => {

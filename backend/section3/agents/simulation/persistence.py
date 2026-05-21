@@ -159,6 +159,17 @@ def update_user_response(
         row.user_response_json = json.dumps(user_response, ensure_ascii=False)
 
 
+def list_sessions(limit: int = 30) -> list[SimulationSession]:
+    """최신 세션 list — 생성 시간 역순."""
+    with session_scope() as s:
+        rows = s.execute(
+            select(SimulationSessionRow)
+            .order_by(SimulationSessionRow.last_activity_at.desc())
+            .limit(limit)
+        ).scalars().all()
+        return [_row_to_session(r) for r in rows]
+
+
 def replay_session(session_id: str) -> SimulationReplay | None:
     with session_scope() as s:
         sess_row = s.get(SimulationSessionRow, session_id)

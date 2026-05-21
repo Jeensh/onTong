@@ -71,46 +71,13 @@ export function OntologyGraphPanel({ sessionId, refreshKey }: Props) {
       {graph && graph.nodes.length > 0 && (
         <>
           <div className="text-[11px] text-gray-600 truncate">
-            <strong>중심 메서드</strong>{" "}
+            <strong>중심:</strong>{" "}
             <code className="text-emerald-700">{graph.target_fqn.split(".").pop()}</code>
           </div>
-
-          {/* 노드 그룹 (지금은 표 형태 — 추후 xyflow 도입 시 교체) */}
-          <div className="space-y-2 overflow-y-auto">
-            {Object.entries(_groupByKind(graph.nodes)).map(([kind, nodes]) => (
-              <div key={kind}>
-                <div className="text-[10px] text-gray-500 mb-1 uppercase tracking-wide">{kind}</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {nodes.map((n) => (
-                    <span
-                      key={n.id}
-                      title={n.id}
-                      className={"text-[10px] px-1.5 py-1 rounded border font-mono truncate max-w-[160px] " + NODE_COLOR[n.kind]}
-                    >
-                      {n.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div>
-            <div className="text-[10px] text-gray-500 mb-1 uppercase tracking-wide">edges ({graph.edges.length})</div>
-            <ul className="text-[10px] space-y-0.5 max-h-32 overflow-y-auto">
-              {graph.edges.slice(0, 30).map((e, i) => (
-                <li key={i} className="font-mono text-gray-700">
-                  <span className="text-gray-500">{e.source.split(".").pop()?.slice(0, 24)}</span>
-                  <span className="mx-1 text-amber-700">[{e.kind}]→</span>
-                  <span className="text-gray-700">{e.target.split(".").pop()?.slice(0, 24)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <_GraphSVG nodes={graph.nodes} edges={graph.edges} centerId={graph.target_fqn} />
 
           <div className="border-t border-gray-200 pt-2 mt-2 text-[10px] text-gray-500">
-            <strong>활용</strong>: 변경 시 영향 전파를 추적하려면 callers 따라 위로,
-            구현체 보려면 callees 따라 아래로 탐색합니다.
+            <strong>활용</strong>: 변경 영향은 callers 위로, 구현체는 callees 아래로.
           </div>
         </>
       )}
@@ -118,8 +85,110 @@ export function OntologyGraphPanel({ sessionId, refreshKey }: Props) {
   );
 }
 
-function _groupByKind<T extends { kind: string }>(arr: T[]): Record<string, T[]> {
-  const out: Record<string, T[]> = {};
-  for (const n of arr) (out[n.kind] ||= []).push(n);
-  return out;
+/** SVG 그래프 — center + 1-hop 원형 배치 + wheel zoom + drag pan. */
+function _GraphSVG({ nodes, edges, centerId }: {
+  nodes: { id: string; label: string; kind: string }[];
+  edges: { source: string; target: string; kind: string }[];
+  centerId: string;
+}) {
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState<{ x0: number; y0: number; px: number; py: number } | null>(null);
+
+  const W = 320, H = 320, CX = W / 2, CY = H / 2;
+  const center = nodes.find((n) => n.id === centerId) ?? nodes[0];
+  const others = nodes.filter((n) => n.id !== center.id);
+  // 원형 배치
+  const positions: Record<string, { x: number; y: number }> = {};
+  positions[center.id] = { x: CX, y: CY };
+  const R = 100;
+  others.forEach((n, i) => {
+    const angle = (2 * Math.PI * i) / Math.max(others.length, 1) - Math.PI / 2;
+    positions[n.id] = { x: CX + R * Math.cos(angle), y: CY + R * Math.sin(angle) };
+  });
+
+  const KIND_FILL: Record<string, string> = {
+    term: "#dbeafe", action: "#ede9fe", code_method: "#d1fae5",
+    code_type: "#fef3c7", rule: "#fee2e2",
+  };
+  const KIND_STROKE: Record<string, string> = {
+    term: "#3b82f6", action: "#8b5cf6", code_method: "#10b981",
+    code_type: "#f59e0b", rule: "#ef4444",
+  };
+
+  function onWheel(e: React.WheelEvent<SVGSVGElement>) {
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    setZoom((z) => Math.max(0.4, Math.min(4, z * delta)));
+  }
+  function onMouseDown(e: React.MouseEvent<SVGSVGElement>) {
+    setDragging({ x0: e.clientX, y0: e.clientY, px: pan.x, py: pan.y });
+  }
+  function onMouseMove(e: React.MouseEvent<SVGSVGElement>) {
+    if (!dragging) return;
+    setPan({ x: dragging.px + (e.clientX - dragging.x0) / zoom,
+             y: dragging.py + (e.clientY - dragging.y0) / zoom });
+  }
+  function onMouseUp() { setDragging(null); }
+
+  return (
+    <div className="relative">
+      <div className="absolute top-1 right-1 z-10 flex gap-1 text-[10px]">
+        <button onClick={() => setZoom((z) => Math.min(4, z * 1.25))}
+          className="bg-white border border-gray-300 rounded w-5 h-5 hover:bg-emerald-50">+</button>
+        <button onClick={() => setZoom((z) => Math.max(0.4, z / 1.25))}
+          className="bg-white border border-gray-300 rounded w-5 h-5 hover:bg-emerald-50">−</button>
+        <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
+          className="bg-white border border-gray-300 rounded px-1.5 hover:bg-emerald-50">⌂</button>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H}
+        className={"border border-gray-200 rounded bg-slate-50 select-none " + (dragging ? "cursor-grabbing" : "cursor-grab")}
+        onWheel={onWheel} onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L7,3.5 L0,7 Z" fill="#94a3b8" />
+          </marker>
+        </defs>
+        <g transform={`translate(${pan.x * zoom + CX * (1 - zoom)}, ${pan.y * zoom + CY * (1 - zoom)}) scale(${zoom})`}>
+          {/* edges */}
+          {edges.map((e, i) => {
+            const a = positions[e.source]; const b = positions[e.target];
+            if (!a || !b) return null;
+            return (
+              <g key={i}>
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                  stroke="#94a3b8" strokeWidth="1.5" markerEnd="url(#arr)" />
+                <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 4} fontSize="10" fill="#475569" textAnchor="middle">
+                  {e.kind}
+                </text>
+              </g>
+            );
+          })}
+          {/* nodes */}
+          {nodes.map((n) => {
+            const p = positions[n.id];
+            if (!p) return null;
+            const isCenter = n.id === center.id;
+            const r = isCenter ? 34 : 28;
+            return (
+              <g key={n.id}>
+                <circle cx={p.x} cy={p.y} r={r}
+                  fill={KIND_FILL[n.kind] ?? "#e2e8f0"}
+                  stroke={KIND_STROKE[n.kind] ?? "#64748b"}
+                  strokeWidth={isCenter ? 3 : 2} />
+                <text x={p.x} y={p.y - 1} fontSize="11" textAnchor="middle" fill="#0f172a"
+                  fontWeight={isCenter ? "bold" : "600"}>
+                  {n.label.length > 11 ? n.label.slice(0, 11) + "…" : n.label}
+                </text>
+                <text x={p.x} y={p.y + 11} fontSize="9" textAnchor="middle" fill="#475569">
+                  {n.kind}
+                </text>
+              </g>
+            );
+          })}
+        </g>
+      </svg>
+      <div className="text-[9px] text-gray-400 mt-1">wheel: zoom · drag: pan · ⌂: reset</div>
+    </div>
+  );
 }
