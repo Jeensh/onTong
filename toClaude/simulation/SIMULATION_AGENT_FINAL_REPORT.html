@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Section 3 시뮬레이션 에이전트 — 최종 기능 보고서</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+      "Pretendard", "Helvetica Neue", Arial, sans-serif;
+    background: #f8fafc; color: #0f172a; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  header.cover {
+    border: 1px solid #e2e8f0; border-radius: 12px;
+    padding: 32px; background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+    margin-bottom: 32px; box-shadow: 0 4px 12px rgba(15,23,42,0.04);
+  }
+  header.cover h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.02em; }
+  header.cover .subtitle { color: #64748b; font-size: 14px; margin: 0 0 14px; }
+  header.cover .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  header.cover .badge {
+    font-size: 11px; padding: 3px 9px; border-radius: 12px;
+    background: #ecfdf5; color: #065f46; border: 1px solid #6ee7b7;
+  }
+  header.cover .badge.amber { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+  header.cover .badge.sky { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
+
+  section.feat {
+    margin: 24px 0; border: 1px solid #e2e8f0; border-radius: 12px;
+    background: #ffffff; overflow: hidden;
+  }
+  section.feat > header {
+    display: flex; align-items: baseline; gap: 12px;
+    padding: 16px 24px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+  }
+  section.feat > header .num {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px; color: #059669; border: 1.5px solid #10b981;
+    padding: 3px 9px; border-radius: 4px; font-weight: 600;
+  }
+  section.feat > header h2 { margin: 0; font-size: 18px; }
+  section.feat .body { padding: 20px 24px; }
+  section.feat p { margin: 0 0 10px; font-size: 14px; color: #1e293b; }
+  section.feat p.lead { font-weight: 500; color: #0f172a; }
+  section.feat ul { margin: 4px 0 12px 1.2em; padding: 0; }
+  section.feat li { font-size: 13px; margin-bottom: 5px; color: #1e293b; }
+
+  .scenario-grid {
+    display: grid; grid-template-columns: 80px 1fr 1fr; gap: 16px;
+    align-items: center; padding: 14px 0; border-bottom: 1px solid #f1f5f9;
+  }
+  .scenario-grid:last-child { border: 0; }
+  .scenario-grid .stage {
+    font-size: 18px; font-weight: 600; text-align: center;
+    padding: 8px; border-radius: 6px;
+  }
+  .scenario-grid .desc h3 { margin: 0 0 4px; font-size: 14px; }
+  .scenario-grid .desc p { margin: 0; font-size: 12px; color: #64748b; }
+  .scenario-grid .query { font-family: monospace; font-size: 11.5px; color: #475569; background: #f1f5f9; padding: 8px 10px; border-radius: 4px; }
+  .stage.simulate { background: #d1fae5; color: #065f46; }
+  .stage.impact { background: #fef3c7; color: #92400e; }
+  .stage.locate { background: #e0f2fe; color: #075985; }
+  .stage.explain { background: #ede9fe; color: #5b21b6; }
+  .stage.hypothesis { background: #fce7f3; color: #831843; }
+
+  figure.cap {
+    margin: 16px 0; border: 1px solid #cbd5e1; border-radius: 8px;
+    background: white; overflow: hidden;
+    box-shadow: 0 2px 6px rgba(15,23,42,0.06);
+  }
+  figure.cap .cap-bar {
+    display: flex; gap: 8px; align-items: center;
+    padding: 10px 14px; border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+    font-size: 11.5px; color: #475569;
+  }
+  figure.cap .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
+  figure.cap .cap-bar strong { color: #0f172a; }
+  figure.cap .cap-bar .right { margin-left: auto; color: #64748b; font-family: monospace; font-size: 10.5px; }
+  figure.cap img { width: 100%; display: block; }
+  figure.cap figcaption { padding: 10px 14px; font-size: 11.5px; color: #64748b; font-style: italic; text-align: center; background: white; }
+
+  table.kv {
+    width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px;
+  }
+  table.kv th, table.kv td {
+    text-align: left; padding: 8px 12px; border-bottom: 1px solid #e2e8f0;
+  }
+  table.kv th { background: #f1f5f9; font-weight: 500; font-size: 12px; color: #475569; }
+  table.kv code { font-size: 11.5px; background: #ecfdf5; padding: 1px 5px; border-radius: 3px; color: #047857; }
+
+  .ok { color: #059669; font-weight: 500; }
+  .warn { color: #d97706; font-weight: 500; }
+
+  details.endpoints {
+    background: #f8fafc; border-left: 3px solid #10b981;
+    border-radius: 4px; margin: 12px 0; padding: 4px 0;
+  }
+  details.endpoints summary {
+    cursor: pointer; padding: 8px 14px;
+    font-size: 12px; color: #047857; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    list-style: none;
+  }
+  details.endpoints summary::-webkit-details-marker { display: none; }
+  details.endpoints summary::before { content: "▸ "; }
+  details.endpoints[open] summary::before { content: "▾ "; }
+  details.endpoints .ep-list { padding: 8px 14px; display: flex; flex-wrap: wrap; gap: 6px; }
+  details.endpoints .ep {
+    font-family: monospace; font-size: 11px; background: white;
+    border: 1px solid #a7f3d0; color: #065f46; padding: 3px 8px; border-radius: 3px;
+  }
+
+  footer.sum {
+    margin-top: 40px; padding: 24px; border: 1px solid #e2e8f0;
+    border-radius: 12px; background: white;
+  }
+  footer.sum h3 { margin: 0 0 12px; font-size: 16px; }
+  footer.sum table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  footer.sum td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; }
+  footer.sum td:first-child { color: #64748b; width: 30%; font-size: 12px; }
+
+  .commit-log { font-family: monospace; font-size: 11.5px; background: #0f172a; color: #cbd5e1; padding: 12px 16px; border-radius: 6px; line-height: 1.5; }
+  .commit-log .hash { color: #fbbf24; }
+  .commit-log .scope { color: #6ee7b7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="cover">
+  <h1>Section 3 시뮬레이션 에이전트 — 최종 기능 보고서</h1>
+  <p class="subtitle">
+    slab-design-real_v2 ontology (83 terms · 136 actions · 148 realizations · 163 anchors · 22 rules) 위에서
+    IT 운영자의 자연어 질문을 5종 intent 로 분류하고, 단계별 ontology 호출과 사용자 확인을 거쳐
+    실측 데이터 기반의 결과를 surface 하는 멀티턴 에이전트.
+  </p>
+  <div class="badges">
+    <span class="badge">브랜치 jyu-simul</span>
+    <span class="badge">실행 일자 2026-05-22</span>
+    <span class="badge sky">실측 Java :8080 호출 (slab-design-boot)</span>
+    <span class="badge amber">SSE 스트리밍</span>
+    <span class="badge">검증 완료 ✓</span>
+  </div>
+</header>
+
+<section class="feat">
+  <header><span class="num">01</span><h2>5종 intent · 자연어 → 적절한 결과</h2></header>
+  <div class="body">
+    <p class="lead">사용자 질문 의도를 OpenAI classifier 로 분류 + 정규식 패턴(예: "신규 X 추가" → hypothesis)
+      으로 보정. 의도에 따라 단계와 결과 UI 가 달라진다.</p>
+
+    <div class="scenario-grid">
+      <div class="stage simulate">🧪</div>
+      <div class="desc"><h3>시뮬레이션 (simulate)</h3><p>주문 1건 → 21-step 알고리즘 통과 → Slab 결과 카드 + Gantt</p></div>
+      <div class="query">"ORD20260510001 주문으로 Slab 설계 시뮬레이션 돌려줘"</div>
+    </div>
+    <div class="scenario-grid">
+      <div class="stage impact">⚡</div>
+      <div class="desc"><h3>영향도 분석 (impact)</h3><p>변경 대상 확인 → 매칭 주문 선택 → 영향 코드/룰/Step/Action/API</p></div>
+      <div class="query">"CAST_SPEC 의 slab두께를 240으로 바꾸면 어떤 step이 영향?"</div>
+    </div>
+    <div class="scenario-grid">
+      <div class="stage locate">🔍</div>
+      <div class="desc"><h3>위치 찾기 (locate)</h3><p>키워드 매칭 코드 위치 list + 본문 highlight</p></div>
+      <div class="query">"DG104 (HR_MIN_WGT 미발견) 에러는 어디서 throw 돼?"</div>
+    </div>
+    <div class="scenario-grid">
+      <div class="stage explain">💬</div>
+      <div class="desc"><h3>설명 (explain)</h3><p>자연어 답변 + 관련 ontology 객체 카드 grid</p></div>
+      <div class="query">"Step 8~13 의 A-a inner loop 가 뭐고 어떻게 수렴해?"</div>
+    </div>
+    <div class="scenario-grid">
+      <div class="stage hypothesis">🔮</div>
+      <div class="desc"><h3>가설 검증 (hypothesis)</h3><p>4-step SSE 스트리밍 — 기존 분석 → 가상 합성 → 가상 주문 → 결과 비교</p></div>
+      <div class="query">"신규 강종 SS500 (productivity ×0.95) 가 추가되면 Slab 결과는?"</div>
+    </div>
+
+    <details class="endpoints">
+      <summary>backend endpoints (총 12)</summary>
+      <div class="ep-list">
+        <span class="ep">POST /start</span>
+        <span class="ep">POST /respond/{sid}</span>
+        <span class="ep">GET /replay/{sid}</span>
+        <span class="ep">GET /graph/{sid}</span>
+        <span class="ep">GET /sessions</span>
+        <span class="ep">DELETE /sessions/{sid}</span>
+        <span class="ep">GET /method/body</span>
+        <span class="ep">GET /data/tables</span>
+        <span class="ep">GET /data/table/{name}</span>
+        <span class="ep">GET /suggested_questions</span>
+        <span class="ep">POST /term_lookup</span>
+        <span class="ep">POST /hypothesis/run</span>
+        <span class="ep">POST /hypothesis/stream (SSE)</span>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section class="feat">
+  <header><span class="num">02</span><h2>진입 화면 — 카테고리 탭 + 동적 예시 질문</h2></header>
+  <div class="body">
+    <ul>
+      <li>5종 intent 가 탭으로 분리 (🧪 시뮬레이션 · ⚡ 영향도 · 🔍 위치 · 💬 설명 · 🔮 가설)</li>
+      <li>예시 질문은 backend <code>/suggested_questions</code> 에서 동적 생성 — JPO 한국어 javadoc + ontology business_terms + seed orders 합성</li>
+      <li>각 예시 카드 하단에 ontology 매핑 chip (예: <code>주문→주문 term</code>) — 진짜 ontology 기반</li>
+      <li>"↻ 다른 예시" 로 seed 갱신, 다른 set 노출</li>
+    </ul>
+    <figure class="cap">
+      <div class="cap-bar"><span class="dot"></span><strong>실제 캡처 — 시뮬레이션 카테고리 진입</strong><span class="right">?view=simulation</span></div>
+      <img src="screenshots/final/1_simulate_landing.png" alt="simulate landing" />
+      <figcaption>좌측 카테고리 탭(5종) · 카테고리 별 동적 예시 질문 · 좌측 nav · 우측 그래프/패널</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="feat">
+  <header><span class="num">03</span><h2>시뮬레이션 — 주문번호 → 실제 Slab 설계 결과</h2></header>
+  <div class="body">
+    <p class="lead">simulate intent + 주문번호 감지 시 multiturn bundle 합성 대신
+    <strong>Java :8080 /api/sd/working/single?trace=true</strong> 호출 → 21-step 통과 → 실제 Slab 결과 + trace</p>
+    <ul>
+      <li>그라데이션 헤더 (주문 + 결과 SUCCESS/FAIL)</li>
+      <li>SVG schematic (길이 · 폭 · 두께 비율) + KPI 4-grid (두께/폭/길이/단중)</li>
+      <li>허용범위 미니 RangeBar — 실제값의 [low, high] 안 위치</li>
+      <li>21-step Gantt — OK / RETRY / FAIL / SKIP 색상 + A-a 루프 iteration 표시</li>
+      <li>전체 필드 collapsible (54 필드 모두)</li>
+    </ul>
+    <figure class="cap">
+      <div class="cap-bar"><span class="dot"></span><strong>simulate 결과 — ORD20260510001</strong><span class="right">slabThickness 230 · slabWgt 13,288kg · SUCCESS</span></div>
+      <img src="screenshots/final/1_simulate_result.png" alt="simulate result" />
+      <figcaption>Java :8080 실제 호출 → golden S1 과 byte-equal 매칭</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="feat">
+  <header><span class="num">04</span><h2>영향도 — 단계별 progressive disclosure</h2></header>
+  <div class="body">
+    <p class="lead">변경 대상 확인 → 매칭 주문 선택 → 영향 결과. 단계별 stepper UI 와 "다음/이전/전체 보기" 버튼.</p>
+    <ul>
+      <li><strong>SECTION 0</strong> 감지된 ontology 용어 (token → label · FQN · definition)</li>
+      <li><strong>STAGE 1</strong> 변경 대상 카드 — table 별 맞춤 UI (CAST_SPEC 🏭 amber · EDGING_GROUP 📐 purple · HR_SPEC 🔥 rose · SD_PRODUCTIVITY_STD 📊 indigo · CUSTOMER_STD 👥 sky)</li>
+      <li><strong>STAGE 2</strong> 매칭 주문 carousel — 사용자가 1건 pick 후 그 주문 기준 분석</li>
+      <li><strong>STAGE 3</strong> 영향 결과 — 6 종 entity 분기:
+        <code>methods</code> (행 click → 코드 본문 + 1-hop) ·
+        <code>steps</code> (21-step 매핑) ·
+        <code>actions</code> (ontology actions) ·
+        <code>apis</code> (Controller) ·
+        <code>rules</code> (business_rules) ·
+        <code>orders</code> (매칭 주문)</li>
+      <li>질문 의도와 일치하는 entity 섹션엔 "질문 의도" 배지</li>
+    </ul>
+    <figure class="cap">
+      <div class="cap-bar"><span class="dot"></span><strong>impact 카루셀 (Gate I)</strong><span class="right">intent=impact · 후보 5건 + 체크박스 다중 선택</span></div>
+      <img src="screenshots/final/2_impact_carousel.png" alt="impact carousel" />
+      <figcaption>후보 5건 — 체크박스 다중 선택 또는 단독 click</figcaption>
+    </figure>
+    <figure class="cap">
+      <div class="cap-bar"><span class="dot"></span><strong>impact stage 1 — 변경 대상 확인</strong><span class="right">CAST_SPEC.SLAB_THICKNESS · before 230 → after</span></div>
+      <img src="screenshots/final/2_impact_result.png" alt="impact result" />
+      <figcaption>stepper "변경대상확인 → 매칭주문선택 → 영향결과" · "변경 대상 확인 — 다음" 버튼</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="feat">
+  <header><span class="num">05</span><h2>위치 찾기 — VSCode 스타일 + keyword highlight</h2></header>
+  <div class="body">
+    <p class="lead">backend <code>_enrich_locate_payload</code> 가 code_methods.body_text/name/fqn LIKE 매칭 →
+    각 위치 (file_path · line · matched_line · keyword · snippet 500 chars) 첨부.</p>
+    <ul>
+      <li>좌측 위치 list — 우선순위 (⚡ primary / 🔍 keyword match / ↑ callers)</li>
+      <li>매칭 라인 번호 + 🔑 keyword chip 표시</li>
+      <li>우측 코드 본문 — keyword 가 <code>&lt;mark&gt;</code> 노랑 배경으로 highlight</li>
+      <li>위치 클릭 시 snippet 우선 사용 (빠른 표시) → 없으면 <code>/method/body</code> 호출</li>
+    </ul>
+    <figure class="cap">
+      <div class="cap-bar"><span class="dot"></span><strong>locate 결과</strong><span class="right">DG104 throw 위치</span></div>
+      <img src="screenshots/final/3_locate_result.png" alt="locate result" />
+      <figcaption>위치 list 좌측 · 코드 본문 우측 · keyword highlight</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="feat">
+  <header><span class="num">06</span><h2>설명 — 답변 + 관련 객체 카드 grid</h2></header>
+  <div class="body">
+    <ul>
+      <li>큰 violet gradient 답변 박스 💬 — 자연어 답변</li>
+      <li>관련 객체 카드 3종 (색상 구분):
+        <code>CODE</code> (emerald, body preview) ·
+        <code>RULES</code> (rose, severity + statement) ·
+        <code>CALLERS</code> (sky, fqn list)</li>
+    </ul>
+    <figure class="cap">
+      <div class="cap-bar"><span class="dot"></span><strong>explain 결과 — "A-a 루프란?"</strong><span class="right">summary + 관련 ontology 객체</span></div>
+      <img src="screenshots/final/4_explain_result.png" alt="explain result" />
+      <figcaption>채팅 스타일 답변 + 관련 객체 카드</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="feat">
+  <header><span class="num">07</span><h2>가설 검증 — SSE 스트리밍 4-step</h2></header>
+  <div class="body">
+    <p class="lead">"신규 X 가 추가되면" 패턴 자동 감지 (정규식 override) → 4단계 backend SSE 순차 전송.</p>
+    <ul>
+      <li><strong>Stage 1</strong> 기존 데이터 분석 — seed SD_PRODUCTIVITY_STD 의 SS400 row 8건</li>
+      <li><strong>Stage 2</strong> 가상 강종 합성 — multiplier ×0.95 적용 row 8건</li>
+      <li><strong>Stage 3</strong> 가상 주문 — base_order_no 4 table (OS/OM/QD/CHEMICAL) 복제 + ORDER_QD.GRADE_CD 만 변경</li>
+      <li><strong>Stage 4</strong> Slab 결과 비교 — Java :8080 실제 호출 baseline + projection (productivity 비율 적용)</li>
+      <li>"▶ SSE stream" 버튼으로 400ms 간격 progressive 등장</li>
+    </ul>
+    <figure class="cap">
+      <div class="cap-bar"><span class="dot"></span><strong>hypothesis 결과</strong><span class="right">SS500 (×0.95) → slabWgt -5.0%</span></div>
+      <img src="screenshots/final/5_hypothesis_result.png" alt="hypothesis result" />
+      <figcaption>4-step 카드 (Sky / Amber / Violet / Emerald) + DIFF 3-col</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="feat">
+  <header><span class="num">08</span><h2>3-pane 보조 패널 — 우측 ontology + 도메인 데이터</h2></header>
+  <div class="body">
+    <ul>
+      <li><strong>🎯 감지된 ontology 용어</strong> (fuchsia gradient + animated pulse) — 사용자 입력 토큰을 business_terms 와 실시간 매핑</li>
+      <li><strong>온톨로지 그래프</strong> — SVG 노드/엣지 (term · action · code_method · code_type · rule 5종 색상) + wheel zoom + drag pan + ⌂ reset</li>
+      <li><strong>slab-design 도메인 데이터</strong> — 14 tables (std 8 / order 4 / result 1 / history 1) chip + 클릭 시 schema + seed row 표</li>
+    </ul>
+    <figure class="cap">
+      <div class="cap-bar"><span class="dot"></span><strong>우측 패널 통합</strong><span class="right">감지 용어 + 그래프 + 14 tables</span></div>
+      <img src="screenshots/final/2_impact_query_typed.png" alt="right panel" />
+      <figcaption>좌측 chat 의 감지된 용어 + 우측 패널 3-section</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="feat">
+  <header><span class="num">09</span><h2>대화 이력 + 세션 관리</h2></header>
+  <div class="body">
+    <ul>
+      <li>좌측 chat 상단 collapsible "대화 이력 (N)" — 최근 20 세션</li>
+      <li>각 row: intent 색 chip · status (done/active/aborted) · last_activity · user_query 첫 줄</li>
+      <li>row click → 그 세션 reopen (replay 자동)</li>
+      <li>hover 시 ✕ 버튼 → window.confirm("삭제하시겠습니까?") → DELETE endpoint (CASCADE)</li>
+    </ul>
+  </div>
+</section>
+
+<section class="feat">
+  <header><span class="num">10</span><h2>검증 결과</h2></header>
+  <div class="body">
+    <table class="kv">
+      <tr><th>ontology 데이터 풍부도</th><td>83 terms · 136 actions (sim_verified) · 148 realizations · 163 anchors · 22 rules · 1,081 methods · 2,298 call_sites</td></tr>
+      <tr><th>simulate (ORD20260510001)</th><td><span class="ok">✓</span> Java :8080 호출 → slabWgt 13,288.01 (golden S1 byte-equal)</td></tr>
+      <tr><th>impact 풍부화</th><td><span class="ok">✓</span> target_change · affected_orders 5건 · affected_rules 1건 · methods 3건 (real fqn)</td></tr>
+      <tr><th>hypothesis grounding</th><td><span class="ok">✓</span> existing 8 rows × 0.95 = virtual 8 rows · projected slabWgt 12,624 (-5.0%, expected -5%)</td></tr>
+      <tr><th>SSE 스트리밍</th><td><span class="ok">✓</span> 4 stages + done event · 400ms 간격 progressive</td></tr>
+      <tr><th>endpoints health</th><td><span class="ok">✓</span> /sessions /data/tables /suggested_questions /term_lookup /hypothesis/run · 모두 200</td></tr>
+      <tr><th>tsc</th><td><span class="ok">✓</span> clean (0 errors)</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="feat">
+  <header><span class="num">11</span><h2>주요 commit 로그</h2></header>
+  <div class="body">
+    <div class="commit-log">
+<span class="hash">6307f03</span> feat(<span class="scope">simulation</span>): impact 단계화 + locate 코드 highlight + SSE 스트리밍 + 검증보고서<br>
+<span class="hash">203bfcc</span> feat(<span class="scope">simulation</span>): 세션 삭제 + 기준 테이블별 _TargetChangeCard + 예시 질문 보정<br>
+<span class="hash">1d54241</span> feat(<span class="scope">simulation</span>): 그래프 zoom · 세션 이력 · entity kind · 다중 선택<br>
+<span class="hash">84469eb</span> fix(<span class="scope">simulation</span>): impact intent 결과 풍부화 + locate 위치 클릭 + 카테고리 탭 + 감지 용어 강조<br>
+<span class="hash">ad1f585</span> fix(<span class="scope">simulation</span>): intent 별 자동 진행 + UI workflow 정합성<br>
+<span class="hash">9d6e976</span> fix(<span class="scope">simulation</span>): "다른 후보" 클릭 시 이전 후보 자동 제외<br>
+<span class="hash">0806163</span> feat(<span class="scope">simulation</span>): JPO·ontology 기반 동적 자연어 질문 + 실시간 용어 매핑<br>
+<span class="hash">e8d0a58</span> feat(<span class="scope">simulation</span>): hypothesis 단계화 + 예시질문 ⑦ 실측 기반 재작성<br>
+<span class="hash">c408eba</span> feat(<span class="scope">simulation</span>): impact intent 인터랙티브 — 행 click → 코드 본문 + 1-hop 확장<br>
+<span class="hash">8843891</span> feat(<span class="scope">simulation</span>): 주문번호 → 전체 Slab 설계 결과 surface
+    </div>
+  </div>
+</section>
+
+<footer class="sum">
+  <h3>핵심 요약</h3>
+  <table>
+    <tr><td>탭 위치</td><td><code>http://localhost:3000/?section=simulation&view=simulation</code></td></tr>
+    <tr><td>backend</td><td><code>backend/section3/agents/simulation/</code> + <code>backend/section3/api/simulation_router.py</code></td></tr>
+    <tr><td>frontend</td><td><code>frontend/src/components/section3/simulation/</code> (10+ 컴포넌트)</td></tr>
+    <tr><td>외부 의존</td><td>Java :8080 (slab-design-boot · spring-boot:run) · OpenAI (intent classifier · 옵션)</td></tr>
+    <tr><td>지원 intent</td><td>simulate · impact · locate · explain · hypothesis · ambiguous (의도 명확화)</td></tr>
+    <tr><td>검증 보고서</td><td><code>toClaude/simulation/SIMULATION_VERIFICATION_REPORT.md</code></td></tr>
+    <tr><td>실측 시나리오</td><td><code>toClaude/simulation/SLAB_S1_EXECUTION_REPORT.md</code> · <code>SLAB_DOMAIN_DATA.md</code></td></tr>
+  </table>
+</footer>
+
+<p style="text-align:center; color:#94a3b8; font-size:11px; margin-top:32px;">
+  Section 3 · 시뮬레이션 에이전트 · jyu-simul · 2026-05-22
+</p>
+
+</div>
+</body>
+</html>
