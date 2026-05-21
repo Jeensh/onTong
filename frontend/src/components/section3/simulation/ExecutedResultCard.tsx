@@ -134,13 +134,34 @@ function _SimulateView({ payload }: { payload: Record<string, unknown> }) {
   );
 }
 
-/** table 별 맞춤 변경 대상 카드. CAST_SPEC, EDGING_GROUP, HR_SPEC, SD_PRODUCTIVITY_STD 등. */
-function _TargetChangeCard({ targetChange }: { targetChange: Record<string, unknown> }) {
+/** table 별 맞춤 변경 대상 카드. CAST_SPEC, EDGING_GROUP, HR_SPEC, SD_PRODUCTIVITY_STD 등.
+ *  editable=true 면 before/after 값을 사용자가 직접 입력/수정. */
+function _TargetChangeCard({ targetChange, editable, onChange }: {
+  targetChange: Record<string, unknown>;
+  editable?: boolean;
+  onChange?: (next: { before: string; after: string }) => void;
+}) {
   const table = String(targetChange.table ?? "");
   const column = String(targetChange.column ?? "");
-  const before = targetChange.before;
-  const after = targetChange.after;
+  const initialBefore = targetChange.before;
+  const initialAfter = targetChange.after;
   const product = targetChange.product as string | undefined;
+
+  const [beforeVal, setBeforeVal] = useState<string>(
+    initialBefore === null || initialBefore === undefined ? "" : String(initialBefore)
+  );
+  const [afterVal, setAfterVal] = useState<string>(
+    initialAfter === null || initialAfter === undefined ? "" : String(initialAfter)
+  );
+
+  function _updateBefore(v: string) {
+    setBeforeVal(v);
+    onChange?.({ before: v, after: afterVal });
+  }
+  function _updateAfter(v: string) {
+    setAfterVal(v);
+    onChange?.({ before: beforeVal, after: v });
+  }
 
   // table 별 메타 (icon · 한국어 라벨 · 주요 컬럼 분류)
   const META: Record<string, { icon: string; ko: string; columns: string[]; color: string }> = {
@@ -174,13 +195,38 @@ function _TargetChangeCard({ targetChange }: { targetChange: Record<string, unkn
         </div>
         <div>
           <div className="text-[9px] text-gray-500 uppercase">변경 전 (현재값)</div>
-          <code className="text-xs text-gray-700">{before === null || before === undefined ? "(seed 미존재)" : String(before)}</code>
+          {editable ? (
+            <input
+              type="text"
+              value={beforeVal}
+              onChange={(e) => _updateBefore(e.target.value)}
+              placeholder="(seed 미존재 — 직접 입력)"
+              className="w-full text-xs px-1.5 py-0.5 border border-gray-300 rounded font-mono text-gray-800 focus:outline-none focus:border-amber-500"
+            />
+          ) : (
+            <code className="text-xs text-gray-700">{beforeVal || "(seed 미존재)"}</code>
+          )}
         </div>
         <div>
           <div className="text-[9px] text-gray-500 uppercase">변경 후</div>
-          <code className={`text-xs text-red-700 font-bold`}>{after === null || after === undefined ? "?" : String(after)}</code>
+          {editable ? (
+            <input
+              type="text"
+              value={afterVal}
+              onChange={(e) => _updateAfter(e.target.value)}
+              placeholder="값 입력"
+              className={`w-full text-xs px-1.5 py-0.5 border border-red-300 rounded font-mono text-red-700 font-bold focus:outline-none focus:border-red-500`}
+            />
+          ) : (
+            <code className={`text-xs text-red-700 font-bold`}>{afterVal || "?"}</code>
+          )}
         </div>
       </div>
+      {editable && (
+        <div className="text-[10px] text-gray-500 mt-1.5 italic">
+          💡 자연어에서 추출한 값이 부정확하거나 비어있으면 직접 수정해 주세요. "다음" 진행 시 입력값 기반으로 영향 분석합니다.
+        </div>
+      )}
 
       {product && (
         <div className="mt-2 text-[10px] text-gray-600">
@@ -231,6 +277,11 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
   const hasOrders = affectedOrders.length > 0;
   const [stage, setStage] = useState<1 | 2 | 3>(hasTarget ? 1 : hasOrders ? 2 : 3);
   const [pickedOrder, setPickedOrder] = useState<string | null>(null);
+  // 사용자가 입력한 변경 전·후 (stage 1 에서 editable)
+  const [userChange, setUserChange] = useState<{ before: string; after: string }>({
+    before: String(targetChange?.before ?? ""),
+    after: String(targetChange?.after ?? ""),
+  });
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggle = (fqn: string) => {
@@ -292,14 +343,20 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
         </div>
       )}
 
-      {/* STAGE 1: 변경 대상 확인 */}
+      {/* STAGE 1: 변경 대상 확인 — editable */}
       {stage === 1 && hasTarget && (
         <>
-          <_TargetChangeCard targetChange={targetChange!} />
-          <div className="flex justify-end gap-2 pt-1">
-            <button onClick={() => setStage(hasOrders ? 2 : 3)}
-              className="px-3 py-1.5 text-xs rounded bg-amber-600 text-white hover:bg-amber-500">
-              ✓ 변경 대상 확인 — 다음
+          <_TargetChangeCard targetChange={targetChange!} editable
+            onChange={(next) => setUserChange(next)} />
+          <div className="flex justify-end items-center gap-2 pt-1">
+            {(!userChange.before || !userChange.after) && (
+              <span className="text-[10px] text-amber-700">⚠ 변경 전/후 값 입력 필요</span>
+            )}
+            <button
+              onClick={() => setStage(hasOrders ? 2 : 3)}
+              disabled={!userChange.before || !userChange.after}
+              className="px-3 py-1.5 text-xs rounded bg-amber-600 text-white hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed">
+              ✓ 변경 전 {userChange.before || "?"} → 후 {userChange.after || "?"} 로 진행
             </button>
           </div>
         </>
@@ -354,10 +411,28 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
       {/* STAGE 3: 영향 결과 — stage 3 일 때만 표시 */}
       {stage === 3 && (
         <>
+          {hasTarget && (
+            <div className="text-[11px] bg-amber-50 border border-amber-300 rounded p-2 flex items-center gap-2">
+              <span>🔄</span>
+              <span>
+                <code className="bg-white px-1.5 py-0.5 rounded border border-amber-200 text-amber-900">
+                  {String(targetChange!.table)}.{String(targetChange!.column)}
+                </code>
+                {" "}을(를){" "}
+                <code className="bg-red-50 px-1 rounded text-red-700">{userChange.before || "?"}</code>
+                <span className="mx-1 text-gray-400">→</span>
+                <code className="bg-emerald-50 px-1 rounded text-emerald-700 font-bold">{userChange.after || "?"}</code>
+                {" "}변경 시 영향
+              </span>
+              <button onClick={() => setStage(1)} className="ml-auto text-[10px] text-amber-700 hover:underline">
+                ← 값 다시 입력
+              </button>
+            </div>
+          )}
           {pickedOrder && (
             <div className="text-[11px] bg-sky-50 border border-sky-200 rounded p-2 flex items-center gap-2">
               <span>📦</span>
-              <span><strong className="text-sky-800">{pickedOrder}</strong> 주문 기준으로 영향 분석 결과를 표시합니다.</span>
+              <span><strong className="text-sky-800">{pickedOrder}</strong> 주문 기준으로 분석</span>
               <button onClick={() => setStage(2)} className="ml-auto text-[10px] text-sky-700 hover:underline">
                 ← 다른 주문 선택
               </button>
