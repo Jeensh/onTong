@@ -172,7 +172,7 @@ def generate_suggestions(*, n_per_intent: int = 2, seed: int | None = None) -> l
             out.append(SuggestedQuestion(
                 intent="simulate",
                 label=f"①다중Slab ({orders[1][-4:]})",
-                query=f"{orders[1]} 주문 (다중 슬랩 시나리오) Slab 설계 돌려봐",
+                query=f"{orders[1]} 주문 (다중 Slab 시나리오) Slab 설계 돌려봐",
                 rationale=f"seed ORDER_OS.{orders[1]}",
             ))
 

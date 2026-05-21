@@ -63,20 +63,71 @@ function _SimulateView({ payload }: { payload: Record<string, unknown> }) {
 
   return (
     <>
-      <div className="text-[11px] text-gray-700">
-        실행 결과 {results.length}건 · invariant <code className="text-emerald-700">{invariant ?? "?"}</code>
+      <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-lg p-3">
+        <div className="text-[10px] uppercase tracking-wide opacity-80">시뮬레이션 실행 결과</div>
+        <div className="text-sm font-semibold mt-0.5 flex items-center justify-between">
+          <span>{results.length} case 실행</span>
+          <span className={
+            "text-xs px-2 py-0.5 rounded " + (
+              invariant === "all_pass" ? "bg-emerald-200 text-emerald-900" :
+              invariant === "some_fail" ? "bg-red-200 text-red-900" :
+              "bg-white/20"
+            )
+          }>invariant: {invariant ?? "?"}</span>
+        </div>
       </div>
-      <div className="space-y-1 max-h-48 overflow-y-auto">
-        {results.slice(0, 5).map((r, i) => (
-          <pre key={i} className="text-[10px] bg-gray-50 border border-gray-200 rounded p-2 overflow-x-auto">
-            {JSON.stringify(r, null, 2).slice(0, 600)}
-          </pre>
-        ))}
+
+      <div className="space-y-2 max-h-64 overflow-y-auto">
+        {results.map((r, i) => {
+          const fixtureId = String(r.fixture_id ?? `case_${i}`);
+          const ok = !r.error;
+          return (
+            <div key={i} className={
+              "border rounded p-2 " +
+              (ok ? "border-emerald-200 bg-emerald-50/40" : "border-red-200 bg-red-50/40")
+            }>
+              <div className="flex items-center gap-2 mb-1">
+                <span className={
+                  "text-[10px] px-1.5 py-0.5 rounded font-semibold " +
+                  (ok ? "bg-emerald-600 text-white" : "bg-red-600 text-white")
+                }>{ok ? "PASS" : "FAIL"}</span>
+                <code className="text-[10px] text-gray-700">{fixtureId}</code>
+              </div>
+              {r.input ? (
+                <details className="text-[10px]">
+                  <summary className="cursor-pointer text-gray-600">input 보기</summary>
+                  <pre className="bg-white border border-gray-200 rounded p-1.5 mt-1 overflow-x-auto">
+                    {JSON.stringify(r.input, null, 2).slice(0, 300)}
+                  </pre>
+                </details>
+              ) : null}
+              {r.output_value !== undefined && r.output_value !== null && (
+                <div className="mt-1 text-[10px]">
+                  <span className="text-gray-500">output: </span>
+                  <code className="font-mono text-emerald-700">
+                    {typeof r.output_value === "object"
+                      ? JSON.stringify(r.output_value).slice(0, 120)
+                      : String(r.output_value)}
+                  </code>
+                </div>
+              )}
+              {Boolean(r.error) && (
+                <div className="mt-1 text-[10px] text-red-700">⚠ {String(r.error)}</div>
+              )}
+            </div>
+          );
+        })}
+        {results.length === 0 && (
+          <div className="text-[10px] text-gray-400 italic">실행 결과 없음 — bundle 합성/실행이 빈 결과 반환</div>
+        )}
       </div>
+
       {baselineDiff && (
         <div className="border border-amber-200 bg-amber-50 rounded p-2">
-          <div className="text-[11px] text-amber-800 mb-1">baseline diff</div>
-          <pre className="text-[10px] overflow-x-auto">{JSON.stringify(baselineDiff, null, 2).slice(0, 600)}</pre>
+          <div className="text-[11px] text-amber-800 font-semibold mb-1">baseline diff</div>
+          <pre className="text-[10px] overflow-x-auto text-gray-800">
+            {JSON.stringify(baselineDiff, null, 2).slice(0, 600)}
+          </pre>
         </div>
       )}
     </>
@@ -87,8 +138,12 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
   const methods = (payload.affected_methods as Array<Record<string, unknown>> | undefined) ?? [];
   const findings = (payload.sim_v2_findings as Array<Record<string, unknown>> | undefined) ?? [];
   const confidence = (payload.confidence as number | undefined) ?? 0;
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const detectedTerms = (payload._detected_terms as Array<Record<string, unknown>> | undefined) ?? [];
+  const targetChange = payload._target_change as Record<string, unknown> | undefined;
+  const affectedOrders = (payload._affected_orders as Array<Record<string, unknown>> | undefined) ?? [];
+  const affectedRules = (payload._affected_rules as Array<Record<string, unknown>> | undefined) ?? [];
 
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggle = (fqn: string) => {
     setExpanded((s) => {
       const n = new Set(s);
@@ -99,58 +154,151 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
 
   return (
     <>
-      <div className="text-[11px] text-gray-700 bg-amber-50 border border-amber-200 rounded p-2">
-        영향받는 method {methods.length}건 · sim_v2 findings {findings.length}건 · confidence {confidence.toFixed(2)}
-        <div className="text-[10px] text-amber-700 mt-1">
-          행을 클릭하면 코드 본문 + 호출/피호출 1-hop 이 확장됩니다.
+      {/* SECTION 0: 감지된 ontology 용어 */}
+      {detectedTerms.length > 0 && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded p-2 text-[11px]">
+          <div className="font-semibold text-emerald-700 mb-1">감지된 ontology 용어</div>
+          <div className="flex flex-wrap gap-1">
+            {detectedTerms.map((t, i) => (
+              <span key={i} className="px-1.5 py-0.5 bg-white border border-emerald-300 rounded font-mono text-[10px]">
+                {String(t.token)} → {String(t.label)}{" "}
+                <code className="text-emerald-700">{String(t.term_fqn)}</code>
+              </span>
+            ))}
+          </div>
         </div>
-      </div>
-      <div className="max-h-[400px] overflow-y-auto border border-gray-200 rounded">
-        <table className="w-full text-[11px] border-collapse">
-          <thead className="sticky top-0">
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left p-1.5 w-6"></th>
-              <th className="text-left p-1.5 text-gray-600">method_fqn</th>
-              <th className="text-left p-1.5 text-gray-600">via</th>
-              <th className="text-right p-1.5 text-gray-600">score</th>
-            </tr>
-          </thead>
-          <tbody>
-            {methods.slice(0, 50).map((m) => {
-              const fqn = String(m.method_fqn);
-              const isOpen = expanded.has(fqn);
-              return (
-                <>
-                  <tr
-                    key={fqn}
-                    className="border-b border-gray-100 hover:bg-amber-50/40 cursor-pointer"
-                    onClick={() => toggle(fqn)}
-                  >
-                    <td className="p-1.5 text-gray-400">
-                      {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                    </td>
-                    <td className="p-1.5 font-mono text-gray-800 truncate max-w-[260px]" title={fqn}>
-                      {fqn.split(".").slice(-2).join(".")}
-                    </td>
-                    <td className="p-1.5 text-gray-500">{String(m.via ?? "—")}</td>
-                    <td className="p-1.5 text-right text-gray-700">{Number(m.score ?? 0).toFixed(2)}</td>
-                  </tr>
-                  {isOpen && (
-                    <tr key={`${fqn}-body`} className="border-b border-amber-100">
-                      <td colSpan={4} className="p-0">
-                        <_MethodBodyRow fqn={fqn} onJumpTo={(f) => { toggle(f); }} />
+      )}
+
+      {/* SECTION 1: 감지된 변경 대상 (table.column + before/after) */}
+      {targetChange && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded p-3">
+          <div className="text-[10px] uppercase text-amber-700 font-semibold mb-1">변경 대상</div>
+          <div className="grid grid-cols-3 gap-2 text-[11px]">
+            <div>
+              <div className="text-gray-500 text-[10px]">target</div>
+              <code className="font-mono text-amber-900">{String(targetChange.table)}.{String(targetChange.column)}</code>
+            </div>
+            <div>
+              <div className="text-gray-500 text-[10px]">변경 전</div>
+              <code className="font-mono text-gray-700">{String(targetChange.before ?? "?")}</code>
+            </div>
+            <div>
+              <div className="text-gray-500 text-[10px]">변경 후</div>
+              <code className="font-mono text-red-700 font-bold">{String(targetChange.after ?? "?")}</code>
+            </div>
+          </div>
+          {Boolean(targetChange.note) && (
+            <div className="text-[10px] text-gray-600 mt-1">{String(targetChange.note)}</div>
+          )}
+        </div>
+      )}
+
+      {/* SECTION 2: 영향받는 코드 */}
+      <div className="border border-gray-200 rounded">
+        <div className="px-2 py-1.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between text-[11px]">
+          <strong>영향받는 코드 (method) {methods.length}건</strong>
+          <span className="text-[10px] text-gray-500">confidence {confidence.toFixed(2)} · 행 click → 본문</span>
+        </div>
+        <div className="max-h-72 overflow-y-auto">
+          <table className="w-full text-[11px] border-collapse">
+            <thead className="sticky top-0">
+              <tr className="bg-gray-50/95 border-b border-gray-200">
+                <th className="text-left p-1.5 w-6"></th>
+                <th className="text-left p-1.5 text-gray-600">method (class.name)</th>
+                <th className="text-left p-1.5 text-gray-600">via</th>
+                <th className="text-right p-1.5 text-gray-600">distance</th>
+                <th className="text-right p-1.5 text-gray-600">strength</th>
+              </tr>
+            </thead>
+            <tbody>
+              {methods.slice(0, 50).map((m) => {
+                const fqn = String(m.fqn ?? "");
+                if (!fqn) return null;
+                const isOpen = expanded.has(fqn);
+                return (
+                  <>
+                    <tr
+                      key={fqn}
+                      className="border-b border-gray-100 hover:bg-amber-50/40 cursor-pointer"
+                      onClick={() => toggle(fqn)}
+                    >
+                      <td className="p-1.5 text-gray-400">
+                        {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                      </td>
+                      <td className="p-1.5 font-mono text-gray-800 truncate max-w-[280px]" title={fqn}>
+                        {fqn.split(".").slice(-2).join(".").replace(/\(.*\)/, "")}
+                      </td>
+                      <td className="p-1.5 text-gray-500">{String(m.via ?? "—")}</td>
+                      <td className="p-1.5 text-right text-gray-500">{String(m.distance ?? "—")}</td>
+                      <td className="p-1.5 text-right text-gray-700 font-mono">
+                        {Number(m.strength ?? 0).toFixed(2)}
                       </td>
                     </tr>
-                  )}
-                </>
-              );
-            })}
-          </tbody>
-        </table>
+                    {isOpen && (
+                      <tr key={`${fqn}-body`} className="border-b border-amber-100">
+                        <td colSpan={5} className="p-0">
+                          <_MethodBodyRow fqn={fqn} onJumpTo={(f) => { toggle(f); }} />
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
+              {methods.length === 0 && (
+                <tr><td colSpan={5} className="p-2 text-gray-400 text-[10px]">영향받는 method 없음</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      {/* SECTION 3: 영향받는 룰 */}
+      {affectedRules.length > 0 && (
+        <div className="border border-rose-200 bg-rose-50/40 rounded p-2">
+          <div className="text-[11px] font-semibold text-rose-800 mb-1">영향받는 business rules ({affectedRules.length})</div>
+          <ul className="text-[10px] space-y-1 max-h-32 overflow-y-auto">
+            {affectedRules.slice(0, 6).map((r, i) => (
+              <li key={i} className="text-gray-700">
+                <code className="bg-rose-100 px-1 rounded text-[9px]">{String(r.severity ?? "?")}</code>
+                <code className="text-rose-700 ml-1">{String(r.fqn ?? "")}</code>
+                <div className="text-gray-600 ml-3">{String(r.statement ?? "")}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* SECTION 4: 영향받는 주문 */}
+      {affectedOrders.length > 0 && (
+        <div className="border border-sky-200 bg-sky-50/40 rounded p-2">
+          <div className="text-[11px] font-semibold text-sky-800 mb-1">매칭 주문 ({affectedOrders.length}건)</div>
+          <table className="w-full text-[10px]">
+            <thead><tr className="border-b border-sky-200">
+              <th className="text-left p-0.5">ORDER_NO</th>
+              <th className="text-left p-0.5">GRADE</th>
+              <th className="text-left p-0.5">PRODUCT</th>
+              <th className="text-right p-0.5">WIDTH</th>
+              <th className="text-right p-0.5">PEND_QTY</th>
+            </tr></thead>
+            <tbody>
+              {affectedOrders.slice(0, 10).map((o, i) => (
+                <tr key={i} className="border-b border-sky-100">
+                  <td className="p-0.5 font-mono">{String(o.ORDER_NO ?? "")}</td>
+                  <td className="p-0.5 font-mono">{String(o.GRADE_CD ?? "")}</td>
+                  <td className="p-0.5 font-mono">{String(o.PRODUCT_CD ?? "")}</td>
+                  <td className="p-0.5 font-mono text-right">{String(o.ORDER_WIDTH ?? "")}</td>
+                  <td className="p-0.5 font-mono text-right">{String(o.DESIGN_PEND_QTY ?? "")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* SECTION 5: sim_v2 findings (technical) */}
       {findings.length > 0 && (
         <details className="text-[11px]">
-          <summary className="cursor-pointer text-gray-600">sim_v2 findings {findings.length}건</summary>
+          <summary className="cursor-pointer text-gray-600">sim_v2 findings ({findings.length})</summary>
           <ul className="mt-2 space-y-1">
             {findings.slice(0, 5).map((f, i) => (
               <li key={i} className="text-gray-700">
@@ -258,60 +406,109 @@ function _MethodBodyRow({ fqn, onJumpTo }: { fqn: string; onJumpTo: (f: string) 
   );
 }
 
-/** locate — VSCode 스타일 파일 트리 + 코드 viewer. */
+/** locate — VSCode 스타일 위치 list + 클릭 시 본문 expand. */
 function _LocateView({ payload }: { payload: Record<string, unknown> }) {
   const target = payload.target as Record<string, unknown> | undefined;
   const body = (payload.body as string | undefined) ?? "";
   const summary = payload.summary as string | undefined;
+  const callers = (payload.callers as Array<Record<string, unknown>> | undefined) ?? [];
+  const rules = (payload.business_rules as Array<Record<string, unknown>> | undefined) ?? [];
   const fqn = String(target?.code_method_fqn ?? "");
 
-  // FQN → file tree path 추출 (com.example.x.y.Class.method → com/example/x/y/Class.java)
-  const classPart = fqn.split("(")[0].split(".").slice(0, -1).join(".");
-  const pkgs = classPart.split(".");
-  const className = pkgs.pop() ?? "";
-  const filePath = pkgs.join("/") + "/" + className + ".java";
+  // 위치 list — primary target + callers
+  type Match = { fqn: string; primary?: boolean };
+  const matches: Match[] = [];
+  if (fqn) matches.push({ fqn, primary: true });
+  for (const c of callers) {
+    const f = String(c.method_fqn ?? c);
+    if (f && f !== fqn) matches.push({ fqn: f });
+  }
+
+  const [activeFqn, setActiveFqn] = useState<string>(fqn);
+  const [activeBody, setActiveBody] = useState<string>(body);
+
+  // 다른 위치 click → /method/body 조회
+  async function pickLocation(targetFqn: string, primary?: boolean) {
+    if (targetFqn === activeFqn) return;
+    setActiveFqn(targetFqn);
+    if (primary) {
+      setActiveBody(body);
+      return;
+    }
+    try {
+      setActiveBody("");
+      const r = await simulationApi.methodBody(targetFqn);
+      setActiveBody(r.body || "(본문 없음 — ontology 응답 비어있음)");
+    } catch (e) {
+      setActiveBody(`로드 실패: ${String(e)}`);
+    }
+  }
+
+  const filePathOf = (f: string) => {
+    const cls = f.split("(")[0].split(".").slice(0, -1).join(".");
+    return cls.replace(/\./g, "/") + ".java";
+  };
 
   return (
     <>
       <div className="text-[11px] text-sky-800 bg-sky-50 border border-sky-200 rounded p-2 flex items-center gap-2">
         <span>🔍</span>
-        <span>{summary || "코드 위치 검색 결과"}</span>
+        <span>{summary || "코드 위치 검색 결과"} · {matches.length} 위치</span>
       </div>
 
-      <div className="grid grid-cols-[200px_1fr] gap-2 border border-gray-300 rounded overflow-hidden">
-        {/* 좌: 파일 트리 */}
-        <div className="bg-slate-50 border-r border-gray-200 p-2 text-[10px]">
-          <div className="text-gray-500 uppercase tracking-wide mb-1">파일 트리</div>
-          <div className="font-mono space-y-0.5">
-            {pkgs.map((seg, i) => (
-              <div key={i} style={{ paddingLeft: i * 8 }} className="text-gray-600">
-                📁 {seg}
-              </div>
-            ))}
-            <div style={{ paddingLeft: pkgs.length * 8 }} className="text-sky-700 font-semibold">
-              📄 {className}.java
-            </div>
-            <div style={{ paddingLeft: (pkgs.length + 1) * 8 }} className="text-emerald-700">
-              ⚡ {fqn.split(".").pop()?.split("(")[0]}
-            </div>
+      <div className="grid grid-cols-[240px_1fr] gap-2 border border-gray-300 rounded overflow-hidden">
+        {/* 좌: 위치 list */}
+        <div className="bg-slate-50 border-r border-gray-200 max-h-80 overflow-y-auto">
+          <div className="px-2 py-1 bg-slate-100 text-[10px] text-gray-600 uppercase tracking-wide border-b border-gray-200">
+            매칭 위치 ({matches.length})
           </div>
+          <ul className="text-[10px]">
+            {matches.map((m, i) => (
+              <li key={m.fqn}>
+                <button
+                  onClick={() => pickLocation(m.fqn, m.primary)}
+                  className={
+                    "w-full text-left px-2 py-1.5 border-b border-gray-100 hover:bg-sky-50 font-mono " +
+                    (m.fqn === activeFqn ? "bg-sky-100 border-l-2 border-l-sky-500" : "")
+                  }
+                  title={m.fqn}
+                >
+                  <div className="text-sky-800 font-semibold truncate">
+                    {m.primary ? "⚡ " : "↑ "}
+                    {m.fqn.split(".").pop()?.split("(")[0]}
+                  </div>
+                  <div className="text-gray-500 truncate text-[9px]">{filePathOf(m.fqn)}</div>
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
 
-        {/* 우: 코드 본문 */}
+        {/* 우: 활성 위치의 코드 본문 */}
         <div className="bg-white">
           <div className="px-2 py-1 bg-gray-50 border-b border-gray-200 text-[10px] flex items-center justify-between">
-            <code className="text-gray-700">{filePath}</code>
-            <span className="text-gray-400">{body.split("\n").length} lines</span>
+            <code className="text-gray-700">{filePathOf(activeFqn)}</code>
+            <span className="text-gray-400">{activeBody.split("\n").length} lines</span>
           </div>
-          <pre className="p-2 text-[10px] max-h-72 overflow-auto text-gray-800 font-mono leading-relaxed">
-            {body || "(코드 본문 없음)"}
+          <pre className="p-2 text-[10px] max-h-80 overflow-auto text-gray-800 font-mono leading-relaxed">
+            {activeBody || "(좌측 위치 선택 — 클릭 시 본문 로드)"}
           </pre>
         </div>
       </div>
 
-      <div className="text-[10px] text-gray-500">
-        💡 좌측 패키지 경로 클릭 시 다른 위치로 이동하는 기능은 후속 작업 예정.
-      </div>
+      {rules.length > 0 && (
+        <div className="border border-rose-200 bg-rose-50/40 rounded p-2">
+          <div className="text-[11px] font-semibold text-rose-700 mb-1">관련 business rules ({rules.length})</div>
+          <ul className="text-[10px] space-y-0.5">
+            {rules.slice(0, 5).map((r, i) => (
+              <li key={i}>
+                <code className="bg-rose-100 px-1 rounded text-[9px]">{String(r.severity ?? "?")}</code>
+                <span className="ml-1 text-gray-700">{String(r.statement ?? "")}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </>
   );
 }

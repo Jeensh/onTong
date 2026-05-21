@@ -362,6 +362,11 @@ async def _proceed_from_target(
                 "sim_v2_findings": [],
                 "sources": [],
             }
+        # 풍부화 — 사용자 질문에서 변경 대상·매칭 주문·관련 룰 추출
+        try:
+            _enrich_impact_payload(payload, user_query=user_query or "", repo_id=repo_id)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("impact payload 풍부화 실패: %s", e)
     elif intent in ("locate", "explain"):
         try:
             look = await build_executed_lookup(
@@ -522,6 +527,159 @@ async def start(
             else f"intent={intent} · 후보 {len(payload.get('candidates', []))} 건"
         ),
     )
+
+
+def _enrich_impact_payload(payload: dict, *, user_query: str, repo_id: str) -> None:
+    """impact intent 의 payload 에 (detected_terms, target_change, affected_orders,
+    affected_rules) 를 in-place 추가.
+
+    user_query 에서:
+      - table 이름 / 한국어 alias 매칭 (CAST_SPEC, ORDER_OS, EDGING_GROUP 등)
+      - column 키워드 (두께/단중/폭/길이)
+      - 변경값 패턴 ("240으로 변경", "0.5→0.3")
+      - 매칭 주문 (column 값이 일치하는 ORDER_*) + business_rules
+    """
+    import re, json as _json
+    from sqlalchemy import select
+    from backend.modeling.persistence.database import session_scope
+    from backend.modeling.domain_layer.orm import BusinessRuleRow
+
+    # 1) detected_terms (이미 _build_target_payload 에서 추가됐을 수도 있음)
+    if "_detected_terms" not in payload:
+        from backend.section3.agents.simulation.suggested_questions import (
+            extract_korean_tokens, lookup_terms,
+        )
+        toks = extract_korean_tokens(user_query)
+        detected = lookup_terms(toks, repo_id=repo_id)
+        payload["_detected_terms"] = [
+            {"token": d.token, "term_fqn": d.term_fqn, "label": d.label, "definition": d.definition}
+            for d in detected
+        ]
+
+    # 2) target_change — table.column + before/after 추출
+    # 한국어 alias → table.column 가벼운 매핑
+    TBL_ALIAS = {
+        "연주설비사양": ("CAST_SPEC", "SLAB_THICKNESS"),
+        "연주설비사양기준": ("CAST_SPEC", "SLAB_THICKNESS"),
+        "열연사양": ("HR_SPEC", None),
+        "EDGING": ("EDGING_GROUP", None),
+        "edging": ("EDGING_GROUP", None),
+        "단중하한": ("HR_MIN_WGT", "MIN_WGT"),
+        "단중상한": ("HR_MAX_WGT", "MAX_WGT"),
+        "실수율": ("SD_PRODUCTIVITY_STD", "PRODUCTIVITY"),
+        "productivity": ("SD_PRODUCTIVITY_STD", "PRODUCTIVITY"),
+        "고객표준": ("CUSTOMER_STD", None),
+    }
+    COL_ALIAS = {
+        "두께": "SLAB_THICKNESS",
+        "단중": "WGT",       # 어느 wgt 인지는 컨텍스트
+        "폭": "WIDTH",
+        "길이": "LENGTH",
+    }
+    target_table: str | None = None
+    target_column: str | None = None
+    target_product: str | None = None
+    for kw, (tbl, col) in TBL_ALIAS.items():
+        if kw in user_query:
+            target_table = tbl
+            target_column = col
+            break
+    for kw, col in COL_ALIAS.items():
+        if kw in user_query and target_column is None:
+            target_column = col
+            break
+    # 제품 분기 (COIL / FS)
+    m_prod = re.search(r"\b(COIL|FS)\b", user_query)
+    if m_prod:
+        target_product = m_prod.group(1)
+    # 변경값 — "240 으로", "0.5 → 0.3", "0.95 배"
+    after_val: str | None = None
+    before_val: str | None = None
+    m_change = re.search(r"(\d+(?:\.\d+)?)\s*(?:으?로|→|->)\s*변경?", user_query)
+    if m_change:
+        after_val = m_change.group(1)
+    if not after_val:
+        m_arrow = re.search(r"(\d+(?:\.\d+)?)\s*(?:→|->)\s*(\d+(?:\.\d+)?)", user_query)
+        if m_arrow:
+            before_val = m_arrow.group(1); after_val = m_arrow.group(2)
+    if not after_val:
+        m_for = re.search(r"(\d+(?:\.\d+)?)\s*으?로", user_query)
+        if m_for:
+            after_val = m_for.group(1)
+    # 현재값 — seed 에서 first row
+    if target_table and target_column and before_val is None:
+        try:
+            rows = domain_data.list_rows(target_table, limit=20)
+            for r in rows:
+                v = r.values.get(target_column)
+                if target_product and r.values.get("PRODUCT_CD") not in (target_product, None):
+                    continue
+                if v is not None:
+                    before_val = str(v); break
+        except Exception:
+            pass
+    if target_table or target_column or after_val:
+        payload["_target_change"] = {
+            "table": target_table or "?", "column": target_column or "?",
+            "before": before_val, "after": after_val,
+            "product": target_product,
+            "note": "자연어에서 추출. 정확하지 않을 수 있으니 확인 필요." if not (target_table and target_column and after_val) else "",
+        }
+
+    # 3) 매칭 주문 — seed ORDER_OM × ORDER_QD join, target_product / target_term 기반
+    matched_orders: list[dict] = []
+    try:
+        om_rows = domain_data.list_rows("ORDER_OM", limit=50)
+        qd_rows_by_order: dict[str, dict] = {}
+        for q in domain_data.list_rows("ORDER_QD", limit=50):
+            qno = str(q.values.get("ORDER_NO"))
+            qd_rows_by_order[qno] = q.values
+        for om in om_rows:
+            v = om.values
+            order_no = str(v.get("ORDER_NO"))
+            qd = qd_rows_by_order.get(order_no, {})
+            if target_product and v.get("PRODUCT_CD") != target_product:
+                continue
+            matched_orders.append({
+                "ORDER_NO": order_no,
+                "GRADE_CD": qd.get("GRADE_CD"),
+                "PRODUCT_CD": v.get("PRODUCT_CD"),
+                "ORDER_WIDTH": v.get("ORDER_WIDTH"),
+                "ORDER_LENGTH": v.get("ORDER_LENGTH"),
+                "DESIGN_PEND_QTY": v.get("DESIGN_PEND_QTY"),
+            })
+    except Exception:
+        pass
+    if matched_orders:
+        payload["_affected_orders"] = matched_orders
+
+    # 4) 관련 business_rules — detected_term 의 fqn 이 terms_ref_json 안에 있으면
+    detected_fqns: set[str] = set()
+    for d in payload.get("_detected_terms") or []:
+        fqn = (d.get("term_fqn") or "").strip()
+        if fqn: detected_fqns.add(fqn)
+    rules: list[dict] = []
+    if detected_fqns:
+        try:
+            with session_scope() as s:
+                rows = s.execute(
+                    select(BusinessRuleRow).where(BusinessRuleRow.repo_id == repo_id)
+                ).scalars().all()
+                for r in rows:
+                    try:
+                        refs = _json.loads(r.terms_ref_json or "[]")
+                    except Exception:
+                        refs = []
+                    if any(f in detected_fqns for f in refs):
+                        rules.append({
+                            "fqn": r.fqn, "severity": r.severity,
+                            "statement": (r.statement or "")[:200],
+                        })
+                        if len(rules) >= 6: break
+        except Exception:
+            pass
+    if rules:
+        payload["_affected_rules"] = rules
 
 
 async def _execute_hypothesis_from_query(

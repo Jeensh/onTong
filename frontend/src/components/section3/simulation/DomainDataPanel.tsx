@@ -18,7 +18,7 @@ const CATEGORY_COLOR: Record<string, string> = {
   other:   "border-gray-300 bg-gray-50 text-gray-700",
 };
 const CATEGORY_LABEL: Record<string, string> = {
-  std: "기준 데이터", order: "주문", result: "슬랩 결과", history: "이력", other: "기타",
+  std: "기준 데이터", order: "주문", result: "Slab 결과", history: "이력", other: "기타",
 };
 
 export function DomainDataPanel() {

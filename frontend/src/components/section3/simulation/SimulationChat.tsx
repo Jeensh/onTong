@@ -14,6 +14,7 @@ import { BundlePreviewCard } from "./BundlePreviewCard";
 import { ExecutedResultCard } from "./ExecutedResultCard";
 import { OntologyGraphPanel } from "./OntologyGraphPanel";
 import { DomainDataPanel } from "./DomainDataPanel";
+import { DetectedTermsPanel } from "./DetectedTermsPanel";
 
 interface Props {
   initialSid: string | null;
@@ -59,6 +60,7 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
   const [presets, setPresets] = useState<SuggestedQuestionView[] | null>(null);
   const [detectedTerms, setDetectedTerms] = useState<DetectedTermView[]>([]);
   const [presetSeed, setPresetSeed] = useState(0);
+  const [presetCat, setPresetCat] = useState<string>("simulate");
 
   // backend 의 동적 예시 질문 로드
   useEffect(() => {
@@ -178,57 +180,90 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {!sid && (
-            <div className="text-sm text-gray-500 leading-relaxed">
-              <div className="flex items-center justify-end mb-2">
-                <button
-                  onClick={() => setPresetSeed((s) => s + 1)}
-                  className="text-[10px] text-gray-400 hover:text-emerald-700"
-                  title="다른 예시 set"
-                >
-                  ↻ 다른 예시
-                </button>
+          {!sid && (() => {
+            const allQs = presets ?? FALLBACK_PRESETS.map((p) => ({ ...p, rationale: "", grounded_terms: [] }));
+            const byCat: Record<string, typeof allQs> = {};
+            for (const q of allQs) (byCat[q.intent] ||= []).push(q);
+            const CATS: { id: string; label: string; emoji: string; desc: string }[] = [
+              { id: "simulate",   label: "시뮬레이션",  emoji: "🧪", desc: "주문/액션을 실제 돌려보고 결과 확인" },
+              { id: "impact",     label: "영향도 분석", emoji: "⚡", desc: "기준/로직 변경 시 영향 범위 추적" },
+              { id: "locate",     label: "위치 찾기",   emoji: "🔍", desc: "코드/룰의 정확한 파일·라인" },
+              { id: "explain",    label: "설명",        emoji: "💬", desc: "도메인 용어/로직의 자연어 답변" },
+              { id: "hypothesis", label: "가설 검증",   emoji: "🔮", desc: "신규 X 추가/변경 시 결과 추론" },
+            ];
+            const catQs = byCat[presetCat] ?? [];
+            return (
+              <div className="text-sm text-gray-500 leading-relaxed">
+                {/* 카테고리 탭 */}
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {CATS.map((c) => {
+                    const n = byCat[c.id]?.length ?? 0;
+                    const active = c.id === presetCat;
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => setPresetCat(c.id)}
+                        className={
+                          "px-2 py-1.5 rounded border text-xs flex items-center gap-1 transition " +
+                          (active
+                            ? "border-emerald-500 bg-emerald-50 text-emerald-800 font-semibold"
+                            : "border-gray-200 text-gray-600 hover:border-emerald-300 hover:bg-emerald-50/40")
+                        }
+                        title={c.desc}
+                      >
+                        <span>{c.emoji}</span>
+                        <span>{c.label}</span>
+                        {n > 0 && <span className="text-[9px] px-1 rounded bg-gray-100 text-gray-600">{n}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center justify-between mb-2 text-[10px]">
+                  <span className="text-gray-500">
+                    {CATS.find((c) => c.id === presetCat)?.desc}
+                  </span>
+                  <button
+                    onClick={() => setPresetSeed((s) => s + 1)}
+                    className="text-gray-400 hover:text-emerald-700"
+                    title="다른 예시 set"
+                  >
+                    ↻ 다른 예시
+                  </button>
+                </div>
+                <ul className="mt-1 space-y-1.5">
+                  {catQs.length === 0 && (
+                    <li className="text-[11px] text-gray-400 italic">이 카테고리의 예시가 없습니다 — ↻ 다른 예시</li>
+                  )}
+                  {catQs.map((q) => (
+                    <li key={q.query}>
+                      <button
+                        onClick={() => setQuery(q.query)}
+                        className="text-left text-xs px-2 py-1.5 rounded border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50 w-full"
+                      >
+                        <span className="text-gray-400 mr-1.5">{q.label}</span>
+                        <span className="text-gray-800">{q.query.length > 100 ? q.query.slice(0, 100) + "..." : q.query}</span>
+                        {q.grounded_terms.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {q.grounded_terms.slice(0, 3).map((t) => (
+                              <span key={t.term_fqn} className="text-[9px] px-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                {t.token}→{t.label}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <ul className="mt-1 space-y-1.5">
-                {(presets ?? FALLBACK_PRESETS.map((p) => ({ ...p, rationale: "", grounded_terms: [] }))).map((q) => (
-                  <li key={q.query}>
-                    <button
-                      onClick={() => setQuery(q.query)}
-                      className="text-left text-xs px-2 py-1.5 rounded border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50 w-full"
-                    >
-                      <span className="text-gray-400 mr-1.5">{q.label}</span>
-                      <span className="text-gray-800">{q.query.length > 100 ? q.query.slice(0, 100) + "..." : q.query}</span>
-                      {q.grounded_terms.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {q.grounded_terms.slice(0, 3).map((t) => (
-                            <span key={t.term_fqn} className="text-[9px] px-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              {t.token}→{t.label}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+            );
+          })()}
 
-          {/* 사용자 입력 중 실시간 ontology 용어 매핑 표시 */}
+          {/* 사용자 입력 중 실시간 ontology 용어 매핑 표시 — 좌측 chat 안 짧은 hint */}
           {!sid && detectedTerms.length > 0 && (
-            <div className="text-[10px] border border-emerald-200 bg-emerald-50/40 rounded p-2">
-              <div className="text-emerald-700 font-semibold mb-1">감지된 ontology 용어 ({detectedTerms.length})</div>
-              <ul className="space-y-0.5">
-                {detectedTerms.slice(0, 6).map((t) => (
-                  <li key={t.term_fqn} className="flex items-baseline gap-1">
-                    <code className="text-emerald-800">{t.token}</code>
-                    <span className="text-gray-400">→</span>
-                    <span className="text-gray-800">{t.label}</span>
-                    <code className="text-gray-400 ml-1">{t.term_fqn}</code>
-                    {t.definition && <span className="text-gray-500 ml-1 truncate">— {t.definition.slice(0, 60)}</span>}
-                  </li>
-                ))}
-              </ul>
+            <div className="text-[10px] flex items-center gap-1 text-fuchsia-700">
+              <span className="animate-pulse">🎯</span>
+              <span>우측 패널에 {detectedTerms.length}개 ontology 용어 감지됨</span>
             </div>
           )}
 
@@ -340,6 +375,12 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
 
       {/* ─────────── 우측 ontology graph ─────────── */}
       <div className="flex flex-col h-full overflow-hidden bg-white p-3 gap-3">
+        <DetectedTermsPanel
+          detected={detectedTerms}
+          fromSession={
+            (replay?.decisions?.[replay?.decisions?.length - 1]?.payload?._detected_terms as DetectedTermView[] | undefined) ?? []
+          }
+        />
         <OntologyGraphPanel sessionId={sid} refreshKey={replay?.decisions.length ?? 0} />
         <DomainDataPanel />
       </div>
