@@ -613,10 +613,18 @@ def _enrich_impact_payload(payload: dict, *, user_query: str, repo_id: str) -> N
     target_table: str | None = None
     target_column: str | None = None
     target_product: str | None = None
+    # 1) 직접 table 이름 (대문자 영문)
+    for t in domain_data.list_tables():
+        if t.table_name in user_query:
+            target_table = t.table_name
+            break
+    # 2) 한국어 alias 매칭
     for kw, (tbl, col) in TBL_ALIAS.items():
         if kw in user_query:
-            target_table = tbl
-            target_column = col
+            if target_table is None:
+                target_table = tbl
+            if col:
+                target_column = col
             break
     for kw, col in COL_ALIAS.items():
         if kw in user_query and target_column is None:
@@ -659,6 +667,20 @@ def _enrich_impact_payload(payload: dict, *, user_query: str, repo_id: str) -> N
             "product": target_product,
             "note": "자연어에서 추출. 정확하지 않을 수 있으니 확인 필요." if not (target_table and target_column and after_val) else "",
         }
+        # 기준 테이블의 모든 row 도 함께 surface — 사용자가 어떤 row 의 값을 바꿀지 선택
+        if target_table:
+            try:
+                rows = domain_data.list_rows(target_table, limit=50)
+                payload["_target_table_rows"] = [r.values for r in rows]
+                t_def = domain_data.get_table(target_table)
+                if t_def:
+                    payload["_target_table_meta"] = {
+                        "pk_columns": t_def.pk_columns,
+                        "columns": [c.name for c in t_def.columns],
+                        "description": t_def.description,
+                    }
+            except Exception:
+                pass
 
     # 3) 매칭 주문 — seed ORDER_OM × ORDER_QD join, target_product / target_term 기반
     matched_orders: list[dict] = []

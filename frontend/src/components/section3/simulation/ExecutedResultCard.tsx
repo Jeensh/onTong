@@ -275,13 +275,30 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
   // 변경 대상 없으면 1을 skip, 주문 없으면 2를 skip → 3 직진
   const hasTarget = !!targetChange;
   const hasOrders = affectedOrders.length > 0;
-  const [stage, setStage] = useState<1 | 2 | 3>(hasTarget ? 1 : hasOrders ? 2 : 3);
+  const targetRows = (payload._target_table_rows as Array<Record<string, unknown>> | undefined) ?? [];
+  const targetMeta = payload._target_table_meta as { pk_columns?: string[]; columns?: string[]; description?: string } | undefined;
+  const hasTargetRows = targetRows.length > 0;
+
+  // ── 4-stage flow ──
+  //   1: 기준 row 선택 (해당 table 의 seed rows)
+  //   2: 변경 전·후 입력
+  //   3: 매칭 주문 선택
+  //   4: 영향 결과
+  // hasTargetRows=false 면 stage 1 skip → 2 부터, hasOrders=false 면 stage 3 skip → 4
+  const initialStage: 1 | 2 | 3 | 4 =
+    hasTargetRows ? 1 : hasTarget ? 2 : hasOrders ? 3 : 4;
+  const [stage, setStage] = useState<1 | 2 | 3 | 4>(initialStage);
+  const [pickedRowIdx, setPickedRowIdx] = useState<number | null>(null);
   const [pickedOrder, setPickedOrder] = useState<string | null>(null);
-  // 사용자가 입력한 변경 전·후 (stage 1 에서 editable)
+  // 사용자가 입력한 변경 전·후 (stage 2 에서 editable)
   const [userChange, setUserChange] = useState<{ before: string; after: string }>({
     before: String(targetChange?.before ?? ""),
     after: String(targetChange?.after ?? ""),
   });
+
+  // 선택된 기준 row → before 값 자동 채움
+  const pickedRow = pickedRowIdx !== null ? targetRows[pickedRowIdx] : null;
+  const targetCol = String(targetChange?.column ?? "");
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggle = (fqn: string) => {
@@ -294,14 +311,17 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
 
   // 단계별 안내 stepper
   const stepperLabels = [
-    hasTarget ? "1. 변경 대상 확인" : null,
-    hasOrders ? "2. 매칭 주문 선택" : null,
-    "3. 영향 결과",
+    hasTargetRows ? "1. 기준 row 선택" : null,
+    hasTarget ? "2. 변경 전/후 입력" : null,
+    hasOrders ? "3. 매칭 주문 선택" : null,
+    "4. 영향 결과",
   ].filter(Boolean) as string[];
   const currentStepIdx = (() => {
-    if (stage === 1 && hasTarget) return 0;
-    if (stage === 2 && hasOrders) return hasTarget ? 1 : 0;
-    return stepperLabels.length - 1;
+    let idx = 0;
+    if (hasTargetRows) { if (stage === 1) return idx; idx++; }
+    if (hasTarget) { if (stage === 2) return idx; idx++; }
+    if (hasOrders) { if (stage === 3) return idx; idx++; }
+    return idx;
   })();
 
   return (
@@ -343,27 +363,131 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
         </div>
       )}
 
-      {/* STAGE 1: 변경 대상 확인 — editable */}
-      {stage === 1 && hasTarget && (
-        <>
-          <_TargetChangeCard targetChange={targetChange!} editable
-            onChange={(next) => setUserChange(next)} />
+      {/* STAGE 1: 기준 데이터 row 선택 */}
+      {stage === 1 && hasTargetRows && (
+        <div className="border-2 border-amber-300 bg-amber-50/40 rounded p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">📋</span>
+            <div>
+              <div className="text-[10px] uppercase text-amber-700 font-semibold tracking-wide">기준 데이터 선택</div>
+              <div className="text-sm text-gray-700">
+                <code className="font-mono text-amber-900">{String(targetChange?.table)}</code> 에 어떤 row 의 값을 변경하시겠어요? <strong>{targetRows.length}건</strong> 中 1건 선택
+              </div>
+              {targetMeta?.description && <div className="text-[10px] text-gray-500 mt-0.5">{targetMeta.description}</div>}
+            </div>
+          </div>
+          <div className="max-h-64 overflow-y-auto border border-amber-200 rounded bg-white">
+            <table className="w-full text-[10px]">
+              <thead className="sticky top-0 bg-amber-50">
+                <tr className="border-b border-amber-200">
+                  <th className="p-1.5 w-8"></th>
+                  {/* PK 컬럼 먼저 + 변경 대상 컬럼 */}
+                  {(targetMeta?.columns ?? Object.keys(targetRows[0] ?? {})).slice(0, 7).map((c) => (
+                    <th key={c} className={
+                      "text-left p-1.5 font-mono " + (
+                        targetMeta?.pk_columns?.includes(c) ? "text-amber-700 font-bold" :
+                        c === targetCol ? "text-red-700 font-bold bg-red-50" : "text-gray-600"
+                      )
+                    }>
+                      {targetMeta?.pk_columns?.includes(c) && "🔑 "}
+                      {c === targetCol && "⭐ "}
+                      {c}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {targetRows.map((row, i) => {
+                  const isPicked = i === pickedRowIdx;
+                  return (
+                    <tr key={i}
+                      onClick={() => {
+                        setPickedRowIdx(i);
+                        const cur = row[targetCol];
+                        setUserChange((s) => ({
+                          ...s,
+                          before: cur === null || cur === undefined ? "" : String(cur),
+                        }));
+                      }}
+                      className={
+                        "cursor-pointer border-b border-gray-100 hover:bg-amber-50/60 " +
+                        (isPicked ? "bg-amber-100 ring-1 ring-amber-400" : "")
+                      }>
+                      <td className="p-1.5 text-center">
+                        <input type="radio" checked={isPicked} readOnly className="accent-amber-500" />
+                      </td>
+                      {(targetMeta?.columns ?? Object.keys(row)).slice(0, 7).map((c) => (
+                        <td key={c} className={
+                          "p-1.5 font-mono " + (
+                            c === targetCol ? "text-red-700 font-bold bg-red-50" : "text-gray-800"
+                          )
+                        }>
+                          {row[c] === null || row[c] === undefined
+                            ? <span className="text-gray-300">null</span>
+                            : String(row[c]).length > 18 ? String(row[c]).slice(0, 18) + "…" : String(row[c])}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
           <div className="flex justify-end items-center gap-2 pt-1">
-            {(!userChange.before || !userChange.after) && (
-              <span className="text-[10px] text-amber-700">⚠ 변경 전/후 값 입력 필요</span>
-            )}
-            <button
-              onClick={() => setStage(hasOrders ? 2 : 3)}
-              disabled={!userChange.before || !userChange.after}
+            <button onClick={() => setStage(2)} disabled={pickedRowIdx === null}
               className="px-3 py-1.5 text-xs rounded bg-amber-600 text-white hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed">
-              ✓ 변경 전 {userChange.before || "?"} → 후 {userChange.after || "?"} 로 진행
+              {pickedRowIdx !== null
+                ? `✓ 이 row 의 ${targetCol} 변경하기`
+                : "row 선택 필요"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* STAGE 2: 변경 전·후 값 입력 — editable */}
+      {stage === 2 && hasTarget && (
+        <>
+          {/* 선택된 row 표시 */}
+          {pickedRow && (
+            <div className="text-[10px] bg-amber-50 border border-amber-200 rounded p-2">
+              <div className="text-gray-500 mb-1">선택된 기준 row:</div>
+              <div className="flex flex-wrap gap-1">
+                {(targetMeta?.pk_columns ?? Object.keys(pickedRow).slice(0, 4)).map((c) => (
+                  <span key={c} className="px-1.5 py-0.5 bg-white border border-amber-300 rounded font-mono">
+                    {c}=<strong>{String(pickedRow[c] ?? "")}</strong>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          <_TargetChangeCard
+            targetChange={{
+              ...targetChange!,
+              before: userChange.before || targetChange!.before,
+            }}
+            editable
+            onChange={(next) => setUserChange(next)} />
+          <div className="flex justify-between items-center gap-2 pt-1">
+            {hasTargetRows && (
+              <button onClick={() => setStage(1)} className="text-[10px] text-gray-500 hover:text-gray-700">← 다른 row 선택</button>
+            )}
+            <div className="flex items-center gap-2 ml-auto">
+              {(!userChange.before || !userChange.after) && (
+                <span className="text-[10px] text-amber-700">⚠ 변경 전/후 값 입력 필요</span>
+              )}
+              <button
+                onClick={() => setStage(hasOrders ? 3 : 4)}
+                disabled={!userChange.before || !userChange.after}
+                className="px-3 py-1.5 text-xs rounded bg-amber-600 text-white hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                ✓ 변경 전 {userChange.before || "?"} → 후 {userChange.after || "?"} 로 진행
+              </button>
+            </div>
           </div>
         </>
       )}
 
-      {/* STAGE 2: 매칭 주문 선택 */}
-      {stage === 2 && hasOrders && (
+      {/* STAGE 3: 매칭 주문 선택 */}
+      {stage === 3 && hasOrders && (
         <div className="border-2 border-sky-300 bg-sky-50/40 rounded p-3 space-y-2">
           <div className="flex items-center gap-2">
             <span className="text-xl">📦</span>
@@ -396,25 +520,30 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
             })}
           </ul>
           <div className="flex justify-between items-center pt-1">
-            <button onClick={() => setStage(1)}
-              className="text-[10px] text-gray-500 hover:text-gray-700">← 변경 대상 다시 보기</button>
-            <button onClick={() => setStage(3)} disabled={!pickedOrder}
+            <button onClick={() => setStage(2)}
+              className="text-[10px] text-gray-500 hover:text-gray-700">← 변경값 다시 입력</button>
+            <button onClick={() => setStage(4)} disabled={!pickedOrder}
               className="px-3 py-1.5 text-xs rounded bg-sky-600 text-white hover:bg-sky-500 disabled:opacity-50">
               {pickedOrder ? `✓ ${pickedOrder} 기준으로 보기` : "주문 선택 필요"}
             </button>
-            <button onClick={() => setStage(3)}
+            <button onClick={() => setStage(4)}
               className="text-[10px] text-gray-500 hover:text-gray-700">전체 보기 →</button>
           </div>
         </div>
       )}
 
-      {/* STAGE 3: 영향 결과 — stage 3 일 때만 표시 */}
-      {stage === 3 && (
+      {/* STAGE 4: 영향 결과 — stage 4 일 때만 표시 */}
+      {stage === 4 && (
         <>
           {hasTarget && (
             <div className="text-[11px] bg-amber-50 border border-amber-300 rounded p-2 flex items-center gap-2">
               <span>🔄</span>
               <span>
+                {pickedRow && targetMeta?.pk_columns && (
+                  <span className="text-gray-500">
+                    {targetMeta.pk_columns.map((c) => `${c}=${pickedRow[c]}`).join(" · ")} · {" "}
+                  </span>
+                )}
                 <code className="bg-white px-1.5 py-0.5 rounded border border-amber-200 text-amber-900">
                   {String(targetChange!.table)}.{String(targetChange!.column)}
                 </code>
@@ -424,7 +553,7 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
                 <code className="bg-emerald-50 px-1 rounded text-emerald-700 font-bold">{userChange.after || "?"}</code>
                 {" "}변경 시 영향
               </span>
-              <button onClick={() => setStage(1)} className="ml-auto text-[10px] text-amber-700 hover:underline">
+              <button onClick={() => setStage(2)} className="ml-auto text-[10px] text-amber-700 hover:underline">
                 ← 값 다시 입력
               </button>
             </div>
@@ -433,7 +562,7 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
             <div className="text-[11px] bg-sky-50 border border-sky-200 rounded p-2 flex items-center gap-2">
               <span>📦</span>
               <span><strong className="text-sky-800">{pickedOrder}</strong> 주문 기준으로 분석</span>
-              <button onClick={() => setStage(2)} className="ml-auto text-[10px] text-sky-700 hover:underline">
+              <button onClick={() => setStage(3)} className="ml-auto text-[10px] text-sky-700 hover:underline">
                 ← 다른 주문 선택
               </button>
             </div>
