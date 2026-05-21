@@ -181,28 +181,64 @@ async def _build_target_payload(
     *, user_query: str, repo_id: str,
     classifier: MultiturnIntentClassifier,
     ontology_client: OntologyClient,
+    exclude_fqns: set[str] | None = None,
+    top_n: int = 12,
 ) -> dict:
     """multiturn 의 build_gate_i 호출 → GateTarget payload (dict).
 
-    후처리: test 메서드 후보 제거. recommended_index 가 가리키는 항목이
-    제거되면 첫 번째 production 후보로 재조정.
+    후처리:
+    1) test 메서드 후보 제거 (*Test 클래스 / @Test).
+    2) exclude_fqns 에 있는 code_method_fqn 제거 ("다른 후보" 재호출 시).
+    3) recommended_index 첫 번째 살아남은 후보로 재조정.
+    4) top_n 을 충분히 크게 (12) 잡아 필터링 후에도 후보가 남도록.
     """
     target = await build_gate_i(
         user_query=user_query,
         repo_id=repo_id,
         classifier=classifier,
         ontology_client=ontology_client,
+        top_n=top_n,
     )
     payload = target.model_dump()
     candidates = payload.get("candidates") or []
     if candidates:
         filtered = [c for c in candidates if not _is_test_candidate(c)]
-        if filtered:
-            payload["candidates"] = filtered
-            payload["recommended_index"] = 0 if filtered else None
-            # 사용자에게 알리는 메모
-            payload["_filtered_test_count"] = len(candidates) - len(filtered)
+        n_test = len(candidates) - len(filtered)
+        n_excl = 0
+        if exclude_fqns:
+            before = len(filtered)
+            filtered = [
+                c for c in filtered
+                if (c.get("code_method_fqn") or "") not in exclude_fqns
+            ]
+            n_excl = before - len(filtered)
+        # 최종 적용
+        payload["candidates"] = filtered[:5]  # 보여줄 후보는 상위 5개로 다시 cap
+        payload["recommended_index"] = 0 if filtered else None
+        if n_test:
+            payload["_filtered_test_count"] = n_test
+        if n_excl:
+            payload["_excluded_count"] = n_excl
     return payload
+
+
+def _collect_seen_fqns(session_id: str) -> set[str]:
+    """현 세션의 모든 이전 target_selected payload 에서 candidate fqn 추출.
+
+    'request_other' 시 같은 후보 재노출 방지.
+    """
+    seen: set[str] = set()
+    rep = p.replay_session(session_id)
+    if rep is None:
+        return seen
+    for d in rep.decisions:
+        if d.gate_kind != "target_selected":
+            continue
+        for c in (d.payload.get("candidates") or []):
+            fqn = (c.get("code_method_fqn") or "").strip()
+            if fqn:
+                seen.add(fqn)
+    return seen
 
 
 def _next_gate_from_target(payload: dict) -> str:
@@ -426,21 +462,30 @@ async def respond(
         query = sess.user_query or ""
         if req.action == "clarify_intent" and req.intent:
             query = f"[intent={req.intent}] {query}"
+        # 'request_other' 일 때만 이전 후보 제외 (clarify_intent 는 다른 intent 라
+        # 자연스럽게 다른 후보 set 이 나옴 → 굳이 제외 안 함)
+        exclude = _collect_seen_fqns(session_id) if req.action == "request_other" else None
         payload = await _build_target_payload(
             user_query=query, repo_id=sess.repo_id,
             classifier=classifier, ontology_client=ontology_client,
+            exclude_fqns=exclude,
         )
         new_intent = req.intent if req.action == "clarify_intent" else payload.get("intent")
         p.update_session(session_id, intent=new_intent)
         new_turn = p.add_gate_decision(
             session_id, gate_kind="target_selected", payload=payload,
         )
+        n_excl = payload.get("_excluded_count", 0)
+        cands_n = len(payload.get("candidates", []))
+        msg = (
+            f"재검색 — intent={payload.get('intent')} · 후보 {cands_n} 건"
+            + (f" (이전 후보 {n_excl} 건 제외됨)" if n_excl else "")
+            + (" — 새 후보 없음. 다른 질문을 시도해 보세요." if cands_n == 0 else "")
+        )
         return RespondResponse(
             session_id=session_id, turn_no=new_turn,
             next_gate=_next_gate_from_target(payload),
-            payload=payload,
-            message=f"재검색 — intent={payload.get('intent')} · "
-                    f"후보 {len(payload.get('candidates', []))} 건",
+            payload=payload, message=msg,
         )
 
     # ── select_candidate → Phase D 의 Gate II 진입 (Phase C 단계에선 stub) ──
