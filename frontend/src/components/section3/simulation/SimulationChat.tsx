@@ -12,6 +12,7 @@ import { IntentCandidateCard } from "./IntentCandidateCard";
 import { BundlePreviewCard } from "./BundlePreviewCard";
 import { ExecutedResultCard } from "./ExecutedResultCard";
 import { OntologyGraphPanel } from "./OntologyGraphPanel";
+import { DomainDataPanel } from "./DomainDataPanel";
 
 interface Props {
   initialSid: string | null;
@@ -21,10 +22,10 @@ interface Props {
 
 /** slab-design-real_v2 의 5 golden 시나리오·실측 도메인 데이터 기반 예시. */
 const PRESET_QUESTIONS: { intent: string; label: string; query: string }[] = [
-  { intent: "simulate",   label: "① 주문 1건 슬랩 설계 (S1)",
-    query: "ORD20260510001 주문으로 슬랩 설계 시뮬레이션 돌려줘" },
+  { intent: "simulate",   label: "① 주문 1건 Slab 설계 (S1)",
+    query: "ORD20260510001 주문으로 Slab 설계 시뮬레이션 돌려줘" },
   { intent: "simulate",   label: "② 두께 변경 후 비교",
-    query: "SdThicknessAction 의 결과 두께 230→200mm 로 바꿨을 때 슬랩 결과 차이" },
+    query: "SdThicknessAction 의 결과 두께 230→200mm 로 바꿨을 때 Slab 결과 차이" },
   { intent: "impact",     label: "③ EDGING 사양 변경 영향",
     query: "SD_HSM_EDGING_SPEC 마진을 늘리면 어떤 step·method 가 영향받아?" },
   { intent: "impact",     label: "④ 단중 하한 룰 변경 영향",
@@ -282,6 +283,7 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
       {/* ─────────── 우측 ontology graph ─────────── */}
       <div className="flex flex-col h-full overflow-hidden bg-white p-3 gap-3">
         <OntologyGraphPanel sessionId={sid} refreshKey={replay?.decisions.length ?? 0} />
+        <DomainDataPanel />
       </div>
     </div>
   );

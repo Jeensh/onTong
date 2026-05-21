@@ -48,6 +48,7 @@ from backend.section3.agents.simulation.schemas import (
 from backend.section3.agents.simulation.slab_design_runner import (
     extract_order_no, is_full_design_intent, run_full_design,
 )
+from backend.section3.agents.simulation import domain_data
 
 logger = logging.getLogger(__name__)
 
@@ -712,6 +713,80 @@ async def get_graph(
         target_fqn=target_fqn,
         nodes=nodes, edges=edges,
         note=f"{len(nodes)} nodes · {len(edges)} edges",
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 도메인 데이터 surface — slab-design-real_v2 의 H2 schema + seed
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class DomainColumnView(BaseModel):
+    name: str
+    java_field: str = ""
+    is_pk: bool = False
+    length: int | None = None
+    precision: int | None = None
+    scale: int | None = None
+    type_hint: str = ""
+
+
+class DomainTableView(BaseModel):
+    table_name: str
+    jpa_class: str
+    jpa_file: str
+    category: str
+    pk_columns: list[str]
+    column_count: int
+    row_count: int
+
+
+class DomainTableDetail(BaseModel):
+    table_name: str
+    jpa_class: str
+    jpa_file: str
+    category: str
+    columns: list[DomainColumnView]
+    pk_columns: list[str]
+    rows: list[dict]
+    row_count_total: int
+
+
+@router.get("/data/tables", response_model=list[DomainTableView])
+async def list_domain_tables() -> list[DomainTableView]:
+    """slab-design-real_v2 의 JPA Entity 기준 table 목록 + seed row 수."""
+    out: list[DomainTableView] = []
+    for t in domain_data.list_tables():
+        out.append(DomainTableView(
+            table_name=t.table_name, jpa_class=t.jpa_class,
+            jpa_file=t.jpa_file, category=t.category,
+            pk_columns=t.pk_columns, column_count=len(t.columns),
+            row_count=domain_data.table_row_count(t.table_name),
+        ))
+    return out
+
+
+@router.get("/data/table/{table_name}", response_model=DomainTableDetail)
+async def get_domain_table(table_name: str, limit: int = 100) -> DomainTableDetail:
+    """단일 table 의 schema + seed rows."""
+    t = domain_data.get_table(table_name)
+    if t is None:
+        raise HTTPException(status_code=404, detail=f"table not found: {table_name}")
+    rows = domain_data.list_rows(t.table_name, limit=limit)
+    return DomainTableDetail(
+        table_name=t.table_name, jpa_class=t.jpa_class, jpa_file=t.jpa_file,
+        category=t.category,
+        columns=[
+            DomainColumnView(
+                name=c.name, java_field=c.java_field, is_pk=c.is_pk,
+                length=c.length, precision=c.precision, scale=c.scale,
+                type_hint=c.type_hint,
+            )
+            for c in t.columns
+        ],
+        pk_columns=t.pk_columns,
+        rows=[r.values for r in rows],
+        row_count_total=domain_data.table_row_count(t.table_name),
     )
 
 

@@ -97,10 +97,43 @@ export interface GraphResponse {
   note: string;
 }
 
+export interface DomainTableView {
+  table_name: string;
+  jpa_class: string;
+  jpa_file: string;
+  category: string;
+  pk_columns: string[];
+  column_count: number;
+  row_count: number;
+}
+
+export interface DomainColumnView {
+  name: string;
+  java_field: string;
+  is_pk: boolean;
+  length: number | null;
+  precision: number | null;
+  scale: number | null;
+  type_hint: string;
+}
+
+export interface DomainTableDetail {
+  table_name: string;
+  jpa_class: string;
+  jpa_file: string;
+  category: string;
+  columns: DomainColumnView[];
+  pk_columns: string[];
+  rows: Record<string, unknown>[];
+  row_count_total: number;
+}
+
 export const simulationApi = {
   start: (req: StartRequest) => _post<StartResponse>("/start", req),
   respond: (sid: string, req: RespondRequest) =>
     _post<RespondResponse>(`/respond/${sid}`, req),
   replay: (sid: string) => _get<ReplayResponse>(`/replay/${sid}`),
   graph: (sid: string) => _get<GraphResponse>(`/graph/${sid}`),
+  listTables: () => _get<DomainTableView[]>("/data/tables"),
+  getTable: (name: string) => _get<DomainTableDetail>(`/data/table/${name}`),
 };
