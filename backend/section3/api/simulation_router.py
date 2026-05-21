@@ -17,6 +17,7 @@ import logging
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, TypeAdapter
 
 from backend.section3.agents.multiturn.gate_executed_lookup import (
@@ -385,6 +386,15 @@ async def _proceed_from_target(
                 "target": target.model_dump(),
                 "error": f"{intent} 실패: {e}",
             }
+        # locate 보강 — 추가 매칭 위치 + 각 위치의 본문/line range
+        if intent == "locate":
+            try:
+                await _enrich_locate_payload(
+                    payload, user_query=user_query or "", repo_id=repo_id,
+                    ontology_client=ontology_client,
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning("locate payload 보강 실패: %s", e)
     else:
         payload = {
             "kind": "executed_unknown",
@@ -770,6 +780,77 @@ def _enrich_impact_payload(payload: dict, *, user_query: str, repo_id: str) -> N
             payload["_affected_apis"] = apis[:6]
     except Exception:
         pass
+
+
+async def _enrich_locate_payload(
+    payload: dict, *, user_query: str, repo_id: str, ontology_client: OntologyClient,
+) -> None:
+    """locate intent — code_methods body_text/name 에 keyword 매칭되는 위치들 surface.
+
+    각 위치마다 file_path · line range · body 스니펫 첨부.
+    """
+    from sqlalchemy import select, or_
+    from backend.modeling.persistence.database import session_scope
+    from backend.modeling.code_layer.orm import CodeMethodRow
+    # keyword 추출 — 사용자 query 안의 한·영 토큰
+    import re
+    tokens = [t for t in re.findall(r"[가-힣A-Za-z_]{2,}", user_query or "")]
+    # 너무 일반적인 단어 제거
+    STOP = {"어디", "위치", "이고", "에서", "throw", "이거", "있어", "있나", "어디서",
+            "찾기", "코드", "라인", "있는지", "the", "and", "in"}
+    tokens = [t for t in tokens if t.lower() not in STOP][:6]
+    if not tokens:
+        return
+
+    locations: list[dict] = []
+    try:
+        with session_scope() as s:
+            for tok in tokens:
+                rows = s.execute(
+                    select(CodeMethodRow).where(
+                        CodeMethodRow.repo_id == repo_id,
+                        or_(
+                            CodeMethodRow.fqn.ilike(f"%{tok}%"),
+                            CodeMethodRow.body_text.ilike(f"%{tok}%"),
+                            CodeMethodRow.name.ilike(f"%{tok}%"),
+                        ),
+                    ).limit(5)
+                ).scalars().all()
+                for r in rows:
+                    # 본문 중 keyword 주변 snippet 추출
+                    body = (r.body_text or "")
+                    snippet = ""
+                    line_in_body = -1
+                    if body:
+                        lower = body.lower()
+                        idx = lower.find(tok.lower())
+                        if idx >= 0:
+                            # 해당 idx 가 몇 번째 줄인지
+                            line_in_body = body[:idx].count("\n")
+                            start_line = max(0, line_in_body - 2)
+                            end_line = line_in_body + 3
+                            snippet = "\n".join(body.split("\n")[start_line:end_line + 1])
+                    abs_line = (r.line_start or 0) + line_in_body if line_in_body >= 0 else r.line_start
+                    locations.append({
+                        "method_fqn": r.fqn,
+                        "method_name": r.name,
+                        "file_path": (r.parent_type_fqn or "").replace(".", "/") + ".java",
+                        "line_start": r.line_start,
+                        "line_end": r.line_end,
+                        "matched_line": abs_line,
+                        "keyword": tok,
+                        "snippet": snippet[:500],
+                    })
+        # dedupe by fqn, sort by matched line
+        seen = set()
+        deduped = []
+        for l in locations:
+            if l["method_fqn"] in seen: continue
+            seen.add(l["method_fqn"])
+            deduped.append(l)
+        payload["_locate_matches"] = deduped[:12]
+    except Exception as e:  # noqa: BLE001
+        logger.warning("locate enrich 실패: %s", e)
 
 
 async def _execute_hypothesis_from_query(
@@ -1271,6 +1352,87 @@ class HypothesisResponse(BaseModel):
     projected_slab: dict | None = None
     diff_summary: list[dict] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+
+
+@router.post("/hypothesis/stream")
+async def hypothesis_stream(req: HypothesisRequest):
+    """SSE — hypothesis 4-step 을 순차로 전송.
+    each event: { stage: int, label: str, data: dict }
+    """
+    import json as _j
+    from backend.section3.agents.simulation import hypothesis_workflow as _hw
+
+    async def gen():
+        # Stage 1: existing data
+        existing_prod = _hw._filter_rows("SD_PRODUCTIVITY_STD", GRADE_CD=req.base_grade)
+        existing_order_rows: dict[str, dict] = {}
+        for tbl in ("ORDER_OS", "ORDER_OM", "ORDER_QD", "ORDER_CHEMICAL"):
+            rows = _hw._filter_rows(tbl, ORDER_NO=req.base_order_no)
+            if rows:
+                existing_order_rows[tbl] = rows[0]
+        yield "data: " + _j.dumps({
+            "stage": 1, "label": "기존 데이터 분석",
+            "data": {
+                "existing_productivity_rows": existing_prod,
+                "existing_order_rows": existing_order_rows,
+            },
+        }, ensure_ascii=False) + "\n\n"
+
+        # Stage 2: virtual grade synthesis
+        virtual_prod = [
+            _hw._synthesize_grade_row(r, req.new_grade, req.productivity_multiplier)
+            for r in existing_prod
+        ]
+        yield "data: " + _j.dumps({
+            "stage": 2, "label": "가상 강종 합성",
+            "data": {"virtual_productivity_rows": virtual_prod},
+        }, ensure_ascii=False) + "\n\n"
+
+        # Stage 3: virtual order
+        new_order_no = f"V{req.base_order_no[1:]}"
+        virtual_order_rows: dict[str, dict] = {}
+        for tbl, base in existing_order_rows.items():
+            virtual_order_rows[tbl] = _hw._synthesize_order_row(
+                base, new_order_no,
+                req.new_grade if tbl == "ORDER_QD" else None,
+            )
+        yield "data: " + _j.dumps({
+            "stage": 3, "label": "가상 주문 합성",
+            "data": {"virtual_order_rows": virtual_order_rows, "new_order_no": new_order_no},
+        }, ensure_ascii=False) + "\n\n"
+
+        # Stage 4: baseline + projection
+        try:
+            from backend.section3.agents.simulation.slab_design_runner import run_full_design
+            baseline = await run_full_design(order_no=req.base_order_no)
+            slabs = baseline.get("slab_results") or []
+            trace = baseline.get("trace") or []
+            if slabs:
+                base_mult = sum(float(r.get("PRODUCTIVITY") or 0) for r in existing_prod) / max(len(existing_prod), 1)
+                new_mult = base_mult * req.productivity_multiplier
+                projected, diff = _hw._project_slab(slabs[0], base_mult, new_mult)
+                yield "data: " + _j.dumps({
+                    "stage": 4, "label": "Slab 결과 비교 (추론)",
+                    "data": {
+                        "baseline_slab": slabs[0],
+                        "baseline_trace": trace[:5],
+                        "projected_slab": projected,
+                        "diff_summary": [d.model_dump() for d in diff] if hasattr(diff[0] if diff else None, "model_dump") else diff,
+                    },
+                }, ensure_ascii=False) + "\n\n"
+            else:
+                yield "data: " + _j.dumps({
+                    "stage": 4, "label": "Slab 결과 비교",
+                    "data": {"error": "baseline 결과 없음"},
+                }, ensure_ascii=False) + "\n\n"
+        except Exception as e:  # noqa: BLE001
+            yield "data: " + _j.dumps({
+                "stage": 4, "label": "Slab 결과 비교", "data": {"error": str(e)},
+            }, ensure_ascii=False) + "\n\n"
+
+        yield "data: " + _j.dumps({"stage": "done", "label": "완료"}, ensure_ascii=False) + "\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
 
 
 @router.post("/hypothesis/run", response_model=HypothesisResponse)

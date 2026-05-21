@@ -222,6 +222,16 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
   const affectedApis = (payload._affected_apis as Array<Record<string, unknown>> | undefined) ?? [];
   const intentFocus = (payload._intent_focus as string) || "code";
 
+  // ── Progressive disclosure stages ─────────────────────────────────────────
+  // stage 1: 변경 대상 확인  (target_change 가 있을 때만)
+  // stage 2: 매칭 주문 선택 (affected_orders 있을 때만)
+  // stage 3: 영향 결과 표시
+  // 변경 대상 없으면 1을 skip, 주문 없으면 2를 skip → 3 직진
+  const hasTarget = !!targetChange;
+  const hasOrders = affectedOrders.length > 0;
+  const [stage, setStage] = useState<1 | 2 | 3>(hasTarget ? 1 : hasOrders ? 2 : 3);
+  const [pickedOrder, setPickedOrder] = useState<string | null>(null);
+
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggle = (fqn: string) => {
     setExpanded((s) => {
@@ -231,9 +241,43 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
     });
   };
 
+  // 단계별 안내 stepper
+  const stepperLabels = [
+    hasTarget ? "1. 변경 대상 확인" : null,
+    hasOrders ? "2. 매칭 주문 선택" : null,
+    "3. 영향 결과",
+  ].filter(Boolean) as string[];
+  const currentStepIdx = (() => {
+    if (stage === 1 && hasTarget) return 0;
+    if (stage === 2 && hasOrders) return hasTarget ? 1 : 0;
+    return stepperLabels.length - 1;
+  })();
+
   return (
     <>
-      {/* SECTION 0: 감지된 ontology 용어 */}
+      {/* Stepper */}
+      {stepperLabels.length > 1 && (
+        <div className="flex items-center gap-1 text-[10px]">
+          {stepperLabels.map((lab, i) => {
+            const done = i < currentStepIdx;
+            const active = i === currentStepIdx;
+            return (
+              <div key={lab} className="flex items-center gap-1">
+                <span className={
+                  "px-2 py-0.5 rounded border " + (
+                    active ? "bg-amber-100 border-amber-400 text-amber-800 font-bold" :
+                    done ? "bg-emerald-50 border-emerald-300 text-emerald-700" :
+                    "bg-gray-50 border-gray-200 text-gray-400"
+                  )
+                }>{done ? "✓ " : ""}{lab}</span>
+                {i < stepperLabels.length - 1 && <span className="text-gray-300">→</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* SECTION 0: 감지된 ontology 용어 (항상 보임) */}
       {detectedTerms.length > 0 && (
         <div className="bg-emerald-50 border border-emerald-200 rounded p-2 text-[11px]">
           <div className="font-semibold text-emerald-700 mb-1">감지된 ontology 용어</div>
@@ -248,8 +292,84 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
         </div>
       )}
 
-      {/* SECTION 1: 감지된 변경 대상 — table 별 맞춤 UI */}
-      {targetChange && <_TargetChangeCard targetChange={targetChange} />}
+      {/* STAGE 1: 변경 대상 확인 */}
+      {stage === 1 && hasTarget && (
+        <>
+          <_TargetChangeCard targetChange={targetChange!} />
+          <div className="flex justify-end gap-2 pt-1">
+            <button onClick={() => setStage(hasOrders ? 2 : 3)}
+              className="px-3 py-1.5 text-xs rounded bg-amber-600 text-white hover:bg-amber-500">
+              ✓ 변경 대상 확인 — 다음
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* STAGE 2: 매칭 주문 선택 */}
+      {stage === 2 && hasOrders && (
+        <div className="border-2 border-sky-300 bg-sky-50/40 rounded p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">📦</span>
+            <div>
+              <div className="text-[10px] uppercase text-sky-700 font-semibold tracking-wide">매칭 주문 선택</div>
+              <div className="text-sm text-gray-700">변경 대상에 매칭되는 {affectedOrders.length}건 — 어떤 주문 기준으로 보시겠어요?</div>
+            </div>
+          </div>
+          <ul className="space-y-1.5">
+            {affectedOrders.map((o, i) => {
+              const orderNo = String(o.ORDER_NO ?? "");
+              const isPicked = pickedOrder === orderNo;
+              return (
+                <li key={i}>
+                  <button onClick={() => setPickedOrder(orderNo)}
+                    className={
+                      "w-full text-left px-3 py-1.5 rounded border transition " +
+                      (isPicked ? "border-sky-500 bg-sky-100" : "border-gray-200 bg-white hover:border-sky-300")
+                    }>
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <code className="font-mono font-semibold text-sky-800">{orderNo}</code>
+                      <span className="text-gray-500">{String(o.GRADE_CD ?? "?")} · {String(o.PRODUCT_CD ?? "?")}</span>
+                      <span className="ml-auto text-gray-400 font-mono">
+                        width {String(o.ORDER_WIDTH ?? "?")} · pendQty {String(o.DESIGN_PEND_QTY ?? "?")}
+                      </span>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="flex justify-between items-center pt-1">
+            <button onClick={() => setStage(1)}
+              className="text-[10px] text-gray-500 hover:text-gray-700">← 변경 대상 다시 보기</button>
+            <button onClick={() => setStage(3)} disabled={!pickedOrder}
+              className="px-3 py-1.5 text-xs rounded bg-sky-600 text-white hover:bg-sky-500 disabled:opacity-50">
+              {pickedOrder ? `✓ ${pickedOrder} 기준으로 보기` : "주문 선택 필요"}
+            </button>
+            <button onClick={() => setStage(3)}
+              className="text-[10px] text-gray-500 hover:text-gray-700">전체 보기 →</button>
+          </div>
+        </div>
+      )}
+
+      {/* STAGE 3: 영향 결과 — stage 3 일 때만 표시 */}
+      {stage === 3 && (
+        <>
+          {pickedOrder && (
+            <div className="text-[11px] bg-sky-50 border border-sky-200 rounded p-2 flex items-center gap-2">
+              <span>📦</span>
+              <span><strong className="text-sky-800">{pickedOrder}</strong> 주문 기준으로 영향 분석 결과를 표시합니다.</span>
+              <button onClick={() => setStage(2)} className="ml-auto text-[10px] text-sky-700 hover:underline">
+                ← 다른 주문 선택
+              </button>
+            </div>
+          )}
+          {!pickedOrder && hasOrders && (
+            <div className="text-[10px] text-gray-500 flex items-center gap-2">
+              <button onClick={() => setStage(2)} className="text-sky-700 hover:underline">
+                📦 주문 선택해서 보기
+              </button>
+            </div>
+          )}
 
       {/* SECTION 2: 영향받는 코드 */}
       <div className="border border-gray-200 rounded">
@@ -407,6 +527,8 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
           </ul>
         </div>
       )}
+        </>
+      )}
     </>
   );
 }
@@ -505,38 +627,74 @@ function _MethodBodyRow({ fqn, onJumpTo }: { fqn: string; onJumpTo: (f: string) 
   );
 }
 
-/** locate — VSCode 스타일 위치 list + 클릭 시 본문 expand. */
+/** 코드 본문에서 keyword 를 highlight (배경 노랑). */
+function _HighlightedCode({ body, keyword }: { body: string; keyword: string }) {
+  if (!keyword || !body) return <>{body}</>;
+  const parts = body.split(new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"));
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.toLowerCase() === keyword.toLowerCase()
+          ? <mark key={i} className="bg-amber-200 text-amber-900">{p}</mark>
+          : <span key={i}>{p}</span>
+      )}
+    </>
+  );
+}
+
+
+/** locate — VSCode 스타일 위치 list + 클릭 시 본문 expand + keyword highlight. */
 function _LocateView({ payload }: { payload: Record<string, unknown> }) {
   const target = payload.target as Record<string, unknown> | undefined;
   const body = (payload.body as string | undefined) ?? "";
   const summary = payload.summary as string | undefined;
   const callers = (payload.callers as Array<Record<string, unknown>> | undefined) ?? [];
   const rules = (payload.business_rules as Array<Record<string, unknown>> | undefined) ?? [];
+  const locateMatches = (payload._locate_matches as Array<Record<string, unknown>> | undefined) ?? [];
   const fqn = String(target?.code_method_fqn ?? "");
 
-  // 위치 list — primary target + callers
-  type Match = { fqn: string; primary?: boolean };
+  // 위치 list — _locate_matches 우선 + primary target + callers
+  type Match = { fqn: string; primary?: boolean; matched_line?: number; keyword?: string; snippet?: string };
   const matches: Match[] = [];
   if (fqn) matches.push({ fqn, primary: true });
+  for (const m of locateMatches) {
+    const f = String(m.method_fqn ?? "");
+    if (f && f !== fqn) {
+      matches.push({
+        fqn: f,
+        matched_line: m.matched_line as number | undefined,
+        keyword: m.keyword as string | undefined,
+        snippet: m.snippet as string | undefined,
+      });
+    }
+  }
   for (const c of callers) {
     const f = String(c.method_fqn ?? c);
-    if (f && f !== fqn) matches.push({ fqn: f });
+    if (f && !matches.find((mm) => mm.fqn === f)) matches.push({ fqn: f });
   }
 
   const [activeFqn, setActiveFqn] = useState<string>(fqn);
   const [activeBody, setActiveBody] = useState<string>(body);
+  const [activeKeyword, setActiveKeyword] = useState<string>("");
+  const [activeMatchedLine, setActiveMatchedLine] = useState<number>(0);
 
   // 다른 위치 click → /method/body 조회
-  async function pickLocation(targetFqn: string, primary?: boolean) {
-    if (targetFqn === activeFqn) return;
-    setActiveFqn(targetFqn);
-    if (primary) {
+  async function pickLocation(m: Match) {
+    if (m.fqn === activeFqn) return;
+    setActiveFqn(m.fqn);
+    setActiveKeyword(m.keyword ?? "");
+    setActiveMatchedLine(m.matched_line ?? 0);
+    if (m.primary) {
       setActiveBody(body);
+      return;
+    }
+    if (m.snippet) {
+      setActiveBody(m.snippet);
       return;
     }
     try {
       setActiveBody("");
-      const r = await simulationApi.methodBody(targetFqn);
+      const r = await simulationApi.methodBody(m.fqn);
       setActiveBody(r.body || "(본문 없음 — ontology 응답 비어있음)");
     } catch (e) {
       setActiveBody(`로드 실패: ${String(e)}`);
@@ -565,7 +723,7 @@ function _LocateView({ payload }: { payload: Record<string, unknown> }) {
             {matches.map((m, i) => (
               <li key={m.fqn}>
                 <button
-                  onClick={() => pickLocation(m.fqn, m.primary)}
+                  onClick={() => pickLocation(m)}
                   className={
                     "w-full text-left px-2 py-1.5 border-b border-gray-100 hover:bg-sky-50 font-mono " +
                     (m.fqn === activeFqn ? "bg-sky-100 border-l-2 border-l-sky-500" : "")
@@ -573,24 +731,36 @@ function _LocateView({ payload }: { payload: Record<string, unknown> }) {
                   title={m.fqn}
                 >
                   <div className="text-sky-800 font-semibold truncate">
-                    {m.primary ? "⚡ " : "↑ "}
+                    {m.primary ? "⚡ " : m.keyword ? "🔍 " : "↑ "}
                     {m.fqn.split(".").pop()?.split("(")[0]}
                   </div>
-                  <div className="text-gray-500 truncate text-[9px]">{filePathOf(m.fqn)}</div>
+                  <div className="text-gray-500 truncate text-[9px]">
+                    {filePathOf(m.fqn)}
+                    {m.matched_line ? ` :${m.matched_line}` : ""}
+                  </div>
+                  {m.keyword && (
+                    <div className="text-amber-700 text-[9px] mt-0.5">
+                      🔑 <code className="bg-amber-100 px-0.5 rounded">{m.keyword}</code> 매칭
+                    </div>
+                  )}
                 </button>
               </li>
             ))}
           </ul>
         </div>
 
-        {/* 우: 활성 위치의 코드 본문 */}
+        {/* 우: 활성 위치의 코드 본문 + keyword highlight */}
         <div className="bg-white">
           <div className="px-2 py-1 bg-gray-50 border-b border-gray-200 text-[10px] flex items-center justify-between">
-            <code className="text-gray-700">{filePathOf(activeFqn)}</code>
-            <span className="text-gray-400">{activeBody.split("\n").length} lines</span>
+            <code className="text-gray-700">{filePathOf(activeFqn)}{activeMatchedLine ? `:${activeMatchedLine}` : ""}</code>
+            <span className="text-gray-400">{activeBody.split("\n").length} lines{activeKeyword && ` · 🔑 ${activeKeyword}`}</span>
           </div>
           <pre className="p-2 text-[10px] max-h-80 overflow-auto text-gray-800 font-mono leading-relaxed">
-            {activeBody || "(좌측 위치 선택 — 클릭 시 본문 로드)"}
+            {activeBody
+              ? activeKeyword
+                ? <_HighlightedCode body={activeBody} keyword={activeKeyword} />
+                : activeBody
+              : "(좌측 위치 선택 — 클릭 시 본문 로드)"}
           </pre>
         </div>
       </div>
@@ -1233,18 +1403,95 @@ function _HypothesisView({ payload }: { payload: Record<string, unknown> }) {
   );
 }
 
-/** backend 가 직접 hypothesis_workflow 결과를 payload 로 보낸 경우 — fetch 없이 즉시 표시. */
+/** backend 가 직접 hypothesis_workflow 결과를 payload 로 보낸 경우 — fetch 없이 즉시 표시.
+ *
+ * 사용자 요구: SSE 스트리밍으로 4-step 순차 등장. payload 의 default 값으로 즉시 stream 시작.
+ */
 function _HypothesisWorkflowView({ payload }: { payload: Record<string, unknown> }) {
-  const hyp = payload as unknown as HypothesisResponse;
+  const initialHyp = payload as unknown as HypothesisResponse;
+  // SSE 스트림으로 step 별 progressive 표시
+  const [streamedStages, setStreamedStages] = useState<Record<number, Record<string, unknown>>>({});
+  const [streaming, setStreaming] = useState(false);
+  const [streamDone, setStreamDone] = useState(false);
+
+  // payload 가 이미 데이터 가지고 있으면 stream 안 함 (initial render). 사용자가 "↻ 스트리밍 보기" 버튼 누를 때 시작.
+  async function startStream() {
+    setStreaming(true);
+    setStreamDone(false);
+    setStreamedStages({});
+    try {
+      const r = await fetch("/api/section3/simulation/hypothesis/stream", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          base_grade: initialHyp.base_grade, new_grade: initialHyp.new_grade,
+          productivity_multiplier: initialHyp.productivity_multiplier,
+          base_order_no: initialHyp.base_order_no,
+        }),
+      });
+      if (!r.ok || !r.body) { setStreaming(false); return; }
+      const reader = r.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        // SSE: "data: {...}\n\n"
+        const parts = buf.split("\n\n");
+        buf = parts.pop() || "";
+        for (const p of parts) {
+          const m = p.match(/^data:\s*(.+)$/m);
+          if (!m) continue;
+          try {
+            const evt = JSON.parse(m[1]);
+            if (evt.stage === "done") { setStreamDone(true); continue; }
+            // 250ms 딜레이로 사용자에게 단계가 보이도록
+            await new Promise((res) => setTimeout(res, 400));
+            setStreamedStages((s) => ({ ...s, [evt.stage]: evt.data }));
+          } catch {}
+        }
+      }
+    } finally {
+      setStreaming(false);
+      setStreamDone(true);
+    }
+  }
+
+  // streamedStages 가 있으면 우선. 없으면 payload 값 사용
+  const usingStream = Object.keys(streamedStages).length > 0;
+  const hyp: HypothesisResponse = usingStream
+    ? {
+        ...initialHyp,
+        existing_productivity_rows: (streamedStages[1]?.existing_productivity_rows as never) ?? [],
+        existing_order_rows: (streamedStages[1]?.existing_order_rows as never) ?? {},
+        virtual_productivity_rows: (streamedStages[2]?.virtual_productivity_rows as never) ?? [],
+        virtual_order_rows: (streamedStages[3]?.virtual_order_rows as never) ?? {},
+        baseline_slab: (streamedStages[4]?.baseline_slab as never) ?? null,
+        baseline_trace: (streamedStages[4]?.baseline_trace as never) ?? [],
+        projected_slab: (streamedStages[4]?.projected_slab as never) ?? null,
+        diff_summary: (streamedStages[4]?.diff_summary as never) ?? [],
+      }
+    : initialHyp;
+
+  // streaming 시 어떤 stage 까지 도달했는지
+  const stagesDone = Object.keys(streamedStages).filter((k) => k !== "done").length;
 
   return (
     <>
       <div className="bg-gradient-to-r from-rose-600 to-rose-700 text-white rounded-lg p-3 shadow">
-        <div className="text-[10px] uppercase tracking-wide opacity-80">가설 검증 — 자동 진행</div>
-        <div className="text-sm font-semibold mt-0.5">
-          신규 강종 <code className="bg-white/20 px-1.5 py-0.5 rounded">{hyp.new_grade}</code>
-          {" "}({hyp.base_grade} 대비 productivity ×{hyp.productivity_multiplier}) →
-          {" "}<code className="bg-white/20 px-1.5 py-0.5 rounded">{hyp.base_order_no}</code> 의 Slab 결과
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <div className="text-[10px] uppercase tracking-wide opacity-80">가설 검증 — 자동 진행</div>
+            <div className="text-sm font-semibold mt-0.5">
+              신규 강종 <code className="bg-white/20 px-1.5 py-0.5 rounded">{hyp.new_grade}</code>
+              {" "}({hyp.base_grade} 대비 productivity ×{hyp.productivity_multiplier}) →
+              {" "}<code className="bg-white/20 px-1.5 py-0.5 rounded">{hyp.base_order_no}</code> 의 Slab 결과
+            </div>
+          </div>
+          <button onClick={startStream} disabled={streaming}
+            className="px-2.5 py-1 bg-white/20 hover:bg-white/30 rounded text-[11px] font-semibold disabled:opacity-50">
+            {streaming ? `▶ ${stagesDone}/4 stream...` : streamDone ? "↻ 다시" : "▶ SSE stream"}
+          </button>
         </div>
       </div>
 
