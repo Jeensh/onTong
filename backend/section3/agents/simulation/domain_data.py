@@ -55,6 +55,8 @@ class TableDef:
     columns: list[ColumnDef] = field(default_factory=list)
     pk_columns: list[str] = field(default_factory=list)
     category: str = "unknown"  # std / order / result / history
+    description: str = ""       # JPO class javadoc 첫 줄
+    keywords: list[str] = field(default_factory=list)  # javadoc 에서 추출한 한국어 토큰
 
 
 @dataclass
@@ -69,6 +71,8 @@ class TableRow:
 
 
 _TABLE_RE = re.compile(r'@Table\s*\(\s*name\s*=\s*"([^"]+)"')
+_JAVADOC_RE = re.compile(r'/\*\*\s*(.*?)\s*\*/', re.DOTALL)
+_KOREAN_TOKEN_RE = re.compile(r'[가-힣]{2,}')
 _COLUMN_RE = re.compile(
     r'(@Id\s+)?@Column\s*\(\s*name\s*=\s*"([^"]+)"'
     r'(?:[^)]*length\s*=\s*(\d+))?'
@@ -99,6 +103,23 @@ def _glob_jpa_files() -> list[Path]:
     return sorted(out)
 
 
+def _extract_javadoc_info(text: str) -> tuple[str, list[str]]:
+    """JPO 파일의 class-level javadoc 추출 → (요약 첫 줄, 한국어 토큰 list)."""
+    # 첫 번째 javadoc 블록 (class 직전)
+    m = _JAVADOC_RE.search(text)
+    if not m:
+        return "", []
+    block = m.group(1)
+    # ' *' prefix 제거 + line 단위 정리
+    lines = [re.sub(r'^\s*\*\s?', '', ln).strip() for ln in block.split("\n")]
+    lines = [ln for ln in lines if ln]
+    summary = lines[0] if lines else ""
+    # 한국어 명사 토큰 (2글자 이상, 중복 제거)
+    full = " ".join(lines)
+    tokens = list(dict.fromkeys(_KOREAN_TOKEN_RE.findall(full)))
+    return summary, tokens
+
+
 @lru_cache(maxsize=1)
 def list_tables() -> list[TableDef]:
     tables: list[TableDef] = []
@@ -108,6 +129,7 @@ def list_tables() -> list[TableDef]:
         if not tm:
             continue
         table_name = tm.group(1)
+        description, keywords = _extract_javadoc_info(text)
         # 모든 @Column + 직후 java field name 매핑은 단순화 — 같은 라인 또는 다음 라인의
         # `private TYPE name;` 잡기
         columns: list[ColumnDef] = []
@@ -137,6 +159,7 @@ def list_tables() -> list[TableDef]:
             table_name=table_name, jpa_class=jpa_class, jpa_file=rel,
             columns=columns, pk_columns=pk_columns,
             category=_categorize(rel),
+            description=description, keywords=keywords,
         ))
     return tables
 

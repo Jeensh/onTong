@@ -50,6 +50,9 @@ from backend.section3.agents.simulation.slab_design_runner import (
 )
 from backend.section3.agents.simulation import domain_data
 from backend.section3.agents.simulation.hypothesis_workflow import run_hypothesis
+from backend.section3.agents.simulation.suggested_questions import (
+    extract_korean_tokens, generate_suggestions, lookup_terms,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +223,16 @@ async def _build_target_payload(
             payload["_filtered_test_count"] = n_test
         if n_excl:
             payload["_excluded_count"] = n_excl
+
+    # 자연어 query 의 한국어 토큰을 ontology business_terms 와 매핑 — 사용자에게
+    # "감지된 용어" surface
+    detected_terms = lookup_terms(extract_korean_tokens(user_query), repo_id=repo_id)
+    if detected_terms:
+        payload["_detected_terms"] = [
+            {"token": d.token, "term_fqn": d.term_fqn, "label": d.label,
+             "definition": d.definition}
+            for d in detected_terms
+        ]
     return payload
 
 
@@ -796,6 +809,68 @@ class DomainTableDetail(BaseModel):
     pk_columns: list[str]
     rows: list[dict]
     row_count_total: int
+
+
+class SuggestedQuestionView(BaseModel):
+    intent: str
+    label: str
+    query: str
+    rationale: str = ""
+    grounded_terms: list[dict] = Field(default_factory=list)
+
+
+@router.get("/suggested_questions", response_model=list[SuggestedQuestionView])
+async def list_suggested_questions(seed: int = 0) -> list[SuggestedQuestionView]:
+    """JPO 한국어 주석 + business_terms + seed orders 기반 동적 예시 질문.
+
+    같은 ontology snapshot 에서 같은 결과 (seed 고정). 클라이언트가 seed 를
+    바꿔 호출하면 다른 set.
+    """
+    qs = generate_suggestions(seed=seed or None)
+    out: list[SuggestedQuestionView] = []
+    for q in qs:
+        # 각 질문의 한국어 토큰을 ontology business_terms 와 매핑
+        toks = extract_korean_tokens(q.query)
+        detected = lookup_terms(toks)
+        out.append(SuggestedQuestionView(
+            intent=q.intent, label=q.label, query=q.query, rationale=q.rationale,
+            grounded_terms=[
+                {"token": d.token, "term_fqn": d.term_fqn, "label": d.label,
+                 "definition": d.definition}
+                for d in detected
+            ],
+        ))
+    return out
+
+
+class TermLookupRequest(BaseModel):
+    text: str
+
+
+class DetectedTermView(BaseModel):
+    token: str
+    term_fqn: str
+    label: str
+    definition: str = ""
+    aliases: list[str] = Field(default_factory=list)
+
+
+@router.post("/term_lookup", response_model=list[DetectedTermView])
+async def term_lookup(req: TermLookupRequest) -> list[DetectedTermView]:
+    """자연어 안의 한국어 토큰 → ontology business_terms 매핑.
+
+    UI 에서 사용자가 query 입력 시 실시간으로 호출하면, "감지된 용어" 카드를
+    pre-flight 로 surface 가능.
+    """
+    toks = extract_korean_tokens(req.text)
+    detected = lookup_terms(toks)
+    return [
+        DetectedTermView(
+            token=d.token, term_fqn=d.term_fqn, label=d.label,
+            definition=d.definition, aliases=d.aliases or [],
+        )
+        for d in detected
+    ]
 
 
 class HypothesisRequest(BaseModel):

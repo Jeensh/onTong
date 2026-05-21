@@ -7,7 +7,8 @@
  */
 import { useEffect, useState } from "react";
 import { Workflow, Send, RotateCcw, Loader2 } from "lucide-react";
-import { simulationApi, type GraphResponse, type ReplayResponse, type SimulationGate } from "@/lib/section3/simulation";
+import { simulationApi, type GraphResponse, type ReplayResponse, type SimulationGate,
+  type SuggestedQuestionView, type DetectedTermView } from "@/lib/section3/simulation";
 import { IntentCandidateCard } from "./IntentCandidateCard";
 import { BundlePreviewCard } from "./BundlePreviewCard";
 import { ExecutedResultCard } from "./ExecutedResultCard";
@@ -20,8 +21,8 @@ interface Props {
   defaultRepoId: string | null;
 }
 
-/** slab-design-real_v2 의 5 golden 시나리오·실측 도메인 데이터 기반 예시. */
-const PRESET_QUESTIONS: { intent: string; label: string; query: string }[] = [
+/** fallback hardcoded — backend /suggested_questions 가 비어 있을 때만 사용. */
+const FALLBACK_PRESETS: { intent: string; label: string; query: string }[] = [
   { intent: "simulate",   label: "① 주문 1건 Slab 설계 (S1)",
     query: "ORD20260510001 주문으로 Slab 설계 시뮬레이션 돌려줘" },
   { intent: "simulate",   label: "② 두께 변경 후 비교",
@@ -55,6 +56,28 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
   const [error, setError] = useState<string | null>(null);
   const [lastGate, setLastGate] = useState<SimulationGate | null>(null);
   const [replay, setReplay] = useState<ReplayResponse | null>(null);
+  const [presets, setPresets] = useState<SuggestedQuestionView[] | null>(null);
+  const [detectedTerms, setDetectedTerms] = useState<DetectedTermView[]>([]);
+  const [presetSeed, setPresetSeed] = useState(0);
+
+  // backend 의 동적 예시 질문 로드
+  useEffect(() => {
+    simulationApi.suggestedQuestions(presetSeed)
+      .then(setPresets)
+      .catch(() => setPresets(null));
+  }, [presetSeed]);
+
+  // query 변경 시 200ms debounce 후 term_lookup
+  useEffect(() => {
+    if (!query.trim() || sid) {
+      setDetectedTerms([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      simulationApi.termLookup(query).then(setDetectedTerms).catch(() => setDetectedTerms([]));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [query, sid]);
 
   useEffect(() => {
     if (!initialSid) return;
@@ -157,17 +180,53 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {!sid && (
             <div className="text-sm text-gray-500 leading-relaxed">
-              자연어로 질문하면 의도를 분석해 5종 흐름 중 하나로 진행합니다.
-              <ul className="mt-3 space-y-1.5">
-                {PRESET_QUESTIONS.map((q) => (
+              <div className="flex items-center justify-between mb-2">
+                <span>JPO · ontology · seed 데이터 기반 예시</span>
+                <button
+                  onClick={() => setPresetSeed((s) => s + 1)}
+                  className="text-[10px] text-gray-400 hover:text-emerald-700"
+                  title="다른 예시 set"
+                >
+                  ↻ 다른 예시
+                </button>
+              </div>
+              <ul className="mt-1 space-y-1.5">
+                {(presets ?? FALLBACK_PRESETS.map((p) => ({ ...p, rationale: "", grounded_terms: [] }))).map((q) => (
                   <li key={q.query}>
                     <button
                       onClick={() => setQuery(q.query)}
                       className="text-left text-xs px-2 py-1.5 rounded border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50 w-full"
                     >
                       <span className="text-gray-400 mr-1.5">{q.label}</span>
-                      <span className="text-gray-800">{q.query}</span>
+                      <span className="text-gray-800">{q.query.length > 100 ? q.query.slice(0, 100) + "..." : q.query}</span>
+                      {q.grounded_terms.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {q.grounded_terms.slice(0, 3).map((t) => (
+                            <span key={t.term_fqn} className="text-[9px] px-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              {t.token}→{t.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* 사용자 입력 중 실시간 ontology 용어 매핑 표시 */}
+          {!sid && detectedTerms.length > 0 && (
+            <div className="text-[10px] border border-emerald-200 bg-emerald-50/40 rounded p-2">
+              <div className="text-emerald-700 font-semibold mb-1">감지된 ontology 용어 ({detectedTerms.length})</div>
+              <ul className="space-y-0.5">
+                {detectedTerms.slice(0, 6).map((t) => (
+                  <li key={t.term_fqn} className="flex items-baseline gap-1">
+                    <code className="text-emerald-800">{t.token}</code>
+                    <span className="text-gray-400">→</span>
+                    <span className="text-gray-800">{t.label}</span>
+                    <code className="text-gray-400 ml-1">{t.term_fqn}</code>
+                    {t.definition && <span className="text-gray-500 ml-1 truncate">— {t.definition.slice(0, 60)}</span>}
                   </li>
                 ))}
               </ul>

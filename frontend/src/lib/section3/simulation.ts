@@ -150,6 +150,8 @@ export const simulationApi = {
   methodBody: (fqn: string, repoId = "slab-design-real-v2") =>
     _get<MethodBodyView>(`/method/body?fqn=${encodeURIComponent(fqn)}&repo_id=${encodeURIComponent(repoId)}`),
   hypothesis: (req: HypothesisRequest) => _post<HypothesisResponse>("/hypothesis/run", req),
+  suggestedQuestions: (seed = 0) => _get<SuggestedQuestionView[]>(`/suggested_questions?seed=${seed}`),
+  termLookup: (text: string) => _post<DetectedTermView[]>("/term_lookup", { text }),
 };
 
 export interface HypothesisRequest {
@@ -157,6 +159,22 @@ export interface HypothesisRequest {
   new_grade?: string;
   productivity_multiplier?: number;
   base_order_no?: string;
+}
+
+export interface SuggestedQuestionView {
+  intent: string;
+  label: string;
+  query: string;
+  rationale: string;
+  grounded_terms: { token: string; term_fqn: string; label: string; definition: string }[];
+}
+
+export interface DetectedTermView {
+  token: string;
+  term_fqn: string;
+  label: string;
+  definition: string;
+  aliases: string[];
 }
 
 export interface HypothesisResponse {
