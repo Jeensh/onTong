@@ -377,11 +377,16 @@ async def respond(
             )
         selected = target.candidates[req.selected_index]
         intent = target.intent
+        # location 이 mock 등에서 None 일 수 있어 stub 으로 채움
+        from backend.section3.agents.multiturn.schemas import CodeLocation
+        location = selected.location or CodeLocation(
+            file_path="(unknown)", line_start=0, line_end=0,
+        )
         action_ref = ActionRef(
             action_id=selected.action_id,
             code_method_fqn=selected.code_method_fqn,
             repo_id=sess.repo_id,
-            location=selected.location,
+            location=location,
         )
 
         return await _proceed_from_target(
