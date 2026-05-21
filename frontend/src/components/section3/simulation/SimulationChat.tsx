@@ -249,6 +249,7 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
           <BundlePreviewCard
             payload={lastDecision.payload}
             onConfirm={() => _onActionDirect("confirm_bundle")}
+            onCompare={(overrides) => _onActionDirect("compare_with_overrides", { overrides })}
             onAbort={() => _onActionDirect("abort")}
             busy={busy}
           />

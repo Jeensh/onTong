@@ -27,8 +27,9 @@ export function ExecutedResultCard({ payload, intent, onRerun, onNew, busy }: Pr
         </div>
       )}
 
-      {!error && intent === "simulate" && <_SimulateView payload={payload} />}
-      {!error && intent === "impact" && <_ImpactView payload={payload} />}
+      {!error && payload.kind === "executed_compare" && <_CompareView payload={payload} />}
+      {!error && payload.kind !== "executed_compare" && intent === "simulate" && <_SimulateView payload={payload} />}
+      {!error && payload.kind !== "executed_compare" && intent === "impact" && <_ImpactView payload={payload} />}
       {!error && (intent === "locate" || intent === "explain") && <_LookupView payload={payload} intent={intent} />}
       {!error && intent === "hypothesis" && <_HypothesisView payload={payload} />}
 
@@ -175,6 +176,52 @@ function _LookupView({ payload, intent }: { payload: Record<string, unknown>; in
           </ul>
         </div>
       )}
+    </>
+  );
+}
+
+function _CompareView({ payload }: { payload: Record<string, unknown> }) {
+  const before = payload.before_result as Record<string, unknown> | null;
+  const after = payload.after_result as Record<string, unknown> | null;
+  const diffs = (payload.field_diffs as Array<Record<string, unknown>> | undefined) ?? [];
+  const summary = payload.summary as string | undefined;
+  const changedCount = diffs.filter((d) => d.changed).length;
+
+  return (
+    <>
+      <div className="text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-300 rounded p-2">
+        변경 전·후 비교 · {summary}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <div className="border border-gray-200 rounded">
+          <div className="px-2 py-1 bg-gray-50 text-[11px] text-gray-600">변경 전</div>
+          <pre className="p-2 text-[10px] max-h-40 overflow-auto">
+            {JSON.stringify(before ?? {}, null, 2).slice(0, 600)}
+          </pre>
+        </div>
+        <div className="border border-emerald-300 rounded">
+          <div className="px-2 py-1 bg-emerald-50 text-[11px] text-emerald-800">변경 후</div>
+          <pre className="p-2 text-[10px] max-h-40 overflow-auto">
+            {JSON.stringify(after ?? {}, null, 2).slice(0, 600)}
+          </pre>
+        </div>
+        <div className="border border-amber-300 rounded">
+          <div className="px-2 py-1 bg-amber-50 text-[11px] text-amber-800">
+            DIFF (변경 {changedCount}/{diffs.length})
+          </div>
+          <ul className="p-2 text-[10px] max-h-40 overflow-auto space-y-0.5">
+            {diffs.filter((d) => d.changed).slice(0, 20).map((d, i) => (
+              <li key={i} className="font-mono">
+                <span className="text-gray-500">{String(d.field)}:</span>{" "}
+                <span className="text-red-700 line-through">{JSON.stringify(d.before)}</span>{" "}
+                →{" "}
+                <span className="text-emerald-700">{JSON.stringify(d.after)}</span>
+              </li>
+            ))}
+            {changedCount === 0 && <li className="text-gray-400">변경 없음</li>}
+          </ul>
+        </div>
+      </div>
     </>
   );
 }

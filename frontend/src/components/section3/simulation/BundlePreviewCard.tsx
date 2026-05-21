@@ -1,16 +1,19 @@
 "use client";
 
-/** bundle_prepared 게이트 카드 — Java 원본 + Python 변환 + fixture 표. */
-import { Check, Ban } from "lucide-react";
+/** bundle_prepared 게이트 카드 — Java 원본 + Python 변환 + fixture + 변경 후 입력. */
+import { useState } from "react";
+import { Check, Ban, GitCompare } from "lucide-react";
 
 interface Props {
   payload: Record<string, unknown>;
   onConfirm: () => void;
+  onCompare?: (overrides: Record<string, unknown>) => void;
   onAbort: () => void;
   busy: boolean;
 }
 
-export function BundlePreviewCard({ payload, onConfirm, onAbort, busy }: Props) {
+export function BundlePreviewCard({ payload, onConfirm, onCompare, onAbort, busy }: Props) {
+  const [overrideJson, setOverrideJson] = useState<string>("");
   const error = payload.error as string | undefined;
   const java = (payload.java_source as string | undefined) ?? "";
   const python = (payload.python_source as string | undefined) ?? "";
@@ -78,10 +81,40 @@ export function BundlePreviewCard({ payload, onConfirm, onAbort, busy }: Props) 
         </div>
       </div>
 
+      {onCompare && (
+        <div className="border border-amber-200 bg-amber-50 rounded p-2 text-[11px]">
+          <div className="text-amber-800 mb-1 flex items-center gap-1">
+            <GitCompare size={11} /> 변경 전/후 비교 (선택)
+          </div>
+          <textarea
+            value={overrideJson}
+            onChange={(e) => setOverrideJson(e.target.value)}
+            placeholder='변경 후 fixture override (JSON). 예: {"order": {"thickness": 0.3}}'
+            rows={3}
+            className="w-full text-[10px] font-mono bg-white border border-amber-300 rounded p-1.5 focus:outline-none focus:ring-1 focus:ring-amber-500"
+          />
+          <div className="text-[10px] text-amber-700 mt-1">
+            override 입력 시 "변경 전·후 비교" 버튼이 활성화됩니다.
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200">
         <button onClick={onAbort} disabled={busy} className="px-3 py-1.5 text-xs rounded border border-gray-300 hover:bg-gray-50">
           <Ban size={11} className="inline mr-1" /> 중단
         </button>
+        {onCompare && overrideJson.trim() && (
+          <button
+            onClick={() => {
+              try { onCompare(JSON.parse(overrideJson)); }
+              catch (e) { alert(`override JSON 파싱 실패: ${e}`); }
+            }}
+            disabled={busy}
+            className="px-3 py-1.5 text-xs rounded bg-amber-600 text-white hover:bg-amber-500 disabled:opacity-50"
+          >
+            <GitCompare size={11} className="inline mr-1" /> 변경 전·후 비교
+          </button>
+        )}
         <button
           onClick={onConfirm} disabled={busy}
           className="px-3 py-1.5 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50"

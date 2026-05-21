@@ -41,6 +41,7 @@ from backend.section3.agents.multiturn.ontology_client import (
     SimV2BackedOntologyClient,
 )
 from backend.section3.agents.simulation import persistence as p
+from backend.section3.agents.simulation.compare_runs import compare_runs
 from backend.section3.agents.simulation.schemas import (
     ActionRef, GateBundle, GateTarget,
 )
@@ -86,10 +87,11 @@ class RespondRequest(BaseModel):
     turn_no: int
     action: Literal[
         "select_candidate", "request_other", "clarify_intent",
-        "confirm_bundle", "rerun", "abort",
+        "confirm_bundle", "rerun", "compare_with_overrides", "abort",
     ]
     selected_index: int | None = None
     intent: str | None = None  # clarify_intent 시
+    overrides: dict | None = None  # compare_with_overrides 시 (변경 후 값)
     note: str | None = None
 
 
@@ -443,6 +445,48 @@ async def respond(
             session_id=session_id, turn_no=new_turn,
             next_gate="done", payload=payload,
             message=f"intent={intent} 실행 완료",
+        )
+
+    # ── compare_with_overrides (변경 전·후 두 번 실행 + field diff) ─────
+    if req.action == "compare_with_overrides":
+        if not req.overrides:
+            raise HTTPException(
+                status_code=422, detail="overrides 가 비어있음 — 변경 후 값을 보내야",
+            )
+        replay = p.replay_session(session_id)
+        if not replay:
+            raise HTTPException(status_code=404, detail="session 없음")
+        bundle_decision = next(
+            (d for d in reversed(replay.decisions) if d.gate_kind == "bundle_prepared"),
+            None,
+        )
+        if bundle_decision is None:
+            raise HTTPException(
+                status_code=409,
+                detail="비교할 bundle 이 없습니다 — select_candidate 부터 진행",
+            )
+        bundle = TypeAdapter(GateBundle).validate_python(bundle_decision.payload)
+        try:
+            cmp = await compare_runs(
+                bundle=bundle, overrides=req.overrides, repo_id=sess.repo_id,
+            )
+            payload = cmp.model_dump()
+            payload["kind"] = "executed_compare"
+        except Exception as e:  # noqa: BLE001
+            logger.exception("compare_runs 실패")
+            payload = {
+                "kind": "executed_compare", "error": f"compare 실패: {e}",
+                "method_fqn": bundle.target.code_method_fqn,
+                "field_diffs": [], "summary": "실행 실패",
+            }
+        new_turn = p.add_gate_decision(
+            session_id, gate_kind="executed", payload=payload,
+        )
+        p.update_session(session_id, status="done")
+        return RespondResponse(
+            session_id=session_id, turn_no=new_turn,
+            next_gate="done", payload=payload,
+            message=payload.get("summary", "compare 완료"),
         )
 
     # ── rerun (Gate III 결과 위에서 다시) ───────────────────────────────
