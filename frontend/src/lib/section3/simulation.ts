@@ -78,9 +78,29 @@ async function _get<T>(path: string): Promise<T> {
   return (await r.json()) as T;
 }
 
+export interface GraphNode {
+  id: string;
+  label: string;
+  kind: "term" | "action" | "code_method" | "code_type" | "rule";
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+  kind: string;
+}
+
+export interface GraphResponse {
+  target_fqn: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  note: string;
+}
+
 export const simulationApi = {
   start: (req: StartRequest) => _post<StartResponse>("/start", req),
   respond: (sid: string, req: RespondRequest) =>
     _post<RespondResponse>(`/respond/${sid}`, req),
   replay: (sid: string) => _get<ReplayResponse>(`/replay/${sid}`),
+  graph: (sid: string) => _get<GraphResponse>(`/graph/${sid}`),
 };

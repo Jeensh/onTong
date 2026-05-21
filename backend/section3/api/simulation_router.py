@@ -147,19 +147,54 @@ def get_ontology_client() -> OntologyClient:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def _is_test_candidate(c: dict) -> bool:
+    """candidate 가 @Test 또는 *Test 클래스의 메서드면 True.
+
+    Section 3 사용자는 production 도메인 로직을 보고 싶어함 — test 메서드는
+    importer 가 src/test/java 도 파싱하기 때문에 후보에 섞임. 시뮬레이션
+    에이전트에서는 제외.
+    """
+    fqn = (c.get("code_method_fqn") or "").strip()
+    # 클래스 이름이 Test 로 끝나거나 (XxxTest / XxxTests) Test 시작 시 제외
+    # FQN 형식: pkg.Class.method(...) — '(' 앞까지를 method, 그 앞 클래스명 추출
+    head = fqn.split("(", 1)[0]              # pkg.Class.method
+    class_part = head.rsplit(".", 1)[0]      # pkg.Class
+    cname = class_part.rsplit(".", 1)[-1]    # Class
+    if cname.endswith("Test") or cname.endswith("Tests") or cname == "SmokeTest":
+        return True
+    # annotations 에 @Test 가 있으면 (junit 4/5)
+    anns = c.get("annotations") or []
+    if any("Test" in a for a in anns):
+        return True
+    return False
+
+
 async def _build_target_payload(
     *, user_query: str, repo_id: str,
     classifier: MultiturnIntentClassifier,
     ontology_client: OntologyClient,
 ) -> dict:
-    """multiturn 의 build_gate_i 호출 → GateTarget payload (dict)."""
+    """multiturn 의 build_gate_i 호출 → GateTarget payload (dict).
+
+    후처리: test 메서드 후보 제거. recommended_index 가 가리키는 항목이
+    제거되면 첫 번째 production 후보로 재조정.
+    """
     target = await build_gate_i(
         user_query=user_query,
         repo_id=repo_id,
         classifier=classifier,
         ontology_client=ontology_client,
     )
-    return target.model_dump()
+    payload = target.model_dump()
+    candidates = payload.get("candidates") or []
+    if candidates:
+        filtered = [c for c in candidates if not _is_test_candidate(c)]
+        if filtered:
+            payload["candidates"] = filtered
+            payload["recommended_index"] = 0 if filtered else None
+            # 사용자에게 알리는 메모
+            payload["_filtered_test_count"] = len(candidates) - len(filtered)
+    return payload
 
 
 def _next_gate_from_target(payload: dict) -> str:
@@ -526,6 +561,94 @@ async def respond(
         )
 
     raise HTTPException(status_code=400, detail=f"알 수 없는 action: {req.action}")
+
+
+class GraphNode(BaseModel):
+    id: str
+    label: str
+    kind: Literal["term", "action", "code_method", "code_type", "rule"]
+
+
+class GraphEdge(BaseModel):
+    source: str
+    target: str
+    kind: str  # "calls" | "realizes" | "uses_term" | "constrains" | "delegates"
+
+
+class GraphResponse(BaseModel):
+    target_fqn: str
+    nodes: list[GraphNode] = Field(default_factory=list)
+    edges: list[GraphEdge] = Field(default_factory=list)
+    note: str = ""
+
+
+@router.get("/graph/{session_id}", response_model=GraphResponse)
+async def get_graph(
+    session_id: str,
+    ontology_client: OntologyClient = Depends(get_ontology_client),
+) -> GraphResponse:
+    """현재 세션의 target method 주변 ontology 그래프.
+
+    가장 최근 target_selected 의 selected 또는 첫 후보 method 를 중심으로
+    caller_graph + realizations + declared_on_term + business_rules 까지
+    1-hop 노드/엣지 합성.
+    """
+    rep = p.replay_session(session_id)
+    if rep is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    target_decision = None
+    for d in reversed(rep.decisions):
+        if d.gate_kind == "target_selected":
+            target_decision = d
+            break
+    if target_decision is None:
+        return GraphResponse(target_fqn="", note="아직 target 이 선택되지 않음")
+
+    cands = target_decision.payload.get("candidates") or []
+    if not cands:
+        return GraphResponse(target_fqn="", note="후보 없음")
+    sel_idx = target_decision.user_response and target_decision.user_response.get("selected_index")
+    cand = cands[sel_idx if isinstance(sel_idx, int) else 0]
+    target_fqn = cand.get("code_method_fqn", "")
+    target_label = cand.get("label", target_fqn)
+    declared_term = cand.get("declared_on_term")
+
+    nodes: list[GraphNode] = [
+        GraphNode(id=target_fqn, label=target_label, kind="code_method"),
+    ]
+    edges: list[GraphEdge] = []
+
+    # ── 1-hop callers ────────────────────────────────────────────────
+    try:
+        graph_resp = await ontology_client.get_caller_graph(target_fqn, repo_id=rep.session.repo_id)
+        cg = graph_resp.data
+        if cg is not None and hasattr(cg, "model_dump"):
+            cg_dict = cg.model_dump()
+        else:
+            cg_dict = cg or {}
+        for c in (cg_dict.get("callers") or [])[:8]:
+            cfqn = c.get("method_fqn") or c.get("fqn")
+            if cfqn and cfqn != target_fqn:
+                nodes.append(GraphNode(id=cfqn, label=cfqn.split(".")[-1][:40], kind="code_method"))
+                edges.append(GraphEdge(source=cfqn, target=target_fqn, kind="calls"))
+        for c in (cg_dict.get("callees") or [])[:8]:
+            cfqn = c.get("method_fqn") or c.get("fqn")
+            if cfqn and cfqn != target_fqn:
+                nodes.append(GraphNode(id=cfqn, label=cfqn.split(".")[-1][:40], kind="code_method"))
+                edges.append(GraphEdge(source=target_fqn, target=cfqn, kind="calls"))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("get_caller_graph 실패: %s", e)
+
+    # ── declared_on_term ────────────────────────────────────────────
+    if declared_term:
+        nodes.append(GraphNode(id=declared_term, label=declared_term.split(".")[-1], kind="term"))
+        edges.append(GraphEdge(source=target_fqn, target=declared_term, kind="uses_term"))
+
+    return GraphResponse(
+        target_fqn=target_fqn,
+        nodes=nodes, edges=edges,
+        note=f"{len(nodes)} nodes · {len(edges)} edges",
+    )
 
 
 @router.get("/replay/{session_id}", response_model=ReplayResponse)

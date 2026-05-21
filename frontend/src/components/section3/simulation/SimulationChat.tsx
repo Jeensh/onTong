@@ -7,10 +7,11 @@
  */
 import { useEffect, useState } from "react";
 import { Workflow, Send, RotateCcw, Loader2 } from "lucide-react";
-import { simulationApi, type ReplayResponse, type SimulationGate } from "@/lib/section3/simulation";
+import { simulationApi, type GraphResponse, type ReplayResponse, type SimulationGate } from "@/lib/section3/simulation";
 import { IntentCandidateCard } from "./IntentCandidateCard";
 import { BundlePreviewCard } from "./BundlePreviewCard";
 import { ExecutedResultCard } from "./ExecutedResultCard";
+import { OntologyGraphPanel } from "./OntologyGraphPanel";
 
 interface Props {
   initialSid: string | null;
@@ -18,12 +19,22 @@ interface Props {
   defaultRepoId: string | null;
 }
 
+/** slab-design-real_v2 의 5 golden 시나리오·실측 도메인 데이터 기반 예시. */
 const PRESET_QUESTIONS: { intent: string; label: string; query: string }[] = [
-  { intent: "impact",     label: "① 기능 개선 영향",  query: "단중 계산 로직 바꾸면 어디 영향?" },
-  { intent: "impact",     label: "② 기준 변경 영향",  query: "design 정책 standard 0.5 → 0.3 으로 바꾸면?" },
-  { intent: "simulate",   label: "③ 주문 변경 비교",  query: "이 주문의 thickness 만 바꿔 돌려봐" },
-  { intent: "locate",     label: "④ 코드 위치 찾기",  query: "edging 룰은 어디 박혀있어?" },
-  { intent: "hypothesis", label: "⑤ 신규 품종 추가",  query: "신규 품종 HC600X 추가되면 어떤 영향?" },
+  { intent: "simulate",   label: "① 주문 1건 슬랩 설계 (S1)",
+    query: "ORD20260510001 주문으로 슬랩 설계 시뮬레이션 돌려줘" },
+  { intent: "simulate",   label: "② 두께 변경 후 비교",
+    query: "SdThicknessAction 의 결과 두께 230→200mm 로 바꿨을 때 슬랩 결과 차이" },
+  { intent: "impact",     label: "③ EDGING 사양 변경 영향",
+    query: "SD_HSM_EDGING_SPEC 마진을 늘리면 어떤 step·method 가 영향받아?" },
+  { intent: "impact",     label: "④ 단중 하한 룰 변경 영향",
+    query: "secondaryWeight 하한을 8000→9000kg 으로 바꾸면 어떤 주문이 fail?" },
+  { intent: "locate",     label: "⑤ DG104 에러 발생 위치",
+    query: "DG104 (HR_MIN_WGT 미발견) 은 어디서 throw 돼?" },
+  { intent: "explain",    label: "⑥ A-a 루프 설명",
+    query: "Step 8~13 의 A-a inner loop 가 뭐고 어떻게 수렴해?" },
+  { intent: "hypothesis", label: "⑦ 신규 강종 추가 가설",
+    query: "신규 강종 HC600X (얇은 두께 0.2mm) 가 추가되면 step 1 SdThicknessAction 이 어떻게 분기?" },
 ];
 
 const INTENT_BADGE: Record<string, { color: string; label: string }> = {
@@ -268,31 +279,9 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
 
       <div className="bg-gray-200" />
 
-      {/* ─────────── 우측 graph + 7-tab (placeholder) ─────────── */}
+      {/* ─────────── 우측 ontology graph ─────────── */}
       <div className="flex flex-col h-full overflow-hidden bg-white p-3 gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">온톨로지 graph</h3>
-          <div className="border border-gray-200 rounded p-3 text-xs text-gray-500 min-h-[180px]">
-            {intent ? (
-              <span>intent=<code>{intent}</code> · target 노드와 인접 actions 가 표시됩니다 (Phase F-2 에서 xyflow 연결).</span>
-            ) : (
-              "(질문 후 노드가 표시됩니다)"
-            )}
-          </div>
-        </div>
-        <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">유형별 호출 결과</h3>
-          <div className="border border-gray-200 rounded text-[11px] text-gray-600">
-            <div className="grid grid-cols-2 border-b border-gray-200">
-              {["Terms", "Actions", "CodeTypes", "Rules", "Anchors", "CallSites", "Delegates"].map((t) => (
-                <button key={t} className="px-2 py-1.5 hover:bg-gray-50 text-left border-b border-gray-100">
-                  {t}
-                </button>
-              ))}
-            </div>
-            <div className="p-3 text-gray-400">선택된 탭의 ontology 응답 row 가 표시됩니다.</div>
-          </div>
-        </div>
+        <OntologyGraphPanel sessionId={sid} refreshKey={replay?.decisions.length ?? 0} />
       </div>
     </div>
   );
