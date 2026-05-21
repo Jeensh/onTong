@@ -27,9 +27,10 @@ export function ExecutedResultCard({ payload, intent, onRerun, onNew, busy }: Pr
         </div>
       )}
 
+      {!error && payload.kind === "executed_full_design" && <_FullDesignView payload={payload} />}
       {!error && payload.kind === "executed_compare" && <_CompareView payload={payload} />}
-      {!error && payload.kind !== "executed_compare" && intent === "simulate" && <_SimulateView payload={payload} />}
-      {!error && payload.kind !== "executed_compare" && intent === "impact" && <_ImpactView payload={payload} />}
+      {!error && payload.kind !== "executed_compare" && payload.kind !== "executed_full_design" && intent === "simulate" && <_SimulateView payload={payload} />}
+      {!error && payload.kind !== "executed_compare" && payload.kind !== "executed_full_design" && intent === "impact" && <_ImpactView payload={payload} />}
       {!error && (intent === "locate" || intent === "explain") && <_LookupView payload={payload} intent={intent} />}
       {!error && intent === "hypothesis" && <_HypothesisView payload={payload} />}
 
@@ -179,6 +180,140 @@ function _LookupView({ payload, intent }: { payload: Record<string, unknown>; in
     </>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _FullDesignView — Java :8080 의 /api/sd/working/single 결과
+// ─────────────────────────────────────────────────────────────────────────────
+
+function _FullDesignView({ payload }: { payload: Record<string, unknown> }) {
+  const orderNo = payload.order_no as string;
+  const slabResults = (payload.slab_results as Array<Record<string, unknown>> | undefined) ?? [];
+  const trace = (payload.trace as Array<Record<string, unknown>> | undefined) ?? [];
+  const errorCode = payload.error_code as string | null;
+  const errorMessage = payload.error_message as string | null;
+  const ok = payload.ok as boolean;
+
+  // 슬랩 결과의 핵심 필드만 추려서 highlight
+  const HIGHLIGHT_FIELDS: { key: string; label: string; unit?: string }[] = [
+    { key: "slabThickness", label: "두께", unit: "mm" },
+    { key: "slabWidth",     label: "폭",   unit: "mm" },
+    { key: "slabLength",    label: "길이", unit: "mm" },
+    { key: "slabWgt",       label: "단중", unit: "kg" },
+    { key: "splitCount",    label: "분할수" },
+    { key: "designStatus",  label: "상태" },
+    { key: "slabNo",        label: "슬랩번호" },
+  ];
+
+  return (
+    <>
+      <div className="text-sm">
+        <span className="font-semibold">주문 </span>
+        <code className="text-emerald-700">{orderNo}</code>
+        <span className="text-gray-500 ml-2">→ 슬랩 {slabResults.length}매 설계</span>
+      </div>
+
+      {!ok && errorCode && (
+        <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded p-2">
+          ⚠ {errorCode}: {errorMessage}
+        </div>
+      )}
+
+      {slabResults.map((slab, i) => (
+        <div key={i} className="border-2 border-emerald-300 rounded-lg bg-emerald-50/30">
+          <div className="px-3 py-2 bg-emerald-100 border-b border-emerald-300 flex items-center justify-between">
+            <strong className="text-emerald-900 text-xs">슬랩 #{i + 1}</strong>
+            <code className="text-[10px] text-emerald-700">slabNo {String(slab.slabNo)}</code>
+          </div>
+          <div className="grid grid-cols-4 gap-2 p-3">
+            {HIGHLIGHT_FIELDS.map((f) => {
+              const v = slab[f.key];
+              if (v === undefined || v === null) return null;
+              return (
+                <div key={f.key} className="text-center">
+                  <div className="text-[10px] text-gray-500">{f.label}</div>
+                  <div className={"text-sm font-mono mt-0.5 " + (
+                    f.key === "designStatus" && v === "SUCCESS" ? "text-emerald-700 font-semibold" :
+                    f.key === "designStatus" ? "text-red-700 font-semibold" : "text-gray-900"
+                  )}>
+                    {typeof v === "number" ? v.toLocaleString(undefined, {maximumFractionDigits: 2}) : String(v)}
+                    {f.unit && <span className="text-[10px] text-gray-400 ml-0.5">{f.unit}</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <details className="border-t border-emerald-200">
+            <summary className="px-3 py-1.5 text-[11px] text-emerald-800 cursor-pointer hover:bg-emerald-100/50">
+              전체 필드 보기 ({Object.keys(slab).length}건)
+            </summary>
+            <div className="p-2 max-h-64 overflow-auto">
+              <table className="w-full text-[10px]">
+                <tbody>
+                  {Object.entries(slab).map(([k, v]) => (
+                    <tr key={k} className="border-b border-emerald-100">
+                      <td className="py-0.5 pr-2 text-gray-500 font-mono">{k}</td>
+                      <td className="py-0.5 font-mono text-gray-800">
+                        {v === null ? <span className="text-gray-300">null</span> :
+                         typeof v === "number" ? v.toLocaleString(undefined, {maximumFractionDigits: 6}) :
+                         String(v)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+      ))}
+
+      {trace.length > 0 && (
+        <details open className="border border-gray-200 rounded">
+          <summary className="px-3 py-2 bg-gray-50 border-b border-gray-200 cursor-pointer text-xs font-semibold text-gray-800">
+            21-step 실행 trace ({trace.length} rows)
+          </summary>
+          <div className="max-h-72 overflow-auto">
+            <table className="w-full text-[10px] border-collapse">
+              <thead className="sticky top-0 bg-gray-50">
+                <tr className="border-b border-gray-200">
+                  <th className="p-1.5 text-left text-gray-600">step</th>
+                  <th className="p-1.5 text-left text-gray-600">action</th>
+                  <th className="p-1.5 text-left text-gray-600">phase</th>
+                  <th className="p-1.5 text-right text-gray-600">iter</th>
+                  <th className="p-1.5 text-left text-gray-600">status</th>
+                  <th className="p-1.5 text-left text-gray-600">error</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trace.map((t, i) => {
+                  const status = String(t.status);
+                  return (
+                    <tr key={i} className="border-b border-gray-100">
+                      <td className="p-1 font-mono">{String(t.step)}</td>
+                      <td className="p-1 text-gray-800">{String(t.stepName)}</td>
+                      <td className="p-1 text-gray-500">{String(t.phase)}</td>
+                      <td className="p-1 text-right text-gray-500">{String(t.iteration)}</td>
+                      <td className={"p-1 font-semibold " + (
+                        status === "OK" ? "text-emerald-700" :
+                        status === "RETRY" ? "text-amber-700" :
+                        status === "FAIL" ? "text-red-700" : "text-gray-500"
+                      )}>{status}</td>
+                      <td className="p-1 text-red-600 font-mono">{t.errorCode ? String(t.errorCode) : ""}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
+
+      <div className="text-[10px] text-gray-400 mt-2">
+        Java :8080 의 /api/sd/working/single?trace=true 호출 결과. 21-step 알고리즘 전체 실행.
+      </div>
+    </>
+  );
+}
+
 
 function _CompareView({ payload }: { payload: Record<string, unknown> }) {
   const before = payload.before_result as Record<string, unknown> | null;

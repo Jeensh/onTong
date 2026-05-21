@@ -45,6 +45,9 @@ from backend.section3.agents.simulation.compare_runs import compare_runs
 from backend.section3.agents.simulation.schemas import (
     ActionRef, GateBundle, GateTarget,
 )
+from backend.section3.agents.simulation.slab_design_runner import (
+    extract_order_no, is_full_design_intent, run_full_design,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,11 +90,15 @@ class RespondRequest(BaseModel):
     turn_no: int
     action: Literal[
         "select_candidate", "request_other", "clarify_intent",
-        "confirm_bundle", "rerun", "compare_with_overrides", "abort",
+        "confirm_bundle", "rerun", "compare_with_overrides",
+        "run_full_design", "abort",
     ]
     selected_index: int | None = None
     intent: str | None = None  # clarify_intent 시
     overrides: dict | None = None  # compare_with_overrides 시 (변경 후 값)
+    order_no: str | None = None    # run_full_design 시 (없으면 query 에서 추출)
+    cmp_cd: str | None = None
+    org_cd: str | None = None
     note: str | None = None
 
 
@@ -205,17 +212,60 @@ def _next_gate_from_target(payload: dict) -> str:
     return "target_selected"
 
 
+async def _execute_full_design(
+    *, session_id: str, order_no: str,
+    cmp_cd: str = "K", org_cd: str = "1",
+) -> "RespondResponse":
+    """Java slab-design 서버 호출 → slabResults + trace 를 executed payload 로."""
+    result = await run_full_design(order_no=order_no, cmp_cd=cmp_cd, org_cd=org_cd)
+    payload: dict = {
+        "kind": "executed_full_design",
+        "order_no": order_no,
+        "cmp_cd": cmp_cd, "org_cd": org_cd,
+        "ok": result["ok"],
+        "slab_results": result["slab_results"],
+        "trace": result["trace"],
+        "error_code": result["error_code"],
+        "error_message": result["error_message"],
+        "base_url": result["base_url"],
+    }
+    if not result["ok"]:
+        payload["error"] = result["error_message"]
+    new_turn = p.add_gate_decision(session_id, gate_kind="executed", payload=payload)
+    p.update_session(session_id, status="done")
+    n_slabs = len(result["slab_results"])
+    msg = (
+        f"Slab {n_slabs}매 설계 완료" if result["ok"] and not result["error_code"]
+        else f"실패 — {result['error_code']}: {(result['error_message'] or '')[:80]}"
+    )
+    return RespondResponse(
+        session_id=session_id, turn_no=new_turn,
+        next_gate="done", payload=payload, message=msg,
+    )
+
+
 async def _proceed_from_target(
     *, session_id: str, intent: str, target: ActionRef, repo_id: str,
     ontology_client: OntologyClient,
     conditions: list[dict] | None = None,
+    user_query: str | None = None,
 ) -> "RespondResponse":
     """select_candidate 시점에서 intent 별로 다음 게이트 자동 진행.
 
-    - simulate, hypothesis → Gate II (bundle_prepared)
-    - impact               → Gate III impact 직진
-    - locate, explain      → Gate III lookup 직진 (mode=locate|explain)
+    - simulate + 주문번호 감지 → Java :8080 전체 설계 직진 (executed_full_design)
+    - simulate, hypothesis     → Gate II (bundle_prepared)
+    - impact                   → Gate III impact 직진
+    - locate, explain          → Gate III lookup 직진 (mode=locate|explain)
     """
+    # 우선 simulate intent + 주문번호 매칭 시 전체 설계
+    if intent == "simulate" and user_query:
+        order_no = extract_order_no(user_query)
+        if order_no:
+            logger.info("full design 분기: %s", order_no)
+            return await _execute_full_design(
+                session_id=session_id, order_no=order_no,
+            )
+
     if intent in ("simulate", "hypothesis"):
         try:
             bundle = await build_gate_ii(
@@ -429,6 +479,20 @@ async def respond(
             repo_id=sess.repo_id,
             ontology_client=ontology_client,
             conditions=target.conditions,
+            user_query=sess.user_query,
+        )
+
+    # ── run_full_design — 사용자가 BundlePreview 에서 명시적으로 전체 설계 실행 ──
+    if req.action == "run_full_design":
+        order_no = req.order_no or extract_order_no(sess.user_query or "")
+        if not order_no:
+            raise HTTPException(
+                status_code=422,
+                detail="order_no 가 필요합니다. ORD20260510001 같은 형식.",
+            )
+        return await _execute_full_design(
+            session_id=session_id, order_no=order_no,
+            cmp_cd=req.cmp_cd or "K", org_cd=req.org_cd or "1",
         )
 
     # ── confirm_bundle → simulate/hypothesis Gate III 실행 ──────────────
