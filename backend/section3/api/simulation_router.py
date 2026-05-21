@@ -49,6 +49,7 @@ from backend.section3.agents.simulation.slab_design_runner import (
     extract_order_no, is_full_design_intent, run_full_design,
 )
 from backend.section3.agents.simulation import domain_data
+from backend.section3.agents.simulation.hypothesis_workflow import run_hypothesis
 
 logger = logging.getLogger(__name__)
 
@@ -795,6 +796,59 @@ class DomainTableDetail(BaseModel):
     pk_columns: list[str]
     rows: list[dict]
     row_count_total: int
+
+
+class HypothesisRequest(BaseModel):
+    base_grade: str = "SS400"
+    new_grade: str = "SS500"
+    productivity_multiplier: float = 0.95
+    base_order_no: str = "ORD20260510001"
+
+
+class HypothesisResponse(BaseModel):
+    base_grade: str
+    new_grade: str
+    productivity_multiplier: float
+    base_order_no: str
+    existing_productivity_rows: list[dict]
+    existing_order_rows: dict[str, dict]
+    virtual_productivity_rows: list[dict]
+    virtual_order_rows: dict[str, dict]
+    baseline_slab: dict | None = None
+    baseline_trace: list[dict] = Field(default_factory=list)
+    projected_slab: dict | None = None
+    diff_summary: list[dict] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
+@router.post("/hypothesis/run", response_model=HypothesisResponse)
+async def hypothesis_run(req: HypothesisRequest) -> HypothesisResponse:
+    """신규 강종 추가 가설 — 4단계 결과를 한 번에 surface.
+
+    1) 기존 grade 의 SD_PRODUCTIVITY_STD row 조회
+    2) productivity_multiplier 로 가상 grade row 합성
+    3) base_order 복제 → ORDER_QD.GRADE_CD 만 변경
+    4) Java :8080 으로 base_order 실행 + projection 추론
+    """
+    r = await run_hypothesis(
+        base_grade=req.base_grade, new_grade=req.new_grade,
+        productivity_multiplier=req.productivity_multiplier,
+        base_order_no=req.base_order_no,
+    )
+    return HypothesisResponse(
+        base_grade=r.base_grade, new_grade=r.new_grade,
+        productivity_multiplier=r.productivity_multiplier,
+        base_order_no=r.base_order_no,
+        existing_productivity_rows=r.existing_productivity_rows,
+        existing_order_rows=r.existing_order_rows,
+        virtual_productivity_rows=r.virtual_productivity_rows,
+        virtual_order_rows=r.virtual_order_rows,
+        baseline_slab=r.baseline_slab,
+        baseline_trace=r.baseline_trace,
+        projected_slab=r.projected_slab,
+        diff_summary=r.diff_summary,
+        notes=r.notes,
+    )
 
 
 class MethodBodyView(BaseModel):

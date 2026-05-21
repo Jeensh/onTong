@@ -34,8 +34,8 @@ const PRESET_QUESTIONS: { intent: string; label: string; query: string }[] = [
     query: "DG104 (HR_MIN_WGT 미발견) 은 어디서 throw 돼?" },
   { intent: "explain",    label: "⑥ A-a 루프 설명",
     query: "Step 8~13 의 A-a inner loop 가 뭐고 어떻게 수렴해?" },
-  { intent: "hypothesis", label: "⑦ 신규 강종 추가 가설",
-    query: "신규 강종 HC600X (얇은 두께 0.2mm) 가 추가되면 step 1 SdThicknessAction 이 어떻게 분기?" },
+  { intent: "hypothesis", label: "⑦ 신규 강종 SS500 추가 시 영향",
+    query: "신규 강종 SS500 (기존 SS400 대비 productivity ×0.95) 가 SD_PRODUCTIVITY_STD 에 추가되고, 동일 사양 주문 (orderWidth 1200 · designPendQty 10000kg) 이 들어오면 ORD20260510001 의 Slab 결과 (slabThickness 230 · slabWgt 13288kg) 와 어떻게 달라질까?" },
 ];
 
 const INTENT_BADGE: Record<string, { color: string; label: string }> = {

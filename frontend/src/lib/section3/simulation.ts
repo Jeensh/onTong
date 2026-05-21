@@ -149,4 +149,28 @@ export const simulationApi = {
   getTable: (name: string) => _get<DomainTableDetail>(`/data/table/${name}`),
   methodBody: (fqn: string, repoId = "slab-design-real-v2") =>
     _get<MethodBodyView>(`/method/body?fqn=${encodeURIComponent(fqn)}&repo_id=${encodeURIComponent(repoId)}`),
+  hypothesis: (req: HypothesisRequest) => _post<HypothesisResponse>("/hypothesis/run", req),
 };
+
+export interface HypothesisRequest {
+  base_grade?: string;
+  new_grade?: string;
+  productivity_multiplier?: number;
+  base_order_no?: string;
+}
+
+export interface HypothesisResponse {
+  base_grade: string;
+  new_grade: string;
+  productivity_multiplier: number;
+  base_order_no: string;
+  existing_productivity_rows: Record<string, unknown>[];
+  existing_order_rows: Record<string, Record<string, unknown>>;
+  virtual_productivity_rows: Record<string, unknown>[];
+  virtual_order_rows: Record<string, Record<string, unknown>>;
+  baseline_slab: Record<string, unknown> | null;
+  baseline_trace: Record<string, unknown>[];
+  projected_slab: Record<string, unknown> | null;
+  diff_summary: { field: string; before: number; after: number; delta: number; delta_pct: number }[];
+  notes: string[];
+}

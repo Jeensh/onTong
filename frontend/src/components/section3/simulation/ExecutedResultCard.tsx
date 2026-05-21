@@ -3,7 +3,7 @@
 /** executed 게이트 카드 — intent 별 차별 레이아웃. */
 import { useEffect, useState } from "react";
 import { RotateCcw, Plus, ChevronRight, ChevronDown, Loader2, Code } from "lucide-react";
-import { simulationApi, type MethodBodyView } from "@/lib/section3/simulation";
+import { simulationApi, type MethodBodyView, type HypothesisResponse } from "@/lib/section3/simulation";
 
 interface Props {
   payload: Record<string, unknown>;
@@ -700,41 +700,264 @@ function _CompareView({ payload }: { payload: Record<string, unknown> }) {
 }
 
 function _HypothesisView({ payload }: { payload: Record<string, unknown> }) {
+  // legacy multiturn hypothesis payload + 신규 hypothesis workflow 둘 다 처리
   const verdict = payload.verdict as string | undefined;
   const reasoning = payload.reasoning as string | undefined;
-  const target = payload.target as Record<string, unknown> | undefined;
-  const conditions = (payload.conditions as Array<Record<string, unknown>> | undefined) ?? [];
+
+  const [hyp, setHyp] = useState<HypothesisResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [params, setParams] = useState({
+    base_grade: "SS400", new_grade: "SS500",
+    productivity_multiplier: 0.95, base_order_no: "ORD20260510001",
+  });
+  const [error, setError] = useState<string | null>(null);
+
+  // 자동 1회 호출 (default 파라미터)
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    simulationApi.hypothesis(params)
+      .then((d) => { if (!cancelled) setHyp(d); })
+      .catch((e) => { if (!cancelled) setError(String(e)); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function _rerun() {
+    setLoading(true); setError(null);
+    try {
+      const d = await simulationApi.hypothesis(params);
+      setHyp(d);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <>
-      {verdict && (
-        <div className="text-sm font-semibold">
-          <span className={
+      {/* 시나리오 헤더 */}
+      <div className="bg-gradient-to-r from-rose-600 to-rose-700 text-white rounded-lg p-3 shadow">
+        <div className="text-[10px] uppercase tracking-wide opacity-80">가설 검증</div>
+        <div className="text-sm font-semibold mt-0.5">
+          신규 강종 <code className="bg-white/20 px-1.5 py-0.5 rounded">{params.new_grade}</code> 가 추가되면
+          <span className="opacity-80">
+            {" "}({params.base_grade} 대비 productivity ×{params.productivity_multiplier})
+          </span>
+          {" "}→ <code className="bg-white/20 px-1.5 py-0.5 rounded">{params.base_order_no}</code> 의 Slab 결과는?
+        </div>
+      </div>
+
+      {/* legacy multiturn 응답이 있으면 같이 표시 */}
+      {(verdict || reasoning) && (
+        <div className="text-xs bg-gray-50 border border-gray-200 rounded p-2">
+          <div className="font-semibold text-gray-700">multiturn verdict: <span className={
             verdict === "passes" ? "text-emerald-700" :
             verdict === "fails" ? "text-red-700" : "text-amber-700"
-          }>
-            verdict: {verdict}
-          </span>
+          }>{verdict ?? "?"}</span></div>
+          {reasoning && <div className="text-gray-600 mt-1">{reasoning}</div>}
         </div>
       )}
-      {reasoning && <div className="text-xs text-gray-800 bg-gray-50 border border-gray-200 rounded p-2">{reasoning}</div>}
-      {target && (
-        <div className="text-[11px] text-gray-600">
-          target: <code className="font-mono">{String(target.code_method_fqn ?? "?")}</code>
+
+      {/* 파라미터 컨트롤 */}
+      <details className="border border-gray-200 rounded text-[11px]">
+        <summary className="px-2 py-1 bg-gray-50 cursor-pointer text-gray-700">파라미터 조정</summary>
+        <div className="p-2 grid grid-cols-2 gap-2">
+          {(["base_grade","new_grade","base_order_no"] as const).map((k) => (
+            <label key={k} className="flex flex-col">
+              <span className="text-gray-500">{k}</span>
+              <input value={params[k] as string}
+                onChange={(e) => setParams({...params, [k]: e.target.value})}
+                className="px-1 py-0.5 border border-gray-300 rounded font-mono"/>
+            </label>
+          ))}
+          <label className="flex flex-col">
+            <span className="text-gray-500">productivity_multiplier</span>
+            <input type="number" step="0.01" min="0.5" max="1.5"
+              value={params.productivity_multiplier}
+              onChange={(e) => setParams({...params, productivity_multiplier: parseFloat(e.target.value)})}
+              className="px-1 py-0.5 border border-gray-300 rounded font-mono"/>
+          </label>
+          <button onClick={_rerun} disabled={loading}
+            className="col-span-2 px-2 py-1 bg-rose-600 text-white rounded hover:bg-rose-500 disabled:opacity-50">
+            {loading ? "분석 중..." : "재실행"}
+          </button>
+        </div>
+      </details>
+
+      {loading && (
+        <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded p-2 flex items-center gap-1">
+          <Loader2 size={12} className="animate-spin" /> 기존 데이터 분석 + 가상 합성 + 추론 진행 중...
         </div>
       )}
-      {conditions.length > 0 && (
-        <div>
-          <div className="text-[11px] text-gray-600 mb-1">conditions {conditions.length}건</div>
-          <ul className="text-[11px] space-y-0.5">
-            {conditions.map((c, i) => (
-              <li key={i} className="font-mono text-gray-700">
-                {String(c.var ?? "?")} {String(c.op ?? "=")} {String(c.value ?? "?")} {String(c.unit ?? "")}
-              </li>
-            ))}
-          </ul>
-        </div>
+      {error && <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded p-2">{error}</div>}
+
+      {hyp && (
+        <>
+          {/* 4-step section */}
+          <_HypoStep n={1} title="기존 데이터 분석" color="sky">
+            <div className="text-[10px] text-gray-600 mb-1">
+              <code className="bg-sky-100 px-1 rounded">{hyp.base_grade}</code> 강종의 SD_PRODUCTIVITY_STD {hyp.existing_productivity_rows.length}건
+            </div>
+            <table className="w-full text-[10px]">
+              <thead><tr className="border-b border-sky-200">
+                <th className="text-left p-0.5">PROC_CD</th>
+                <th className="text-left p-0.5">CUSTOMER_CD</th>
+                <th className="text-right p-0.5">PRODUCTIVITY</th>
+              </tr></thead>
+              <tbody>
+                {hyp.existing_productivity_rows.slice(0, 12).map((r, i) => (
+                  <tr key={i} className="border-b border-sky-100">
+                    <td className="p-0.5 font-mono">{String(r.PROC_CD)}</td>
+                    <td className="p-0.5 font-mono text-gray-500">{String(r.CUSTOMER_CD)}</td>
+                    <td className="p-0.5 font-mono text-right">{String(r.PRODUCTIVITY)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </_HypoStep>
+
+          <_HypoStep n={2} title="가상 강종 합성" color="amber">
+            <div className="text-[10px] text-gray-600 mb-1">
+              <code className="bg-amber-100 px-1 rounded">{hyp.new_grade}</code> ×{hyp.productivity_multiplier}
+            </div>
+            <table className="w-full text-[10px]">
+              <thead><tr className="border-b border-amber-200">
+                <th className="text-left p-0.5">PROC_CD</th>
+                <th className="text-right p-0.5">기존</th>
+                <th className="text-right p-0.5">가상</th>
+              </tr></thead>
+              <tbody>
+                {hyp.virtual_productivity_rows.slice(0, 12).map((r, i) => {
+                  const orig = hyp.existing_productivity_rows[i];
+                  return (
+                    <tr key={i} className="border-b border-amber-100">
+                      <td className="p-0.5 font-mono">{String(r.PROC_CD)}</td>
+                      <td className="p-0.5 font-mono text-right text-gray-500">{String(orig?.PRODUCTIVITY ?? "?")}</td>
+                      <td className="p-0.5 font-mono text-right text-amber-700 font-semibold">{String(r.PRODUCTIVITY)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </_HypoStep>
+
+          <_HypoStep n={3} title="가상 주문 합성" color="violet">
+            <div className="text-[10px] text-gray-600">
+              <code className="bg-violet-100 px-1 rounded">{hyp.base_order_no}</code> 4 table 복제 →
+              ORDER_QD.GRADE_CD = <code className="bg-amber-100 px-1 rounded">{hyp.new_grade}</code> 만 변경
+            </div>
+            <ul className="text-[10px] mt-1 space-y-0.5">
+              {Object.entries(hyp.virtual_order_rows).map(([t, row]) => (
+                <li key={t} className="font-mono">
+                  <span className="text-violet-700">{t}</span>
+                  <span className="text-gray-400 ml-1">
+                    {t === "ORDER_QD" ? `GRADE_CD=${row.GRADE_CD}` :
+                     t === "ORDER_OM" ? `width=${row.ORDER_WIDTH} len=${row.ORDER_LENGTH} wgt=${row.ORDER_WGT_LOW}~${row.ORDER_WGT_HIGH}` :
+                     `${Object.keys(row).length} 필드 복제`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </_HypoStep>
+
+          <_HypoStep n={4} title="Slab 결과 비교 (추론)" color="emerald">
+            {hyp.baseline_slab ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-2 text-[10px]">
+                  <div className="border border-gray-300 rounded p-1.5">
+                    <div className="text-gray-500">기존 ({hyp.base_grade})</div>
+                    <div className="font-mono">
+                      두께 {hyp.baseline_slab.slabThickness as number} · 폭 {hyp.baseline_slab.slabWidth as number}
+                    </div>
+                    <div className="font-mono text-emerald-700 font-semibold">
+                      단중 {Number(hyp.baseline_slab.slabWgt).toFixed(1)}kg
+                    </div>
+                  </div>
+                  <div className="border border-amber-300 bg-amber-50 rounded p-1.5">
+                    <div className="text-amber-700">가상 ({hyp.new_grade})</div>
+                    <div className="font-mono">
+                      두께 {hyp.projected_slab?.slabThickness as number} · 폭 {hyp.projected_slab?.slabWidth as number}
+                    </div>
+                    <div className="font-mono text-amber-800 font-semibold">
+                      단중 {Number(hyp.projected_slab?.slabWgt ?? 0).toFixed(1)}kg
+                    </div>
+                  </div>
+                  <div className="border border-red-300 bg-red-50 rounded p-1.5">
+                    <div className="text-red-700">DIFF</div>
+                    <div className="font-mono">두께 0 · 폭 0 (강종 무관)</div>
+                    <div className="font-mono text-red-800 font-semibold">
+                      단중 {hyp.diff_summary.find((d) => d.field === "slabWgt")?.delta_pct ?? 0}%
+                    </div>
+                  </div>
+                </div>
+                {hyp.diff_summary.length > 0 && (
+                  <details className="text-[10px]">
+                    <summary className="cursor-pointer text-gray-600">전체 diff ({hyp.diff_summary.length}건)</summary>
+                    <table className="w-full mt-1">
+                      <thead><tr className="border-b border-gray-300">
+                        <th className="text-left p-0.5">field</th>
+                        <th className="text-right p-0.5">before</th>
+                        <th className="text-right p-0.5">after</th>
+                        <th className="text-right p-0.5">%</th>
+                      </tr></thead>
+                      <tbody>
+                        {hyp.diff_summary.map((d) => (
+                          <tr key={d.field} className="border-b border-gray-100">
+                            <td className="p-0.5 font-mono">{d.field}</td>
+                            <td className="p-0.5 font-mono text-right">{d.before.toFixed(2)}</td>
+                            <td className="p-0.5 font-mono text-right text-emerald-700">{d.after.toFixed(2)}</td>
+                            <td className="p-0.5 font-mono text-right text-red-700">{d.delta_pct}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </details>
+                )}
+              </div>
+            ) : (
+              <div className="text-[10px] text-gray-400">baseline 실행 결과 없음</div>
+            )}
+          </_HypoStep>
+
+          {hyp.notes.length > 0 && (
+            <details className="text-[10px] border border-gray-200 rounded">
+              <summary className="px-2 py-1 bg-gray-50 cursor-pointer text-gray-600">분석 노트 ({hyp.notes.length})</summary>
+              <ul className="p-2 space-y-1">
+                {hyp.notes.map((n, i) => <li key={i} className="text-gray-700">· {n}</li>)}
+              </ul>
+            </details>
+          )}
+        </>
       )}
     </>
+  );
+}
+
+function _HypoStep({ n, title, color, children }: {
+  n: number; title: string; color: "sky"|"amber"|"violet"|"emerald"; children: React.ReactNode;
+}) {
+  const colorMap = {
+    sky:     "border-sky-300 bg-sky-50/40",
+    amber:   "border-amber-300 bg-amber-50/40",
+    violet:  "border-violet-300 bg-violet-50/40",
+    emerald: "border-emerald-300 bg-emerald-50/40",
+  };
+  const badge = {
+    sky:     "bg-sky-600",
+    amber:   "bg-amber-600",
+    violet:  "bg-violet-600",
+    emerald: "bg-emerald-600",
+  };
+  return (
+    <div className={"border-2 rounded p-2 " + colorMap[color]}>
+      <div className="flex items-center gap-2 mb-2">
+        <span className={"text-[10px] w-5 h-5 rounded-full text-white font-bold flex items-center justify-center " + badge[color]}>{n}</span>
+        <strong className="text-xs text-gray-800">{title}</strong>
+      </div>
+      {children}
+    </div>
   );
 }
