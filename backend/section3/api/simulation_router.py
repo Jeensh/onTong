@@ -752,6 +752,80 @@ class DomainTableDetail(BaseModel):
     row_count_total: int
 
 
+class MethodBodyView(BaseModel):
+    method_fqn: str
+    body: str = ""
+    file_path: str = ""
+    line_start: int | None = None
+    line_end: int | None = None
+    annotations: list[str] = Field(default_factory=list)
+    callers: list[str] = Field(default_factory=list)
+    callees: list[str] = Field(default_factory=list)
+
+
+@router.get("/method/body", response_model=MethodBodyView)
+async def get_method_body(
+    fqn: str, repo_id: str = "slab-design-real-v2",
+    ontology_client: OntologyClient = Depends(get_ontology_client),
+) -> MethodBodyView:
+    """impact intent 의 affected method 행 click 시 코드 본문 + 1-hop graph 확장."""
+    body_text = ""
+    file_path = ""
+    line_start = None
+    line_end = None
+    callers: list[str] = []
+    callees: list[str] = []
+    annotations: list[str] = []
+
+    try:
+        body_r = await ontology_client.get_method_body(fqn, repo_id=repo_id)
+        body_text = body_r.data or ""
+    except Exception as e:  # noqa: BLE001
+        logger.warning("get_method_body 실패: %s", e)
+
+    # 우리 SQLite ontology.db 에서 직접 meta 보완
+    try:
+        from sqlalchemy import select
+        from backend.modeling.persistence.database import session_scope
+        from backend.modeling.code_layer.orm import CodeMethodRow
+        with session_scope() as s:
+            row = s.execute(
+                select(CodeMethodRow).where(
+                    CodeMethodRow.fqn == fqn,
+                    CodeMethodRow.repo_id == repo_id,
+                )
+            ).scalar_one_or_none()
+            if row:
+                if not body_text and row.body_text:
+                    body_text = row.body_text
+                line_start = row.line_start
+                line_end = row.line_end
+                try:
+                    import json
+                    annotations = json.loads(row.annotations_json or "[]")
+                except Exception:
+                    pass
+    except Exception as e:  # noqa: BLE001
+        logger.warning("CodeMethod 조회 실패: %s", e)
+
+    # callers / callees (1-hop)
+    try:
+        cg = await ontology_client.get_caller_graph(fqn, repo_id=repo_id)
+        cg_dict = cg.data.model_dump() if cg.data and hasattr(cg.data, "model_dump") else (cg.data or {})
+        callers = [c.get("method_fqn") or c.get("fqn") or "" for c in (cg_dict.get("callers") or [])][:10]
+        callees = [c.get("method_fqn") or c.get("fqn") or "" for c in (cg_dict.get("callees") or [])][:10]
+        callers = [c for c in callers if c]
+        callees = [c for c in callees if c]
+    except Exception as e:  # noqa: BLE001
+        logger.warning("get_caller_graph 실패: %s", e)
+
+    return MethodBodyView(
+        method_fqn=fqn, body=body_text, file_path=file_path,
+        line_start=line_start, line_end=line_end,
+        annotations=annotations, callers=callers, callees=callees,
+    )
+
+
 @router.get("/data/tables", response_model=list[DomainTableView])
 async def list_domain_tables() -> list[DomainTableView]:
     """slab-design-real_v2 의 JPA Entity 기준 table 목록 + seed row 수."""

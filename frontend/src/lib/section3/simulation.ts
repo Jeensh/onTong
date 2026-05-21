@@ -128,6 +128,17 @@ export interface DomainTableDetail {
   row_count_total: number;
 }
 
+export interface MethodBodyView {
+  method_fqn: string;
+  body: string;
+  file_path: string;
+  line_start: number | null;
+  line_end: number | null;
+  annotations: string[];
+  callers: string[];
+  callees: string[];
+}
+
 export const simulationApi = {
   start: (req: StartRequest) => _post<StartResponse>("/start", req),
   respond: (sid: string, req: RespondRequest) =>
@@ -136,4 +147,6 @@ export const simulationApi = {
   graph: (sid: string) => _get<GraphResponse>(`/graph/${sid}`),
   listTables: () => _get<DomainTableView[]>("/data/tables"),
   getTable: (name: string) => _get<DomainTableDetail>(`/data/table/${name}`),
+  methodBody: (fqn: string, repoId = "slab-design-real-v2") =>
+    _get<MethodBodyView>(`/method/body?fqn=${encodeURIComponent(fqn)}&repo_id=${encodeURIComponent(repoId)}`),
 };

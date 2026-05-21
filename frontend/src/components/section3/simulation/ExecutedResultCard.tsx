@@ -1,7 +1,9 @@
 "use client";
 
 /** executed 게이트 카드 — intent 별 차별 레이아웃. */
-import { RotateCcw, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { RotateCcw, Plus, ChevronRight, ChevronDown, Loader2, Code } from "lucide-react";
+import { simulationApi, type MethodBodyView } from "@/lib/section3/simulation";
 
 interface Props {
   payload: Record<string, unknown>;
@@ -83,31 +85,64 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
   const methods = (payload.affected_methods as Array<Record<string, unknown>> | undefined) ?? [];
   const findings = (payload.sim_v2_findings as Array<Record<string, unknown>> | undefined) ?? [];
   const confidence = (payload.confidence as number | undefined) ?? 0;
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const toggle = (fqn: string) => {
+    setExpanded((s) => {
+      const n = new Set(s);
+      n.has(fqn) ? n.delete(fqn) : n.add(fqn);
+      return n;
+    });
+  };
 
   return (
     <>
-      <div className="text-[11px] text-gray-700">
+      <div className="text-[11px] text-gray-700 bg-amber-50 border border-amber-200 rounded p-2">
         영향받는 method {methods.length}건 · sim_v2 findings {findings.length}건 · confidence {confidence.toFixed(2)}
+        <div className="text-[10px] text-amber-700 mt-1">
+          행을 클릭하면 코드 본문 + 호출/피호출 1-hop 이 확장됩니다.
+        </div>
       </div>
-      <div className="max-h-64 overflow-y-auto">
+      <div className="max-h-[400px] overflow-y-auto border border-gray-200 rounded">
         <table className="w-full text-[11px] border-collapse">
-          <thead>
+          <thead className="sticky top-0">
             <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="text-left p-1.5 w-6"></th>
               <th className="text-left p-1.5 text-gray-600">method_fqn</th>
               <th className="text-left p-1.5 text-gray-600">via</th>
               <th className="text-right p-1.5 text-gray-600">score</th>
             </tr>
           </thead>
           <tbody>
-            {methods.slice(0, 20).map((m, i) => (
-              <tr key={i} className="border-b border-gray-100">
-                <td className="p-1.5 font-mono text-gray-800 truncate max-w-[280px]" title={String(m.method_fqn)}>
-                  {String(m.method_fqn)}
-                </td>
-                <td className="p-1.5 text-gray-500">{String(m.via ?? "—")}</td>
-                <td className="p-1.5 text-right text-gray-700">{Number(m.score ?? 0).toFixed(2)}</td>
-              </tr>
-            ))}
+            {methods.slice(0, 50).map((m) => {
+              const fqn = String(m.method_fqn);
+              const isOpen = expanded.has(fqn);
+              return (
+                <>
+                  <tr
+                    key={fqn}
+                    className="border-b border-gray-100 hover:bg-amber-50/40 cursor-pointer"
+                    onClick={() => toggle(fqn)}
+                  >
+                    <td className="p-1.5 text-gray-400">
+                      {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                    </td>
+                    <td className="p-1.5 font-mono text-gray-800 truncate max-w-[260px]" title={fqn}>
+                      {fqn.split(".").slice(-2).join(".")}
+                    </td>
+                    <td className="p-1.5 text-gray-500">{String(m.via ?? "—")}</td>
+                    <td className="p-1.5 text-right text-gray-700">{Number(m.score ?? 0).toFixed(2)}</td>
+                  </tr>
+                  {isOpen && (
+                    <tr key={`${fqn}-body`} className="border-b border-amber-100">
+                      <td colSpan={4} className="p-0">
+                        <_MethodBodyRow fqn={fqn} onJumpTo={(f) => { toggle(f); }} />
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -124,6 +159,100 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
         </details>
       )}
     </>
+  );
+}
+
+/** 인터랙티브 expand — method body + callers/callees navigation. */
+function _MethodBodyRow({ fqn, onJumpTo }: { fqn: string; onJumpTo: (f: string) => void }) {
+  const [data, setData] = useState<MethodBodyView | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    simulationApi.methodBody(fqn)
+      .then((d) => { if (!cancelled) setData(d); })
+      .catch((e) => { if (!cancelled) setError(String(e)); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [fqn]);
+
+  if (loading) {
+    return (
+      <div className="px-3 py-2 text-[11px] text-gray-500 bg-amber-50/30 flex items-center gap-1">
+        <Loader2 size={11} className="animate-spin" /> 코드 로드 중...
+      </div>
+    );
+  }
+  if (error) {
+    return <div className="px-3 py-2 text-[11px] text-red-700 bg-red-50">{error}</div>;
+  }
+  if (!data) return null;
+
+  return (
+    <div className="px-3 py-2 bg-amber-50/30 space-y-2">
+      <div className="text-[10px] text-gray-500 font-mono break-all">{fqn}</div>
+      {data.line_start && (
+        <div className="text-[10px] text-gray-500">
+          L{data.line_start}–{data.line_end ?? "?"}
+          {data.annotations.length > 0 && (
+            <span className="ml-2">
+              {data.annotations.map((a) => (
+                <code key={a} className="ml-1 text-[9px] px-1 bg-indigo-100 text-indigo-700 rounded">@{a}</code>
+              ))}
+            </span>
+          )}
+        </div>
+      )}
+      {data.body ? (
+        <pre className="text-[10px] bg-white border border-amber-200 rounded p-2 max-h-48 overflow-auto text-gray-800">
+{data.body.slice(0, 1200)}{data.body.length > 1200 ? "\n..." : ""}
+        </pre>
+      ) : (
+        <div className="text-[10px] text-gray-400 italic">body 없음 (ontology 응답 비어있음)</div>
+      )}
+      <div className="grid grid-cols-2 gap-2 text-[10px]">
+        <div>
+          <div className="text-gray-500 mb-1 flex items-center gap-1">
+            <Code size={10} /> 호출하는 곳 ({data.callers.length})
+          </div>
+          <ul className="space-y-0.5">
+            {data.callers.slice(0, 6).map((c) => (
+              <li key={c}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onJumpTo(c); }}
+                  className="font-mono text-emerald-700 hover:underline truncate text-left"
+                  title={c}
+                >
+                  ← {c.split(".").slice(-2).join(".")}
+                </button>
+              </li>
+            ))}
+            {data.callers.length === 0 && <li className="text-gray-400">없음</li>}
+          </ul>
+        </div>
+        <div>
+          <div className="text-gray-500 mb-1 flex items-center gap-1">
+            <Code size={10} /> 호출되는 곳 ({data.callees.length})
+          </div>
+          <ul className="space-y-0.5">
+            {data.callees.slice(0, 6).map((c) => (
+              <li key={c}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onJumpTo(c); }}
+                  className="font-mono text-sky-700 hover:underline truncate text-left"
+                  title={c}
+                >
+                  → {c.split(".").slice(-2).join(".")}
+                </button>
+              </li>
+            ))}
+            {data.callees.length === 0 && <li className="text-gray-400">없음</li>}
+          </ul>
+        </div>
+      </div>
+    </div>
   );
 }
 
