@@ -1425,6 +1425,14 @@ class SessionSummary(BaseModel):
     last_activity_at: str
 
 
+@router.delete("/sessions/{session_id}")
+async def delete_session(session_id: str) -> dict:
+    ok = p.delete_session(session_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="session not found")
+    return {"deleted": session_id}
+
+
 @router.get("/sessions", response_model=list[SessionSummary])
 async def list_sessions(limit: int = 30) -> list[SessionSummary]:
     """최근 대화 이력 list. 사용자가 과거 대화로 재진입 가능."""

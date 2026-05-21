@@ -159,6 +159,16 @@ def update_user_response(
         row.user_response_json = json.dumps(user_response, ensure_ascii=False)
 
 
+def delete_session(session_id: str) -> bool:
+    """세션 + decision_log 모두 삭제 (CASCADE). 존재 여부 반환."""
+    with session_scope() as s:
+        row = s.get(SimulationSessionRow, session_id)
+        if not row:
+            return False
+        s.delete(row)
+    return True
+
+
 def list_sessions(limit: int = 30) -> list[SimulationSession]:
     """최신 세션 list — 생성 시간 역순."""
     with session_scope() as s:

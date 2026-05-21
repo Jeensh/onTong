@@ -193,7 +193,7 @@ def generate_suggestions(*, n_per_intent: int = 2, seed: int | None = None) -> l
             out.append(SuggestedQuestion(
                 intent="impact",
                 label=f"②{tbl2} 변경 영향",
-                query=f"{tbl2} 의 {kw2} 마진을 바꾸면 어떤 주문이 fail 할 수 있어?",
+                query=f"{tbl2} 기준의 하한·상한 값을 바꾸면 어떤 주문이 fail 할 수 있어?",
                 rationale=f"JPO {tbl2} javadoc keyword '{kw2}'",
             ))
 

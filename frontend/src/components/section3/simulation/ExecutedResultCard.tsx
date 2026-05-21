@@ -134,6 +134,82 @@ function _SimulateView({ payload }: { payload: Record<string, unknown> }) {
   );
 }
 
+/** table 별 맞춤 변경 대상 카드. CAST_SPEC, EDGING_GROUP, HR_SPEC, SD_PRODUCTIVITY_STD 등. */
+function _TargetChangeCard({ targetChange }: { targetChange: Record<string, unknown> }) {
+  const table = String(targetChange.table ?? "");
+  const column = String(targetChange.column ?? "");
+  const before = targetChange.before;
+  const after = targetChange.after;
+  const product = targetChange.product as string | undefined;
+
+  // table 별 메타 (icon · 한국어 라벨 · 주요 컬럼 분류)
+  const META: Record<string, { icon: string; ko: string; columns: string[]; color: string }> = {
+    CAST_SPEC: { icon: "🏭", ko: "연주설비사양", color: "amber", columns: ["SLAB_THICKNESS","WIDTH_LOW","WIDTH_HIGH","LENGTH_LOW","LENGTH_HIGH","WGT_LOW","WGT_HIGH"] },
+    HR_SPEC: { icon: "🔥", ko: "열연설비사양", color: "rose", columns: ["WIDTH_LOW","WIDTH_HIGH","LENGTH_LOW","LENGTH_HIGH"] },
+    EDGING_GROUP: { icon: "📐", ko: "EDGING 그룹", color: "purple", columns: ["GROUP_CD","WIDTH_LOW","WIDTH_HIGH"] },
+    HR_MAX_WGT: { icon: "⬆", ko: "열연 최대 단중", color: "rose", columns: ["THICKNESS","WIDTH","MAX_WGT"] },
+    HR_MIN_WGT: { icon: "⬇", ko: "열연 최소 단중", color: "rose", columns: ["THICKNESS","WIDTH","MIN_WGT"] },
+    SD_PRODUCTIVITY_STD: { icon: "📊", ko: "실수율 기준", color: "indigo", columns: ["PROC_CD","GRADE_CD","PRODUCTIVITY"] },
+    CUSTOMER_STD: { icon: "👥", ko: "고객표준", color: "sky", columns: ["CUSTOMER_CD"] },
+  };
+  const meta = META[table] ?? { icon: "📋", ko: table, color: "amber", columns: [column] };
+
+  return (
+    <div className={`bg-${meta.color}-50 border-2 border-${meta.color}-300 rounded-lg p-3`}>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xl">{meta.icon}</span>
+        <div>
+          <div className={`text-[10px] uppercase text-${meta.color}-700 font-semibold tracking-wide`}>변경 대상 (기준 테이블)</div>
+          <div className="text-sm font-semibold text-gray-900">
+            <code className="text-[12px]">{table}</code>
+            <span className="text-gray-500 text-[11px] ml-1.5">({meta.ko})</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 bg-white rounded p-2 border border-gray-200">
+        <div>
+          <div className="text-[9px] text-gray-500 uppercase">column</div>
+          <code className={`text-xs text-${meta.color}-800 font-bold`}>{column}</code>
+        </div>
+        <div>
+          <div className="text-[9px] text-gray-500 uppercase">변경 전 (현재값)</div>
+          <code className="text-xs text-gray-700">{before === null || before === undefined ? "(seed 미존재)" : String(before)}</code>
+        </div>
+        <div>
+          <div className="text-[9px] text-gray-500 uppercase">변경 후</div>
+          <code className={`text-xs text-red-700 font-bold`}>{after === null || after === undefined ? "?" : String(after)}</code>
+        </div>
+      </div>
+
+      {product && (
+        <div className="mt-2 text-[10px] text-gray-600">
+          <span className="text-gray-500">scope: </span>
+          <code className="bg-white px-1.5 py-0.5 rounded border border-gray-200">PRODUCT_CD = {product}</code>
+        </div>
+      )}
+
+      {/* table 의 주요 컬럼 hint */}
+      <details className="mt-2 text-[10px]">
+        <summary className="cursor-pointer text-gray-500">이 테이블의 주요 컬럼 ({meta.columns.length})</summary>
+        <div className="mt-1 flex flex-wrap gap-1">
+          {meta.columns.map((c) => (
+            <code key={c} className={
+              "text-[9px] px-1.5 py-0.5 rounded border " +
+              (c === column ? `bg-${meta.color}-200 border-${meta.color}-400 font-bold` : "bg-white border-gray-200 text-gray-600")
+            }>{c}</code>
+          ))}
+        </div>
+      </details>
+
+      {Boolean(targetChange.note) && (
+        <div className="text-[10px] text-gray-600 mt-2 italic">{String(targetChange.note)}</div>
+      )}
+    </div>
+  );
+}
+
+
 function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
   const methods = (payload.affected_methods as Array<Record<string, unknown>> | undefined) ?? [];
   const confidence = (payload.confidence as number | undefined) ?? 0;
@@ -172,29 +248,8 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
         </div>
       )}
 
-      {/* SECTION 1: 감지된 변경 대상 (table.column + before/after) */}
-      {targetChange && (
-        <div className="bg-amber-50 border-2 border-amber-300 rounded p-3">
-          <div className="text-[10px] uppercase text-amber-700 font-semibold mb-1">변경 대상</div>
-          <div className="grid grid-cols-3 gap-2 text-[11px]">
-            <div>
-              <div className="text-gray-500 text-[10px]">target</div>
-              <code className="font-mono text-amber-900">{String(targetChange.table)}.{String(targetChange.column)}</code>
-            </div>
-            <div>
-              <div className="text-gray-500 text-[10px]">변경 전</div>
-              <code className="font-mono text-gray-700">{String(targetChange.before ?? "?")}</code>
-            </div>
-            <div>
-              <div className="text-gray-500 text-[10px]">변경 후</div>
-              <code className="font-mono text-red-700 font-bold">{String(targetChange.after ?? "?")}</code>
-            </div>
-          </div>
-          {Boolean(targetChange.note) && (
-            <div className="text-[10px] text-gray-600 mt-1">{String(targetChange.note)}</div>
-          )}
-        </div>
-      )}
+      {/* SECTION 1: 감지된 변경 대상 — table 별 맞춤 UI */}
+      {targetChange && <_TargetChangeCard targetChange={targetChange} />}
 
       {/* SECTION 2: 영향받는 코드 */}
       <div className="border border-gray-200 rounded">

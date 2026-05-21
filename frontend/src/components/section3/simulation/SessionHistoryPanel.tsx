@@ -2,7 +2,7 @@
 
 /** 시뮬레이션 대화 이력 viewer — 좌측 chat 상단 collapsible. */
 import { useEffect, useState } from "react";
-import { History, RotateCcw } from "lucide-react";
+import { History, RotateCcw, X } from "lucide-react";
 
 interface SessionSummary {
   session_id: string;
@@ -35,6 +35,15 @@ export function SessionHistoryPanel({ currentSid, onPick }: {
       if (r.ok) setSessions(await r.json());
     } catch {}
   }
+
+  async function deleteSession(sid: string, query: string | null) {
+    const ok = window.confirm(`이 대화 이력을 삭제하시겠습니까?\n\n"${query ?? sid}"`);
+    if (!ok) return;
+    try {
+      const r = await fetch(`/api/section3/simulation/sessions/${sid}`, { method: "DELETE" });
+      if (r.ok) refresh();
+    } catch {}
+  }
   useEffect(() => {
     refresh();
   }, [currentSid]);
@@ -59,7 +68,7 @@ export function SessionHistoryPanel({ currentSid, onPick }: {
             const isCurrent = s.session_id === currentSid;
             const date = new Date(s.last_activity_at);
             return (
-              <li key={s.session_id}>
+              <li key={s.session_id} className="group relative">
                 <button
                   onClick={() => onPick(s.session_id)}
                   className={
@@ -79,11 +88,18 @@ export function SessionHistoryPanel({ currentSid, onPick }: {
                         s.status === "aborted" ? "text-red-500" : "text-amber-500"
                       )
                     }>{s.status}</span>
-                    <span className="text-gray-400 ml-auto">{date.toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                    <span className="text-gray-400 ml-auto pr-5">{date.toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
                   </div>
-                  <div className="text-gray-800 truncate mt-0.5" title={s.user_query ?? ""}>
+                  <div className="text-gray-800 truncate mt-0.5 pr-5" title={s.user_query ?? ""}>
                     {s.user_query ?? "(no query)"}
                   </div>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteSession(s.session_id, s.user_query); }}
+                  className="absolute top-1.5 right-2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 transition"
+                  title="이 대화 이력 삭제"
+                >
+                  <X size={12} />
                 </button>
               </li>
             );
