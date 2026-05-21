@@ -407,10 +407,14 @@ async def start(
     classifier: MultiturnIntentClassifier = Depends(get_classifier),
     ontology_client: OntologyClient = Depends(get_ontology_client),
 ) -> StartResponse:
-    """세션 생성 + Gate I (intent 분류 + 후보 검색) 한 번에.
+    """세션 생성 + Gate I (intent 분류 + 후보 검색).
 
-    intent 가 ambiguous 면 candidates 가 빈 채로 와서 UI 가 의도 명확화
-    카드 surface. 그 외 intent 면 후보 carousel surface.
+    intent 별 fast-path:
+      - simulate + ORD pattern → full_design 직진 (Java :8080 호출)
+      - hypothesis → run_hypothesis 직진 (단계화 카드)
+      - explain / locate → 자동 첫 후보 pick → executed 직진
+      - simulate (no ORD) / impact → 후보 carousel (사용자 선택 필요)
+      - ambiguous → 명확화 카드
     """
     sid = p.start_session(repo_id=req.repo_id, user_query=req.user_query)
     payload = await _build_target_payload(
@@ -418,23 +422,148 @@ async def start(
         classifier=classifier, ontology_client=ontology_client,
     )
     intent = payload.get("intent", "ambiguous")
+
+    # ── LLM 분류 보정: "신규 X 추가" / "추가되면" 패턴 → hypothesis 강제 ──
+    import re as _re
+    if _re.search(r"신규\s*\S+\s*(추가|들어오)|새\s*\S+\s*(추가|들어오)|"
+                  r"가\s*추가되면|이\s*추가되면", req.user_query):
+        if intent != "hypothesis":
+            logger.info("hypothesis pattern detected, override intent %s→hypothesis", intent)
+            intent = "hypothesis"
+            payload["intent"] = "hypothesis"
+            payload["_intent_overridden"] = True
     p.update_session(sid, intent=intent)
     turn_no = p.add_gate_decision(sid, gate_kind="target_selected", payload=payload)
-    next_gate = _next_gate_from_target(payload)
     logger.info(
         "simulation.start sid=%s turn=%s intent=%s candidates=%s",
         sid, turn_no, intent, len(payload.get("candidates", [])),
     )
+
+    # ── intent 별 fast-path: 후보 carousel 의미 없는 intent 는 자동 진행 ──
+
+    # 1) simulate + 주문번호 감지 → 전체 설계 직진
+    if intent == "simulate" and extract_order_no(req.user_query):
+        order_no = extract_order_no(req.user_query)
+        if order_no:
+            r = await _execute_full_design(session_id=sid, order_no=order_no)
+            return StartResponse(
+                session_id=sid, turn_no=r.turn_no, next_gate="done",
+                payload=r.payload, message=r.message,
+            )
+
+    # 2) hypothesis → 자동으로 hypothesis_workflow 호출 (default params)
+    if intent == "hypothesis":
+        # 후보는 surface 하되 곧 hypothesis 결과로 덮어쓰기
+        hyp_payload = await _execute_hypothesis_from_query(
+            session_id=sid, user_query=req.user_query,
+        )
+        return StartResponse(
+            session_id=sid,
+            turn_no=hyp_payload["_turn_no"],
+            next_gate="done", payload=hyp_payload["_payload"],
+            message=f"가설 분석 완료 — 4-step workflow 실행",
+        )
+
+    # 3) explain / locate 후보 0건 — ontology 검색이 안 잡혔어도 lookup 시도 가능하도록
+    #    가상 ActionRef 로 fallback (executed_lookup 이 빈 결과 + 메시지로 응답)
+    if intent in ("explain", "locate") and not payload.get("candidates"):
+        from backend.section3.agents.multiturn.schemas import CodeLocation as _CL
+        action_ref = ActionRef(
+            action_id=f"virtual.{intent}.fallback",
+            code_method_fqn="",
+            repo_id=req.repo_id,
+            location=_CL(file_path="(no match)", line_start=0, line_end=0),
+        )
+        p.update_user_response(sid, turn_no, {
+            "action": "select_candidate", "selected_index": -1, "auto": True,
+            "note": "no candidate — fallback empty target",
+        })
+        r = await _proceed_from_target(
+            session_id=sid, intent=intent, target=action_ref,
+            repo_id=req.repo_id, ontology_client=ontology_client,
+            conditions=[], user_query=req.user_query,
+        )
+        return StartResponse(
+            session_id=sid, turn_no=r.turn_no, next_gate=r.next_gate,
+            payload=r.payload or {}, message=r.message,
+        )
+
+    # 4) explain / locate → 자동 첫 후보 pick (사용자 후보 선택 의미 없음)
+    if intent in ("explain", "locate") and payload.get("candidates"):
+        first = payload["candidates"][0]
+        from backend.section3.agents.multiturn.schemas import CodeLocation
+        action_ref = ActionRef(
+            action_id=first.get("action_id", ""),
+            code_method_fqn=first.get("code_method_fqn", ""),
+            repo_id=req.repo_id,
+            location=CodeLocation(**first["location"]) if first.get("location") else
+                     CodeLocation(file_path="(unknown)", line_start=0, line_end=0),
+        )
+        # update_user_response 로 자동 select 기록 (UX 일관성)
+        p.update_user_response(sid, turn_no, {
+            "action": "select_candidate", "selected_index": 0, "auto": True,
+        })
+        r = await _proceed_from_target(
+            session_id=sid, intent=intent, target=action_ref,
+            repo_id=req.repo_id, ontology_client=ontology_client,
+            conditions=[], user_query=req.user_query,
+        )
+        return StartResponse(
+            session_id=sid, turn_no=r.turn_no, next_gate=r.next_gate,
+            payload=r.payload or {}, message=r.message,
+        )
+
+    # 5) 기본: 후보 carousel 표시 (simulate no ORD / impact / ambiguous)
+    next_gate = _next_gate_from_target(payload)
     return StartResponse(
-        session_id=sid,
-        turn_no=turn_no,
-        next_gate=next_gate,
-        payload=payload,
+        session_id=sid, turn_no=turn_no, next_gate=next_gate, payload=payload,
         message=(
             "의도 명확화 필요" if next_gate == "ambiguous_clarification"
             else f"intent={intent} · 후보 {len(payload.get('candidates', []))} 건"
         ),
     )
+
+
+async def _execute_hypothesis_from_query(
+    *, session_id: str, user_query: str,
+) -> dict:
+    """hypothesis intent 의 query 에서 grade / order 추출 후 run_hypothesis 호출.
+
+    LLM 정확 추출은 후속 — 일단 정규식 + 기본값 fallback.
+    """
+    import re
+    # 강종 패턴
+    grade_match = re.search(r"\b(SS\d{2,4}|HC\d{2,4}[A-Z]?)\b", user_query)
+    new_grade = grade_match.group(0) if grade_match else "SS500"
+    # 주문번호
+    order_no = extract_order_no(user_query) or "ORD20260510001"
+    # multiplier
+    mult_match = re.search(r"productivity\s*[×x*]\s*(\d+\.?\d*)", user_query, re.I)
+    mult = float(mult_match.group(1)) if mult_match else 0.95
+    if mult > 2: mult = mult / 100  # "5%" 같은 경우 0.05 → 0.95 로 변환은 사용자 입력 의도 다름. 단순 raw 사용.
+
+    r = await run_hypothesis(
+        base_grade="SS400", new_grade=new_grade,
+        productivity_multiplier=mult, base_order_no=order_no,
+    )
+    payload = {
+        "kind": "executed_hypothesis_workflow",
+        "base_grade": r.base_grade, "new_grade": r.new_grade,
+        "productivity_multiplier": r.productivity_multiplier,
+        "base_order_no": r.base_order_no,
+        "existing_productivity_rows": r.existing_productivity_rows,
+        "existing_order_rows": r.existing_order_rows,
+        "virtual_productivity_rows": r.virtual_productivity_rows,
+        "virtual_order_rows": r.virtual_order_rows,
+        "baseline_slab": r.baseline_slab,
+        "baseline_trace": r.baseline_trace,
+        "projected_slab": r.projected_slab,
+        "diff_summary": r.diff_summary,
+        "notes": r.notes,
+    }
+    new_turn = p.add_gate_decision(session_id, gate_kind="executed", payload=payload)
+    p.update_session(session_id, status="done")
+    return {"_turn_no": new_turn, "_payload": payload}
 
 
 @router.post("/respond/{session_id}", response_model=RespondResponse)

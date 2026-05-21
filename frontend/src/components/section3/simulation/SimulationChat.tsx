@@ -180,8 +180,7 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {!sid && (
             <div className="text-sm text-gray-500 leading-relaxed">
-              <div className="flex items-center justify-between mb-2">
-                <span>JPO · ontology · seed 데이터 기반 예시</span>
+              <div className="flex items-center justify-end mb-2">
                 <button
                   onClick={() => setPresetSeed((s) => s + 1)}
                   className="text-[10px] text-gray-400 hover:text-emerald-700"
