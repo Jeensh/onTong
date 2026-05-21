@@ -33,7 +33,8 @@ export function ExecutedResultCard({ payload, intent, onRerun, onNew, busy }: Pr
       {!error && payload.kind === "executed_compare" && <_CompareView payload={payload} />}
       {!error && payload.kind !== "executed_compare" && payload.kind !== "executed_full_design" && intent === "simulate" && <_SimulateView payload={payload} />}
       {!error && payload.kind !== "executed_compare" && payload.kind !== "executed_full_design" && intent === "impact" && <_ImpactView payload={payload} />}
-      {!error && (intent === "locate" || intent === "explain") && <_LookupView payload={payload} intent={intent} />}
+      {!error && intent === "locate" && <_LocateView payload={payload} />}
+      {!error && intent === "explain" && <_ExplainView payload={payload} />}
       {!error && intent === "hypothesis" && <_HypothesisView payload={payload} />}
 
       <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200">
@@ -256,56 +257,144 @@ function _MethodBodyRow({ fqn, onJumpTo }: { fqn: string; onJumpTo: (f: string) 
   );
 }
 
-function _LookupView({ payload, intent }: { payload: Record<string, unknown>; intent: string }) {
-  // executed_lookup 의 shape — locate 와 explain 양쪽 공용
+/** locate — VSCode 스타일 파일 트리 + 코드 viewer. */
+function _LocateView({ payload }: { payload: Record<string, unknown> }) {
   const target = payload.target as Record<string, unknown> | undefined;
-  const body = payload.body as string | undefined;
-  const callers = (payload.callers as Array<Record<string, unknown>> | undefined) ?? [];
-  const rules = (payload.business_rules as Array<Record<string, unknown>> | undefined) ?? [];
+  const body = (payload.body as string | undefined) ?? "";
   const summary = payload.summary as string | undefined;
+  const fqn = String(target?.code_method_fqn ?? "");
+
+  // FQN → file tree path 추출 (com.example.x.y.Class.method → com/example/x/y/Class.java)
+  const classPart = fqn.split("(")[0].split(".").slice(0, -1).join(".");
+  const pkgs = classPart.split(".");
+  const className = pkgs.pop() ?? "";
+  const filePath = pkgs.join("/") + "/" + className + ".java";
 
   return (
     <>
-      {summary && (
-        <div className="text-sm text-gray-800 bg-violet-50 border border-violet-200 rounded p-2">
-          {summary}
-        </div>
-      )}
-      {target && (
-        <div className="text-[11px] text-gray-600">
-          target: <code className="font-mono">{String(target.code_method_fqn ?? "?")}</code>
-        </div>
-      )}
-      {body && (
-        <div className="border border-gray-200 rounded">
-          <div className="px-2 py-1 bg-gray-50 border-b border-gray-200 text-[11px] text-gray-600">
-            method body
+      <div className="text-[11px] text-sky-800 bg-sky-50 border border-sky-200 rounded p-2 flex items-center gap-2">
+        <span>🔍</span>
+        <span>{summary || "코드 위치 검색 결과"}</span>
+      </div>
+
+      <div className="grid grid-cols-[200px_1fr] gap-2 border border-gray-300 rounded overflow-hidden">
+        {/* 좌: 파일 트리 */}
+        <div className="bg-slate-50 border-r border-gray-200 p-2 text-[10px]">
+          <div className="text-gray-500 uppercase tracking-wide mb-1">파일 트리</div>
+          <div className="font-mono space-y-0.5">
+            {pkgs.map((seg, i) => (
+              <div key={i} style={{ paddingLeft: i * 8 }} className="text-gray-600">
+                📁 {seg}
+              </div>
+            ))}
+            <div style={{ paddingLeft: pkgs.length * 8 }} className="text-sky-700 font-semibold">
+              📄 {className}.java
+            </div>
+            <div style={{ paddingLeft: (pkgs.length + 1) * 8 }} className="text-emerald-700">
+              ⚡ {fqn.split(".").pop()?.split("(")[0]}
+            </div>
           </div>
-          <pre className="p-2 text-[10px] max-h-48 overflow-auto text-gray-800">{body.slice(0, 800)}</pre>
         </div>
-      )}
-      {callers.length > 0 && (
-        <div>
-          <div className="text-[11px] text-gray-600 mb-1">callers {callers.length}건</div>
-          <ul className="text-[10px] space-y-0.5 max-h-32 overflow-y-auto">
-            {callers.slice(0, 20).map((c, i) => (
-              <li key={i} className="font-mono text-gray-700 truncate">{String(c.method_fqn ?? c)}</li>
-            ))}
-          </ul>
+
+        {/* 우: 코드 본문 */}
+        <div className="bg-white">
+          <div className="px-2 py-1 bg-gray-50 border-b border-gray-200 text-[10px] flex items-center justify-between">
+            <code className="text-gray-700">{filePath}</code>
+            <span className="text-gray-400">{body.split("\n").length} lines</span>
+          </div>
+          <pre className="p-2 text-[10px] max-h-72 overflow-auto text-gray-800 font-mono leading-relaxed">
+            {body || "(코드 본문 없음)"}
+          </pre>
         </div>
-      )}
-      {rules.length > 0 && (
-        <div>
-          <div className="text-[11px] text-gray-600 mb-1">business rules {rules.length}건</div>
-          <ul className="text-[11px] space-y-1 max-h-32 overflow-y-auto">
-            {rules.slice(0, 6).map((r, i) => (
-              <li key={i} className="text-gray-700">
-                <code className="bg-red-50 px-1 rounded">{String(r.severity ?? "?")}</code> · {String(r.statement ?? "")}
-              </li>
-            ))}
-          </ul>
+      </div>
+
+      <div className="text-[10px] text-gray-500">
+        💡 좌측 패키지 경로 클릭 시 다른 위치로 이동하는 기능은 후속 작업 예정.
+      </div>
+    </>
+  );
+}
+
+/** explain — 자연어 답변 + 관련 객체 카드 grid. */
+function _ExplainView({ payload }: { payload: Record<string, unknown> }) {
+  const target = payload.target as Record<string, unknown> | undefined;
+  const body = (payload.body as string | undefined) ?? "";
+  const summary = payload.summary as string | undefined;
+  const callers = (payload.callers as Array<Record<string, unknown>> | undefined) ?? [];
+  const rules = (payload.business_rules as Array<Record<string, unknown>> | undefined) ?? [];
+
+  const targetClass = String(target?.code_method_fqn ?? "").split("(")[0].split(".").slice(-2, -1)[0] ?? "";
+  const targetMethod = String(target?.code_method_fqn ?? "").split("(")[0].split(".").pop() ?? "";
+
+  return (
+    <>
+      {/* 큰 답변 박스 — chat 이 더 수용 */}
+      <div className="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-200 rounded-lg p-3 shadow-sm">
+        <div className="flex items-start gap-2">
+          <div className="text-xl">💬</div>
+          <div className="flex-1">
+            <div className="text-[10px] uppercase tracking-wide text-violet-700 font-semibold mb-1">답변</div>
+            <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+              {summary ||
+                (target ? `${targetClass}.${targetMethod} 에 대한 설명입니다. 본문은 아래 코드 카드를 참고하세요.` :
+                  "해당 의미에 대한 정확한 답변을 ontology 가 합성하지 못했습니다. 다른 표현으로 다시 시도해 주세요.")}
+            </div>
+          </div>
         </div>
-      )}
+      </div>
+
+      {/* 관련 객체 카드 grid */}
+      <div className="grid grid-cols-2 gap-2">
+        {/* code 카드 */}
+        {target && (
+          <div className="border-2 border-emerald-200 bg-emerald-50/50 rounded p-2 col-span-2">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600 text-white font-semibold">CODE</span>
+              <code className="text-[11px] font-mono text-emerald-900">
+                {targetClass}.{targetMethod}
+              </code>
+            </div>
+            <pre className="text-[10px] bg-white border border-emerald-200 rounded p-2 max-h-40 overflow-auto text-gray-800">
+              {body.slice(0, 600) || "(본문 없음)"}
+            </pre>
+          </div>
+        )}
+
+        {/* business rules 카드 */}
+        {rules.length > 0 && (
+          <div className="border-2 border-rose-200 bg-rose-50/50 rounded p-2">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-600 text-white font-semibold">RULES</span>
+              <span className="text-[10px] text-gray-500">{rules.length}건</span>
+            </div>
+            <ul className="text-[10px] space-y-1 max-h-32 overflow-y-auto">
+              {rules.slice(0, 5).map((r, i) => (
+                <li key={i}>
+                  <code className="text-[9px] bg-rose-100 px-1 rounded text-rose-800">{String(r.severity ?? "?")}</code>
+                  <span className="text-gray-700 ml-1">{String(r.statement ?? "")}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* callers 카드 */}
+        {callers.length > 0 && (
+          <div className="border-2 border-sky-200 bg-sky-50/50 rounded p-2">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-600 text-white font-semibold">CALLERS</span>
+              <span className="text-[10px] text-gray-500">{callers.length}건</span>
+            </div>
+            <ul className="text-[10px] space-y-0.5 max-h-32 overflow-y-auto">
+              {callers.slice(0, 8).map((c, i) => (
+                <li key={i} className="font-mono text-sky-800 truncate" title={String(c.method_fqn ?? c)}>
+                  ← {String(c.method_fqn ?? c).split(".").slice(-2).join(".")}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </>
   );
 }
