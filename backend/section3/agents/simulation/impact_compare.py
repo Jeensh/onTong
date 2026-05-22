@@ -22,7 +22,7 @@ from backend.section3.agents.simulation.slab_design_runner import run_full_desig
 logger = logging.getLogger(__name__)
 
 
-# (table, column) → baseline slab 의 어떤 필드를 어떻게 바꿀지
+# (table, column) → baseline slab 의 어떤 필드를 어떻게 바꿀지 (직접 대입)
 DIRECT_MAP: dict[tuple[str, str], list[str]] = {
     ("CAST_SPEC", "SLAB_THICKNESS"): ["slabThickness"],
     ("CAST_SPEC", "WIDTH_LOW"): ["slabWidthLow", "slabWidthLow1"],
@@ -37,6 +37,33 @@ DIRECT_MAP: dict[tuple[str, str], list[str]] = {
     ("HR_SPEC", "LENGTH_HIGH"): ["firstLengthHigh"],
     ("HR_MIN_WGT", "MIN_WGT"): ["secondWgtLow"],
     ("HR_MAX_WGT", "MAX_WGT"): ["secondWgtHigh", "slabWgtHigh"],
+}
+
+# (table, column) → ratio 적용 (변경된 비율을 다운스트림 필드들에 비례 전파)
+# 도메인 지식: slab-design 21-step 알고리즘에서 weight = thickness × width × length × density × adjust.
+# 즉 thickness ↑ → 단중 계열 비례 ↑ · width ↑ → 단중·길이 영향 등.
+PROPAGATION_RULES: dict[tuple[str, str], dict[str, str]] = {
+    # SLAB_THICKNESS 변경 → 단중 계열 비례 (두께 변화율만큼 무게 증가)
+    ("CAST_SPEC", "SLAB_THICKNESS"): {
+        "slabWgt": "ratio", "slabWgtLow": "ratio", "slabWgtHigh": "ratio",
+        "slabWgt1": "ratio", "slabWgtLow1": "ratio", "slabWgtHigh1": "ratio",
+        "firstWgtLow": "ratio", "firstWgtHigh": "ratio",
+        "secondWgtLow": "ratio", "secondWgtHigh": "ratio",
+        "splitWgtLow": "ratio", "splitWgtHigh": "ratio",
+        "slabWgtInProgress": "ratio",
+    },
+    # 폭 변경 → 단중·길이 일부 영향 (slab volume = w × l × t)
+    ("CAST_SPEC", "WIDTH_LOW"): {"slabWgtLow": "ratio", "firstWgtLow": "ratio"},
+    ("CAST_SPEC", "WIDTH_HIGH"): {"slabWgtHigh": "ratio", "firstWgtHigh": "ratio"},
+    # productivity 변경 → 단중 계열 비례 (hypothesis_workflow 모델과 동일)
+    ("SD_PRODUCTIVITY_STD", "PRODUCTIVITY"): {
+        "slabWgt": "ratio", "slabWgtLow": "ratio", "slabWgtHigh": "ratio",
+        "slabWgt1": "ratio", "slabWgtLow1": "ratio", "slabWgtHigh1": "ratio",
+        "firstWgtLow": "ratio", "firstWgtHigh": "ratio",
+        "secondWgtLow": "ratio", "secondWgtHigh": "ratio",
+        "splitWgtLow": "ratio", "splitWgtHigh": "ratio",
+        "slabWgtInProgress": "ratio",
+    },
 }
 
 
@@ -121,33 +148,45 @@ async def compare_impact_slab(
 
     after_num = _coerce_num(after)
     before_num = _coerce_num(before)
-
-    # 2) 직접 매핑
     key = (table.upper(), column.upper())
+
+    # 2-A) 직접 대입 — 변경 대상 자체 필드
     if key in DIRECT_MAP and after_num is not None:
         for field in DIRECT_MAP[key]:
             if field in projected:
                 old = projected[field]
                 projected[field] = after_num
-                notes.append(f"{field} {old} → {after_num} (직접 매핑)")
-    elif key == ("SD_PRODUCTIVITY_STD", "PRODUCTIVITY") and after_num is not None and before_num:
-        # ratio 모델
-        ratio = after_num / before_num if before_num else 1.0
-        for f in ("slabWgt", "slabWgtLow", "slabWgtHigh", "slabWgt1",
-                  "slabWgtLow1", "slabWgtHigh1", "firstWgtLow", "firstWgtHigh",
-                  "secondWgtLow", "secondWgtHigh", "splitWgtLow", "splitWgtHigh",
-                  "slabWgtInProgress"):
-            if f in projected and projected[f] is not None:
-                old = projected[f]
-                try:
-                    projected[f] = round(float(old) * ratio, 3)
-                    notes.append(f"{f} {old} → {projected[f]} (×{ratio:.3f})")
-                except Exception:
-                    pass
-    else:
+                notes.append(f"[직접] {field} {old} → {after_num}")
+
+    # 2-B) propagation — 변경 비율로 downstream 필드 비례 전파
+    ratio: float | None = None
+    if after_num is not None and before_num and before_num != 0:
+        ratio = after_num / before_num
+
+    if key in PROPAGATION_RULES and ratio is not None and abs(ratio - 1.0) > 1e-9:
+        rules = PROPAGATION_RULES[key]
+        for field, mode in rules.items():
+            if field in DIRECT_MAP.get(key, []):
+                continue  # 이미 직접 대입한 필드는 skip
+            if field not in projected or projected[field] is None:
+                continue
+            try:
+                old = float(projected[field])
+                if mode == "ratio":
+                    new = round(old * ratio, 3)
+                    projected[field] = new
+                    notes.append(f"[전파] {field} {old} → {new} (×{ratio:.4f})")
+            except Exception:
+                continue
         notes.append(
-            f"{table}.{column} 의 직접 매핑 룰이 없습니다. baseline 그대로 표시. "
-            "추론을 강화하려면 DIRECT_MAP 에 추가하세요."
+            f"※ propagation 모델 — 도메인 지식(weight ∝ thickness × width × length × density) 기반 "
+            f"비례 추정. 실제 21-step 알고리즘은 guard·rule 영향으로 차이가 있을 수 있습니다."
+        )
+
+    if key not in DIRECT_MAP and key not in PROPAGATION_RULES:
+        notes.append(
+            f"{table}.{column} 의 매핑 룰이 없습니다. baseline 그대로. "
+            "DIRECT_MAP / PROPAGATION_RULES 에 추가하면 추론 가능."
         )
 
     # 3) diff
