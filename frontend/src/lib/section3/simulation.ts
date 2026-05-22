@@ -152,7 +152,46 @@ export const simulationApi = {
   hypothesis: (req: HypothesisRequest) => _post<HypothesisResponse>("/hypothesis/run", req),
   suggestedQuestions: (seed = 0) => _get<SuggestedQuestionView[]>(`/suggested_questions?seed=${seed}`),
   termLookup: (text: string) => _post<DetectedTermView[]>("/term_lookup", { text }),
+  impactCompare: (req: ImpactCompareRequest) => _post<ImpactCompareResponse>("/impact/compare_slab", req),
 };
+
+export interface ImpactCompareRequest {
+  table: string;
+  column: string;
+  before?: string | null;
+  after?: string | null;
+  order_no: string;
+  cmp_cd?: string;
+  org_cd?: string;
+  affected_method_fqns?: string[];
+}
+
+export interface TranspiledMethod {
+  fqn: string;
+  class_name?: string;
+  method_name?: string;
+  java: string;
+  java_truncated?: boolean;
+  python: string;
+  python_truncated?: boolean;
+  idiom_diffs?: { idiom_name?: string; summary?: string }[];
+  line_start?: number;
+  line_end?: number;
+  error?: string;
+}
+
+export interface ImpactCompareResponse {
+  ok: boolean;
+  order_no: string;
+  target: { table: string; column: string; before: string | null; after: string | null };
+  baseline_slab: Record<string, unknown> | null;
+  projected_slab: Record<string, unknown> | null;
+  diff: { field: string; before: unknown; after: unknown; delta: number | null; delta_pct: number | null }[];
+  notes: string[];
+  transpiled_methods: TranspiledMethod[];
+  error?: string;
+  error_code?: string;
+}
 
 export interface HypothesisRequest {
   base_grade?: string;

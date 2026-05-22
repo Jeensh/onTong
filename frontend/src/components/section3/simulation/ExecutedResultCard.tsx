@@ -3,7 +3,7 @@
 /** executed 게이트 카드 — intent 별 차별 레이아웃. */
 import { useEffect, useState } from "react";
 import { RotateCcw, Plus, ChevronRight, ChevronDown, Loader2, Code } from "lucide-react";
-import { simulationApi, type MethodBodyView, type HypothesisResponse } from "@/lib/section3/simulation";
+import { simulationApi, type MethodBodyView, type HypothesisResponse, type ImpactCompareResponse, type TranspiledMethod } from "@/lib/section3/simulation";
 
 interface Props {
   payload: Record<string, unknown>;
@@ -131,6 +131,202 @@ function _SimulateView({ payload }: { payload: Record<string, unknown> }) {
         </div>
       )}
     </>
+  );
+}
+
+/** stage 4: 선택 주문 + 변경 대상 → baseline vs projected slab 비교 + Java→Python. */
+function _ImpactSlabCompareCard({ table, column, before, after, order_no, affectedFqns }: {
+  table: string; column: string; before: string; after: string; order_no: string; affectedFqns: string[];
+}) {
+  const [data, setData] = useState<ImpactCompareResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true); setError(null);
+    simulationApi.impactCompare({
+      table, column, before, after, order_no, affected_method_fqns: affectedFqns,
+    })
+      .then((d) => { if (!cancelled) setData(d); })
+      .catch((e) => { if (!cancelled) setError(String(e)); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [table, column, before, after, order_no, affectedFqns.join("|")]);
+
+  if (loading) return (
+    <div className="text-[11px] bg-emerald-50 border border-emerald-200 rounded p-3 flex items-center gap-2">
+      <Loader2 size={12} className="animate-spin text-emerald-700" />
+      <span>주문 <code className="bg-white px-1 rounded">{order_no}</code> 의 변경 전/후 Slab 결과 계산 중...</span>
+    </div>
+  );
+  if (error) return <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded p-2">⚠ {error}</div>;
+  if (!data || !data.ok) return (
+    <div className="text-[11px] bg-amber-50 border border-amber-200 rounded p-2">
+      ⚠ Slab 비교 실패: {data?.error || "unknown"}
+    </div>
+  );
+
+  const HIGHLIGHT = ["slabThickness", "slabWidth", "slabLength", "slabWgt", "splitCount", "designStatus"];
+  const changedFields = new Set(data.diff.map((d) => d.field));
+
+  return (
+    <div className="border-2 border-emerald-300 bg-white rounded-lg overflow-hidden">
+      <div className="px-3 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white flex items-center gap-2">
+        <span>🎯</span>
+        <strong className="text-sm">변경 전·후 Slab 설계 결과 비교</strong>
+        <span className="text-[10px] ml-auto opacity-80">
+          {data.diff.length}개 필드 변경 · 주문 {order_no}
+        </span>
+      </div>
+
+      {/* 핵심 필드 3-col */}
+      <div className="grid grid-cols-3 gap-2 p-3 text-[11px]">
+        <div className="border border-gray-300 rounded p-2 bg-gray-50">
+          <div className="text-[9px] text-gray-500 uppercase mb-1">변경 전 (baseline)</div>
+          {HIGHLIGHT.map((f) => {
+            const v = data.baseline_slab?.[f];
+            if (v === undefined || v === null) return null;
+            return (
+              <div key={f} className="font-mono">
+                <span className="text-gray-500">{f}</span>{": "}
+                <span className="text-gray-800 font-semibold">
+                  {typeof v === "number" ? v.toLocaleString(undefined, {maximumFractionDigits: 2}) : String(v)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="border border-emerald-300 rounded p-2 bg-emerald-50/40">
+          <div className="text-[9px] text-emerald-700 uppercase mb-1">변경 후 (projected)</div>
+          {HIGHLIGHT.map((f) => {
+            const v = data.projected_slab?.[f];
+            const ch = changedFields.has(f);
+            if (v === undefined || v === null) return null;
+            return (
+              <div key={f} className="font-mono">
+                <span className="text-gray-500">{f}</span>{": "}
+                <span className={ch ? "text-emerald-700 font-bold" : "text-gray-700"}>
+                  {typeof v === "number" ? v.toLocaleString(undefined, {maximumFractionDigits: 2}) : String(v)}
+                  {ch && " ✦"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="border border-amber-300 rounded p-2 bg-amber-50/40">
+          <div className="text-[9px] text-amber-700 uppercase mb-1">DIFF ({data.diff.length})</div>
+          {data.diff.slice(0, 8).map((d, i) => (
+            <div key={i} className="font-mono">
+              <span className="text-gray-500">{d.field}</span>
+              <div className="text-[10px]">
+                <span className="text-red-700 line-through">{String(d.before)}</span>
+                <span className="mx-1 text-gray-400">→</span>
+                <span className="text-emerald-700 font-bold">{String(d.after)}</span>
+                {d.delta_pct !== null && (
+                  <span className="ml-1 text-amber-700">({d.delta_pct > 0 ? "+" : ""}{d.delta_pct}%)</span>
+                )}
+              </div>
+            </div>
+          ))}
+          {data.diff.length === 0 && <div className="text-gray-400 italic">변경 없음</div>}
+        </div>
+      </div>
+
+      {/* 전체 필드 collapsible */}
+      {data.projected_slab && (
+        <details className="border-t border-gray-200">
+          <summary className="px-3 py-1.5 text-[11px] text-gray-600 cursor-pointer hover:bg-gray-50">
+            전체 Slab 필드 ({Object.keys(data.projected_slab).length}) — 변경된 필드는 ✦
+          </summary>
+          <div className="p-2 max-h-48 overflow-auto">
+            <table className="w-full text-[10px]">
+              <thead><tr className="border-b border-gray-300">
+                <th className="text-left p-0.5">field</th>
+                <th className="text-right p-0.5">before</th>
+                <th className="text-right p-0.5">after</th>
+              </tr></thead>
+              <tbody>
+                {Object.entries(data.projected_slab).map(([k, v]) => {
+                  const ch = changedFields.has(k);
+                  const b = data.baseline_slab?.[k];
+                  return (
+                    <tr key={k} className={"border-b border-gray-100 " + (ch ? "bg-emerald-50/40" : "")}>
+                      <td className="p-0.5 font-mono">{ch ? "✦ " : ""}{k}</td>
+                      <td className="p-0.5 font-mono text-right text-gray-500">
+                        {b === null || b === undefined ? "—" : String(b)}
+                      </td>
+                      <td className={"p-0.5 font-mono text-right " + (ch ? "text-emerald-700 font-bold" : "text-gray-700")}>
+                        {v === null || v === undefined ? "—" : String(v)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
+
+      {/* Java → Python 변환 */}
+      {data.transpiled_methods.length > 0 && (
+        <div className="border-t border-gray-200 p-3 space-y-2">
+          <div className="text-[11px] font-semibold text-gray-700 flex items-center gap-1">
+            ⚙ 영향받는 Java 코드 → Python 실시간 변환 ({data.transpiled_methods.length})
+          </div>
+          {data.transpiled_methods.map((m) => <_TranspiledMethodCard key={m.fqn} method={m} />)}
+        </div>
+      )}
+
+      {data.notes.length > 0 && (
+        <details className="border-t border-gray-200 text-[10px]">
+          <summary className="px-3 py-1.5 cursor-pointer text-gray-500">분석 노트 ({data.notes.length})</summary>
+          <ul className="p-2 space-y-1">
+            {data.notes.map((n, i) => <li key={i} className="text-gray-600">· {n}</li>)}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+/** Java→Python 한 method — 2-col 코드 비교 + idiom diffs. */
+function _TranspiledMethodCard({ method }: { method: TranspiledMethod }) {
+  return (
+    <div className="border border-gray-200 rounded">
+      <div className="px-2 py-1 bg-gray-50 border-b border-gray-200 text-[10px] flex items-center gap-1">
+        <code className="font-mono font-bold text-gray-800">{method.class_name}.{method.method_name}</code>
+        {method.line_start && <span className="text-gray-400">L{method.line_start}-{method.line_end ?? "?"}</span>}
+        {method.error && <span className="ml-auto text-red-700">⚠ {method.error}</span>}
+      </div>
+      <div className="grid grid-cols-2 gap-0">
+        <div>
+          <div className="text-[9px] text-amber-700 px-2 py-0.5 bg-amber-50 border-b border-r border-amber-200">Java (원본)</div>
+          <pre className="p-2 text-[10px] max-h-48 overflow-auto bg-white border-r border-gray-200 text-gray-800">
+            {method.java || "(본문 없음)"}{method.java_truncated && "\n..."}
+          </pre>
+        </div>
+        <div>
+          <div className="text-[9px] text-emerald-700 px-2 py-0.5 bg-emerald-50 border-b border-emerald-200">Python (sim_v2 변환)</div>
+          <pre className="p-2 text-[10px] max-h-48 overflow-auto bg-emerald-50/30 text-emerald-900">
+            {method.python || "(변환 실패)"}{method.python_truncated && "\n..."}
+          </pre>
+        </div>
+      </div>
+      {method.idiom_diffs && method.idiom_diffs.length > 0 && (
+        <details className="border-t border-gray-200">
+          <summary className="px-2 py-1 text-[10px] text-gray-500 cursor-pointer">idiom 변환 {method.idiom_diffs.length}건</summary>
+          <ul className="px-3 pb-2 text-[10px] space-y-0.5">
+            {method.idiom_diffs.map((d, i) => (
+              <li key={i}>
+                <code className="bg-amber-100 px-1 rounded">{String(d.idiom_name ?? "?")}</code>
+                <span className="text-gray-600 ml-1">{String(d.summary ?? "")}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
   );
 }
 
@@ -535,6 +731,17 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
       {/* STAGE 4: 영향 결과 — stage 4 일 때만 표시 */}
       {stage === 4 && (
         <>
+          {/* slab 비교 (선택된 주문 기반) — 변경 전/후 결과 */}
+          {pickedOrder && targetChange && userChange.before && userChange.after && (
+            <_ImpactSlabCompareCard
+              table={String(targetChange.table)}
+              column={String(targetChange.column)}
+              before={userChange.before}
+              after={userChange.after}
+              order_no={pickedOrder}
+              affectedFqns={methods.map((m) => String(m.fqn ?? "")).filter(Boolean).slice(0, 5)}
+            />
+          )}
           {hasTarget && (
             <div className="text-[11px] bg-amber-50 border border-amber-300 rounded p-2 flex items-center gap-2">
               <span>🔄</span>

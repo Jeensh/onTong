@@ -51,6 +51,7 @@ from backend.section3.agents.simulation.slab_design_runner import (
 )
 from backend.section3.agents.simulation import domain_data
 from backend.section3.agents.simulation.hypothesis_workflow import run_hypothesis
+from backend.section3.agents.simulation.impact_compare import compare_impact_slab
 from backend.section3.agents.simulation.suggested_questions import (
     extract_korean_tokens, generate_suggestions, lookup_terms,
 )
@@ -366,6 +367,12 @@ async def _proceed_from_target(
                 "sim_v2_findings": [],
                 "sources": [],
             }
+        # affected_methods 에서 @Test / *Test 클래스 제거
+        if payload.get("affected_methods"):
+            payload["affected_methods"] = [
+                m for m in payload["affected_methods"]
+                if not _is_test_candidate({"code_method_fqn": m.get("fqn", "")})
+            ]
         # 풍부화 — 사용자 질문에서 변경 대상·매칭 주문·관련 룰 추출
         try:
             _enrich_impact_payload(payload, user_query=user_query or "", repo_id=repo_id)
@@ -1485,6 +1492,41 @@ async def hypothesis_run(req: HypothesisRequest) -> HypothesisResponse:
         diff_summary=r.diff_summary,
         notes=r.notes,
     )
+
+
+class ImpactCompareRequest(BaseModel):
+    table: str
+    column: str
+    before: str | None = None
+    after: str | None = None
+    order_no: str
+    cmp_cd: str = "K"
+    org_cd: str = "1"
+    affected_method_fqns: list[str] | None = None
+
+
+class ImpactCompareResponse(BaseModel):
+    ok: bool
+    order_no: str
+    target: dict
+    baseline_slab: dict | None = None
+    projected_slab: dict | None = None
+    diff: list[dict] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    transpiled_methods: list[dict] = Field(default_factory=list)
+    error: str | None = None
+    error_code: str | None = None
+
+
+@router.post("/impact/compare_slab", response_model=ImpactCompareResponse)
+async def impact_compare_slab_endpoint(req: ImpactCompareRequest) -> ImpactCompareResponse:
+    """선택 주문 + 변경 대상 → baseline vs projected slab 비교 + Java→Python."""
+    r = await compare_impact_slab(
+        table=req.table, column=req.column, before=req.before, after=req.after,
+        order_no=req.order_no, cmp_cd=req.cmp_cd, org_cd=req.org_cd,
+        affected_method_fqns=req.affected_method_fqns,
+    )
+    return ImpactCompareResponse(**r)
 
 
 class MethodBodyView(BaseModel):
