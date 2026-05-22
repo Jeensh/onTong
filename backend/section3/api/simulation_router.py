@@ -52,6 +52,7 @@ from backend.section3.agents.simulation.slab_design_runner import (
 from backend.section3.agents.simulation import domain_data
 from backend.section3.agents.simulation.hypothesis_workflow import run_hypothesis
 from backend.section3.agents.simulation.impact_compare import compare_impact_slab
+from backend.section3.agents.simulation.new_standard_workflow import run_new_standard_workflow
 from backend.section3.agents.simulation.suggested_questions import (
     extract_korean_tokens, generate_suggestions, lookup_terms,
 )
@@ -448,15 +449,16 @@ async def start(
     )
     intent = payload.get("intent", "ambiguous")
 
-    # ── LLM 분류 보정: "신규 X 추가" / "추가되면" 패턴 → hypothesis 강제 ──
+    # ── LLM 분류 보정: "신규 X 추가" 패턴 → hypothesis 강제 ──
     import re as _re
-    if _re.search(r"신규\s*\S+\s*(추가|들어오)|새\s*\S+\s*(추가|들어오)|"
-                  r"가\s*추가되면|이\s*추가되면", req.user_query):
-        if intent != "hypothesis":
-            logger.info("hypothesis pattern detected, override intent %s→hypothesis", intent)
-            intent = "hypothesis"
-            payload["intent"] = "hypothesis"
-            payload["_intent_overridden"] = True
+    q = req.user_query
+    has_new_keyword = bool(_re.search(r"\b(신규|새|new|추가|추가되면|들어오면)\b", q, _re.I)) \
+                      or any(kw in q for kw in ("신규", "새 ", "추가되면", "추가된다면", "들어오면"))
+    if has_new_keyword and intent != "hypothesis":
+        logger.info("hypothesis pattern detected, override intent %s→hypothesis", intent)
+        intent = "hypothesis"
+        payload["intent"] = "hypothesis"
+        payload["_intent_overridden"] = True
     p.update_session(sid, intent=intent)
     turn_no = p.add_gate_decision(sid, gate_kind="target_selected", payload=payload)
     logger.info(
@@ -885,40 +887,74 @@ async def _enrich_locate_payload(
 async def _execute_hypothesis_from_query(
     *, session_id: str, user_query: str,
 ) -> dict:
-    """hypothesis intent 의 query 에서 grade / order 추출 후 run_hypothesis 호출.
+    """hypothesis intent 의 query 에서 신규 기준 추출 후 적절한 workflow 호출.
 
-    LLM 정확 추출은 후속 — 일단 정규식 + 기본값 fallback.
+    "신규 품종 X" → new_standard_workflow (PRODUCT_CD)
+    "신규 강종 X" → new_standard_workflow (GRADE_CD)
+    productivity ×Y → 기존 run_hypothesis
     """
     import re
-    # 강종 패턴
-    grade_match = re.search(r"\b(SS\d{2,4}|HC\d{2,4}[A-Z]?)\b", user_query)
-    new_grade = grade_match.group(0) if grade_match else "SS500"
-    # 주문번호
     order_no = extract_order_no(user_query) or "ORD20260510001"
-    # multiplier
-    mult_match = re.search(r"productivity\s*[×x*]\s*(\d+\.?\d*)", user_query, re.I)
-    mult = float(mult_match.group(1)) if mult_match else 0.95
-    if mult > 2: mult = mult / 100  # "5%" 같은 경우 0.05 → 0.95 로 변환은 사용자 입력 의도 다름. 단순 raw 사용.
 
-    r = await run_hypothesis(
-        base_grade="SS400", new_grade=new_grade,
-        productivity_multiplier=mult, base_order_no=order_no,
-    )
-    payload = {
-        "kind": "executed_hypothesis_workflow",
-        "base_grade": r.base_grade, "new_grade": r.new_grade,
-        "productivity_multiplier": r.productivity_multiplier,
-        "base_order_no": r.base_order_no,
-        "existing_productivity_rows": r.existing_productivity_rows,
-        "existing_order_rows": r.existing_order_rows,
-        "virtual_productivity_rows": r.virtual_productivity_rows,
-        "virtual_order_rows": r.virtual_order_rows,
-        "baseline_slab": r.baseline_slab,
-        "baseline_trace": r.baseline_trace,
-        "projected_slab": r.projected_slab,
-        "diff_summary": r.diff_summary,
-        "notes": r.notes,
-    }
+    # 신규 품종 패턴 — 영문 대문자 코드만 의미있게 추출
+    new_product_cd: str | None = None
+    prod_code = re.search(r"신규\s*품종\s*([A-Z][A-Z0-9_-]{1,15})\b", user_query)
+    if prod_code:
+        new_product_cd = prod_code.group(1)
+    elif "품종" in user_query and any(kw in user_query for kw in ("신규", "새", "추가", "들어오")):
+        new_product_cd = "SHEET"  # default 가상 품종 코드
+
+    # 신규 강종 패턴
+    new_grade_cd: str | None = None
+    grade_match = re.search(r"신규\s*강종\s*([A-Z][A-Z0-9_-]{1,15})|새\s*강종\s*([A-Z][A-Z0-9_-]{1,15})", user_query)
+    if grade_match:
+        new_grade_cd = grade_match.group(1) or grade_match.group(2)
+    elif re.search(r"\b(SS\d{2,4}|HC\d{2,4}[A-Z]?)\b", user_query):
+        gm = re.search(r"\b(SS\d{2,4}|HC\d{2,4}[A-Z]?)\b", user_query)
+        if gm: new_grade_cd = gm.group(0)
+    elif "강종" in user_query and any(kw in user_query for kw in ("신규", "새", "추가", "들어오")):
+        new_grade_cd = "SS500"
+
+    # productivity 패턴이 있으면 기존 run_hypothesis 사용
+    mult_match = re.search(r"productivity\s*[×x*]\s*(\d+\.?\d*)", user_query, re.I)
+    has_productivity = mult_match is not None
+
+    if has_productivity and new_grade_cd:
+        # 기존 hypothesis_workflow (강종 productivity)
+        mult = float(mult_match.group(1))
+        r = await run_hypothesis(
+            base_grade="SS400", new_grade=new_grade_cd,
+            productivity_multiplier=mult, base_order_no=order_no,
+        )
+        payload = {
+            "kind": "executed_hypothesis_workflow",
+            "base_grade": r.base_grade, "new_grade": r.new_grade,
+            "productivity_multiplier": r.productivity_multiplier,
+            "base_order_no": r.base_order_no,
+            "existing_productivity_rows": r.existing_productivity_rows,
+            "existing_order_rows": r.existing_order_rows,
+            "virtual_productivity_rows": r.virtual_productivity_rows,
+            "virtual_order_rows": r.virtual_order_rows,
+            "baseline_slab": r.baseline_slab,
+            "baseline_trace": r.baseline_trace,
+            "projected_slab": r.projected_slab,
+            "diff_summary": r.diff_summary,
+            "notes": r.notes,
+        }
+    else:
+        # 신규 기준 추가 workflow
+        from backend.section3.agents.simulation.new_standard_workflow import (
+            run_new_standard_workflow as _run_ns,
+        )
+        r = await _run_ns(
+            new_product_cd=new_product_cd, new_grade_cd=new_grade_cd,
+            base_order_no=order_no,
+        )
+        payload = {
+            "kind": "executed_new_standard",
+            **r,
+        }
+
     new_turn = p.add_gate_decision(session_id, gate_kind="executed", payload=payload)
     p.update_session(session_id, status="done")
     return {"_turn_no": new_turn, "_payload": payload}
@@ -1492,6 +1528,46 @@ async def hypothesis_run(req: HypothesisRequest) -> HypothesisResponse:
         diff_summary=r.diff_summary,
         notes=r.notes,
     )
+
+
+class NewStandardRequest(BaseModel):
+    new_product_cd: str | None = None
+    new_grade_cd: str | None = None
+    new_custom_attrs: dict | None = None
+    base_order_no: str = "ORD20260510001"
+
+
+class NewStandardResponse(BaseModel):
+    new_product_cd: str | None = None
+    new_grade_cd: str | None = None
+    new_custom_attrs: dict = Field(default_factory=dict)
+    closest_existing_order: dict | None = None
+    use_virtual: bool = False
+    virtual_order: dict = Field(default_factory=dict)
+    baseline_order_no: str
+    baseline_slab: dict | None = None
+    projected_slab: dict | None = None
+    diff: list[dict] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    transpiled_methods: list[dict] = Field(default_factory=list)
+    code_changes_needed: list[dict] = Field(default_factory=list)
+
+
+@router.post("/new_standard/run", response_model=NewStandardResponse)
+async def new_standard_run(req: NewStandardRequest) -> NewStandardResponse:
+    """신규 기준 (품종 / 강종 / 사용자 정의) 추가 시나리오:
+    - 가장 가까운 기존 주문 찾기 → baseline
+    - 매칭 없으면 가상 주문 합성
+    - 신규 기준 적용 시 slab 결과 추론 + Java→Python 변환
+    - 코드 수정 필요 여부 안내
+    """
+    r = await run_new_standard_workflow(
+        new_product_cd=req.new_product_cd,
+        new_grade_cd=req.new_grade_cd,
+        new_custom_attrs=req.new_custom_attrs,
+        base_order_no=req.base_order_no,
+    )
+    return NewStandardResponse(**r)
 
 
 class ImpactCompareRequest(BaseModel):

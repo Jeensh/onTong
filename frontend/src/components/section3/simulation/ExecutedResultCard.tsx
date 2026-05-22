@@ -32,6 +32,7 @@ export function ExecutedResultCard({ payload, intent, onRerun, onNew, busy }: Pr
       {!error && payload.kind === "executed_full_design" && <_FullDesignView payload={payload} />}
       {!error && payload.kind === "executed_compare" && <_CompareView payload={payload} />}
       {!error && payload.kind === "executed_hypothesis_workflow" && <_HypothesisWorkflowView payload={payload} />}
+      {!error && payload.kind === "executed_new_standard" && <_NewStandardView payload={payload} />}
       {!error && payload.kind !== "executed_compare" && payload.kind !== "executed_full_design" && payload.kind !== "executed_hypothesis_workflow" && intent === "simulate" && <_SimulateView payload={payload} />}
       {!error && payload.kind !== "executed_compare" && payload.kind !== "executed_full_design" && intent === "impact" && <_ImpactView payload={payload} />}
       {!error && payload.kind !== "executed_hypothesis_workflow" && intent === "locate" && <_LocateView payload={payload} />}
@@ -2043,6 +2044,156 @@ function _HypothesisWorkflowView({ payload }: { payload: Record<string, unknown>
   );
 }
 
+
+/** 신규 기준 추가 시나리오 결과 — _NewStandardView.
+ *  사용자: "신규 품종 X 가 추가되면 어디 영향?" → 가상 주문 + 시뮬 + 코드 영향 + Java→Python.
+ */
+function _NewStandardView({ payload }: { payload: Record<string, unknown> }) {
+  const newProduct = payload.new_product_cd as string | null;
+  const newGrade = payload.new_grade_cd as string | null;
+  const closest = payload.closest_existing_order as Record<string, unknown> | null;
+  const useVirtual = payload.use_virtual as boolean;
+  const virtualOrder = payload.virtual_order as Record<string, Record<string, unknown>>;
+  const baselineSlab = payload.baseline_slab as Record<string, unknown> | null;
+  const projectedSlab = payload.projected_slab as Record<string, unknown> | null;
+  const diff = (payload.diff as Array<Record<string, unknown>> | undefined) ?? [];
+  const notes = (payload.notes as string[] | undefined) ?? [];
+  const transpiled = (payload.transpiled_methods as TranspiledMethod[] | undefined) ?? [];
+  const codeChanges = (payload.code_changes_needed as Array<Record<string, unknown>> | undefined) ?? [];
+
+  return (
+    <>
+      <div className="bg-gradient-to-r from-rose-600 to-fuchsia-600 text-white rounded-lg p-3 shadow">
+        <div className="text-[10px] uppercase tracking-wide opacity-80">신규 기준 추가 시뮬레이션</div>
+        <div className="text-sm font-semibold mt-0.5">
+          {newProduct && <>신규 품종 <code className="bg-white/20 px-1.5 py-0.5 rounded">{newProduct}</code></>}
+          {newGrade && <> · 신규 강종 <code className="bg-white/20 px-1.5 py-0.5 rounded">{newGrade}</code></>}
+          {" "}→ 가상 주문 합성 + Slab 결과 추론 + 코드 영향 분석
+        </div>
+      </div>
+
+      <_HypoStep n={1} title={useVirtual ? "가상 주문 합성 (매칭 기존 주문 없음)" : "매칭 기존 주문 사용"} color="violet">
+        {closest && (
+          <div className="text-[10px] mb-2">
+            <span className="text-gray-500">closest existing order: </span>
+            <code className="bg-white px-1.5 py-0.5 rounded border border-violet-200">
+              {String(closest.order_no)} (PRODUCT={String(closest.PRODUCT_CD)} · GRADE={String(closest.GRADE_CD)} · score {String(closest.score)})
+            </code>
+          </div>
+        )}
+        {useVirtual && Object.keys(virtualOrder).length > 0 && (
+          <div className="space-y-1">
+            <div className="text-[10px] text-gray-600">합성된 가상 주문 4 table:</div>
+            <ul className="text-[10px] space-y-0.5">
+              {Object.entries(virtualOrder).map(([t, row]) => (
+                <li key={t} className="font-mono">
+                  <span className="text-violet-700 font-semibold">{t}</span>
+                  <span className="text-gray-500 ml-1">
+                    ORDER_NO={String((row as Record<string, unknown>).ORDER_NO)}
+                    {t === "ORDER_OM" && <> · PRODUCT_CD={String((row as Record<string, unknown>).PRODUCT_CD)} · width={String((row as Record<string, unknown>).ORDER_WIDTH)}</>}
+                    {t === "ORDER_QD" && <> · GRADE_CD={String((row as Record<string, unknown>).GRADE_CD)}</>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </_HypoStep>
+
+      <_HypoStep n={2} title="Slab 결과 추론 (변경 전·후 비교)" color="emerald">
+        {baselineSlab && projectedSlab ? (
+          <>
+            <div className="text-[10px] text-gray-600 mb-1">
+              baseline 주문 = <code className="bg-white px-1 rounded">{String(payload.baseline_order_no ?? "?")}</code>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-[10px]">
+              <div className="border border-gray-300 rounded p-1.5">
+                <div className="text-gray-500">기존 (closest)</div>
+                <div className="font-mono">
+                  두께 {String(baselineSlab.slabThickness)} · 폭 {String(baselineSlab.slabWidth)}
+                </div>
+                <div className="font-mono text-emerald-700 font-semibold">
+                  단중 {Number(baselineSlab.slabWgt ?? 0).toFixed(1)}kg
+                </div>
+              </div>
+              <div className="border border-fuchsia-300 bg-fuchsia-50 rounded p-1.5">
+                <div className="text-fuchsia-700">신규 기준 + 가상 주문</div>
+                <div className="font-mono">
+                  두께 {String(projectedSlab.slabThickness)} · 폭 {String(projectedSlab.slabWidth)}
+                </div>
+                <div className="font-mono text-fuchsia-800 font-semibold">
+                  단중 {Number(projectedSlab.slabWgt ?? 0).toFixed(1)}kg
+                </div>
+              </div>
+              <div className="border border-amber-300 bg-amber-50 rounded p-1.5">
+                <div className="text-amber-700">DIFF ({diff.length})</div>
+                {diff.length === 0 ? (
+                  <div className="font-mono text-gray-500">변경 없음 (추론 기반)</div>
+                ) : (
+                  <div className="font-mono text-amber-800">
+                    {diff.slice(0, 3).map((d) => (
+                      <div key={String(d.field)}>{String(d.field)}: {String(d.delta_pct ?? 0)}%</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="text-[10px] text-gray-400">baseline 결과 없음</div>
+        )}
+      </_HypoStep>
+
+      <_HypoStep n={3} title="영향받는 Java 코드 → Python 실시간 변환" color="amber">
+        {transpiled.length > 0 ? (
+          <div className="space-y-2">
+            {transpiled.map((m) => <_TranspiledMethodCard key={m.fqn} method={m} />)}
+          </div>
+        ) : (
+          <div className="text-[10px] text-gray-400">영향받는 코드 없음 — DB 룰만 추가하면 됨</div>
+        )}
+      </_HypoStep>
+
+      <_HypoStep n={4} title="코드 수정 필요 여부" color="sky">
+        <ul className="space-y-1.5 text-[11px]">
+          {codeChanges.map((c, i) => {
+            const sev = String(c.severity);
+            const sevColor =
+              sev === "high" ? "bg-red-100 text-red-800 border-red-300" :
+              sev === "medium" ? "bg-amber-100 text-amber-800 border-amber-300" :
+              sev === "info" ? "bg-emerald-100 text-emerald-800 border-emerald-300" :
+              "bg-gray-100 text-gray-700 border-gray-300";
+            return (
+              <li key={i} className="bg-white border border-sky-200 rounded p-2">
+                <div className="flex items-start gap-2">
+                  <span className={"text-[9px] px-1.5 py-0.5 rounded border font-semibold " + sevColor}>
+                    {sev.toUpperCase()}
+                  </span>
+                  <div className="flex-1">
+                    <code className="text-[10px] text-sky-800">{String(c.file)}</code>
+                    <div className="text-gray-800 mt-0.5">{String(c.issue)}</div>
+                    <div className="text-gray-600 text-[10px] mt-1">
+                      <strong>조치:</strong> {String(c.action)}
+                    </div>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </_HypoStep>
+
+      {notes.length > 0 && (
+        <details className="text-[10px] border border-gray-200 rounded">
+          <summary className="px-2 py-1 bg-gray-50 cursor-pointer text-gray-600">분석 노트 ({notes.length})</summary>
+          <ul className="p-2 space-y-1">
+            {notes.map((n, i) => <li key={i} className="text-gray-700">· {n}</li>)}
+          </ul>
+        </details>
+      )}
+    </>
+  );
+}
 
 function _HypoStep({ n, title, color, children }: {
   n: number; title: string; color: "sky"|"amber"|"violet"|"emerald"; children: React.ReactNode;
