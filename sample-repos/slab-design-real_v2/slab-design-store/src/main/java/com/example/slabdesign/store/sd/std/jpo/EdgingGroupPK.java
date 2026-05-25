@@ -5,7 +5,7 @@ import java.util.Objects;
 
 /**
  * sd · std · EDGING_GROUP composite PK.
- * (회사코드, 소구분코드, 우선순위) — 우선순위가 unique sequence 가정.
+ * (온톨로지코드, 소구분코드, 우선순위) — 우선순위가 unique sequence 가정.
  * 룩업 시 (강종, 품종, 고객사, 열연목표폭) 으로 매칭되는 행이 여러 개일 수 있고,
  * 그 중 우선순위 가장 낮은(또는 높은) 1건을 선택.
  */

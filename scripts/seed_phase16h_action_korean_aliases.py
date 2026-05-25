@@ -36,7 +36,7 @@ KOREAN_RE = re.compile(r"[가-힣]+")
 KOREAN_COMPOUND_RE = re.compile(r"[가-힣]+(?:_[가-힣]+)+")
 
 # 단독 Korean alias 로는 너무 generic — N actions 에 매핑되면 over-expansion 노이즈
-# (compound 형 e.g. "슬랩설계_실행" 은 specific 이므로 유지)
+# (compound 형 e.g. "Slab설계_실행" 은 specific 이므로 유지)
 KOREAN_STOPWORDS = {"실행", "검증", "처리", "확인", "검사", "수행", "조회", "갱신"}
 
 
@@ -67,7 +67,7 @@ def derive_korean_aliases(fqn: str, label: str) -> list[str]:
             # split parts → 단독은 stopword 필터 적용
             for sub in tok.split("_"):
                 _emit(sub, is_compound=False)
-        # (2) plain Korean (e.g. "두께", "슬랩설계", "분류") → stopword 필터
+        # (2) plain Korean (e.g. "두께", "Slab설계", "분류") → stopword 필터
         for m in KOREAN_RE.finditer(source):
             _emit(m.group(0), is_compound=False)
     return out

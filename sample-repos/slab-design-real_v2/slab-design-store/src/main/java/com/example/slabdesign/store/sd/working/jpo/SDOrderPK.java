@@ -4,7 +4,7 @@ import java.io.Serializable;
 import java.util.Objects;
 
 /**
- * sd · working · ORDER 4종 공통 복합키 (회사코드, 소코드, 주문번호).
+ * sd · working · ORDER 4종 공통 복합키 (온톨로지코드, 소코드, 주문번호).
  * @IdClass 로 4 JPO (OS/OM/QD/CHEMICAL) 가 공유.
  * 필드명·타입은 각 @Entity 의 @Id 필드와 정확히 일치해야 한다 (JPA 규약).
  */

@@ -5,7 +5,7 @@ import java.util.Objects;
 
 /**
  * sd · std · EDGING_SPEC composite PK.
- * (회사코드, 소구분코드, edging그룹코드).
+ * (온톨로지코드, 소구분코드, edging그룹코드).
  * EDGING_GROUP_CD 가 '*' 인 row 는 catchall (전체).
  */
 public class EdgingSpecPK implements Serializable {

@@ -25,7 +25,7 @@ def _hypothesis() -> hp.EntityHypothesis:
         candidate_term_korean="열연공장 표준",
         candidate_term_english="HrSpec",
         domain_role="standard",
-        pk_role_summary="회사·소·열연공장·품종 4축",
+        pk_role_summary="온톨로지·소·열연공장·품종 4축",
         column_notes=[],
         relations_hint=[],
         domain_questions=[],
@@ -85,7 +85,7 @@ def _names() -> nm.NamingDecision:
                 korean_label="열연공장",
                 english_id="HrPlant",
                 role="root",
-                description_short="회사·소 단위의 물리 열연 설비",
+                description_short="온톨로지·소 단위의 물리 열연 설비",
             ),
             nm.EntityName(
                 korean_label="열연공장제약",
@@ -247,7 +247,7 @@ def test_build_title_uses_root_or_standalone_label():
                 korean_label="열연Edging규격그룹기준",
                 english_id="EdgingGroupRule",
                 role="standalone",
-                description_short="회사·소 단위 그룹 분류 룰",
+                description_short="온톨로지·소 단위 그룹 분류 룰",
             )
         ],
         naming_rationale="r",

@@ -152,8 +152,34 @@ export const simulationApi = {
   hypothesis: (req: HypothesisRequest) => _post<HypothesisResponse>("/hypothesis/run", req),
   suggestedQuestions: (seed = 0) => _get<SuggestedQuestionView[]>(`/suggested_questions?seed=${seed}`),
   termLookup: (text: string) => _post<DetectedTermView[]>("/term_lookup", { text }),
+  ontologyInspect: (term_fqn: string, repo_id = "slab-design-real-v2") =>
+    _post<OntologyInspectResponse>("/ontology_inspect", { term_fqn, repo_id }),
   impactCompare: (req: ImpactCompareRequest) => _post<ImpactCompareResponse>("/impact/compare_slab", req),
 };
+
+export interface OntologyCallRecord {
+  method: string;
+  url: string;
+  elapsed_ms: number;
+  status: "ok" | "error" | "empty";
+  item_count: number | null;
+  error: string | null;
+}
+
+export interface OntologyInspectResponse {
+  term_fqn: string;
+  term: Record<string, unknown> | null;
+  effective_parts: Record<string, unknown>[];
+  related_actions: { fqn: string; label: string; kind: string; description: string }[];
+  business_rules: { fqn: string; statement: string; severity: string; enforced_by: string[] }[];
+  anchor_bindings: {
+    anchor_id: string; method_fqn: string; target_action_fqn: string;
+    target_slot: string; anchor_locator: string; line: number | null;
+    confidence: number;
+  }[];
+  calls: OntologyCallRecord[];
+  total_ms: number;
+}
 
 export interface ImpactCompareRequest {
   table: string;

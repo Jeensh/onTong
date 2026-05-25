@@ -56,7 +56,7 @@ BR_METADATA = {
             "com.example.slabdesign.feature.sd.process.working.action.SdOrderValidator.validate(SDOrderEntity)",
         ],
         "operational_history": [
-            {"incident_id": "P-2018-0098", "summary": "정XX 슬랩 중복 생성 사고",
+            {"incident_id": "P-2018-0098", "summary": "정XX Slab 중복 생성 사고",
              "occurred_at": "2018-11-22", "triggered_by": None, "fixed_at_commit": None},
         ],
     },
@@ -86,7 +86,7 @@ BR_METADATA = {
             "com.example.slabdesign.feature.sd.process.working.action.SdOrderValidator.validate(SDOrderEntity)",
         ],
         "operational_history": [
-            {"incident_id": "P-2020-0411", "summary": "당일 마감 슬랩 생성 사고",
+            {"incident_id": "P-2020-0411", "summary": "당일 마감 Slab 생성 사고",
              "occurred_at": "2020-04-11", "triggered_by": None, "fixed_at_commit": None},
         ],
     },

@@ -6,7 +6,7 @@ import java.util.Objects;
 
 /**
  * sd · std · HR_MIN_WGT composite PK.
- * (회사, 소구분, 열연코드, 두께, 폭) — 5 컬럼.
+ * (온톨로지, 소구분, 열연코드, 두께, 폭) — 5 컬럼.
  * HR_MAX_WGT 와 동일 구조, 다른 의미 (MIN vs MAX).
  */
 public class HrMinWgtPK implements Serializable {

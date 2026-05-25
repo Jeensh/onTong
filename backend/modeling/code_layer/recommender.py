@@ -63,9 +63,9 @@ _SLAB_GLOSSARY: dict[str, _GlossaryEntry] = {
     "SDOrderOsJpo":      _GlossaryEntry("주문스펙", struct_like_hint=True, aliases=("OrderOs",)),
     "OrderChemical":     _GlossaryEntry("화학성분", struct_like_hint=True),
     "OrderQd":           _GlossaryEntry("품질데이터", struct_like_hint=True),
-    # 슬랩 / 결과
-    "Slab":              _GlossaryEntry("슬랩"),
-    "SDSlabEntity":      _GlossaryEntry("슬랩", aliases=("Slab",)),
+    # Slab / 결과
+    "Slab":              _GlossaryEntry("Slab"),
+    "SDSlabEntity":      _GlossaryEntry("Slab", aliases=("Slab",)),
     "SlabResult":        _GlossaryEntry("결과"),
     "SlabDesignHist":    _GlossaryEntry("이력"),
     # 도메인 atomics (struct_like 도 합쳐서 일단 composite 로)
@@ -77,7 +77,7 @@ _SLAB_GLOSSARY: dict[str, _GlossaryEntry] = {
     "PackagingWeight":   _GlossaryEntry("포장단중", struct_like_hint=True),
     "UnitWeight":        _GlossaryEntry("단중"),
     "ProductivityRate":  _GlossaryEntry("실수율"),
-    "Cmpcd":             _GlossaryEntry("회사"),
+    "Cmpcd":             _GlossaryEntry("온톨로지"),
     "OrgCd":             _GlossaryEntry("소"),
     # spec / rule master
     "HrSpec":            _GlossaryEntry("HR스펙"),
@@ -96,7 +96,7 @@ _SLAB_GLOSSARY: dict[str, _GlossaryEntry] = {
 
 # 메서드 이름 → 한국어 라벨 (도메인 액션 위주)
 _METHOD_LABEL_GLOSSARY: dict[str, str] = {
-    "design":            "슬랩설계_실행",
+    "design":            "Slab설계_실행",
     "validate":          "정합성_검증",
     "classify":          "분류",
     "execute":           "실행",

@@ -17,7 +17,7 @@ public class SdSeedController {
     private static final List<ScenarioMeta> SCENARIOS = List.of(
         new ScenarioMeta("S1", "ORD20260510001", "일반 COIL 주문 (golden path: split fallback → 1 slab)",
             "K1 K    ", "1 slab"),
-        new ScenarioMeta("S2", "ORD20260510002", "다중 슬랩 + A-a inner loop (split=2 + step10→step13)",
+        new ScenarioMeta("S2", "ORD20260510002", "다중 Slab + A-a inner loop (split=2 + step10→step13)",
             "K1      ", "3 slabs"),
         new ScenarioMeta("S3", "ORD20260510003", "A-a inner-loop fallback (split=1 + step10→step13)",
             "K1KK    ", "2 slabs"),

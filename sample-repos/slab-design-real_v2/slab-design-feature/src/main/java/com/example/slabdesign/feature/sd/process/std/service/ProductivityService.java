@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 /**
  * sd · std · 실수율 룩업 서비스.
  *
- * SD_PRODUCTIVITY_STD 테이블에서 (회사/소/공정/강종/품종/고객) 6-축 키로 실수율 조회.
+ * SD_PRODUCTIVITY_STD 테이블에서 (온톨로지/소/공정/강종/품종/고객) 6-축 키로 실수율 조회.
  * 룩업 실패 시 SdConstants.DEFAULT_PRODUCTIVITY fallback.
  *
  * 알고리즘 step 6/9/13 에서 활용. 결과는 SDOrderEntity.productivity 작업용 필드에 캐시.
@@ -57,7 +57,7 @@ public class ProductivityService {
      * 누적 실수율 — confirmedPlantCd 의 활성 공정(' ' 아닌 자리) 모두에서 룩업한 실수율 곱.
      * 비활성 공정은 곱에서 제외. 각 공정 룩업 미매칭 시 기본값 사용.
      *
-     * 데이터 의미: 1 슬랩 → 모든 공정 통과 → 최종 product 실수율 = 각 공정 실수율의 곱.
+     * 데이터 의미: 1 Slab → 모든 공정 통과 → 최종 product 실수율 = 각 공정 실수율의 곱.
      */
     public BigDecimal cumulativeProductivity(String cmpCd, String orgCd, String confirmedPlantCd,
                                              String gradeCd, String productCd, String customerCd) {

@@ -24,7 +24,7 @@ def _hr_plant_hypothesis() -> hp.EntityHypothesis:
         candidate_term_english="HrSpec",
         domain_role="standard",
         pk_role_summary=(
-            "회사·소·열연공장·품종 4축 조합 — 한 row = 한 열연공장의 한 품종에 대한 폭/길이 범위"
+            "온톨로지·소·열연공장·품종 4축 조합 — 한 row = 한 열연공장의 한 품종에 대한 폭/길이 범위"
         ),
         column_notes=[
             hp.ColumnNote(db_column="WIDTH_LOW", note="step 2 폭하한 계산"),
@@ -52,7 +52,7 @@ def _hr_plant_answers() -> aa.AbsorbedAnswers:
         per_question={
             "meaning": aa.AbsorbedAnswer(
                 question_id="meaning",
-                raw_text="열연공장의 능력 + 품종별 제약. 즉 회사·소·공장 단위의 설비, 그 산하에 품종별 제약",
+                raw_text="열연공장의 능력 + 품종별 제약. 즉 온톨로지·소·공장 단위의 설비, 그 산하에 품종별 제약",
                 normalized="열연공장 (설비) + 품종별 제약 — composite 가능성",
             ),
             "owner": aa.AbsorbedAnswer(

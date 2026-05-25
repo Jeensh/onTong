@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * sd · std · HR_SPEC 룩업 서비스.
- * 4-축 composite key (회사/소/열연공장/품종) 정확매칭 룩업.
+ * 4-축 composite key (온톨로지/소/열연공장/품종) 정확매칭 룩업.
  */
 @Service
 public class HrSpecService {

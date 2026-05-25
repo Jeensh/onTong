@@ -54,6 +54,11 @@ export function IntentCandidateCard({
   }
 
   if (intent === "ambiguous" || candidates.length === 0) {
+    function _pick(id: string) {
+      if (busy) return;
+      setPickedIntent(id);
+      onClarify(id);
+    }
     return (
       <div className="border border-gray-300 rounded-lg bg-white p-4 space-y-3">
         <header className="flex items-center justify-between">
@@ -61,40 +66,38 @@ export function IntentCandidateCard({
           <span className="text-xs text-gray-400">intent={intent ?? "?"}</span>
         </header>
         <p className="text-sm text-gray-700">
-          "{userQuery}" 의 의도가 명확하지 않습니다. 5종 중 하나를 골라 주세요.
+          "{userQuery}" 의 의도가 명확하지 않습니다. 아래 5종 중 하나를 클릭하면 그 의도로 즉시 재검색합니다.
         </p>
         <div className="space-y-1.5">
-          {CLARIFY_OPTIONS.map((o) => (
-            <label
-              key={o.id}
-              className={"flex items-start gap-2 p-2 rounded border cursor-pointer " +
-                (pickedIntent === o.id
-                  ? "border-emerald-500 bg-emerald-50"
-                  : "border-gray-200 hover:bg-gray-50")}
-            >
-              <input
-                type="radio"
-                checked={pickedIntent === o.id}
-                onChange={() => setPickedIntent(o.id)}
-                className="mt-1 accent-emerald-500"
-              />
-              <div className="text-xs">
-                <div className="font-semibold text-gray-900">{o.label}</div>
-                <div className="text-gray-500">{o.desc}</div>
-              </div>
-            </label>
-          ))}
+          {CLARIFY_OPTIONS.map((o) => {
+            const selected = pickedIntent === o.id;
+            return (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => _pick(o.id)}
+                disabled={busy}
+                aria-pressed={selected}
+                className={"w-full text-left flex items-start gap-2 p-2 rounded border transition disabled:opacity-50 " +
+                  (selected
+                    ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200"
+                    : "border-gray-200 hover:bg-emerald-50 hover:border-emerald-300")}
+              >
+                <Check size={12} className={"mt-0.5 " + (selected ? "text-emerald-600" : "text-transparent group-hover:text-emerald-400")} />
+                <div className="text-xs flex-1">
+                  <div className="font-semibold text-gray-900">{o.label}</div>
+                  <div className="text-gray-500">{o.desc}</div>
+                </div>
+                {busy && selected && (
+                  <span className="text-[10px] text-emerald-600 animate-pulse">처리 중…</span>
+                )}
+              </button>
+            );
+          })}
         </div>
         <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200">
           <button onClick={onAbort} disabled={busy} className="px-3 py-1.5 text-xs rounded border border-gray-300 hover:bg-gray-50">
             <Ban size={11} className="inline mr-1" /> 중단
-          </button>
-          <button
-            onClick={() => pickedIntent && onClarify(pickedIntent)}
-            disabled={busy || !pickedIntent}
-            className="px-3 py-1.5 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50"
-          >
-            <Check size={11} className="inline mr-1" /> 이 의도로 재검색
           </button>
         </div>
       </div>

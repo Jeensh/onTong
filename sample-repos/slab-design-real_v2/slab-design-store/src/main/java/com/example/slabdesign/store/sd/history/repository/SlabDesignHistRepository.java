@@ -8,7 +8,7 @@ import java.util.List;
 
 /**
  * sd · history · SLAB_DESIGN_HIST repository.
- * P2.4: step 별 적재 + 주문/슬랩 별 조회.
+ * P2.4: step 별 적재 + 주문/Slab 별 조회.
  */
 public interface SlabDesignHistRepository extends JpaRepository<SlabDesignHistJpo, SlabDesignHistPK> {
 
@@ -16,7 +16,7 @@ public interface SlabDesignHistRepository extends JpaRepository<SlabDesignHistJp
     List<SlabDesignHistJpo> findByCmpCdAndOrgCdAndOrderNoOrderByEventTimeAsc(
         String cmpCd, String orgCd, String orderNo);
 
-    /** 특정 슬랩 기준 이력 (성공 케이스). */
+    /** 특정 Slab 기준 이력 (성공 케이스). */
     List<SlabDesignHistJpo> findByCmpCdAndOrgCdAndSlabNoOrderByStepNoAsc(
         String cmpCd, String orgCd, String slabNo);
 }

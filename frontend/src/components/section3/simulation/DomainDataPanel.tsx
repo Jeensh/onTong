@@ -66,7 +66,7 @@ export function DomainDataPanel() {
         <span className="text-[10px] text-gray-400 ml-auto">{tables.length} tables</span>
       </div>
 
-      <div className="space-y-2 max-h-80 overflow-y-auto">
+      <div className="space-y-2">
         {Object.entries(grouped).map(([cat, ts]) => (
           <div key={cat}>
             <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">
@@ -105,7 +105,7 @@ export function DomainDataPanel() {
               <X size={12} />
             </button>
           </div>
-          <div className="p-2 space-y-2 max-h-72 overflow-y-auto text-[10px]">
+          <div className="p-2 space-y-2 text-[10.5px]">
             {/* schema */}
             <div>
               <div className="text-gray-500 mb-1">schema ({detail.columns.length} cols)</div>

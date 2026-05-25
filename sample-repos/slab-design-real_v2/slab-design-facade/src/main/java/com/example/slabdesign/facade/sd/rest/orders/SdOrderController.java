@@ -45,7 +45,7 @@ public class SdOrderController {
         this.chemRepo = chemRepo;
     }
 
-    @Operation(summary = "회사·소 단위 주문 목록 (페이지)")
+    @Operation(summary = "온톨로지·소 단위 주문 목록 (페이지)")
     @GetMapping
     public List<OrderSummary> list(
             @RequestParam String cmpCd,

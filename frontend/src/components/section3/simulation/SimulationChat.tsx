@@ -6,15 +6,13 @@
  * 중앙·우측 패널 렌더.
  */
 import { useEffect, useState } from "react";
-import { Workflow, Send, RotateCcw, Loader2 } from "lucide-react";
+import { Workflow, Send, RotateCcw, Loader2, User, Code2, FileSpreadsheet } from "lucide-react";
 import { simulationApi, type GraphResponse, type ReplayResponse, type SimulationGate,
   type SuggestedQuestionView, type DetectedTermView } from "@/lib/section3/simulation";
 import { IntentCandidateCard } from "./IntentCandidateCard";
 import { BundlePreviewCard } from "./BundlePreviewCard";
-import { ExecutedResultCard } from "./ExecutedResultCard";
-import { OntologyGraphPanel } from "./OntologyGraphPanel";
-import { DomainDataPanel } from "./DomainDataPanel";
-import { DetectedTermsPanel } from "./DetectedTermsPanel";
+import { ExecutedResultCard, ResultErrorBoundary } from "./ExecutedResultCard";
+// 우측 패널 제거 (2026-05-23 사용자 요구) — chat + 분석 메인. 필요시 다시 import.
 import { SessionHistoryPanel } from "./SessionHistoryPanel";
 
 interface Props {
@@ -32,13 +30,13 @@ const FALLBACK_PRESETS: { intent: string; label: string; query: string }[] = [
   { intent: "impact",     label: "③ EDGING 사양 변경 영향",
     query: "SD_HSM_EDGING_SPEC 마진을 늘리면 어떤 step·method 가 영향받아?" },
   { intent: "impact",     label: "④ 단중 하한 룰 변경 영향",
-    query: "secondaryWeight 하한을 8000→9000kg 으로 바꾸면 어떤 주문이 fail?" },
+    query: "2차 단중 하한을8000→9000kg 으로 바꾸면 어떤 주문이 fail?" },
   { intent: "locate",     label: "⑤ DG104 에러 발생 위치",
     query: "DG104 (HR_MIN_WGT 미발견) 은 어디서 throw 돼?" },
   { intent: "explain",    label: "⑥ A-a 루프 설명",
     query: "Step 8~13 의 A-a inner loop 가 뭐고 어떻게 수렴해?" },
-  { intent: "hypothesis", label: "⑦ 신규 강종 SS500 추가 시 영향",
-    query: "신규 강종 SS500 (기존 SS400 대비 productivity ×0.95) 가 SD_PRODUCTIVITY_STD 에 추가되고, 동일 사양 주문 (orderWidth 1200 · designPendQty 10000kg) 이 들어오면 ORD20260510001 의 Slab 결과 (slabThickness 230 · slabWgt 13288kg) 와 어떻게 달라질까?" },
+  { intent: "hypothesis", label: "⑦ 조건 변경 시 단중 변화 (sweep)",
+    query: "주문의 설계대기량 상한 값을 10kg씩 10번 증가시킬 때마다 Slab 설계 단중값이 어떻게 변해?" },
 ];
 
 const INTENT_BADGE: Record<string, { color: string; label: string }> = {
@@ -62,6 +60,34 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
   const [detectedTerms, setDetectedTerms] = useState<DetectedTermView[]>([]);
   const [presetSeed, setPresetSeed] = useState(0);
   const [presetCat, setPresetCat] = useState<string>("simulate");
+
+  // 결과 승인 lift up — 왼쪽 turn 카드(③ 결과 도출 완료)도 승인 후에만 표시
+  const [executedApproved, setExecutedApproved] = useState(false);
+  // 새 session 시작 시 reset
+  useEffect(() => { setExecutedApproved(false); }, [sid]);
+
+  // perspective: 현업(business) = 코드 카드/Java 본문 hide, 데이터·답변 중심.
+  //              IT(it) = 기존 default, 코드 + 데이터 + 디버그 모두.
+  const [perspective, setPerspective] = useState<"business" | "it">(() => {
+    if (typeof window === "undefined") return "it";
+    return (localStorage.getItem("sim:perspective") as "business" | "it") ?? "it";
+  });
+  // result_mode — 답변에서 데이터만 / 코드+데이터 (perspective=it 일 때만 의미)
+  const [resultMode, setResultMode] = useState<"auto" | "data_only" | "code_and_data">(() => {
+    if (typeof window === "undefined") return "auto";
+    return (localStorage.getItem("sim:resultMode") as "auto" | "data_only" | "code_and_data") ?? "auto";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") localStorage.setItem("sim:perspective", perspective);
+  }, [perspective]);
+  useEffect(() => {
+    if (typeof window !== "undefined") localStorage.setItem("sim:resultMode", resultMode);
+  }, [resultMode]);
+
+  // perspective=business 일 때 result_mode 는 자동으로 data_only
+  const effectiveResultMode: "data_only" | "code_and_data" = perspective === "business"
+    ? "data_only"
+    : (resultMode === "data_only" ? "data_only" : "code_and_data");
 
   // backend 의 동적 예시 질문 로드
   useEffect(() => {
@@ -159,6 +185,23 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
     onNewSession();
   }
 
+  // 재생성 — 같은 user_query 로 새 세션 생성 (status=done 세션에 rerun 불가 문제 해결)
+  async function _onRegenerate() {
+    if (busy) return;
+    const lastQuery = replay?.user_query;
+    if (!lastQuery) return;
+    setBusy(true); setError(null);
+    try {
+      const r = await simulationApi.start({ user_query: lastQuery, repo_id: repo });
+      setLastGate(r.next_gate);
+      await _refresh(r.session_id);
+    } catch (e) {
+      setError(`재생성 실패: ${String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // 가장 최근 게이트 결정
   const lastDecision = replay?.decisions?.[replay.decisions.length - 1] ?? null;
   const intent: string | null =
@@ -166,18 +209,68 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
   const intentBadge = intent ? INTENT_BADGE[intent] : null;
 
   return (
-    <div className="h-full grid" style={{ gridTemplateColumns: "33% 1px 40% 1px 27%" }}>
+    <div className="h-full grid" style={{ gridTemplateColumns: "35% 1px 65%" }}>
       {/* ─────────── 좌측 chat ─────────── */}
       <div className="flex flex-col h-full overflow-hidden bg-white">
-        <div className="px-4 py-3 border-b border-gray-200 flex items-center gap-2">
-          <Workflow size={16} className="text-emerald-600" />
-          <strong className="text-sm">시뮬레이션 에이전트</strong>
+        <div className="px-3 py-2 border-b border-gray-200 flex items-center gap-1.5 flex-wrap">
+          <Workflow size={15} className="text-emerald-600 flex-shrink-0" />
+          <strong className="text-xs flex-shrink-0">시뮬레이션 에이전트</strong>
           {intentBadge && (
-            <span className={`text-[10px] px-2 py-0.5 rounded border ${intentBadge.color}`}>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded border flex-shrink-0 ${intentBadge.color}`}>
               {intentBadge.label}
             </span>
           )}
-          <span className="text-xs text-gray-400 ml-auto">{repo}</span>
+          {/* perspective toggle (현업 / IT) */}
+          <div className="ml-auto flex items-center gap-0.5 bg-gray-100 rounded p-0.5 text-[10.5px] flex-shrink-0">
+            <button
+              onClick={() => setPerspective("business")}
+              className={"px-2 py-0.5 rounded flex items-center gap-1 transition " + (
+                perspective === "business"
+                  ? "bg-white shadow text-emerald-700 font-semibold"
+                  : "text-gray-500 hover:text-gray-700"
+              )}
+              title="현업 모드 — 데이터·결과 중심, 코드 카드 숨김"
+            >
+              <User size={11} /> 현업
+            </button>
+            <button
+              onClick={() => setPerspective("it")}
+              className={"px-2 py-0.5 rounded flex items-center gap-1 transition " + (
+                perspective === "it"
+                  ? "bg-white shadow text-violet-700 font-semibold"
+                  : "text-gray-500 hover:text-gray-700"
+              )}
+              title="IT 모드 — 코드 + 데이터 + 디버그 모두 표시"
+            >
+              <Code2 size={11} /> IT
+            </button>
+          </div>
+          {/* IT 모드일 때만 result_mode chip 노출 */}
+          {perspective === "it" && (
+            <div className="flex items-center gap-0.5 bg-gray-100 rounded p-0.5 text-[10px] flex-shrink-0">
+              {[
+                { id: "auto", label: "자동" },
+                { id: "data_only", label: "데이터" },
+                { id: "code_and_data", label: "코드+데이터" },
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setResultMode(m.id as "auto" | "data_only" | "code_and_data")}
+                  className={"px-1.5 py-0.5 rounded transition whitespace-nowrap " + (
+                    resultMode === m.id
+                      ? "bg-white shadow text-gray-900 font-semibold"
+                      : "text-gray-500 hover:text-gray-700"
+                  )}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {/* repo 라벨 — 좁을 때 다음 줄로 wrap, basis-full 로 강제 줄바꿈 */}
+          <span className="text-[10px] text-gray-400 basis-full text-right truncate" title={repo}>
+            {repo}
+          </span>
         </div>
 
         <SessionHistoryPanel
@@ -265,11 +358,11 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
             );
           })()}
 
-          {/* 사용자 입력 중 실시간 ontology 용어 매핑 표시 — 좌측 chat 안 짧은 hint */}
+          {/* 사용자 입력 중 ontology 용어 매핑 hint — 한 줄로 간략, 우측 패널 언급 없음 */}
           {!sid && detectedTerms.length > 0 && (
             <div className="text-[10px] flex items-center gap-1 text-fuchsia-700">
               <span className="animate-pulse">🎯</span>
-              <span>우측 패널에 {detectedTerms.length}개 ontology 용어 감지됨</span>
+              <span>{detectedTerms.length}개 ontology 용어 감지: {detectedTerms.slice(0, 3).map((t) => t.label).join(", ")}{detectedTerms.length > 3 && " …"}</span>
             </div>
           )}
 
@@ -282,16 +375,28 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
             </div>
           )}
 
-          {replay?.decisions.map((d) => (
-            <div key={d.turn_no} className="text-[11px]">
-              <div className="text-gray-400 mb-1">
-                turn {d.turn_no} · <code className="text-gray-600">{d.gate_kind}</code>
+          {replay?.decisions.map((d) => {
+            // 2026-05-25: executed turn 카드는 결과 승인 전엔 hide (사용자 요구)
+            if (d.gate_kind === "executed" && !executedApproved) return null;
+            const stepMeta = _stepMetaForGate(d.gate_kind, d.payload);
+            return (
+              <div key={d.turn_no} className="text-[12px]">
+                <div className={"rounded-lg border-2 p-2.5 " + stepMeta.boxCls}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className={"w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold " + stepMeta.badgeCls}>
+                      {d.turn_no}
+                    </span>
+                    <span className={"text-[13.5px] font-bold " + stepMeta.titleCls}>
+                      {stepMeta.title}
+                    </span>
+                  </div>
+                  <div className="text-[11.5px] text-gray-700 pl-8 leading-relaxed">
+                    {_renderTurnSummary(d.gate_kind, d.payload)}
+                  </div>
+                </div>
               </div>
-              <div className="bg-gray-50 border border-gray-200 rounded p-2 max-h-32 overflow-y-auto text-gray-700">
-                {_renderTurnSummary(d.gate_kind, d.payload)}
-              </div>
-            </div>
-          ))}
+            );
+          })}
 
           {busy && (
             <div className="flex items-center gap-2 text-xs text-emerald-700">
@@ -337,8 +442,8 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
 
       <div className="bg-gray-200" />
 
-      {/* ─────────── 중앙 active gate (intent 별 차별) ─────────── */}
-      <div className="flex flex-col h-full overflow-hidden bg-gray-50 p-4">
+      {/* ─────────── 중앙 active gate (intent 별 차별) — overflow-y-auto 로 카드 잘림 방지 ─────────── */}
+      <div className="flex flex-col h-full overflow-y-auto bg-gray-50 p-4 simulation-middle-panel">
         {!sid && (
           <div className="text-xs text-gray-500 mt-4">
             좌측에 질문을 입력하면 의도 분석 + 후보 카드가 여기에 표시됩니다.
@@ -367,29 +472,23 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
         )}
 
         {lastDecision?.gate_kind === "executed" && (
-          <ExecutedResultCard
-            payload={lastDecision.payload}
-            intent={(intent as string) ?? "unknown"}
-            onRerun={() => _onActionDirect("rerun")}
-            onNew={_onReset}
-            busy={busy}
-          />
+          <ResultErrorBoundary name="ExecutedResultCard">
+            <ExecutedResultCard
+              payload={lastDecision.payload}
+              intent={(intent as string) ?? "unknown"}
+              onRerun={_onRegenerate}
+              onNew={_onReset}
+              busy={busy}
+              perspective={perspective}
+              resultMode={effectiveResultMode}
+              sessionId={sid ?? undefined}
+              approved={executedApproved}
+              onApproveChange={setExecutedApproved}
+            />
+          </ResultErrorBoundary>
         )}
       </div>
 
-      <div className="bg-gray-200" />
-
-      {/* ─────────── 우측 ontology graph ─────────── */}
-      <div className="flex flex-col h-full overflow-hidden bg-white p-3 gap-3">
-        <DetectedTermsPanel
-          detected={detectedTerms}
-          fromSession={
-            (replay?.decisions?.[replay?.decisions?.length - 1]?.payload?._detected_terms as DetectedTermView[] | undefined) ?? []
-          }
-        />
-        <OntologyGraphPanel sessionId={sid} refreshKey={replay?.decisions.length ?? 0} />
-        <DomainDataPanel />
-      </div>
     </div>
   );
 }
@@ -397,21 +496,98 @@ export function SimulationChat({ initialSid, onNewSession, defaultRepoId }: Prop
 // ─────────────────────────────────────────────────────────────────────────────
 // 좌측 chat 안 turn summary
 // ─────────────────────────────────────────────────────────────────────────────
+function _stepMetaForGate(gateKind: string, payload: Record<string, unknown>) {
+  // 사용자 친화 라벨 + 색상
+  const intent = String(payload.intent ?? "");
+  const INTENT_KO: Record<string, string> = {
+    simulate: "시뮬레이션", impact: "영향도 분석", locate: "위치 찾기",
+    explain: "설명", hypothesis: "가설 검증", ambiguous: "의도 확인 필요",
+  };
+  if (gateKind === "target_selected") {
+    return {
+      title: `① 질문 분석 — ${INTENT_KO[intent] ?? intent}`,
+      boxCls: "border-sky-300 bg-sky-50/60",
+      badgeCls: "bg-sky-600 text-white",
+      titleCls: "text-sky-900",
+    };
+  }
+  if (gateKind === "bundle_prepared") {
+    return {
+      title: "② 시뮬 입력 준비",
+      boxCls: "border-amber-300 bg-amber-50/60",
+      badgeCls: "bg-amber-600 text-white",
+      titleCls: "text-amber-900",
+    };
+  }
+  if (gateKind === "executed") {
+    if (payload.error) {
+      return {
+        title: "③ 결과 — 오류 발생",
+        boxCls: "border-red-300 bg-red-50/60",
+        badgeCls: "bg-red-600 text-white",
+        titleCls: "text-red-900",
+      };
+    }
+    return {
+      title: "③ 결과 도출 완료",
+      boxCls: "border-emerald-300 bg-emerald-50/60",
+      badgeCls: "bg-emerald-600 text-white",
+      titleCls: "text-emerald-900",
+    };
+  }
+  return {
+    title: gateKind,
+    boxCls: "border-gray-200 bg-gray-50",
+    badgeCls: "bg-gray-400 text-white",
+    titleCls: "text-gray-800",
+  };
+}
+
 function _renderTurnSummary(gateKind: string, payload: Record<string, unknown>): React.ReactNode {
+  const INTENT_KO: Record<string, string> = {
+    simulate: "시뮬레이션 — 주문 → slab 설계",
+    impact: "영향도 분석 — 기준값 변경 시 결과 영향",
+    locate: "위치 찾기 — 코드 안 위치",
+    explain: "설명 — ontology 도메인 답변",
+    hypothesis: "가설 검증 — 가상 시나리오",
+    ambiguous: "의도가 명확하지 않습니다 — 옵션 선택 필요",
+  };
   if (gateKind === "target_selected") {
     const intent = String(payload.intent ?? "");
     const cands = (payload.candidates as unknown[] | undefined) ?? [];
-    return <span>intent=<code>{intent}</code> · 후보 {cands.length}건</span>;
+    const detected = (payload._detected_terms as Array<{label?: string}> | undefined) ?? [];
+    return (
+      <>
+        <div>{INTENT_KO[intent] ?? intent}</div>
+        {cands.length > 0 && (
+          <div className="text-gray-500 mt-0.5">관련 동작 후보 {cands.length}개 추출</div>
+        )}
+        {detected.length > 0 && (
+          <div className="text-fuchsia-700 mt-0.5">
+            ontology 용어 {detected.length}개 감지: {detected.slice(0, 3).map((t) => t.label).join(", ")}
+            {detected.length > 3 && " …"}
+          </div>
+        )}
+      </>
+    );
   }
   if (gateKind === "bundle_prepared") {
     const conf = payload.confidence as number | undefined;
     const fx = (payload.fixtures as unknown[] | undefined)?.length ?? 0;
-    return <span>bundle (confidence {conf?.toFixed?.(2) ?? "?"} · fixtures {fx}건)</span>;
+    return <span>시뮬 데이터 {fx}건 준비 · 자신감 {conf ? `${(conf * 100).toFixed(0)}%` : "?"}</span>;
   }
   if (gateKind === "executed") {
     const kind = payload.kind as string;
-    if (payload.error) return <span className="text-red-700">error: {String(payload.error).slice(0, 120)}</span>;
-    return <span>실행 완료 · kind={kind}</span>;
+    if (payload.error) return <span className="text-red-700">{String(payload.error).slice(0, 120)}</span>;
+    const KIND_KO: Record<string, string> = {
+      executed_full_design: "slab 21-step 전체 설계 결과",
+      executed_impact: "영향받는 method · 주문 · rule 추출 완료",
+      executed_lookup: "ontology 기반 답변 합성 완료",
+      executed_compare: "변경 전·후 비교 결과",
+      executed_hypothesis_workflow: "가설 4-step 워크플로 완료",
+      executed_new_standard: "신규 기준 추가 시뮬 완료",
+    };
+    return <span>{KIND_KO[kind] ?? "실행 완료"}</span>;
   }
   return <code>{gateKind}</code>;
 }

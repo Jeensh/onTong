@@ -95,7 +95,7 @@ function _GraphSVG({ nodes, edges, centerId }: {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState<{ x0: number; y0: number; px: number; py: number } | null>(null);
 
-  const W = 320, H = 320, CX = W / 2, CY = H / 2;
+  const W = 360, H = 460, CX = W / 2, CY = H / 2;
   const center = nodes.find((n) => n.id === centerId) ?? nodes[0];
   const others = nodes.filter((n) => n.id !== center.id);
   // 원형 배치

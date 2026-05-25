@@ -1,9 +1,19 @@
 "use client";
 
 /** executed 게이트 카드 — intent 별 차별 레이아웃. */
-import { useEffect, useState } from "react";
-import { RotateCcw, Plus, ChevronRight, ChevronDown, Loader2, Code } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { RotateCcw, Plus, ChevronRight, ChevronDown, Loader2, Code, FileSpreadsheet, Download } from "lucide-react";
 import { simulationApi, type MethodBodyView, type HypothesisResponse, type ImpactCompareResponse, type TranspiledMethod } from "@/lib/section3/simulation";
+import { ExcelExportDialog } from "./ExcelExportDialog";
+import { EvidenceBar } from "./EvidenceBar";
+import { PipelineTimeline } from "./PipelineTimeline";
+import { Q3InteractiveCard } from "./Q3InteractiveCard";
+import { WalkthroughStepsCard } from "./WalkthroughStepsCard";
+import { DynamicBlocksCard } from "./DynamicBlocksCard";
+import { EditableBaseOrderPanel } from "./EditableBaseOrderPanel";
+
+export type Perspective = "business" | "it";
+export type ResultMode = "data_only" | "code_and_data";
 
 interface Props {
   payload: Record<string, unknown>;
@@ -11,17 +21,179 @@ interface Props {
   onRerun: () => void;
   onNew: () => void;
   busy: boolean;
+  perspective?: Perspective;
+  resultMode?: ResultMode;
+  sessionId?: string;
+  /** 2026-05-25 — 결과 승인 상태 lift up. SimulationChat 의 왼쪽 turn 카드가 이 값을 봐서 표시. */
+  approved?: boolean;
+  onApproveChange?: (approved: boolean) => void;
 }
 
-export function ExecutedResultCard({ payload, intent, onRerun, onNew, busy }: Props) {
+/** 결과 본문 카드 렌더 시 throw 차단 — 전체 페이지 죽지 않도록 fallback UI. */
+export class ResultErrorBoundary extends React.Component<
+  { name: string; children: React.ReactNode },
+  { err: Error | null }
+> {
+  state: { err: Error | null } = { err: null };
+  static getDerivedStateFromError(err: Error) { return { err }; }
+  componentDidCatch(err: Error, info: React.ErrorInfo) {
+    console.error(`[ResultErrorBoundary:${this.props.name}] caught:`, err, info);
+  }
+  render() {
+    if (this.state.err) {
+      return (
+        <div className="border-2 border-amber-300 bg-amber-50/70 rounded-lg p-4 my-2 text-[12px] text-amber-900 sim-anim-fadein">
+          <div className="font-semibold mb-1.5 flex items-center gap-2">
+            <span>⚠</span><span>결과 카드 렌더 중 오류 — {this.props.name}</span>
+          </div>
+          <div className="text-amber-800 text-[11px] mb-2">
+            backend 응답을 화면에 그리는 과정에서 예외가 발생했습니다. 다른 질문으로 다시 시도하거나 페이지를 새로고침해 주세요. (에러는 페이지 전체를 죽이지 않고 이 카드 안에서만 잡혔습니다.)
+          </div>
+          <details className="text-[10px] text-amber-700">
+            <summary className="cursor-pointer">기술 상세 (개발용)</summary>
+            <pre className="mt-1 whitespace-pre-wrap break-all bg-amber-100/60 p-2 rounded">{String(this.state.err?.message ?? this.state.err)}</pre>
+            {this.state.err?.stack && (
+              <pre className="mt-1 whitespace-pre-wrap break-all bg-amber-100/60 p-2 rounded">{this.state.err.stack.slice(0, 800)}</pre>
+            )}
+          </details>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+class _SafeView extends React.Component<
+  { name: string; children: React.ReactNode },
+  { err: Error | null }
+> {
+  state: { err: Error | null } = { err: null };
+  static getDerivedStateFromError(err: Error) { return { err }; }
+  componentDidCatch(err: Error, info: React.ErrorInfo) {
+    console.error(`[SafeView:${this.props.name}] caught:`, err, info);
+  }
+  render() {
+    if (this.state.err) {
+      return (
+        <div className="border-2 border-amber-300 bg-amber-50/60 rounded-lg p-3 text-[12px] text-amber-900">
+          <div className="font-semibold mb-1">⚠ 카드 렌더 중 오류 — {this.props.name}</div>
+          <div className="text-amber-800 text-[11px]">
+            화면 표시 중 예외가 발생했습니다. 새 질문으로 다시 시도하거나 페이지를 새로고침해 주세요.
+          </div>
+          <details className="mt-2 text-[10px] text-amber-700">
+            <summary className="cursor-pointer">기술 상세</summary>
+            <pre className="mt-1 whitespace-pre-wrap break-all">{String(this.state.err?.message ?? this.state.err)}</pre>
+          </details>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/** 코드 카드를 어떻게 노출할지 결정.
+ *
+ * 2026-05-25 변경: 현업 모드도 코드/온톨로지 raw 를 *완전 hide* 가 아니라
+ *   "collapsed" — 사용자가 "상세" 클릭 시 펼침. (역할 모호함 해소).
+ *   - business → collapsed (기본 접힘, 상세 펼침 가능)
+ *   - it + data_only → collapsed
+ *   - it + code_and_data → open
+ *
+ * "hide" 는 더 이상 반환하지 않지만, legacy 코드와의 호환을 위해 enum 유지.
+ */
+export function shouldShowCode(perspective: Perspective, resultMode: ResultMode): "hide" | "collapsed" | "open" {
+  if (perspective === "business") return "collapsed";
+  if (resultMode === "data_only") return "collapsed";
+  return "open";
+}
+
+export function ExecutedResultCard({
+  payload, intent, onRerun, onNew, busy,
+  perspective = "it", resultMode = "code_and_data", sessionId,
+  approved: approvedProp, onApproveChange,
+}: Props) {
   const error = payload.error as string | undefined;
+  const codeMode = shouldShowCode(perspective, resultMode);
+  const [excelOpen, setExcelOpen] = useState(false);
+
+  const evidence = payload._evidence as {
+    overall_confidence: number;
+    source_breakdown_pct: Record<string, number>;
+    fields: Record<string, Array<{
+      kind: string; summary: string; confidence: number;
+      source_ref?: string | null; detail?: string | null;
+    }>>;
+  } | undefined;
+  // backend 2026-05-24 변경 — dict { sections, markdown }. legacy string 호환.
+  const llmAnalysisRaw = payload._llm_analysis;
+  const llmSections = (typeof llmAnalysisRaw === "object" && llmAnalysisRaw !== null
+    ? (llmAnalysisRaw as { sections?: { heading: string; body: string }[] }).sections
+    : undefined) ?? [];
+  const llmAnalysisLegacy = typeof llmAnalysisRaw === "string"
+    ? (llmAnalysisRaw as string).replace(/\*\*/g, "").replace(/`/g, "").replace(/^##\s*/gm, "")
+    : undefined;
+  const pipelineSteps = (payload._pipeline_steps as Array<{
+    step_no: number; title: string; action: string; result_summary: string;
+    details?: Record<string, unknown>; evidence_kind?: string; duration_hint?: string;
+  }> | undefined) ?? [];
+  // 21-step walkthrough — 사용자 질문 관련 step
+  const walkthroughSteps = (payload._walkthrough_steps as Array<{
+    step_no: number | null; phase: string; phase_label: string; title: string;
+    purpose: string; formula: string; input_terms: string[]; output_field: string;
+    action_fqn: string | null; base_tables: string[]; notes: string;
+  }> | undefined) ?? [];
+  const walkthroughInsight = payload._walkthrough_insight as string | undefined;
+  // 사용자 승인 게이트 — 외부 lift up 지원. props 가 있으면 외부 state, 없으면 internal.
+  const [approvedInternal, setApprovedInternal] = useState<boolean>(false);
+  const approved = approvedProp ?? approvedInternal;
+  const setApproved = (v: boolean) => {
+    if (onApproveChange) onApproveChange(v);
+    else setApprovedInternal(v);
+  };
+
+  // 2026-05-25 — clarify_form / new_standard_form submit 시 AI 분석 노출.
+  // payload._dynamic_blocks 에 form type 이 있으면 사용자 액션 대기 상태.
+  const dynamicBlocks = (payload._dynamic_blocks as Array<{type: string}> | undefined) ?? [];
+  const hasFormBlock = dynamicBlocks.some(b =>
+    b.type === "clarify_form" || b.type === "new_standard_form");
+  const [formSubmitted, setFormSubmitted] = useState<boolean>(false);
+  useEffect(() => {
+    const handler = () => setFormSubmitted(true);
+    window.addEventListener("sim:form-submitted", handler);
+    return () => window.removeEventListener("sim:form-submitted", handler);
+  }, []);
+  // 새 session 시작 시 reset
+  useEffect(() => { setFormSubmitted(false); }, [sessionId]);
 
   return (
-    <div className="border border-gray-300 rounded-lg bg-white p-4 space-y-3 overflow-y-auto">
-      <header className="flex items-center justify-between">
+    <div className="border border-gray-300 rounded-lg bg-white p-4 space-y-3 sim-stagger">
+      <header className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-sm font-semibold text-gray-900">실행 결과 (3/3)</h3>
-        <span className="text-xs text-gray-400">intent={intent}</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={"text-[10px] px-1.5 py-0.5 rounded border " + (
+            perspective === "business"
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+              : "bg-violet-50 text-violet-700 border-violet-200"
+          )}>{perspective === "business" ? "현업 모드" : "IT 모드"}</span>
+          <span className="text-xs text-gray-400">intent={intent}</span>
+        </div>
       </header>
+
+      {/* 🆕 신뢰도 chip — 카드 전체 + source breakdown */}
+      {evidence && (
+        <div className="sim-anim-fadein"><EvidenceBar evidence={evidence} /></div>
+      )}
+
+      {/* 🆕 순차 ontology 호출 timeline + 사용자 승인 게이트 */}
+      {pipelineSteps.length > 0 && (
+        <div className="sim-anim-fadein"><PipelineTimeline
+          steps={pipelineSteps}
+          approved={approved}
+          onApprove={() => setApproved(true)}
+          onRegenerate={() => { setApproved(false); onRerun(); }}
+          regenerating={busy}
+        /></div>
+      )}
 
       {error && (
         <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded p-2">
@@ -29,17 +201,101 @@ export function ExecutedResultCard({ payload, intent, onRerun, onNew, busy }: Pr
         </div>
       )}
 
-      {!error && payload.kind === "executed_full_design" && <_FullDesignView payload={payload} />}
-      {!error && payload.kind === "executed_compare" && <_CompareView payload={payload} />}
-      {!error && payload.kind === "executed_hypothesis_workflow" && <_HypothesisWorkflowView payload={payload} />}
-      {!error && payload.kind === "executed_new_standard" && <_NewStandardView payload={payload} />}
-      {!error && payload.kind !== "executed_compare" && payload.kind !== "executed_full_design" && payload.kind !== "executed_hypothesis_workflow" && intent === "simulate" && <_SimulateView payload={payload} />}
-      {!error && payload.kind !== "executed_compare" && payload.kind !== "executed_full_design" && intent === "impact" && <_ImpactView payload={payload} />}
-      {!error && payload.kind !== "executed_hypothesis_workflow" && intent === "locate" && <_LocateView payload={payload} />}
-      {!error && payload.kind !== "executed_hypothesis_workflow" && intent === "explain" && <_ExplainView payload={payload} />}
-      {!error && payload.kind !== "executed_hypothesis_workflow" && intent === "hypothesis" && <_HypothesisView payload={payload} />}
+      {/* 🆕 (2026-05-25) 결과 승인 후 최우선 표시 — 사용자 질문 맞춤 가변 UI.
+          기존엔 결과 본문 (term/code 카드) 아래에 있었지만 사용자 의미 우선순위에 맞춰 위로 이동. */}
+      {(approved || pipelineSteps.length === 0) && Array.isArray(payload._dynamic_blocks) && (payload._dynamic_blocks as unknown[]).length > 0 && (
+        <DynamicBlocksCard blocks={payload._dynamic_blocks as never} />
+      )}
 
-      <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200">
+      {/* 🆕 21-step 카탈로그 — 질문 관련 단계만 surface (승인 후) */}
+      {(approved || pipelineSteps.length === 0) && walkthroughSteps.length > 0 && (
+        <WalkthroughStepsCard steps={walkthroughSteps} insight={walkthroughInsight} />
+      )}
+
+      {/* 결과 본문 (term/code 등 ontology raw) — 가변 UI 다음에 보조 정보로 표시 */}
+      {(approved || pipelineSteps.length === 0) && (
+        <>
+          {!error && payload.kind === "executed_full_design" && <_SafeView name="FullDesign"><_FullDesignView payload={payload} codeMode={codeMode} /></_SafeView>}
+          {!error && payload.kind === "executed_compare" && <_SafeView name="Compare"><_CompareView payload={payload} codeMode={codeMode} /></_SafeView>}
+          {!error && payload.kind === "executed_hypothesis_workflow" && <_SafeView name="HypothesisWorkflow"><_HypothesisWorkflowView payload={payload} codeMode={codeMode} /></_SafeView>}
+          {!error && payload.kind === "executed_new_standard" && <_SafeView name="NewStandard"><_NewStandardView payload={payload} codeMode={codeMode} /></_SafeView>}
+          {!error && payload.kind !== "executed_compare" && payload.kind !== "executed_full_design" && payload.kind !== "executed_hypothesis_workflow" && intent === "simulate" && <_SafeView name="Simulate"><_SimulateView payload={payload} codeMode={codeMode} /></_SafeView>}
+          {!error && payload.kind !== "executed_compare" && payload.kind !== "executed_full_design" && intent === "impact" && <_SafeView name="Impact"><_ImpactView payload={payload} codeMode={codeMode} /></_SafeView>}
+          {!error && payload.kind !== "executed_hypothesis_workflow" && intent === "locate" && <_SafeView name="Locate"><_LocateView payload={payload} codeMode={codeMode} /></_SafeView>}
+          {!error && payload.kind !== "executed_hypothesis_workflow" && intent === "explain" && <_SafeView name="Explain"><_ExplainView payload={payload} codeMode={codeMode} /></_SafeView>}
+          {!error
+            && (payload.kind === "executed_hypothesis" || payload.kind === "executed_new_standard")
+            && intent === "hypothesis"
+            && <_SafeView name="Hypothesis"><_HypothesisView payload={payload} codeMode={codeMode} /></_SafeView>}
+        </>
+      )}
+
+      {/* AI 분석 대기 안내 — 사용자 액션 (결과 승인 OR 폼 submit) 전엔 대기 */}
+      {/* 1) pipeline 미승인 — "결과 승인" 누르라고 안내 */}
+      {!approved && pipelineSteps.length > 0 && (llmSections.length > 0 || llmAnalysisLegacy) && (
+        <div className="border-2 border-dashed border-amber-300 bg-amber-50/40 rounded-lg p-3 text-[11.5px] text-amber-900 sim-anim-fadein">
+          <div className="font-bold mb-0.5">⏳ AI 분석 대기 중 — 결과 승인 필요</div>
+          <div className="text-amber-800">위의 timeline 카드에서 <strong>[✓ 결과 승인]</strong> 을 누르세요. 승인 후 본문 카드들 + 입력 폼 → 입력 승인 → AI 분석이 표시됩니다.</div>
+        </div>
+      )}
+      {/* 2) pipeline 승인 + 폼 있는데 폼 submit 안 됨 */}
+      {(approved || pipelineSteps.length === 0) && hasFormBlock && !formSubmitted && (llmSections.length > 0 || llmAnalysisLegacy) && (
+        <div className="border-2 border-dashed border-amber-300 bg-amber-50/40 rounded-lg p-3 text-[11.5px] text-amber-900 sim-anim-fadein">
+          <div className="font-bold mb-0.5">⏳ AI 분석 대기 중 — 입력 폼 승인 필요</div>
+          <div className="text-amber-800">
+            위의 입력 폼 (🛠 시뮬 입력 / 신규 기준 입력) 에서 값을 확인·수정하고 <strong>[✓ 승인]</strong> 을 눌러주세요.
+            승인된 입력값 + 가상 주문 결과 + 21-step 산식을 함께 분석한 답변이 그 후 표시됩니다.
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 LLM 분석 카드 — 모든 의도 공통 gate: 사용자 액션 후에만 마지막 표시.
+          - pipelineSteps 있으면 approved 필수
+          - form 있으면 formSubmitted 필수
+          - 둘 다 통과해야 노출 (모든 의도 공통). */}
+      {(approved || pipelineSteps.length === 0)
+        && (!hasFormBlock || formSubmitted)
+        && (llmSections.length > 0 || llmAnalysisLegacy) && (
+        <div className="border-2 border-indigo-300 bg-gradient-to-br from-indigo-50/60 to-blue-50/40 rounded-lg p-4 sim-anim-fadein">
+          <div className="flex items-center gap-2 mb-3 flex-wrap border-b-2 border-indigo-200 pb-2">
+            <span className="text-[11px] px-2 py-0.5 rounded bg-indigo-700 text-white font-bold tracking-wide">AI 분석</span>
+            <span className="text-[14px] text-indigo-900 font-extrabold">왜 이런 결과가 나왔는가</span>
+            <_MiniConfidenceChip evidence={evidence} />
+          </div>
+          {llmSections.length > 0 ? (
+            <div className="space-y-3">
+              {llmSections.map((s, i) => (
+                <div key={i} className="bg-white rounded-lg p-3 border-l-4 border-l-indigo-500 border border-indigo-100 shadow-sm">
+                  <div className="flex items-baseline gap-2 mb-2 pb-1.5 border-b border-indigo-100">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-700 text-white font-bold">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <h4 className="text-[13.5px] font-extrabold text-indigo-900 tracking-tight">{s.heading}</h4>
+                  </div>
+                  <div className="text-[12.5px] text-gray-800 leading-[1.85] pl-1">
+                    <_AnalysisBody text={s.body.replace(/\*\*/g, "").replace(/`/g, "")} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-[12.5px] text-gray-800 leading-[1.85] bg-white rounded-lg p-3 border-l-4 border-l-indigo-500">
+              <_AnalysisBody text={(llmAnalysisLegacy ?? "").toString()} />
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200 flex-wrap">
+        {sessionId && (
+          <button
+            onClick={() => setExcelOpen(true)}
+            className="px-3 py-1.5 text-xs rounded border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+            title="결과를 Excel 로 다운로드 — 컬럼명 한글+영어 동시 표기"
+          >
+            <FileSpreadsheet size={11} className="inline mr-1" /> Excel 추출
+          </button>
+        )}
         {intent === "simulate" && (
           <button onClick={onRerun} disabled={busy} className="px-3 py-1.5 text-xs rounded border border-gray-300 hover:bg-gray-50">
             <RotateCcw size={11} className="inline mr-1" /> 재실행
@@ -49,6 +305,15 @@ export function ExecutedResultCard({ payload, intent, onRerun, onNew, busy }: Pr
           <Plus size={11} className="inline mr-1" /> 새 질문
         </button>
       </div>
+
+      {excelOpen && sessionId && (
+        <ExcelExportDialog
+          sessionId={sessionId}
+          payload={payload}
+          intent={intent}
+          onClose={() => setExcelOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -57,7 +322,7 @@ export function ExecutedResultCard({ payload, intent, onRerun, onNew, busy }: Pr
 // intent 별 sub-view
 // ─────────────────────────────────────────────────────────────────────────────
 
-function _SimulateView({ payload }: { payload: Record<string, unknown> }) {
+function _SimulateView({ payload, codeMode = "open" }: { payload: Record<string, unknown>; codeMode?: "hide" | "collapsed" | "open" }) {
   const results = (payload.results as Array<Record<string, unknown>> | undefined) ?? [];
   const invariant = payload.invariant_status as string | undefined;
   const baselineDiff = payload.baseline_diff as Record<string, unknown> | null;
@@ -136,8 +401,9 @@ function _SimulateView({ payload }: { payload: Record<string, unknown> }) {
 }
 
 /** stage 4: 선택 주문 + 변경 대상 → baseline vs projected slab 비교 + Java→Python. */
-function _ImpactSlabCompareCard({ table, column, before, after, order_no, affectedFqns }: {
+function _ImpactSlabCompareCard({ table, column, before, after, order_no, affectedFqns, codeMode = "open" }: {
   table: string; column: string; before: string; after: string; order_no: string; affectedFqns: string[];
+  codeMode?: "hide" | "collapsed" | "open";
 }) {
   const [data, setData] = useState<ImpactCompareResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -269,14 +535,25 @@ function _ImpactSlabCompareCard({ table, column, before, after, order_no, affect
         </details>
       )}
 
-      {/* Java → Python 변환 */}
-      {data.transpiled_methods.length > 0 && (
-        <div className="border-t border-gray-200 p-3 space-y-2">
-          <div className="text-[11px] font-semibold text-gray-700 flex items-center gap-1">
-            ⚙ 영향받는 Java 코드 → Python 실시간 변환 ({data.transpiled_methods.length})
+      {/* Java → Python 변환 — 현업 모드(codeMode=hide)에서는 숨김 */}
+      {data.transpiled_methods.length > 0 && codeMode !== "hide" && (
+        codeMode === "collapsed" ? (
+          <details className="border-t border-gray-200 p-3">
+            <summary className="text-[11px] font-semibold text-gray-700 cursor-pointer">
+              ⚙ 영향받는 Java 코드 → Python 실시간 변환 ({data.transpiled_methods.length}) — 클릭하여 펼치기
+            </summary>
+            <div className="mt-2 space-y-2">
+              {data.transpiled_methods.map((m) => <_TranspiledMethodCard key={m.fqn} method={m} />)}
+            </div>
+          </details>
+        ) : (
+          <div className="border-t border-gray-200 p-3 space-y-2">
+            <div className="text-[11px] font-semibold text-gray-700 flex items-center gap-1">
+              ⚙ 영향받는 Java 코드 → Python 실시간 변환 ({data.transpiled_methods.length})
+            </div>
+            {data.transpiled_methods.map((m) => <_TranspiledMethodCard key={m.fqn} method={m} />)}
           </div>
-          {data.transpiled_methods.map((m) => <_TranspiledMethodCard key={m.fqn} method={m} />)}
-        </div>
+        )
       )}
 
       {data.notes.length > 0 && (
@@ -333,10 +610,13 @@ function _TranspiledMethodCard({ method }: { method: TranspiledMethod }) {
 
 /** table 별 맞춤 변경 대상 카드. CAST_SPEC, EDGING_GROUP, HR_SPEC, SD_PRODUCTIVITY_STD 등.
  *  editable=true 면 before/after 값을 사용자가 직접 입력/수정. */
-function _TargetChangeCard({ targetChange, editable, onChange }: {
+function _TargetChangeCard({ targetChange, editable, onChange, onColumnChange, availableColumns, pkColumns }: {
   targetChange: Record<string, unknown>;
   editable?: boolean;
   onChange?: (next: { before: string; after: string }) => void;
+  onColumnChange?: (newColumn: string) => void;
+  availableColumns?: string[];
+  pkColumns?: string[];
 }) {
   const table = String(targetChange.table ?? "");
   const column = String(targetChange.column ?? "");
@@ -388,7 +668,21 @@ function _TargetChangeCard({ targetChange, editable, onChange }: {
       <div className="grid grid-cols-3 gap-2 bg-white rounded p-2 border border-gray-200">
         <div>
           <div className="text-[9px] text-gray-500 uppercase">column</div>
-          <code className={`text-xs text-${meta.color}-800 font-bold`}>{column}</code>
+          {editable && onColumnChange && (availableColumns?.length ?? 0) > 0 ? (
+            <select
+              value={column}
+              onChange={(e) => onColumnChange(e.target.value)}
+              className={`w-full text-xs px-1.5 py-0.5 border border-${meta.color}-300 rounded font-mono text-${meta.color}-800 font-bold bg-${meta.color}-50 focus:outline-none focus:border-${meta.color}-500`}
+            >
+              {(availableColumns ?? []).map((c) => (
+                <option key={c} value={c}>
+                  {pkColumns?.includes(c) ? "🔑 " : ""}{c}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <code className={`text-xs text-${meta.color}-800 font-bold`}>{column || "?"}</code>
+          )}
         </div>
         <div>
           <div className="text-[9px] text-gray-500 uppercase">변경 전 (현재값)</div>
@@ -453,17 +747,52 @@ function _TargetChangeCard({ targetChange, editable, onChange }: {
 }
 
 
-function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
+function _ImpactView({ payload, codeMode = "open" }: { payload: Record<string, unknown>; codeMode?: "hide" | "collapsed" | "open" }) {
   const methods = (payload.affected_methods as Array<Record<string, unknown>> | undefined) ?? [];
   const confidence = (payload.confidence as number | undefined) ?? 0;
   const detectedTerms = (payload._detected_terms as Array<Record<string, unknown>> | undefined) ?? [];
   const targetChange = payload._target_change as Record<string, unknown> | undefined;
   const affectedOrders = (payload._affected_orders as Array<Record<string, unknown>> | undefined) ?? [];
+  const affectedOrdersColumns = (payload._affected_orders_columns as string[] | undefined)
+    ?? ["ORDER_NO", "GRADE_CD", "PRODUCT_CD", "ORDER_WIDTH", "DESIGN_PEND_QTY"];
+  const affectedOrdersSynthesisNote = payload._affected_orders_synthesis as string | undefined;
   const affectedRules = (payload._affected_rules as Array<Record<string, unknown>> | undefined) ?? [];
   const affectedSteps = (payload._affected_steps as Array<Record<string, unknown>> | undefined) ?? [];
   const affectedActions = (payload._affected_actions as Array<Record<string, unknown>> | undefined) ?? [];
   const affectedApis = (payload._affected_apis as Array<Record<string, unknown>> | undefined) ?? [];
   const intentFocus = (payload._intent_focus as string) || "code";
+  // 🆕 Q2 — Edging 능력 상하한 변경 영향
+  const edgingImpact = payload._edging_impact as {
+    title: string; purpose: string;
+    base_edging: { HR_TGT_WIDTH_LOW: number; HR_TGT_WIDTH_HIGH: number };
+    external_constraints: Record<string, number>;
+    scenarios: {
+      label: string; new_low: number; new_high: number;
+      effective_low: number; effective_high: number; effective_range: number;
+      range_change_pct: number; avg_width: number; weight_change_pct: number;
+      max_wgt_change_pct?: number; min_wgt_change_pct?: number;
+      feasible: boolean; binding_constraint?: string; edging_active?: boolean;
+      warning: string | null;
+    }[];
+    core_logic: string; insight?: string; note: string;
+  } | undefined;
+  // 🆕 Q3 interactive — 가상 주문 + 사용자 입력 4-stage (사용자 명시 2026-05-23)
+  const q3Interactive = payload._q3_interactive as {
+    virtual_order: Record<string, unknown>;
+    constraints: { HR_MAX_WGT: number; HR_MIN_WGT: number };
+    ontology_basis: string[];
+    default_before: { ORDER_WGT_LOW: number; ORDER_WGT_HIGH: number; DESIGN_PEND_QTY: number };
+    default_after_hint: { ORDER_WGT_LOW: number; ORDER_WGT_HIGH: number; DESIGN_PEND_QTY: number };
+  } | undefined;
+  // 🆕 Q3 — 포장단중·설계대기량 sweep (auto, q3 interactive 없을 때 fallback)
+  const weightSweep = payload._weight_sweep as {
+    base_order: Record<string, unknown>;
+    sweep_variables: string[];
+    var_ranges: Record<string, [number, number]>;
+    grid: { vars: Record<string, number>; projected_split_count: number; projected_slab_wgt: number; feasible: boolean; violations: string[] }[];
+    best: { vars: Record<string, number>; projected_split_count: number; projected_slab_wgt: number } | null;
+    total_cells: number; feasible_cells: number; summary: string;
+  } | undefined;
 
   // ── Progressive disclosure stages ─────────────────────────────────────────
   // stage 1: 변경 대상 확인  (target_change 가 있을 때만)
@@ -482,8 +811,11 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
   //   3: 매칭 주문 선택
   //   4: 영향 결과
   // hasTargetRows=false 면 stage 1 skip → 2 부터, hasOrders=false 면 stage 3 skip → 4
-  const initialStage: 1 | 2 | 3 | 4 =
-    hasTargetRows ? 1 : hasTarget ? 2 : hasOrders ? 3 : 4;
+  // Q3 일 때는 Q3InteractiveCard 가 본문 → 외부 stage 흐름은 skip 해 stage 4 로 직진
+  // Q2(Edging) 일 때도 stage 3 가상주문 선택 후 → stage 4 의 결과 카드를 새로 띄움
+  const initialStage: 1 | 2 | 3 | 4 = q3Interactive
+    ? 4
+    : hasTargetRows ? 1 : hasTarget ? 2 : hasOrders ? 3 : 4;
   const [stage, setStage] = useState<1 | 2 | 3 | 4>(initialStage);
   const [pickedRowIdx, setPickedRowIdx] = useState<number | null>(null);
   const [pickedOrder, setPickedOrder] = useState<string | null>(null);
@@ -495,7 +827,33 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
 
   // 선택된 기준 row → before 값 자동 채움
   const pickedRow = pickedRowIdx !== null ? targetRows[pickedRowIdx] : null;
-  const targetCol = String(targetChange?.column ?? "");
+  // 사용자가 stage 1·2 에서 column 을 자유롭게 바꿀 수 있도록 별도 state.
+  // backend 추출이 "?" 이거나 부정확할 때 dropdown / 헤더클릭으로 override.
+  const initialCol = (() => {
+    const c = String(targetChange?.column ?? "");
+    if (c && c !== "?") return c;
+    // 변경 대상 자동: pk 가 아닌 첫 컬럼
+    const cols = targetMeta?.columns ?? Object.keys(targetRows[0] ?? {});
+    const pk = new Set(targetMeta?.pk_columns ?? []);
+    return cols.find((c) => !pk.has(c)) ?? cols[0] ?? "";
+  })();
+  const [pickedCol, setPickedCol] = useState<string>(initialCol);
+  const targetCol = pickedCol;
+  const targetColumns: string[] = targetMeta?.columns ?? Object.keys(targetRows[0] ?? {});
+
+  // column 변경 시 — 선택된 row 가 있으면 그 row 의 새 column 값으로 before 갱신
+  function pickColumn(newCol: string) {
+    setPickedCol(newCol);
+    if (pickedRow) {
+      const v = pickedRow[newCol];
+      setUserChange((s) => ({
+        ...s,
+        before: v === null || v === undefined ? "" : String(v),
+      }));
+    } else {
+      setUserChange((s) => ({ ...s, before: "" }));
+    }
+  }
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggle = (fqn: string) => {
@@ -510,7 +868,7 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
   const stepperLabels = [
     hasTargetRows ? "1. 기준 row 선택" : null,
     hasTarget ? "2. 변경 전/후 입력" : null,
-    hasOrders ? "3. 매칭 주문 선택" : null,
+    hasOrders ? "3. 가상 주문 선택" : null,
     "4. 영향 결과",
   ].filter(Boolean) as string[];
   const currentStepIdx = (() => {
@@ -560,6 +918,272 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
         </div>
       )}
 
+      {/* 🆕 Q2 — Edging 능력 상하한 변경 영향 */}
+      {edgingImpact && (
+        <div className="border-2 border-purple-300 bg-gradient-to-br from-purple-50/60 to-fuchsia-50/40 rounded-lg p-3 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-700 text-white font-semibold">EDGING</span>
+            <span className="text-sm font-bold text-purple-900">{edgingImpact.title}</span>
+          </div>
+          <div className="text-[11px] text-purple-800 italic">{edgingImpact.purpose}</div>
+
+          {/* 기준 + 외부 제약 */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-white/80 rounded p-2 border border-purple-200">
+              <div className="text-[9px] text-purple-700 uppercase font-semibold mb-1">현재 Edging 능력</div>
+              <code className="text-[11px] text-purple-900 font-mono">
+                LOW {edgingImpact.base_edging.HR_TGT_WIDTH_LOW.toLocaleString()} ~ HIGH {edgingImpact.base_edging.HR_TGT_WIDTH_HIGH.toLocaleString()}
+              </code>
+            </div>
+            <div className="bg-white/80 rounded p-2 border border-amber-200">
+              <div className="text-[9px] text-amber-700 uppercase font-semibold mb-1">외부 설비 제약 (교집합)</div>
+              {Object.entries(edgingImpact.external_constraints).map(([k, v]) => (
+                <div key={k} className="text-[10px] font-mono text-amber-900">
+                  <code>{k}</code>=<strong>{v.toLocaleString()}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* insight — 현재 EDGING binding 여부 핵심 메시지 */}
+          {edgingImpact.insight && (
+            <div className="bg-white/90 rounded border-2 border-purple-400 p-2 text-[11px] text-purple-900 leading-relaxed">
+              {edgingImpact.insight}
+            </div>
+          )}
+
+          {/* 시나리오 표 */}
+          <div className="bg-white/80 rounded border border-purple-200 overflow-x-auto">
+            <div className="px-2 py-1.5 bg-purple-100/60 text-[10.5px] font-semibold text-purple-900 border-b border-purple-200">
+              시나리오 비교 — 변경 후 효과 폭 · binding 설비 · 단중 영향
+            </div>
+            <table className="w-full text-[10.5px]">
+              <thead className="bg-purple-50">
+                <tr className="border-b border-purple-200 text-purple-700">
+                  <th className="text-left p-1.5">시나리오</th>
+                  <th className="text-right p-1.5">신규 EDGING</th>
+                  <th className="text-right p-1.5">효과 폭 (교집합)</th>
+                  <th className="text-left p-1.5">binding 설비</th>
+                  <th className="text-right p-1.5">폭 범위 변화</th>
+                  <th className="text-right p-1.5">최대 단중 변화</th>
+                  <th className="text-right p-1.5">최소 단중 변화</th>
+                </tr>
+              </thead>
+              <tbody>
+                {edgingImpact.scenarios.map((sc, i) => (
+                  <tr key={i} className={
+                    "border-b border-gray-100 " + (
+                      !sc.feasible ? "bg-red-50/40 text-gray-500" :
+                      sc.label === "현재 EDGING" ? "bg-gray-50 font-semibold" :
+                      sc.weight_change_pct > 0.5 ? "bg-emerald-50/50" :
+                      sc.weight_change_pct < -0.5 ? "bg-orange-50/50" : ""
+                    )
+                  }>
+                    <td className="p-1.5 font-semibold">{sc.label}</td>
+                    <td className="text-right p-1.5 font-mono">
+                      {sc.new_low.toLocaleString()} ~ {sc.new_high.toLocaleString()}
+                    </td>
+                    <td className="text-right p-1.5 font-mono">
+                      {sc.feasible
+                        ? `${sc.effective_low.toLocaleString()} ~ ${sc.effective_high.toLocaleString()}`
+                        : "—"}
+                    </td>
+                    <td className="p-1.5 text-[10px]">
+                      {sc.binding_constraint && (
+                        <span className={
+                          "px-1 py-0.5 rounded " + (
+                            sc.edging_active
+                              ? "bg-purple-200 text-purple-900 font-semibold"
+                              : "bg-gray-200 text-gray-700"
+                          )
+                        }>{sc.binding_constraint}</span>
+                      )}
+                    </td>
+                    <td className={"text-right p-1.5 font-mono " + (
+                      sc.range_change_pct > 0.5 ? "text-emerald-700" :
+                      sc.range_change_pct < -0.5 ? "text-orange-700" : "text-gray-500"
+                    )}>
+                      {sc.range_change_pct > 0 ? "+" : ""}{sc.range_change_pct.toFixed(1)}%
+                    </td>
+                    <td className={"text-right p-1.5 font-mono font-bold " + (
+                      (sc.max_wgt_change_pct ?? sc.weight_change_pct) > 0.5 ? "text-emerald-700" :
+                      (sc.max_wgt_change_pct ?? sc.weight_change_pct) < -0.5 ? "text-orange-700" : "text-gray-500"
+                    )}>
+                      {sc.warning ? (
+                        <span className="text-red-700">⚠ {sc.warning}</span>
+                      ) : (
+                        <>{(sc.max_wgt_change_pct ?? sc.weight_change_pct) > 0 ? "+" : ""}{(sc.max_wgt_change_pct ?? sc.weight_change_pct).toFixed(1)}%</>
+                      )}
+                    </td>
+                    <td className={"text-right p-1.5 font-mono " + (
+                      (sc.min_wgt_change_pct ?? 0) > 0.5 ? "text-orange-700" :
+                      (sc.min_wgt_change_pct ?? 0) < -0.5 ? "text-emerald-700" : "text-gray-500"
+                    )}>
+                      {sc.warning || sc.min_wgt_change_pct === undefined ? "—" : (
+                        <>{sc.min_wgt_change_pct > 0 ? "+" : ""}{sc.min_wgt_change_pct.toFixed(1)}%</>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-[10.5px]">
+            <div className="bg-white/70 rounded p-2 border border-purple-200">
+              <div className="text-[9px] text-purple-700 uppercase font-semibold mb-1">핵심 로직</div>
+              <div className="text-gray-800 leading-relaxed">{edgingImpact.core_logic}</div>
+            </div>
+            <div className="bg-amber-50/70 rounded p-2 border border-amber-200">
+              <div className="text-[9px] text-amber-700 uppercase font-semibold mb-1">⚠ 유의사항</div>
+              <div className="text-gray-800 leading-relaxed">{edgingImpact.note}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 Q3 interactive — 가상 주문 + 사용자 입력 (우선) */}
+      {/* Q3 — default sweep 결과 즉시 노출 (사용자가 단계 진행 안 해도 best 결과 바로 보이게) */}
+      {/* 🆕 editable 기준주문 + 21-step 산식 trace (2026-05-25) */}
+      {q3Interactive && weightSweep && weightSweep.best && (
+        <EditableBaseOrderPanel initial={weightSweep as never} />
+      )}
+
+      {q3Interactive && (
+        <Q3InteractiveCard data={q3Interactive} />
+      )}
+
+      {/* 🆕 Q3 fallback — auto sweep (q3 interactive 없을 때만) */}
+      {!q3Interactive && weightSweep && (
+        <div className="border-2 border-teal-300 bg-gradient-to-br from-teal-50/60 to-cyan-50/40 rounded-lg p-3 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-700 text-white font-semibold">SWEEP</span>
+            <span className="text-sm font-bold text-teal-900">단중 최적화 — 변수 sweep</span>
+            <span className="text-[10px] text-teal-700 ml-auto">
+              {weightSweep.total_cells} 조합 · feasible {weightSweep.feasible_cells} 건
+            </span>
+          </div>
+
+          {/* base order */}
+          <div className="bg-white/80 rounded p-2 border border-teal-200">
+            <div className="text-[9px] text-teal-700 uppercase font-semibold mb-1">기준 주문 (base)</div>
+            <div className="flex flex-wrap gap-1 text-[10px]">
+              {Object.entries(weightSweep.base_order)
+                .filter(([k, v]) => !k.startsWith("_") && v !== null && v !== undefined && typeof v !== "object")
+                .slice(0, 8)
+                .map(([k, v]) => (
+                  <code key={k} className="bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded text-teal-900">
+                    {k}=<strong>{String(v)}</strong>
+                  </code>
+                ))}
+            </div>
+          </div>
+
+          {/* sweep 변수 + 범위 */}
+          <div className="bg-white/80 rounded p-2 border border-teal-200">
+            <div className="text-[9px] text-teal-700 uppercase font-semibold mb-1">sweep 변수 ({weightSweep.sweep_variables.length})</div>
+            <div className="space-y-1 text-[10.5px]">
+              {weightSweep.sweep_variables.map((v) => {
+                const r = weightSweep.var_ranges[v];
+                return (
+                  <div key={v} className="flex items-center gap-2">
+                    <code className="font-mono text-teal-900 font-bold">{v}</code>
+                    <span className="text-gray-600">범위:</span>
+                    <code className="bg-gray-50 px-1 rounded text-gray-800">
+                      {r?.[0]?.toLocaleString()} ~ {r?.[1]?.toLocaleString()}
+                    </code>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 최적 조합 highlight */}
+          {weightSweep.best && (
+            <div className="bg-emerald-100/70 border-2 border-emerald-400 rounded p-2.5">
+              <div className="flex items-center gap-1 mb-1.5">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-700 text-white font-bold">🏆 BEST</span>
+                <span className="text-[11px] font-bold text-emerald-900">최적 조합</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div>
+                  <div className="text-[9px] text-emerald-700 uppercase font-semibold">예상 slab 단중</div>
+                  <div className="text-lg font-bold text-emerald-900">
+                    {weightSweep.best.projected_slab_wgt.toLocaleString()} <span className="text-xs text-emerald-700">kg</span>
+                  </div>
+                  <div className="text-[10px] text-emerald-700">
+                    split {weightSweep.best.projected_split_count}개
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[9px] text-emerald-700 uppercase font-semibold">권장 변수값</div>
+                  {Object.entries(weightSweep.best.vars).map(([k, v]) => (
+                    <div key={k} className="text-[10.5px]">
+                      <code className="text-emerald-900">{k}</code> = <strong>{v.toLocaleString()}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* grid 표 — 상위 12 cell */}
+          <details className="bg-white/80 rounded border border-teal-200" open>
+            <summary className="cursor-pointer px-2 py-1 text-[10.5px] text-teal-900 font-semibold">
+              sweep grid ({weightSweep.grid.length} 조합, slab 단중 ↓ 정렬)
+            </summary>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[10px]">
+                <thead className="bg-teal-50">
+                  <tr className="border-b border-teal-200 text-teal-700">
+                    <th className="text-left p-1.5">상태</th>
+                    {weightSweep.sweep_variables.map((v) => (
+                      <th key={v} className="text-right p-1.5 font-mono">{v}</th>
+                    ))}
+                    <th className="text-right p-1.5">예상 slab 단중</th>
+                    <th className="text-right p-1.5">split</th>
+                    <th className="text-left p-1.5">위반</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...weightSweep.grid]
+                    .sort((a, b) => b.projected_slab_wgt - a.projected_slab_wgt)
+                    .slice(0, 16)
+                    .map((c, i) => (
+                      <tr key={i} className={"border-b border-gray-100 " + (
+                        c === weightSweep.best ? "bg-emerald-50 font-bold" :
+                        !c.feasible ? "bg-red-50/50 text-gray-500" : ""
+                      )}>
+                        <td className="p-1.5">
+                          <span className={"text-[9px] px-1 py-0.5 rounded " + (
+                            c.feasible ? "bg-emerald-200 text-emerald-900" : "bg-red-200 text-red-900"
+                          )}>
+                            {c.feasible ? "OK" : "✗"}
+                          </span>
+                        </td>
+                        {weightSweep.sweep_variables.map((v) => (
+                          <td key={v} className="text-right p-1.5 font-mono">
+                            {c.vars[v]?.toLocaleString()}
+                          </td>
+                        ))}
+                        <td className="text-right p-1.5 font-mono text-emerald-900">
+                          {c.projected_slab_wgt.toLocaleString()}
+                        </td>
+                        <td className="text-right p-1.5 font-mono">{c.projected_split_count}</td>
+                        <td className="text-[9px] text-red-700">{c.violations.join(", ")}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+
+          <div className="text-[10.5px] text-teal-800 bg-teal-100/40 rounded p-1.5 italic">
+            💡 {weightSweep.summary}
+          </div>
+        </div>
+      )}
+
       {/* STAGE 1: 기준 데이터 row 선택 */}
       {stage === 1 && hasTargetRows && (
         <div className="border-2 border-amber-300 bg-amber-50/40 rounded p-3 space-y-2">
@@ -573,19 +1197,41 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
               {targetMeta?.description && <div className="text-[10px] text-gray-500 mt-0.5">{targetMeta.description}</div>}
             </div>
           </div>
-          <div className="max-h-64 overflow-y-auto border border-amber-200 rounded bg-white">
+          {/* 컬럼 선택 안내 + dropdown */}
+          <div className="bg-white border border-amber-200 rounded p-2 flex items-center gap-2 flex-wrap text-[11px]">
+            <span className="text-amber-700 font-semibold">변경할 컬럼:</span>
+            <select
+              value={pickedCol}
+              onChange={(e) => pickColumn(e.target.value)}
+              className="text-xs px-2 py-1 border border-amber-300 rounded font-mono bg-amber-50 text-amber-900 focus:outline-none focus:border-amber-500"
+            >
+              {targetColumns.map((c) => (
+                <option key={c} value={c}>
+                  {targetMeta?.pk_columns?.includes(c) ? "🔑 " : ""}{c}
+                </option>
+              ))}
+            </select>
+            <span className="text-[10px] text-gray-500">또는 아래 표의 ⭐ 컬럼 헤더를 클릭해서 변경</span>
+          </div>
+
+          <div className="max-h-72 overflow-y-auto border border-amber-200 rounded bg-white">
             <table className="w-full text-[10px]">
               <thead className="sticky top-0 bg-amber-50">
                 <tr className="border-b border-amber-200">
                   <th className="p-1.5 w-8"></th>
-                  {/* PK 컬럼 먼저 + 변경 대상 컬럼 */}
-                  {(targetMeta?.columns ?? Object.keys(targetRows[0] ?? {})).slice(0, 7).map((c) => (
-                    <th key={c} className={
-                      "text-left p-1.5 font-mono " + (
-                        targetMeta?.pk_columns?.includes(c) ? "text-amber-700 font-bold" :
-                        c === targetCol ? "text-red-700 font-bold bg-red-50" : "text-gray-600"
-                      )
-                    }>
+                  {/* PK 컬럼 먼저 + 변경 대상 컬럼 — 헤더 클릭으로 column 변경 */}
+                  {targetColumns.slice(0, 9).map((c) => (
+                    <th
+                      key={c}
+                      onClick={() => pickColumn(c)}
+                      title={`이 컬럼을 변경 대상으로 선택: ${c}`}
+                      className={
+                        "text-left p-1.5 font-mono cursor-pointer hover:bg-amber-100 transition " + (
+                          targetMeta?.pk_columns?.includes(c) ? "text-amber-700 font-bold" :
+                          c === targetCol ? "text-red-700 font-bold bg-red-50 ring-2 ring-red-300" : "text-gray-600"
+                        )
+                      }
+                    >
                       {targetMeta?.pk_columns?.includes(c) && "🔑 "}
                       {c === targetCol && "⭐ "}
                       {c}
@@ -613,7 +1259,7 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
                       <td className="p-1.5 text-center">
                         <input type="radio" checked={isPicked} readOnly className="accent-amber-500" />
                       </td>
-                      {(targetMeta?.columns ?? Object.keys(row)).slice(0, 7).map((c) => (
+                      {targetColumns.slice(0, 9).map((c) => (
                         <td key={c} className={
                           "p-1.5 font-mono " + (
                             c === targetCol ? "text-red-700 font-bold bg-red-50" : "text-gray-800"
@@ -635,7 +1281,7 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
               className="px-3 py-1.5 text-xs rounded bg-amber-600 text-white hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed">
               {pickedRowIdx !== null
                 ? `✓ 이 row 의 ${targetCol} 변경하기`
-                : "row 선택 필요"}
+                : `row 선택 필요 (현재 변경 컬럼: ${targetCol})`}
             </button>
           </div>
         </div>
@@ -660,10 +1306,15 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
           <_TargetChangeCard
             targetChange={{
               ...targetChange!,
+              column: targetCol,
               before: userChange.before || targetChange!.before,
             }}
             editable
-            onChange={(next) => setUserChange(next)} />
+            onChange={(next) => setUserChange(next)}
+            onColumnChange={pickColumn}
+            availableColumns={targetColumns}
+            pkColumns={targetMeta?.pk_columns}
+          />
           <div className="flex justify-between items-center gap-2 pt-1">
             {hasTargetRows && (
               <button onClick={() => setStage(1)} className="text-[10px] text-gray-500 hover:text-gray-700">← 다른 row 선택</button>
@@ -683,48 +1334,70 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
         </>
       )}
 
-      {/* STAGE 3: 매칭 주문 선택 */}
-      {stage === 3 && hasOrders && (
-        <div className="border-2 border-sky-300 bg-sky-50/40 rounded p-3 space-y-2">
+      {/* STAGE 3: 시뮬용 가상 주문 선택 — 2026-05-25 사용자 요구: clarify_form 위에서
+          이미 가상 주문 입력 받으므로 중복 — 영구 hide. Q3 도 동일. */}
+      {false && stage === 3 && hasOrders && !q3Interactive && (
+        <div className="border-2 border-sky-300 bg-sky-50/40 rounded-lg p-3 space-y-2">
           <div className="flex items-center gap-2">
-            <span className="text-xl">📦</span>
-            <div>
-              <div className="text-[10px] uppercase text-sky-700 font-semibold tracking-wide">매칭 주문 선택</div>
-              <div className="text-sm text-gray-700">변경 대상에 매칭되는 {affectedOrders.length}건 — 어떤 주문 기준으로 보시겠어요?</div>
+            <span className="text-xl">🧪</span>
+            <div className="flex-1">
+              <div className="text-[10.5px] uppercase text-sky-700 font-semibold tracking-wide">가상 주문 (실제 DB 사용 안 함)</div>
+              <div className="text-[12.5px] text-gray-800">
+                이 변경을 시뮬할 <strong>가상 주문 {affectedOrders.length}건</strong>을 합성했습니다 — 어떤 주문 기준으로 결과를 보시겠어요?
+              </div>
+              {affectedOrdersSynthesisNote && (
+                <div className="text-[10px] text-sky-600 mt-0.5">💡 {affectedOrdersSynthesisNote}</div>
+              )}
             </div>
           </div>
-          <ul className="space-y-1.5">
-            {affectedOrders.map((o, i) => {
-              const orderNo = String(o.ORDER_NO ?? "");
-              const isPicked = pickedOrder === orderNo;
-              return (
-                <li key={i}>
-                  <button onClick={() => setPickedOrder(orderNo)}
-                    className={
-                      "w-full text-left px-3 py-1.5 rounded border transition " +
-                      (isPicked ? "border-sky-500 bg-sky-100" : "border-gray-200 bg-white hover:border-sky-300")
-                    }>
-                    <div className="flex items-center gap-2 text-[11px]">
-                      <code className="font-mono font-semibold text-sky-800">{orderNo}</code>
-                      <span className="text-gray-500">{String(o.GRADE_CD ?? "?")} · {String(o.PRODUCT_CD ?? "?")}</span>
-                      <span className="ml-auto text-gray-400 font-mono">
-                        width {String(o.ORDER_WIDTH ?? "?")} · pendQty {String(o.DESIGN_PEND_QTY ?? "?")}
-                      </span>
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="bg-white rounded border border-sky-200 overflow-x-auto">
+            <table className="w-full text-[11px]">
+              <thead className="bg-sky-50 sticky top-0">
+                <tr className="border-b border-sky-200 text-sky-700">
+                  <th className="text-left p-2 w-6"></th>
+                  {affectedOrdersColumns.map((c) => (
+                    <th key={c} className="text-left p-2 font-mono text-[10px]">{c}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {affectedOrders.map((o, i) => {
+                  const orderNo = String(o.ORDER_NO ?? "");
+                  const isPicked = pickedOrder === orderNo;
+                  return (
+                    <tr key={i}
+                      onClick={() => setPickedOrder(orderNo)}
+                      className={
+                        "cursor-pointer border-b border-sky-100 hover:bg-sky-50/60 " +
+                        (isPicked ? "bg-sky-100 ring-1 ring-sky-400" : "")
+                      }>
+                      <td className="p-2 text-center">
+                        <input type="radio" checked={isPicked} readOnly className="accent-sky-500" />
+                      </td>
+                      {affectedOrdersColumns.map((c) => (
+                        <td key={c} className={"p-2 font-mono " + (
+                          c === "ORDER_NO" ? "text-sky-800 font-semibold" : "text-gray-800"
+                        )}>
+                          {o[c] === null || o[c] === undefined ? <span className="text-gray-300">—</span> : String(o[c])}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
           <div className="flex justify-between items-center pt-1">
             <button onClick={() => setStage(2)}
-              className="text-[10px] text-gray-500 hover:text-gray-700">← 변경값 다시 입력</button>
-            <button onClick={() => setStage(4)} disabled={!pickedOrder}
-              className="px-3 py-1.5 text-xs rounded bg-sky-600 text-white hover:bg-sky-500 disabled:opacity-50">
-              {pickedOrder ? `✓ ${pickedOrder} 기준으로 보기` : "주문 선택 필요"}
-            </button>
-            <button onClick={() => setStage(4)}
-              className="text-[10px] text-gray-500 hover:text-gray-700">전체 보기 →</button>
+              className="text-[11px] text-gray-600 hover:text-gray-900 underline">← 변경값 다시 입력</button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setStage(4)}
+                className="text-[11px] text-gray-500 hover:text-gray-700">전체 보기 →</button>
+              <button onClick={() => setStage(4)} disabled={!pickedOrder}
+                className="px-3 py-1.5 text-[11px] rounded bg-sky-600 text-white hover:bg-sky-500 disabled:opacity-50 font-semibold">
+                {pickedOrder ? `✓ ${pickedOrder} 기준으로 진행` : "주문 선택 필요"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -736,13 +1409,85 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
           {pickedOrder && targetChange && userChange.before && userChange.after && (
             <_ImpactSlabCompareCard
               table={String(targetChange.table)}
-              column={String(targetChange.column)}
+              column={targetCol}
               before={userChange.before}
               after={userChange.after}
               order_no={pickedOrder}
               affectedFqns={methods.map((m) => String(m.fqn ?? "")).filter(Boolean).slice(0, 5)}
+              codeMode={codeMode}
             />
           )}
+          {/* Q2 Edging — 선택 주문에 6 시나리오 적용한 slab 결과 변화 */}
+          {pickedOrder && edgingImpact && (() => {
+            const pOrder = affectedOrders.find((o) => String(o.ORDER_NO) === pickedOrder);
+            const orderW = pOrder ? Number(pOrder.ORDER_WIDTH) : 0;
+            return (
+              <div className="border-2 border-purple-300 bg-gradient-to-br from-purple-50/60 to-fuchsia-50/40 rounded-lg p-3 sim-anim-fadein">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  <span className="text-[10.5px] px-2 py-0.5 rounded bg-purple-700 text-white font-bold">선택 주문 결과</span>
+                  <strong className="text-[13px] text-purple-900">
+                    {pickedOrder} 주문 — Edging 6 시나리오 적용 시 slab 결과
+                  </strong>
+                </div>
+                {pOrder && (
+                  <div className="bg-white/80 rounded p-2 mb-2 border border-purple-100 text-[11px] flex flex-wrap gap-2">
+                    <code className="text-purple-800">PRODUCT={String(pOrder.PRODUCT_CD ?? "?")}</code>
+                    <code className="text-purple-800">GRADE={String(pOrder.GRADE_CD ?? "?")}</code>
+                    <code className="text-purple-800">ORDER_WIDTH={String(pOrder.ORDER_WIDTH ?? "?")}</code>
+                    <code className="text-purple-800">DESIGN_PEND_QTY={String(pOrder.DESIGN_PEND_QTY ?? "?")}</code>
+                  </div>
+                )}
+                <table className="w-full text-[11px] bg-white rounded border border-purple-200">
+                  <thead className="bg-purple-50">
+                    <tr className="border-b border-purple-200 text-purple-700">
+                      <th className="text-left p-2">시나리오</th>
+                      <th className="text-right p-2">효과 폭 교집합</th>
+                      <th className="text-right p-2">주문 폭({orderW}) 수용?</th>
+                      <th className="text-right p-2">최대 단중 변화</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {edgingImpact.scenarios.map((sc, i) => {
+                      const inRange = orderW >= sc.effective_low && orderW <= sc.effective_high;
+                      return (
+                        <tr key={i} className={
+                          "border-b border-gray-100 " + (
+                            !sc.feasible ? "bg-red-50/40 text-gray-500" :
+                            sc.label === "현재 EDGING" ? "bg-gray-100 font-semibold" :
+                            sc.weight_change_pct > 0.5 ? "bg-emerald-50/50" :
+                            sc.weight_change_pct < -0.5 ? "bg-orange-50/50" : ""
+                          )
+                        }>
+                          <td className="p-2 font-semibold">{sc.label}</td>
+                          <td className="text-right p-2 font-mono">
+                            {sc.feasible ? `${sc.effective_low.toLocaleString()} ~ ${sc.effective_high.toLocaleString()}` : "—"}
+                          </td>
+                          <td className="text-right p-2">
+                            {sc.feasible ? (
+                              inRange
+                                ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">✓ 수용</span>
+                                : <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-800 font-semibold">✗ 범위 밖</span>
+                            ) : "—"}
+                          </td>
+                          <td className={"text-right p-2 font-mono font-bold " + (
+                            (sc.max_wgt_change_pct ?? sc.weight_change_pct) > 0.5 ? "text-emerald-700" :
+                            (sc.max_wgt_change_pct ?? sc.weight_change_pct) < -0.5 ? "text-orange-700" : "text-gray-500"
+                          )}>
+                            {sc.warning ? <span className="text-red-700">⚠</span> : (
+                              <>{(sc.max_wgt_change_pct ?? sc.weight_change_pct) > 0 ? "+" : ""}{(sc.max_wgt_change_pct ?? sc.weight_change_pct).toFixed(1)}%</>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div className="mt-2 text-[11px] text-purple-800 bg-purple-50 rounded p-2">
+                  💡 선택한 주문 폭({orderW}mm)이 각 시나리오의 효과 폭 안에 들어가는지 + 그 시나리오에서 최대 단중이 얼마나 변하는지 한눈에 비교
+                </div>
+              </div>
+            );
+          })()}
           {hasTarget && (
             <div className="text-[11px] bg-amber-50 border border-amber-300 rounded p-2 flex items-center gap-2">
               <span>🔄</span>
@@ -783,101 +1528,147 @@ function _ImpactView({ payload }: { payload: Record<string, unknown> }) {
             </div>
           )}
 
-      {/* SECTION 2: 영향받는 코드 */}
-      <div className="border border-gray-200 rounded">
-        <div className="px-2 py-1.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between text-[11px]">
-          <strong>영향받는 코드 (method) {methods.length}건</strong>
-          <span className="text-[10px] text-gray-500">confidence {confidence.toFixed(2)} · 행 click → 본문</span>
-        </div>
-        <div className="max-h-72 overflow-y-auto">
-          <table className="w-full text-[11px] border-collapse">
-            <thead className="sticky top-0">
-              <tr className="bg-gray-50/95 border-b border-gray-200">
-                <th className="text-left p-1.5 w-6"></th>
-                <th className="text-left p-1.5 text-gray-600">method (class.name)</th>
-                <th className="text-left p-1.5 text-gray-600">via</th>
-                <th className="text-right p-1.5 text-gray-600">distance</th>
-                <th className="text-right p-1.5 text-gray-600">strength</th>
-              </tr>
-            </thead>
-            <tbody>
-              {methods.slice(0, 50).map((m) => {
-                const fqn = String(m.fqn ?? "");
-                if (!fqn) return null;
-                const isOpen = expanded.has(fqn);
-                return (
-                  <>
-                    <tr
-                      key={fqn}
-                      className="border-b border-gray-100 hover:bg-amber-50/40 cursor-pointer"
-                      onClick={() => toggle(fqn)}
-                    >
-                      <td className="p-1.5 text-gray-400">
-                        {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                      </td>
-                      <td className="p-1.5 font-mono text-gray-800 truncate max-w-[280px]" title={fqn}>
-                        {fqn.split(".").slice(-2).join(".").replace(/\(.*\)/, "")}
-                      </td>
-                      <td className="p-1.5 text-gray-500">{String(m.via ?? "—")}</td>
-                      <td className="p-1.5 text-right text-gray-500">{String(m.distance ?? "—")}</td>
-                      <td className="p-1.5 text-right text-gray-700 font-mono">
-                        {Number(m.strength ?? 0).toFixed(2)}
-                      </td>
-                    </tr>
-                    {isOpen && (
-                      <tr key={`${fqn}-body`} className="border-b border-amber-100">
-                        <td colSpan={5} className="p-0">
-                          <_MethodBodyRow fqn={fqn} onJumpTo={(f) => { toggle(f); }} />
+      {/* SECTION 2: 영향받는 코드 — codeMode=collapsed 면 details 로 접힘, open 면 펼침 */}
+      {codeMode !== "hide" && methods.length > 0 && (() => {
+        const headerTitle = (payload._affected_methods_source === "related")
+          ? `📎 관련 있는 코드 (method) ${methods.length}건`
+          : `영향받는 코드 (method) ${methods.length}건`;
+        const headerSubtitle = (payload._affected_methods_source === "related")
+          ? "직접 영향은 0건이라 관련 term → action → method 로 대체"
+          : `confidence ${confidence.toFixed(2)} · 행 click → 본문`;
+        const tableBody = (
+          <div className="max-h-72 overflow-y-auto">
+            <table className="w-full text-[11px] border-collapse">
+              <thead className="sticky top-0">
+                <tr className="bg-gray-50/95 border-b border-gray-200">
+                  <th className="text-left p-1.5 w-6"></th>
+                  <th className="text-left p-1.5 text-gray-600">method (class.name)</th>
+                  <th className="text-left p-1.5 text-gray-600">via</th>
+                  <th className="text-right p-1.5 text-gray-600">distance</th>
+                  <th className="text-right p-1.5 text-gray-600">strength</th>
+                </tr>
+              </thead>
+              <tbody>
+                {methods.slice(0, 50).map((m) => {
+                  const fqn = String(m.fqn ?? "");
+                  if (!fqn) return null;
+                  const isOpen = expanded.has(fqn);
+                  return (
+                    <React.Fragment key={fqn}>
+                      <tr
+                        className="border-b border-gray-100 hover:bg-amber-50/40 cursor-pointer"
+                        onClick={() => toggle(fqn)}
+                      >
+                        <td className="p-1.5 text-gray-400">
+                          {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                        </td>
+                        <td className="p-1.5 font-mono text-gray-800 truncate max-w-[280px]" title={fqn}>
+                          {fqn.split(".").slice(-2).join(".").replace(/\(.*\)/, "")}
+                        </td>
+                        <td className="p-1.5 text-gray-500">{String(m.via ?? "—")}</td>
+                        <td className="p-1.5 text-right text-gray-500">{String(m.distance ?? "—")}</td>
+                        <td className="p-1.5 text-right text-gray-700 font-mono">
+                          {Number(m.strength ?? 0).toFixed(2)}
                         </td>
                       </tr>
-                    )}
-                  </>
-                );
-              })}
-              {methods.length === 0 && (
-                <tr><td colSpan={5} className="p-2 text-gray-400 text-[10px]">영향받는 method 없음</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                      {isOpen && (
+                        <tr className="border-b border-amber-100">
+                          <td colSpan={5} className="p-0">
+                            <_MethodBodyRow fqn={fqn} onJumpTo={(f) => { toggle(f); }} />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+                {methods.length === 0 && (
+                  <tr><td colSpan={5} className="p-2 text-gray-400 text-[10px]">영향받는 method 없음</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        );
+        if (codeMode === "collapsed") {
+          return (
+            <details className="border border-gray-200 rounded">
+              <summary className="px-2 py-1.5 bg-gray-50 border-b border-gray-200 cursor-pointer text-[11px] flex items-center justify-between">
+                <strong>{headerTitle}</strong>
+                <span className="text-[10px] text-gray-500">{headerSubtitle} · 상세 펼치기</span>
+              </summary>
+              {tableBody}
+            </details>
+          );
+        }
+        return (
+          <div className="border border-gray-200 rounded">
+            <div className="px-2 py-1.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between text-[11px]">
+              <strong>{headerTitle}</strong>
+              <span className="text-[10px] text-gray-500">{headerSubtitle}</span>
+            </div>
+            {tableBody}
+          </div>
+        );
+      })()}
 
-      {/* SECTION 3: 영향받는 룰 */}
+      {/* SECTION 3: 영향받는 룰 — chip + hover tooltip (디폴트 단순) */}
       {affectedRules.length > 0 && (
-        <div className="border border-rose-200 bg-rose-50/40 rounded p-2">
-          <div className="text-[11px] font-semibold text-rose-800 mb-1">영향받는 business rules ({affectedRules.length})</div>
-          <ul className="text-[10px] space-y-1 max-h-32 overflow-y-auto">
-            {affectedRules.slice(0, 6).map((r, i) => (
-              <li key={i} className="text-gray-700">
-                <code className="bg-rose-100 px-1 rounded text-[9px]">{String(r.severity ?? "?")}</code>
-                <code className="text-rose-700 ml-1">{String(r.fqn ?? "")}</code>
-                <div className="text-gray-600 ml-3">{String(r.statement ?? "")}</div>
-              </li>
-            ))}
-          </ul>
+        <div className="bg-indigo-50/40 border border-indigo-200 rounded-lg p-2 flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] text-indigo-900 font-semibold">📘 적용 업무 규칙</span>
+          <span className="text-[10.5px] text-indigo-700">{affectedRules.length}개</span>
+          <div className="flex gap-1 flex-wrap">
+            {affectedRules.slice(0, 8).map((r, i) => {
+              const sev = String(r.severity ?? "soft");
+              const isHard = sev === "hard";
+              const fqn = String(r.fqn ?? "");
+              const shortName = fqn.split(".").slice(-2).join(".") || `규칙 #${i + 1}`;
+              return (
+                <span key={i}
+                  className={"group relative text-[10.5px] px-2 py-0.5 rounded border cursor-help " + (
+                    isHard ? "bg-indigo-100 text-indigo-900 border-indigo-300 hover:bg-indigo-200"
+                           : "bg-sky-100 text-sky-900 border-sky-300 hover:bg-sky-200"
+                  )}
+                  title={`${isHard ? "필수 규칙" : "권장 규칙"}\n${String(r.statement ?? "")}`}
+                >
+                  {isHard ? "🔷" : "🔹"} {shortName}
+                  <span className="absolute left-0 top-full mt-1 z-30 hidden group-hover:block w-80 bg-white border-2 border-indigo-300 rounded-lg p-2.5 shadow-xl text-left">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className={"text-[9px] px-1.5 py-0.5 rounded font-bold " + (
+                        isHard ? "bg-indigo-600 text-white" : "bg-sky-400 text-sky-900"
+                      )}>{isHard ? "필수 규칙" : "권장 규칙"}</span>
+                      <code className="text-[9.5px] text-gray-500 font-mono">{fqn}</code>
+                    </div>
+                    <div className="text-[11.5px] text-gray-800 leading-relaxed">
+                      {String(r.statement ?? "")}
+                    </div>
+                  </span>
+                </span>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* SECTION 4: 영향받는 주문 */}
-      {affectedOrders.length > 0 && (
+      {/* SECTION 4: 가상 주문 — 질문 연관 동적 컬럼. 주문 선택 후엔 hide (중복 방지) */}
+      {affectedOrders.length > 0 && !pickedOrder && (
         <div className="border border-sky-200 bg-sky-50/40 rounded p-2">
-          <div className="text-[11px] font-semibold text-sky-800 mb-1">매칭 주문 ({affectedOrders.length}건)</div>
+          <div className="flex items-baseline gap-1.5 mb-1">
+            <span className="text-[11px] font-semibold text-sky-800">🧪 시뮬용 가상 주문 ({affectedOrders.length}건)</span>
+            <span className="text-[9.5px] text-sky-600">실제 DB 사용 안 함 · 기준 데이터 범위 내 ontology 합성</span>
+          </div>
           <table className="w-full text-[10px]">
             <thead><tr className="border-b border-sky-200">
-              <th className="text-left p-0.5">ORDER_NO</th>
-              <th className="text-left p-0.5">GRADE</th>
-              <th className="text-left p-0.5">PRODUCT</th>
-              <th className="text-right p-0.5">WIDTH</th>
-              <th className="text-right p-0.5">PEND_QTY</th>
+              {affectedOrdersColumns.map((c) => (
+                <th key={c} className={c === "ORDER_NO" ? "text-left p-0.5" : "text-right p-0.5"}>{c}</th>
+              ))}
             </tr></thead>
             <tbody>
               {affectedOrders.slice(0, 10).map((o, i) => (
                 <tr key={i} className="border-b border-sky-100">
-                  <td className="p-0.5 font-mono">{String(o.ORDER_NO ?? "")}</td>
-                  <td className="p-0.5 font-mono">{String(o.GRADE_CD ?? "")}</td>
-                  <td className="p-0.5 font-mono">{String(o.PRODUCT_CD ?? "")}</td>
-                  <td className="p-0.5 font-mono text-right">{String(o.ORDER_WIDTH ?? "")}</td>
-                  <td className="p-0.5 font-mono text-right">{String(o.DESIGN_PEND_QTY ?? "")}</td>
+                  {affectedOrdersColumns.map((c) => (
+                    <td key={c} className={"p-0.5 font-mono " + (c === "ORDER_NO" ? "" : "text-right")}>
+                      {o[c] === null || o[c] === undefined ? "—" : String(o[c])}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
@@ -1056,7 +1847,7 @@ function _HighlightedCode({ body, keyword }: { body: string; keyword: string }) 
 
 
 /** locate — VSCode 스타일 위치 list + 클릭 시 본문 expand + keyword highlight. */
-function _LocateView({ payload }: { payload: Record<string, unknown> }) {
+function _LocateView({ payload, codeMode = "open" }: { payload: Record<string, unknown>; codeMode?: "hide" | "collapsed" | "open" }) {
   const target = payload.target as Record<string, unknown> | undefined;
   const body = (payload.body as string | undefined) ?? "";
   const summary = payload.summary as string | undefined;
@@ -1081,7 +1872,8 @@ function _LocateView({ payload }: { payload: Record<string, unknown> }) {
     }
   }
   for (const c of callers) {
-    const f = String(c.method_fqn ?? c);
+    // backend caller shape: {fqn, distance, via, match_kind} — c.fqn 우선
+    const f = String(c?.fqn ?? c?.method_fqn ?? c?.code_method_fqn ?? "");
     if (f && !matches.find((mm) => mm.fqn === f)) matches.push({ fqn: f });
   }
 
@@ -1125,9 +1917,11 @@ function _LocateView({ payload }: { payload: Record<string, unknown> }) {
         <span>{summary || "코드 위치 검색 결과"} · {matches.length} 위치</span>
       </div>
 
-      <div className="grid grid-cols-[240px_1fr] gap-2 border border-gray-300 rounded overflow-hidden">
+      <div className={"gap-2 border border-gray-300 rounded overflow-hidden " + (
+        codeMode === "open" ? "grid grid-cols-[240px_1fr]" : "grid grid-cols-1"
+      )}>
         {/* 좌: 위치 list */}
-        <div className="bg-slate-50 border-r border-gray-200 max-h-80 overflow-y-auto">
+        <div className="bg-slate-50 border-r border-gray-200 max-h-[420px] overflow-y-auto">
           <div className="px-2 py-1 bg-slate-100 text-[10px] text-gray-600 uppercase tracking-wide border-b border-gray-200">
             매칭 위치 ({matches.length})
           </div>
@@ -1161,21 +1955,38 @@ function _LocateView({ payload }: { payload: Record<string, unknown> }) {
           </ul>
         </div>
 
-        {/* 우: 활성 위치의 코드 본문 + keyword highlight */}
-        <div className="bg-white">
-          <div className="px-2 py-1 bg-gray-50 border-b border-gray-200 text-[10px] flex items-center justify-between">
-            <code className="text-gray-700">{filePathOf(activeFqn)}{activeMatchedLine ? `:${activeMatchedLine}` : ""}</code>
-            <span className="text-gray-400">{activeBody.split("\n").length} lines{activeKeyword && ` · 🔑 ${activeKeyword}`}</span>
+        {/* 우: 활성 위치의 코드 본문 — open 이면 인라인, collapsed 면 details 로 접힘 */}
+        {codeMode === "open" && (
+          <div className="bg-white">
+            <div className="px-2 py-1 bg-gray-50 border-b border-gray-200 text-[10px] flex items-center justify-between">
+              <code className="text-gray-700">{filePathOf(activeFqn)}{activeMatchedLine ? `:${activeMatchedLine}` : ""}</code>
+              <span className="text-gray-400">{activeBody.split("\n").length} lines{activeKeyword && ` · 🔑 ${activeKeyword}`}</span>
+            </div>
+            <pre className="p-2 text-[10px] max-h-[420px] overflow-auto text-gray-800 font-mono leading-relaxed">
+              {activeBody
+                ? activeKeyword
+                  ? <_HighlightedCode body={activeBody} keyword={activeKeyword} />
+                  : activeBody
+                : "(좌측 위치 선택 — 클릭 시 본문 로드)"}
+            </pre>
           </div>
-          <pre className="p-2 text-[10px] max-h-80 overflow-auto text-gray-800 font-mono leading-relaxed">
+        )}
+      </div>
+      {codeMode === "collapsed" && (
+        <details className="border border-gray-200 rounded bg-white">
+          <summary className="px-2 py-1.5 bg-gray-50 border-b border-gray-200 cursor-pointer text-[10.5px] text-gray-700 flex items-center justify-between">
+            <span>📄 코드 본문 보기 — <code className="text-gray-800">{filePathOf(activeFqn)}{activeMatchedLine ? `:${activeMatchedLine}` : ""}</code></span>
+            <span className="text-gray-400">{activeBody.split("\n").length} lines{activeKeyword && ` · 🔑 ${activeKeyword}`} · 상세 펼치기</span>
+          </summary>
+          <pre className="p-2 text-[10px] max-h-[420px] overflow-auto text-gray-800 font-mono leading-relaxed">
             {activeBody
               ? activeKeyword
                 ? <_HighlightedCode body={activeBody} keyword={activeKeyword} />
                 : activeBody
               : "(좌측 위치 선택 — 클릭 시 본문 로드)"}
           </pre>
-        </div>
-      </div>
+        </details>
+      )}
 
       {rules.length > 0 && (
         <div className="border border-rose-200 bg-rose-50/40 rounded p-2">
@@ -1195,82 +2006,581 @@ function _LocateView({ payload }: { payload: Record<string, unknown> }) {
 }
 
 /** explain — 자연어 답변 + 관련 객체 카드 grid. */
-function _ExplainView({ payload }: { payload: Record<string, unknown> }) {
+/** 답변/카드의 mini 신뢰도 chip — overall + 상위 2개 source. hover 시 근거 원문. */
+/** LLM 분석 body 시각 강조 — 이모지 없이 색·굵기로 가독성. */
+function _AnalysisBody({ text }: { text: string }) {
+  if (!text) return null;
+  // 정규식: 숫자(단위) | 변화율 | key term (Slab 단중/분할수/매수/Step N/HR_MAX_WGT/ORDER_WGT_HIGH/DESIGN_PEND_QTY)
+  const PATTERN = /(\d{1,3}(?:,\d{3})+(?:\.\d+)?\s*(?:kg|mm|g\/cm³|톤|개|매|건|%|단)?|\d+(?:\.\d+)?\s*%|[+\-]\d+(?:\.\d+)?%|Step\s*\d+|HR_MAX_WGT|HR_MIN_WGT|ORDER_WGT_HIGH|ORDER_WGT_LOW|DESIGN_PEND_QTY|ORDER_WIDTH|ORDER_LENGTH|slabWgt|secondWgtHigh|splitWgtHigh|maxSplitCountUpper|optimalSplitCount|slabCount|Slab\s*(?:단중|매수|분할수|두께|폭|길이)|분할수|매수|단중\s*(?:상한|하한)?|포장단중|설계대기량|baseline|after|productivity|비중)/g;
+  const parts: Array<{ type: "text" | "highlight"; value: string }> = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = PATTERN.exec(text)) !== null) {
+    if (m.index > last) parts.push({ type: "text", value: text.slice(last, m.index) });
+    parts.push({ type: "highlight", value: m[0] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push({ type: "text", value: text.slice(last) });
+  return (
+    <span style={{ whiteSpace: "pre-wrap" }}>
+      {parts.map((p, i) => {
+        if (p.type === "text") return <span key={i}>{p.value}</span>;
+        const v = p.value;
+        // 변화율 (+/-NN%) — 양수=emerald, 음수=rose
+        const pctMatch = v.match(/^([+\-]?)(\d+(?:\.\d+)?)\s*%$/);
+        if (pctMatch) {
+          const sign = pctMatch[1];
+          const cls = sign === "-" ? "text-rose-700 bg-rose-100" :
+                      sign === "+" ? "text-emerald-700 bg-emerald-100" :
+                      "text-gray-700 bg-gray-100";
+          return (
+            <strong key={i} className={`${cls} px-1 py-0.5 rounded font-extrabold`}>
+              {v}
+            </strong>
+          );
+        }
+        // 숫자 + 단위 (12,345 kg / 1500 mm / 7.82 g/cm³ 등) — indigo 강조
+        if (/\d/.test(v) && /(kg|mm|g\/cm³|톤|개|매|건|단)/.test(v)) {
+          return (
+            <strong key={i} className="text-indigo-800 font-extrabold bg-indigo-50 px-1 rounded">
+              {v}
+            </strong>
+          );
+        }
+        // Step N / 산식 키 (HR_MAX_WGT, slabWgt 등) — violet 굵기
+        if (/^(Step\s*\d+|HR_|ORDER_|DESIGN_|slabWgt|secondWgtHigh|splitWgtHigh|maxSplit|optimalSplit|slabCount)/.test(v)) {
+          return (
+            <code key={i} className="text-violet-800 font-bold bg-violet-50 px-1 rounded text-[11.5px]">
+              {v}
+            </code>
+          );
+        }
+        // 도메인 한국어 key term — gray-900 굵기
+        return <strong key={i} className="text-gray-900 font-bold underline decoration-indigo-300 decoration-2 underline-offset-2">{v}</strong>;
+      })}
+    </span>
+  );
+}
+
+function _MiniConfidenceChip({ evidence }: {
+  evidence: {
+    overall_confidence: number;
+    source_breakdown_pct: Record<string, number>;
+    fields?: Record<string, Array<{ kind: string; summary: string; source_ref?: string | null; detail?: string | null }>>;
+  } | undefined;
+}) {
+  if (!evidence) return null;
+  const conf = evidence.overall_confidence;
+  const breakdown = evidence.source_breakdown_pct ?? {};
+  const fields = evidence.fields ?? {};
+  const top = Object.entries(breakdown).filter(([_, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const KIND_LABEL: Record<string, string> = {
+    ontology: "온톨로지", business_rule: "업무규칙", seed_data: "seed", java_anchor: "java",
+    propagation: "전파규칙", inference: "AI 추론", assumption: "가정",
+  };
+  const confColor =
+    conf >= 0.85 ? "bg-emerald-100 text-emerald-800 border-emerald-300" :
+    conf >= 0.7  ? "bg-cyan-100 text-cyan-800 border-cyan-300" :
+    conf >= 0.5  ? "bg-amber-100 text-amber-800 border-amber-300" :
+                   "bg-gray-100 text-gray-700 border-gray-300";
+  // 각 chip 의 hover 시 — 해당 kind 의 근거 5건 모음
+  function _evidenceFor(kind: string) {
+    const items: Array<{ summary: string; source_ref?: string | null; detail?: string | null }> = [];
+    for (const evs of Object.values(fields)) {
+      for (const e of evs) {
+        if (e.kind === kind) items.push(e);
+        // ontology 카테고리는 business_rule/seed/java_anchor 도 포함
+        else if (kind === "ontology" && ["business_rule","seed_data","java_anchor"].includes(e.kind)) items.push(e);
+        // inference 카테고리는 propagation/assumption 포함
+        else if (kind === "inference" && ["propagation","assumption"].includes(e.kind)) items.push(e);
+      }
+    }
+    return items.slice(0, 5);
+  }
+  return (
+    <span className="inline-flex items-center gap-1 flex-wrap">
+      <span className={"text-[10px] px-1.5 py-0.5 rounded border font-semibold " + confColor}
+            title={`종합 신뢰도 ${(conf * 100).toFixed(0)}% (1.0 = 사실 근거, 0.0 = 추측)`}>
+        신뢰도 {(conf * 100).toFixed(0)}%
+      </span>
+      {top.map(([k, v]) => {
+        const evList = _evidenceFor(k);
+        return (
+          <span key={k} className="group relative text-[10px] px-1 py-0.5 rounded bg-white border border-gray-200 text-gray-700 cursor-help">
+            {KIND_LABEL[k] ?? k} <strong>{v}%</strong>
+            {evList.length > 0 && (
+              <span className="absolute left-0 top-full mt-1 z-40 hidden group-hover:block w-80 bg-white border-2 border-indigo-300 rounded-lg p-2.5 shadow-xl text-left">
+                <div className="text-[11px] font-bold text-indigo-900 mb-1">
+                  {KIND_LABEL[k] ?? k} 근거 ({evList.length}건)
+                </div>
+                <ul className="space-y-1 text-[10.5px] text-gray-800">
+                  {evList.map((e, i) => (
+                    <li key={i} className="border-l-2 border-indigo-200 pl-1.5">
+                      <div className="font-semibold">{e.summary.slice(0, 80)}</div>
+                      {e.source_ref && (
+                        <code className="text-[9px] text-gray-500 break-all">{e.source_ref}</code>
+                      )}
+                      {e.detail && (
+                        <div className="text-[10px] text-gray-600 italic mt-0.5">{e.detail.slice(0, 100)}</div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </span>
+            )}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+
+function _ExplainView({ payload, codeMode = "open" }: { payload: Record<string, unknown>; codeMode?: "hide" | "collapsed" | "open" }) {
   const target = payload.target as Record<string, unknown> | undefined;
   const body = (payload.body as string | undefined) ?? "";
   const summary = payload.summary as string | undefined;
   const callers = (payload.callers as Array<Record<string, unknown>> | undefined) ?? [];
   const rules = (payload.business_rules as Array<Record<string, unknown>> | undefined) ?? [];
+  const detectedTerms = (payload._detected_terms as Array<{
+    token: string; term_fqn: string; label: string; definition: string; aliases?: string[];
+  }> | undefined) ?? [];
+  // 2026-05-23: Q1 — 단중 영향 변수 카탈로그
+  const weightCatalog = payload._weight_catalog as {
+    title: string; purpose: string; core_formula: string;
+    external_constraint: string;
+    variables: {
+      variable: string; table_column: string; direction: string;
+      formula_role: string; rationale: string; constraint: string;
+      controllable_by: string;
+    }[];
+    ontology_terms: { fqn: string; label: string; description: string; aliases: string[]; kind: string }[];
+    controllable_summary: { priority: string; items: string[]; note: string }[];
+  } | undefined;
+  // 2026-05-22: term-first 답변 — backend 가 atomic term 의 ontology fan-out 첨부
+  // 2026-05-25: nested array 가 undefined 일 때 throw 차단 — defaults 적용
+  const termExplainRaw = payload._term_explain as {
+    term_fqn?: string;
+    term?: Record<string, unknown> | null;
+    effective_parts?: Record<string, unknown>[];
+    related_actions?: { fqn: string; label: string; kind: string; description: string }[];
+    business_rules?: { fqn: string; statement: string; severity: string; enforced_by: string[] }[];
+    anchor_bindings?: { anchor_id: string; method_fqn: string; target_slot: string; anchor_locator: string; line: number | null }[];
+  } | undefined;
+  const termExplain = termExplainRaw ? {
+    term_fqn: termExplainRaw.term_fqn ?? "",
+    term: termExplainRaw.term ?? null,
+    effective_parts: termExplainRaw.effective_parts ?? [],
+    related_actions: termExplainRaw.related_actions ?? [],
+    business_rules: termExplainRaw.business_rules ?? [],
+    anchor_bindings: termExplainRaw.anchor_bindings ?? [],
+  } : undefined;
+  const primarySource = (payload._explain_primary_source as string | undefined) ?? "method";
 
   const targetClass = String(target?.code_method_fqn ?? "").split("(")[0].split(".").slice(-2, -1)[0] ?? "";
   const targetMethod = String(target?.code_method_fqn ?? "").split("(")[0].split(".").pop() ?? "";
 
+  // 답변 보조 텍스트 — summary 가 없거나 약할 때, detected term 으로 자연어 답을 합성
+  const fallbackAnswer = (() => {
+    if (summary && summary.length > 30) return null;
+    if (detectedTerms.length === 0) return null;
+    const t = detectedTerms[0];
+    const alias = (t.aliases ?? []).filter((a) => a !== t.label).slice(0, 4).join(", ");
+    return (
+      <>
+        <span className="font-semibold">{t.token}</span> 은(는) ontology 용어{" "}
+        <span className="font-semibold text-violet-800">{t.label}</span>
+        {alias && (<span className="text-gray-600"> (별칭: {alias})</span>)}
+        {t.definition && (<span className="block mt-1 text-gray-700">{t.definition}</span>)}
+      </>
+    );
+  })();
+
   return (
     <>
-      {/* 큰 답변 박스 — chat 이 더 수용 */}
+      {/* 큰 답변 박스 — chat 이 더 수용 + 신뢰도 chip inline */}
       <div className="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-200 rounded-lg p-3 shadow-sm">
         <div className="flex items-start gap-2">
           <div className="text-xl">💬</div>
           <div className="flex-1">
-            <div className="text-[10px] uppercase tracking-wide text-violet-700 font-semibold mb-1">답변</div>
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              <span className="text-[10px] uppercase tracking-wide text-violet-700 font-semibold">답변</span>
+              <_MiniConfidenceChip evidence={payload._evidence as never} />
+            </div>
             <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
-              {summary ||
-                (target ? `${targetClass}.${targetMethod} 에 대한 설명입니다. 본문은 아래 코드 카드를 참고하세요.` :
-                  "해당 의미에 대한 정확한 답변을 ontology 가 합성하지 못했습니다. 다른 표현으로 다시 시도해 주세요.")}
+              {summary && summary.length > 30 ? summary
+                : fallbackAnswer ? fallbackAnswer
+                : (target ? `${targetClass}.${targetMethod} 에 대한 설명입니다. 본문은 아래 코드 카드를 참고하세요.` :
+                    "해당 의미에 대한 정확한 답변을 ontology 가 합성하지 못했습니다. 다른 표현으로 다시 시도해 주세요.")}
             </div>
           </div>
         </div>
       </div>
 
-      {/* 관련 객체 카드 grid */}
+      {/* 🆕 Q1 — slab 단중 영향 변수 카탈로그 (사용자 명시 2026-05-23) */}
+      {weightCatalog && (
+        <div className="border-2 border-emerald-300 bg-gradient-to-br from-emerald-50/60 to-teal-50/40 rounded-lg p-3 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-700 text-white font-semibold">CATALOG</span>
+            <span className="text-sm font-bold text-emerald-900">{weightCatalog.title}</span>
+          </div>
+          <div className="text-[11px] text-emerald-800 italic">목적: {weightCatalog.purpose}</div>
+
+          {/* 핵심 공식 / 외부 제약 */}
+          <div className="grid grid-cols-1 gap-2">
+            <div className="bg-white/80 rounded p-2 border border-emerald-200">
+              <div className="text-[9px] text-emerald-700 uppercase font-semibold mb-1">핵심 공식</div>
+              <code className="text-[12px] text-emerald-900 font-mono">{weightCatalog.core_formula}</code>
+            </div>
+            <div className="bg-white/80 rounded p-2 border border-amber-200">
+              <div className="text-[9px] text-amber-700 uppercase font-semibold mb-1">외부 제약 (단중 상하한)</div>
+              <code className="text-[12px] text-amber-900 font-mono">{weightCatalog.external_constraint}</code>
+            </div>
+          </div>
+
+          {/* 변수 카탈로그 — 영향 방향 + 통제 가능성 */}
+          <div className="bg-white/80 rounded border border-emerald-200">
+            <div className="px-2 py-1.5 bg-emerald-100/60 text-[10.5px] font-semibold text-emerald-900 border-b border-emerald-200">
+              영향 변수 ({weightCatalog.variables.length}개)
+            </div>
+            <table className="w-full text-[10.5px]">
+              <thead className="bg-emerald-50">
+                <tr className="border-b border-emerald-200 text-emerald-700">
+                  <th className="text-left p-1.5 font-semibold">변수</th>
+                  <th className="text-left p-1.5 font-semibold">단중 방향</th>
+                  <th className="text-left p-1.5 font-semibold">출처 (table·column)</th>
+                  <th className="text-left p-1.5 font-semibold">제약 / 통제</th>
+                </tr>
+              </thead>
+              <tbody>
+                {weightCatalog.variables.map((v, i) => (
+                  <tr key={i} className="border-b border-emerald-100 align-top hover:bg-emerald-50/40">
+                    <td className="p-1.5 font-semibold text-emerald-900">{v.variable}</td>
+                    <td className="p-1.5">
+                      <span className={"text-[10px] px-1.5 py-0.5 rounded border " + (
+                        v.direction.includes("비례") && !v.direction.includes("반비례")
+                          ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                          : v.direction.includes("반비례")
+                          ? "bg-orange-100 text-orange-800 border-orange-300"
+                          : "bg-gray-100 text-gray-700 border-gray-300"
+                      )}>{v.direction}</span>
+                      <div className="text-[9px] text-gray-600 mt-0.5 font-mono">{v.formula_role}</div>
+                    </td>
+                    <td className="p-1.5">
+                      <code className="text-[10px] bg-emerald-50 px-1 rounded text-emerald-900 break-all">
+                        {v.table_column}
+                      </code>
+                      <div className="text-[10px] text-gray-700 mt-0.5 leading-tight">{v.rationale}</div>
+                    </td>
+                    <td className="p-1.5">
+                      <div className="text-[10px] text-amber-800 bg-amber-50 rounded p-1 mb-0.5">⚠ {v.constraint}</div>
+                      <div className="text-[10px] text-emerald-700">✦ {v.controllable_by}</div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 통제 가능성 별 priority */}
+          <div className="grid grid-cols-3 gap-2">
+            {weightCatalog.controllable_summary.map((c, i) => (
+              <div key={i} className={
+                "rounded p-2 border " + (
+                  i === 0 ? "bg-emerald-100/60 border-emerald-300" :
+                  i === 1 ? "bg-amber-100/60 border-amber-300" :
+                  "bg-rose-100/40 border-rose-300"
+                )
+              }>
+                <div className="text-[10.5px] font-bold mb-1">{c.priority}</div>
+                <ul className="text-[10px] space-y-0.5">
+                  {c.items.map((it, j) => (
+                    <li key={j} className="text-gray-800">• {it}</li>
+                  ))}
+                </ul>
+                <div className="text-[9px] text-gray-600 mt-1 italic">{c.note}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* ontology terms hit */}
+          {weightCatalog.ontology_terms.length > 0 && (
+            <details className="bg-white/70 rounded border border-emerald-200">
+              <summary className="cursor-pointer px-2 py-1 text-[10.5px] text-emerald-900 font-semibold">
+                ontology 매칭 term ({weightCatalog.ontology_terms.length})
+              </summary>
+              <ul className="px-2 pb-2 space-y-1">
+                {weightCatalog.ontology_terms.map((t) => (
+                  <li key={t.fqn} className="border-l-2 border-emerald-300 pl-1.5 text-[10px]">
+                    <div className="flex items-baseline gap-1 flex-wrap">
+                      <span className="font-semibold text-emerald-900">{t.label}</span>
+                      <code className="text-[9px] text-gray-500">{t.fqn}</code>
+                      <span className="text-[9px] text-gray-500">{t.kind}</span>
+                    </div>
+                    {t.description && (
+                      <div className="text-gray-700 mt-0.5">{t.description}</div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+
+      {/* atomic term ontology 근거 — collapsed (사용자 요구 2026-05-25: hover/펼치기로만 노출) */}
+      {termExplain && termExplain.term && (
+        <details className="border border-violet-200 bg-violet-50/40 rounded-lg">
+          <summary className="cursor-pointer px-3 py-2 flex items-baseline gap-2 flex-wrap text-[12px] hover:bg-violet-100/40 rounded-lg">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-700 text-white font-semibold">📚 ontology 근거</span>
+            <span className="font-bold text-violet-900">{String(termExplain.term.label ?? "")}</span>
+            <code className="text-[10px] text-gray-500 font-mono">{termExplain.term_fqn}</code>
+            <span className="ml-auto text-[10px] text-gray-500">
+              {String(termExplain.term.kind ?? "")}
+              {termExplain.term.value_type ? ` · ${termExplain.term.value_type}` : ""}
+              {" · 펼치기"}
+            </span>
+          </summary>
+          <div className="px-3 pb-3 pt-1 space-y-2">
+          {(termExplain.term.aliases as string[] | undefined) && (termExplain.term.aliases as string[]).length > 0 && (
+            <div className="flex items-baseline gap-1 flex-wrap">
+              <span className="text-[10px] text-gray-500">aliases:</span>
+              {(termExplain.term.aliases as string[]).map((a) => (
+                <code key={a} className="text-[10px] px-1 rounded bg-white border border-violet-200 text-violet-900">{a}</code>
+              ))}
+            </div>
+          )}
+          {(termExplain.term.description as string | undefined) && (
+            <div className="text-[11.5px] text-gray-800 leading-relaxed bg-white/60 rounded p-2 border border-violet-100">
+              {String(termExplain.term.description)}
+            </div>
+          )}
+          <div className="grid grid-cols-3 gap-2 text-[10.5px]">
+            <div className="bg-white/70 rounded p-1.5 border border-violet-100">
+              <div className="text-[9px] text-gray-500 uppercase">value_type</div>
+              <div className="font-mono text-violet-900">{String(termExplain.term.value_type ?? "—")}</div>
+            </div>
+            <div className="bg-white/70 rounded p-1.5 border border-violet-100">
+              <div className="text-[9px] text-gray-500 uppercase">unit</div>
+              <div className="font-mono text-violet-900">{String(termExplain.term.unit ?? "—")}</div>
+            </div>
+            <div className="bg-white/70 rounded p-1.5 border border-violet-100">
+              <div className="text-[9px] text-gray-500 uppercase">domain</div>
+              <div className="font-mono text-violet-900">{String(termExplain.term.domain ?? "—")}</div>
+            </div>
+          </div>
+
+          {/* 관련 action — 디폴트 닫힘 */}
+          {termExplain.related_actions.length > 0 && (
+            <details className="bg-white/70 rounded border border-violet-100">
+              <summary className="cursor-pointer px-2 py-1 text-[11px] text-violet-900 font-semibold hover:text-violet-700">
+                ⋯ 관련 ontology action ({termExplain.related_actions.length}) — 펼치기
+              </summary>
+              <ul className="px-2 pb-2 space-y-1">
+                {termExplain.related_actions.slice(0, 8).map((a) => (
+                  <li key={a.fqn} className="border-l-2 border-violet-300 pl-1.5">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-[9px] px-1 rounded bg-purple-100 text-purple-800">{a.kind}</span>
+                      <span className="text-[11px] font-semibold text-purple-900">{a.label}</span>
+                    </div>
+                    <code className="text-[9px] text-gray-500 break-all">{a.fqn}</code>
+                    {a.description && (
+                      <div className="text-[10px] text-gray-700 mt-0.5">
+                        {a.description.length > 160 ? a.description.slice(0, 160) + "..." : a.description}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          {/* business rules — 디폴트 닫힘 */}
+          {termExplain.business_rules.length > 0 && (
+            <details className="bg-white/70 rounded border border-amber-200">
+              <summary className="cursor-pointer px-2 py-1 text-[11px] text-amber-900 font-semibold hover:text-amber-700">
+                ⋯ 적용 업무 규칙 ({termExplain.business_rules.length}) — 펼치기
+              </summary>
+              <ul className="px-2 pb-2 space-y-1">
+                {termExplain.business_rules.slice(0, 6).map((r) => (
+                  <li key={r.fqn} className="border-l-2 border-amber-300 pl-1.5">
+                    <div className="flex items-baseline gap-1 flex-wrap">
+                      <span className={"text-[9px] px-1 rounded " + (
+                        r.severity === "hard" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"
+                      )}>{r.severity}</span>
+                      <code className="text-[9px] text-gray-700">{r.fqn}</code>
+                    </div>
+                    <div className="text-[10.5px] text-gray-800">{r.statement}</div>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          {/* anchor bindings — code 모드 hide 면 가리기 */}
+          {termExplain.anchor_bindings.length > 0 && codeMode !== "hide" && (
+            <details className="bg-white/70 rounded border border-emerald-200">
+              <summary className="cursor-pointer px-2 py-1 text-[11px] text-emerald-900 font-semibold">
+                anchor bindings — Java 코드 attach 지점 ({termExplain.anchor_bindings.length})
+              </summary>
+              <ul className="px-2 pb-2 space-y-1">
+                {termExplain.anchor_bindings.slice(0, 6).map((ab) => (
+                  <li key={ab.anchor_id} className="border-l-2 border-emerald-300 pl-1.5">
+                    <div className="flex items-baseline gap-1 flex-wrap">
+                      <code className="text-[9px] text-emerald-800 font-semibold">{ab.anchor_id}</code>
+                      {ab.line !== null && <span className="text-[9px] text-gray-500">L{ab.line}</span>}
+                    </div>
+                    <code className="text-[9px] text-gray-600 break-all block">{ab.method_fqn}</code>
+                    <div className="text-[10px] text-gray-700">slot: <code>{ab.target_slot}</code></div>
+                    {ab.anchor_locator && (
+                      <code className="text-[9px] bg-gray-50 px-1 rounded text-gray-700">{ab.anchor_locator}</code>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          </div>
+        </details>
+      )}
+
+      {/* 질문에서 짚어낸 온톨로지 용어 — chip 한 줄, hover 시 상세 tooltip */}
+      {!termExplain && detectedTerms.length > 0 && (
+        <div className="bg-fuchsia-50/40 border border-fuchsia-200 rounded-lg p-2 flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] text-fuchsia-800 font-semibold">📚 온톨로지 근거</span>
+          <span className="text-[10.5px] text-fuchsia-700">질문에서 짚어낸 온톨로지 용어 {detectedTerms.length}개</span>
+          <div className="flex gap-1 flex-wrap">
+            {detectedTerms.map((t) => (
+              <span
+                key={t.term_fqn}
+                className="group relative text-[10.5px] px-2 py-0.5 rounded bg-fuchsia-100 text-fuchsia-900 border border-fuchsia-200 cursor-help hover:bg-fuchsia-200"
+                title={`${t.label}\n${t.definition ?? ""}${(t.aliases?.length ?? 0) > 1 ? "\n다른 이름: " + (t.aliases ?? []).filter((a) => a !== t.label).slice(0, 4).join(", ") : ""}`}
+              >
+                {t.label}
+                <span className="absolute left-0 top-full mt-1 z-30 hidden group-hover:block w-72 bg-white border-2 border-fuchsia-300 rounded-lg p-2.5 shadow-xl text-left">
+                  <strong className="text-[12px] text-fuchsia-900">{t.label}</strong>
+                  <span className="ml-1 text-[10px] text-gray-500 font-mono">{t.term_fqn}</span>
+                  {t.definition && (
+                    <div className="text-[11px] text-gray-700 mt-1 leading-relaxed">
+                      {t.definition.length > 220 ? t.definition.slice(0, 220) + "…" : t.definition}
+                    </div>
+                  )}
+                  {(t.aliases?.length ?? 0) > 1 && (
+                    <div className="text-[10px] text-gray-500 mt-1.5">
+                      다른 이름: <span className="text-fuchsia-700">{(t.aliases ?? []).filter((a) => a !== t.label).slice(0, 5).join(" · ")}</span>
+                    </div>
+                  )}
+                </span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 관련 객체 카드 grid — weightCatalog (Q1) 답변엔 CODE 카드 자체 hide */}
       <div className="grid grid-cols-2 gap-2">
-        {/* code 카드 */}
-        {target && (
-          <div className="border-2 border-emerald-200 bg-emerald-50/50 rounded p-2 col-span-2">
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600 text-white font-semibold">CODE</span>
-              <code className="text-[11px] font-mono text-emerald-900">
-                {targetClass}.{targetMethod}
-              </code>
+        {/* code 카드: weightCatalog 가 있으면 (Q1) 관련 없으므로 표시 안 함.
+            현업 모드(collapsed) 면 details 안에 접힘, IT 모드(open) 면 펼침 표시. */}
+        {target && !weightCatalog && codeMode !== "hide" && body && (
+          codeMode === "collapsed" ? (
+            <details className="border-2 border-emerald-200 bg-emerald-50/50 rounded p-2 col-span-2">
+              <summary className="cursor-pointer flex items-center gap-1.5">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600 text-white font-semibold">
+                  CODE{primarySource === "term" ? " (참고 — 자동 매칭)" : ""}
+                </span>
+                <code className="text-[11px] font-mono text-emerald-900">
+                  {targetClass}.{targetMethod}
+                </code>
+                <span className="ml-auto text-[9px] text-emerald-700">상세 펼치기</span>
+              </summary>
+              <pre className="mt-2 text-[10.5px] bg-white border border-emerald-200 rounded p-2 overflow-auto text-gray-800 max-h-72">
+                {body.slice(0, 1500) || "(본문 없음)"}
+              </pre>
+            </details>
+          ) : (
+            <div className="border-2 border-emerald-200 bg-emerald-50/50 rounded p-2 col-span-2">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600 text-white font-semibold">
+                  CODE{primarySource === "term" ? " (참고 — 자동 매칭)" : ""}
+                </span>
+                <code className="text-[11px] font-mono text-emerald-900">
+                  {targetClass}.{targetMethod}
+                </code>
+                {primarySource === "term" && (
+                  <span className="text-[9px] text-gray-500 ml-auto">term 답변과 직접 관련은 적을 수 있음</span>
+                )}
+              </div>
+              <pre className="text-[10.5px] bg-white border border-emerald-200 rounded p-2 overflow-auto text-gray-800 max-h-72">
+                {body.slice(0, 1500) || "(본문 없음)"}
+              </pre>
             </div>
-            <pre className="text-[10px] bg-white border border-emerald-200 rounded p-2 max-h-40 overflow-auto text-gray-800">
-              {body.slice(0, 600) || "(본문 없음)"}
-            </pre>
-          </div>
+          )
         )}
 
-        {/* business rules 카드 */}
+        {/* 적용되는 업무 규칙 — chip + hover 상세 (정보색 indigo) */}
         {rules.length > 0 && (
-          <div className="border-2 border-rose-200 bg-rose-50/50 rounded p-2">
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-600 text-white font-semibold">RULES</span>
-              <span className="text-[10px] text-gray-500">{rules.length}건</span>
+          <div className="bg-indigo-50/40 border border-indigo-200 rounded-lg p-2 col-span-2 flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] text-indigo-900 font-semibold">📘 온톨로지 근거</span>
+            <span className="text-[10.5px] text-indigo-700">적용 업무 규칙 {rules.length}개</span>
+            <div className="flex gap-1 flex-wrap">
+              {rules.slice(0, 8).map((r, i) => {
+                const sev = String(r.severity ?? "soft");
+                const isHard = sev === "hard";
+                const fqn = String(r.fqn ?? "");
+                const shortName = fqn.split(".").slice(-2).join(".") || `규칙 #${i + 1}`;
+                return (
+                  <span key={i}
+                    className={"group relative text-[10.5px] px-2 py-0.5 rounded border cursor-help " + (
+                      isHard ? "bg-red-100 text-red-900 border-red-300 hover:bg-red-200"
+                             : "bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200"
+                    )}
+                    title={`${isHard ? "절대 위반 불가" : "권장 규칙"}\n${String(r.statement ?? "")}`}
+                  >
+                    {isHard ? "🔴" : "🟡"} {shortName}
+                    <span className="absolute left-0 top-full mt-1 z-30 hidden group-hover:block w-80 bg-white border-2 border-rose-300 rounded-lg p-2.5 shadow-xl text-left">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className={"text-[9px] px-1.5 py-0.5 rounded font-bold " + (
+                          isHard ? "bg-red-600 text-white" : "bg-amber-400 text-amber-900"
+                        )}>{isHard ? "절대 위반 불가" : "권장"}</span>
+                        <code className="text-[9.5px] text-gray-500 font-mono">{fqn}</code>
+                      </div>
+                      <div className="text-[11.5px] text-gray-800 leading-relaxed">
+                        {String(r.statement ?? "")}
+                      </div>
+                    </span>
+                  </span>
+                );
+              })}
             </div>
-            <ul className="text-[10px] space-y-1 max-h-32 overflow-y-auto">
-              {rules.slice(0, 5).map((r, i) => (
-                <li key={i}>
-                  <code className="text-[9px] bg-rose-100 px-1 rounded text-rose-800">{String(r.severity ?? "?")}</code>
-                  <span className="text-gray-700 ml-1">{String(r.statement ?? "")}</span>
-                </li>
-              ))}
-            </ul>
           </div>
         )}
 
-        {/* callers 카드 */}
+        {/* 이걸 호출하는 곳 — chip + hover 상세 */}
         {callers.length > 0 && (
-          <div className="border-2 border-sky-200 bg-sky-50/50 rounded p-2">
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-600 text-white font-semibold">CALLERS</span>
-              <span className="text-[10px] text-gray-500">{callers.length}건</span>
+          <div className="bg-sky-50/40 border border-sky-200 rounded-lg p-2 col-span-2 flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] text-sky-900 font-semibold">🔗 온톨로지 근거</span>
+            <span className="text-[10.5px] text-sky-700">변경 시 같이 영향받는 호출 위치 {callers.length}개</span>
+            <div className="flex gap-1 flex-wrap">
+              {callers.slice(0, 10).map((c, i) => {
+                const fqn = String((c?.fqn ?? c?.method_fqn ?? c?.code_method_fqn ?? "") || "");
+                const distance = c?.distance !== undefined ? Number(c.distance) : 1;
+                const display = fqn.split("(")[0].split(".").slice(-2).join(".") || "(미상)";
+                const distanceLabel = distance === 1 ? "직접 호출" : `${distance} 단계`;
+                return (
+                  <span key={i}
+                    className="group relative text-[10.5px] px-2 py-0.5 rounded bg-sky-100 text-sky-900 border border-sky-200 cursor-help hover:bg-sky-200 font-mono"
+                    title={`${distanceLabel}\n${fqn}`}
+                  >
+                    ← {display}
+                    <span className="absolute left-0 top-full mt-1 z-30 hidden group-hover:block w-96 bg-white border-2 border-sky-300 rounded-lg p-2.5 shadow-xl text-left">
+                      <div className="text-[10.5px] text-sky-700 font-semibold mb-1">{distanceLabel}로 영향받는 위치</div>
+                      <code className="text-[10.5px] text-gray-800 break-all">{fqn}</code>
+                    </span>
+                  </span>
+                );
+              })}
             </div>
-            <ul className="text-[10px] space-y-0.5 max-h-32 overflow-y-auto">
-              {callers.slice(0, 8).map((c, i) => (
-                <li key={i} className="font-mono text-sky-800 truncate" title={String(c.method_fqn ?? c)}>
-                  ← {String(c.method_fqn ?? c).split(".").slice(-2).join(".")}
-                </li>
-              ))}
-            </ul>
           </div>
         )}
       </div>
@@ -1282,7 +2592,7 @@ function _ExplainView({ payload }: { payload: Record<string, unknown> }) {
 // _FullDesignView — Java :8080 의 /api/sd/working/single 결과
 // ─────────────────────────────────────────────────────────────────────────────
 
-function _FullDesignView({ payload }: { payload: Record<string, unknown> }) {
+function _FullDesignView({ payload, codeMode = "open" }: { payload: Record<string, unknown>; codeMode?: "hide" | "collapsed" | "open" }) {
   const orderNo = payload.order_no as string;
   const slabResults = (payload.slab_results as Array<Record<string, unknown>> | undefined) ?? [];
   const trace = (payload.trace as Array<Record<string, unknown>> | undefined) ?? [];
@@ -1532,7 +2842,7 @@ function _TraceGantt({ trace }: { trace: Array<Record<string, unknown>> }) {
 }
 
 
-function _CompareView({ payload }: { payload: Record<string, unknown> }) {
+function _CompareView({ payload, codeMode = "open" }: { payload: Record<string, unknown>; codeMode?: "hide" | "collapsed" | "open" }) {
   const before = payload.before_result as Record<string, unknown> | null;
   const after = payload.after_result as Record<string, unknown> | null;
   const diffs = (payload.field_diffs as Array<Record<string, unknown>> | undefined) ?? [];
@@ -1578,7 +2888,7 @@ function _CompareView({ payload }: { payload: Record<string, unknown> }) {
   );
 }
 
-function _HypothesisView({ payload }: { payload: Record<string, unknown> }) {
+function _HypothesisView({ payload, codeMode = "open" }: { payload: Record<string, unknown>; codeMode?: "hide" | "collapsed" | "open" }) {
   // legacy multiturn hypothesis payload + 신규 hypothesis workflow 둘 다 처리
   const verdict = payload.verdict as string | undefined;
   const reasoning = payload.reasoning as string | undefined;
@@ -1819,7 +3129,7 @@ function _HypothesisView({ payload }: { payload: Record<string, unknown> }) {
  *
  * 사용자 요구: SSE 스트리밍으로 4-step 순차 등장. payload 의 default 값으로 즉시 stream 시작.
  */
-function _HypothesisWorkflowView({ payload }: { payload: Record<string, unknown> }) {
+function _HypothesisWorkflowView({ payload, codeMode = "open" }: { payload: Record<string, unknown>; codeMode?: "hide" | "collapsed" | "open" }) {
   const initialHyp = payload as unknown as HypothesisResponse;
   // SSE 스트림으로 step 별 progressive 표시
   const [streamedStages, setStreamedStages] = useState<Record<number, Record<string, unknown>>>({});
@@ -2048,7 +3358,7 @@ function _HypothesisWorkflowView({ payload }: { payload: Record<string, unknown>
 /** 신규 기준 추가 시나리오 결과 — _NewStandardView.
  *  사용자: "신규 품종 X 가 추가되면 어디 영향?" → 가상 주문 + 시뮬 + 코드 영향 + Java→Python.
  */
-function _NewStandardView({ payload }: { payload: Record<string, unknown> }) {
+function _NewStandardView({ payload, codeMode = "open" }: { payload: Record<string, unknown>; codeMode?: "hide" | "collapsed" | "open" }) {
   const newProduct = payload.new_product_cd as string | null;
   const newGrade = payload.new_grade_cd as string | null;
   const closest = payload.closest_existing_order as Record<string, unknown> | null;

@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * sd · working · 통합 슬랩 도메인 Entity.
+ * sd · working · 통합 Slab 도메인 Entity.
  *
  * dev notes 패턴 (SDOrder 와 동일):
  *   1) DB값 필드: SLAB_RESULT 컬럼 매핑 (영속화)

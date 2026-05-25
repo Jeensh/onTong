@@ -67,7 +67,7 @@ def resolver():
               aliases=("ValidationResult",)),
         _term("term.scm.product.unit_weight", "주문단중",
               aliases=("UnitWeight",),
-              description="주문단중 = 슬랩 한 본의 weight"),
+              description="주문단중 = Slab 한 본의 weight"),
     ])
 
 

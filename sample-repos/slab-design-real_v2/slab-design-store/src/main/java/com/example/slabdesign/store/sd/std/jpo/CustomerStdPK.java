@@ -5,7 +5,7 @@ import java.util.Objects;
 
 /**
  * sd · std · CUSTOMER_STD composite PK.
- * (회사, 소구분, 우선순위) — EDGING_GROUP 과 동일한 우선순위 tiebreaker 패턴.
+ * (온톨로지, 소구분, 우선순위) — EDGING_GROUP 과 동일한 우선순위 tiebreaker 패턴.
  */
 public class CustomerStdPK implements Serializable {
 

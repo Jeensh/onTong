@@ -14,7 +14,7 @@ to retry.
 - `domain_verb_korean` / `domain_verb_english` — name the business
   operation. Korean is the display name (verb phrase). English is
   PascalCase. Examples: `주문 생성 / CreateOrder`,
-  `슬랩 설계 검증 / ValidateSlabDesign`, `결재 한도 조회 / GetPaymentLimit`.
+  `Slab 설계 검증 / ValidateSlabDesign`, `결재 한도 조회 / GetPaymentLimit`.
   Do not just camelCase-translate the method name — interpret.
 - `action_kind_guess` — pick exactly one:
   - `pure_function`: same input → same output, no side effects.

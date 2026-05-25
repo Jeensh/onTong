@@ -12,11 +12,11 @@ REST endpoint 카탈로그. 모든 예시는 서버가 `http://localhost:8080`�
 
 ---
 
-## 1. Working — 21-step 슬랩 설계 실행
+## 1. Working — 21-step Slab 설계 실행
 
 ### 1.1 `POST /api/sd/working/batch`
 
-회사·소 단위 배치 (v1 호환). `findDesignable()`이 잡는 모든 후보 주문을 차례로 설계.
+온톨로지·소 단위 배치 (v1 호환). `findDesignable()`이 잡는 모든 후보 주문을 차례로 설계.
 
 ```bash
 curl -s -X POST 'http://localhost:8080/api/sd/working/batch?cmpCd=K&orgCd=1' | jq .
@@ -35,7 +35,7 @@ curl -s -X POST 'http://localhost:8080/api/sd/working/batch?cmpCd=K&orgCd=1' | j
 }
 ```
 
-`skippedCount`는 알고리즘이 fail로 종결한 주문 수(예: S4 DG004). 처리된 슬랩의 마지막 한 개씩만 `processedSlabs`에 들어간다(각 주문당 1 entity 반환).
+`skippedCount`는 알고리즘이 fail로 종결한 주문 수(예: S4 DG004). 처리된 Slab의 마지막 한 개씩만 `processedSlabs`에 들어간다(각 주문당 1 entity 반환).
 
 ### 1.2 `POST /api/sd/working/single`
 
@@ -82,7 +82,7 @@ DG 코드 fail 시:
 }
 ```
 
-> **Quirk**: `slabResults`는 길이 ≤ 1로 제한된다(알고리즘이 마지막 슬랩 entity 한 개만 반환). 분할이 N매인 경우 N개 record 모두 보려면 `GET /api/sd/results?...&orderNo=...`를 사용.
+> **Quirk**: `slabResults`는 길이 ≤ 1로 제한된다(알고리즘이 마지막 Slab entity 한 개만 반환). 분할이 N매인 경우 N개 record 모두 보려면 `GET /api/sd/results?...&orderNo=...`를 사용.
 
 ### 1.3 `POST /api/sd/working/single?trace=true`
 
@@ -178,7 +178,7 @@ curl -s 'http://localhost:8080/api/sd/orders/K/1/ORD20260510001' | jq '{os: .os.
 
 ---
 
-## 3. Results — 슬랩 결과(SLAB_RESULT)
+## 3. Results — Slab 결과(SLAB_RESULT)
 
 ### 3.1 `GET /api/sd/results` — 주문번호 기준 N건
 
@@ -194,7 +194,7 @@ curl -s 'http://localhost:8080/api/sd/results?cmpCd=K&orgCd=1&orderNo=ORD2026051
 { "slabNo": "000000000004", "splitCount": 2, "slabWgt": 18333.334 }
 ```
 
-(S2는 split=2이지만 슬랩 row가 3개 — 알고리즘이 split 결과 매수를 마지막에 조정하기 때문. `docs/SCENARIOS.md` 참고.)
+(S2는 split=2이지만 Slab row가 3개 — 알고리즘이 split 결과 매수를 마지막에 조정하기 때문. `docs/SCENARIOS.md` 참고.)
 
 ### 3.2 `GET /api/sd/results/{slabNo}` — 단건
 
@@ -222,7 +222,7 @@ curl -s 'http://localhost:8080/api/sd/history?cmpCd=K&orgCd=1&orderNo=ORD2026051
 { "stepNo": 0, "errorCode": "DG004", "eventTime": "2026-05-10T13:33:18" }
 ```
 
-### 4.2 `GET /api/sd/history/slab/{slabNo}` — 슬랩 기준 (성공 케이스)
+### 4.2 `GET /api/sd/history/slab/{slabNo}` — Slab 기준 (성공 케이스)
 
 `stepNo` 오름차순. `cmpCd`/`orgCd`는 query 로 받음.
 
@@ -297,7 +297,7 @@ curl -s 'http://localhost:8080/api/sd/seed/scenarios' | jq .
 | ID | orderNo | confirmedPlantCd | 의도 | 결과 |
 |----|---------|------------------|-----|------|
 | S1 | ORD20260510001 | `K1 K    ` | 골든 패스 | 1 slab |
-| S2 | ORD20260510002 | `K1      ` | 다중 슬랩 + A-a inner loop | 3 slabs (split=2) |
+| S2 | ORD20260510002 | `K1      ` | 다중 Slab + A-a inner loop | 3 slabs (split=2) |
 | S3 | ORD20260510003 | `K1KK    ` | A-a inner-loop fallback | 2 slabs (split=1 → recalc) |
 | S4 | ORD20260510004 | `K1      ` | DG004 cross-check fail | 0 slab + history 1 |
 | S5 | ORD20260510005 | `K1     K` | 최소 활성 공정 | 1 slab |

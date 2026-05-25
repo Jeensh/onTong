@@ -10,7 +10,7 @@ public final class SdErrorCode {
     private SdErrorCode() {}
 
     // ==== Phase 1 정합성 점검 (DG001 ~ DG005) ====
-    /** 재고주문 — STOCK_CODE = 1, 새 슬랩 설계 대상 아님. */
+    /** 재고주문 — STOCK_CODE = 1, 새 Slab 설계 대상 아님. */
     public static final String VAL_STOCK_ORDER       = "DG001";
     /** 주문 폭/길이 양수 아님. */
     public static final String VAL_ORDER_SIZE        = "DG002";
@@ -39,7 +39,7 @@ public final class SdErrorCode {
     /** A-a 루프 control signal — 현재 분할수 iteration 실패, 다음 split 또는 외부 fallback 필요.
      *  history 적재 대상이 아님 (loop 내부 신호). 최종 fail 은 DG109. */
     public static final String ALG_ITERATION_NEEDED       = "DG108";
-    /** A-a 루프 분할수 1까지 모두 시도해도 수렴 실패 — 슬랩 설계 최종 불가 (Q2 답변 반영). */
+    /** A-a 루프 분할수 1까지 모두 시도해도 수렴 실패 — Slab 설계 최종 불가 (Q2 답변 반영). */
     public static final String ALG_NO_CONVERGENCE         = "DG109";
 
     // EDGING_SPEC 미존재 (정확매칭 + '*' fallback 모두 실패) 는 사용자 사양에 따라

@@ -9,7 +9,7 @@ business_terms 에 폭/너비/길이/중량/분할 term 자체가 없음. 같은
   2. 13 actions 의 declared_on_term 을 dimension term 으로 정정 (기존 order term 이거나 None 인 경우만)
 
 미정정 대상 (의도적 유지):
-  - 슬랩설계_실행, order.정합성_검증, 결정, record_* (order/logging 의도)
+  - Slab설계_실행, order.정합성_검증, 결정, record_* (order/logging 의도)
   - product.분류, slab.slab_save_실행, resolve_and_set (별도 도메인)
 """
 from __future__ import annotations

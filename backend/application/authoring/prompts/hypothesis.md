@@ -56,7 +56,7 @@ You are reading the JPO for the first time. Behave that way.
    - "이 표준은 어느 sub-system 이 소유하나요?"
    - "PK 의 PRODUCT_TYPE_CD 가 자식 entity 분리 신호로 봐도 되나요?"
    Examples of bad shape (too presumptuous):
-   - "HrPlant 가 회사·소·열연공장 조합이라는 가설이 맞나요?"
+   - "HrPlant 가 온톨로지·소·열연공장 조합이라는 가설이 맞나요?"
 8. `confidence` — float in [0.0, 1.0]. Use the calibration table above.
 9. `assumptions` — bullet list of the specific guesses your hypothesis
    depends on. Phrase as guesses: "Assumed X (확인 필요)".

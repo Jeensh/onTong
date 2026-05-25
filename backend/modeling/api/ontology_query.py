@@ -237,7 +237,7 @@ class OntologyQueryClientImpl:
         hits: list[SearchHitDTO] = []
 
         # R3-3: 한국어 1-token query 는 음절 단위 substring 매칭이 자연. 예: "설계" 가
-        # "슬랩설계_실행" 의 중간에 있어도 사실상 token match (Korean 합성어는 syllable
+        # "Slab설계_실행" 의 중간에 있어도 사실상 token match (Korean 합성어는 syllable
         # 단위로 의미가 합쳐짐). 이전엔 substring 0.6 → kind boost 후도 term startswith
         # 0.85 에 밀려 action 이 #12 등수. 0.8 로 bump.
         _q_is_korean = bool(q) and not q.isascii()
@@ -250,7 +250,7 @@ class OntologyQueryClientImpl:
             if ll.startswith(q) or ff.startswith(q):
                 return 0.85
             if q in ll or q in ff:
-                # Korean substring 은 합성어 중간 매칭이라도 의미 있음 — "설계" 가 "슬랩설계"
+                # Korean substring 은 합성어 중간 매칭이라도 의미 있음 — "설계" 가 "Slab설계"
                 # 안에 있으면 사실상 token boundary 와 동등. 영문 substring (0.6) 보다 강함.
                 return 0.85 if _q_is_korean else 0.6
             # R4-1: 한국어 synonym 영문 매칭 — "최종" → "final" 처럼 한국어 query 가 영문
@@ -285,7 +285,7 @@ class OntologyQueryClientImpl:
                 s = max(s, _score(al, a.fqn))
             if s > 0:
                 # R3-3: workflow action 은 top-level entry — 같은 score 라도 가산점.
-                # "설계" 검색 시 history_controller term 보다 슬랩설계_실행 workflow 가 위로.
+                # "설계" 검색 시 history_controller term 보다 Slab설계_실행 workflow 가 위로.
                 if a.kind == ActionKind.WORKFLOW:
                     s = min(1.0, s + 0.05)
                 # R5-5: 한국어 → 영문 synonym 경로로 action 도달 시 추가 boost.
@@ -409,7 +409,7 @@ def _tokenize(text: str) -> set[str]:
 
     예: 'slabWidth' → {'slab', 'width'}
         'sd_max_split_count' → {'sd', 'max', 'split', 'count'}
-        '슬랩 두께' → {'슬랩', '두께'} (한국어는 공백 기준)
+        'Slab 두께' → {'Slab', '두께'} (한국어는 공백 기준)
     너무 짧은 (≤1자) 영문 토큰은 noise 라 제외.
     """
     if not text:

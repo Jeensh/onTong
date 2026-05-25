@@ -27,7 +27,7 @@ public class SdWorkingController {
         this.driver = driver;
     }
 
-    @Operation(summary = "회사·소 단위 배치 슬랩 설계 (v1 호환)")
+    @Operation(summary = "온톨로지·소 단위 배치 Slab 설계 (v1 호환)")
     @PostMapping("/batch")
     public SdDriver.BatchResult batchDesign(
             @RequestParam String cmpCd,
@@ -35,7 +35,7 @@ public class SdWorkingController {
         return driver.batchDesign(cmpCd, orgCd);
     }
 
-    @Operation(summary = "주문 1건 슬랩 설계 (옵션: trace=true 로 step-별 입출력 trace 반환)")
+    @Operation(summary = "주문 1건 Slab 설계 (옵션: trace=true 로 step-별 입출력 trace 반환)")
     @PostMapping("/single")
     public SingleDesignResponse singleDesign(
             @RequestBody SingleDesignRequest req,

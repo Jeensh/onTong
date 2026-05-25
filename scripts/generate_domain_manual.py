@@ -9,7 +9,7 @@ Section 2 모델링이 잘 동작하는지 검증하기 위한 첫 산출물.
     - sample-repos/slab-design-real/toClaude/*.md              (사용자 제공 도메인 doc, 검증용)
 
 출력 :
-    wiki/슬랩설계/01-도메인-개념.md   (매뉴얼 1차)
+    wiki/Slab설계/01-도메인-개념.md   (매뉴얼 1차)
 
 Usage :
     cd /Users/donghae/workspace/ai/onTong
@@ -40,7 +40,7 @@ from backend.modeling.gap_detection import (  # noqa: E402
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SLAB_REPO = REPO_ROOT / "sample-repos" / "slab-design-real"
 SNAPSHOT = SLAB_REPO / ".analyzed" / "entities.json"
-OUT_PATH = REPO_ROOT / "wiki" / "슬랩설계" / "01-도메인-개념.md"
+OUT_PATH = REPO_ROOT / "wiki" / "Slab설계" / "01-도메인-개념.md"
 
 
 # ---------------------------------------------------------------------------
@@ -128,14 +128,14 @@ def cluster_columns(entities: list[dict]) -> tuple[dict[str, list[dict]], dict[s
          ["customer_cd"],
          "고객사 코드",
          "주문 고객사 식별 코드."),
-        ("회사코드",
+        ("온톨로지코드",
          ["cmp_cd"],
-         "회사 코드",
+         "온톨로지 코드",
          "복합 PK 의 첫 자리 (2자리)."),
         ("소코드",
          ["org_cd"],
          "소 코드",
-         "복합 PK 의 두 번째 자리 (1자리). 회사 내 조직."),
+         "복합 PK 의 두 번째 자리 (1자리). 온톨로지 내 조직."),
         ("주문번호",
          ["order_no"],
          "주문 번호",
@@ -160,11 +160,11 @@ def cluster_columns(entities: list[dict]) -> tuple[dict[str, list[dict]], dict[s
          ["width"],
          "폭",
          "Slab 폭 (mm). 2D sheet 의 두 번째 축."),
-        ("슬랩두께",
+        ("Slab두께",
          ["slab_thickness"],
          "Slab 설계 두께",
          "step 1 의 출력. CAST_SPEC 룩업 결과."),
-        ("슬랩번호",
+        ("Slab번호",
          ["slab_no"],
          "Slab 번호",
          "12자리 zero-padded sequence. SLAB_RESULT/SLAB_DESIGN_HIST PK."),

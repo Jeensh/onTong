@@ -70,7 +70,7 @@ export function DashboardPanel({
             Section 3 — Simulation Dashboard
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            현재 ontology.db 에 적재된 repo 별 실 데이터 + 멀티턴 세션 이력.
+            현재 ontology.db 에 적재된 repo 별 실 데이터 + 멀티턴 대화 이력.
           </p>
         </header>
 

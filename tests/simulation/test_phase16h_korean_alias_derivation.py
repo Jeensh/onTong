@@ -42,11 +42,11 @@ def test_korean_with_english_fqn() -> None:
 
 
 def test_korean_underscore_compound_in_fqn() -> None:
-    """FQN 의 슬랩설계_실행 → compound + 슬랩설계 (실행 단독은 stopword 제외)."""
+    """FQN 의 Slab설계_실행 → compound + Slab설계 (실행 단독은 stopword 제외)."""
     mod = _load_module()
-    r = mod.derive_korean_aliases("action.scm.슬랩설계_실행", "slab design")
-    assert "슬랩설계_실행" in r
-    assert "슬랩설계" in r
+    r = mod.derive_korean_aliases("action.scm.Slab설계_실행", "slab design")
+    assert "Slab설계_실행" in r
+    assert "Slab설계" in r
     assert "실행" not in r, f"stopword 실행 단독 제외. r={r}"
 
 

@@ -5,7 +5,7 @@ import java.util.Objects;
 
 /**
  * sd · working · SLAB_RESULT composite PK.
- * (회사코드, 소코드, slab 번호) — 3 컬럼.
+ * (온톨로지코드, 소코드, slab 번호) — 3 컬럼.
  */
 public class SlabResultPK implements Serializable {
 

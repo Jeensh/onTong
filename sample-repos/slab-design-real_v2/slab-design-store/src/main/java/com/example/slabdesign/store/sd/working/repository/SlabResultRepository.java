@@ -13,9 +13,9 @@ import java.util.Optional;
  */
 public interface SlabResultRepository extends JpaRepository<SlabResultJpo, SlabResultPK> {
 
-    /** 주문번호 기준 모든 slab 조회 (1 주문 → N 슬랩). */
+    /** 주문번호 기준 모든 slab 조회 (1 주문 → N Slab). */
     List<SlabResultJpo> findByCmpCdAndOrgCdAndOrderNo(String cmpCd, String orgCd, String orderNo);
 
-    /** Slab 번호 단건 조회 (회사·소를 모르는 검색 시나리오). */
+    /** Slab 번호 단건 조회 (온톨로지·소를 모르는 검색 시나리오). */
     Optional<SlabResultJpo> findFirstBySlabNo(String slabNo);
 }

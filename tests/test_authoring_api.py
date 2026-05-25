@@ -216,7 +216,7 @@ def test_hypothesize_endpoint_records_decision(client, monkeypatch):
         candidate_term_korean="열연공장",
         candidate_term_english="HrPlant",
         domain_role="standard",
-        pk_role_summary="회사·소·열연공장·품종",
+        pk_role_summary="온톨로지·소·열연공장·품종",
         confidence=0.7,
     )
     monkeypatch.setattr(auth_api, "propose_entity_hypothesis", _stub_async(fake))
@@ -262,7 +262,7 @@ def test_naming_endpoint_records_decision(client, monkeypatch):
         candidate_term_korean="열연공장",
         candidate_term_english="HrPlant",
         domain_role="standard",
-        pk_role_summary="회사·소·열연공장·품종",
+        pk_role_summary="온톨로지·소·열연공장·품종",
         confidence=0.7,
     )
     accepted = op.OntologyOption(
@@ -370,7 +370,7 @@ def test_confirm_endpoint_persists_business_terms(client):
                 korean_label="열연공장",
                 english_id="HrPlant",
                 role="root",
-                description_short="회사·소 단위 열연 설비",
+                description_short="온톨로지·소 단위 열연 설비",
             ),
             nm.EntityName(
                 korean_label="열연공장제약",

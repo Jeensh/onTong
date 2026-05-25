@@ -5,7 +5,7 @@ import java.util.Objects;
 
 /**
  * sd · std · CAST_SPEC composite PK.
- * (회사코드, 소구분코드, 제강코드, 연주코드, 머신코드, 품종) — 6 컬럼.
+ * (온톨로지코드, 소구분코드, 제강코드, 연주코드, 머신코드, 품종) — 6 컬럼.
  */
 public class CastSpecPK implements Serializable {
 

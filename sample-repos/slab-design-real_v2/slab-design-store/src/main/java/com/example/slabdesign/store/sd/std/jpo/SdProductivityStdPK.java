@@ -5,7 +5,7 @@ import java.util.Objects;
 
 /**
  * sd · std · SD_PRODUCTIVITY_STD composite PK.
- * (회사, 소구분, 공정구분, 강종, 품종코드, 고객사) — 6 컬럼.
+ * (온톨로지, 소구분, 공정구분, 강종, 품종코드, 고객사) — 6 컬럼.
  */
 public class SdProductivityStdPK implements Serializable {
 

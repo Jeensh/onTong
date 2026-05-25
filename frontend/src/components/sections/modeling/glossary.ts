@@ -73,7 +73,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   workflow: {
     label: "Action.kind = workflow",
     short: "직접 method 매핑 안 갖고, sub_actions 로 다른 Action 들의 control flow 만 표현. 21-step 같은 multi-step 알고리즘.",
-    example: "예: action.scm.슬랩설계_실행 (workflow, sub_actions=21)",
+    example: "예: action.scm.Slab설계_실행 (workflow, sub_actions=21)",
   },
   declared_on_term: {
     label: "Declared on Term",
@@ -100,7 +100,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   business_rule: {
     label: "BusinessRule",
     short: "도메인 제약. \"X 는 Y 범위여야 한다\" 같은 invariant. enforced_by 로 코드 가드 위치, operational_history 로 운영 사고 추적.",
-    example: "예: rule.scm.order.no_stock_order — P-2018-0098 슬랩 중복 사고",
+    example: "예: rule.scm.order.no_stock_order — P-2018-0098 Slab 중복 사고",
   },
   severity: {
     label: "BR Severity",
