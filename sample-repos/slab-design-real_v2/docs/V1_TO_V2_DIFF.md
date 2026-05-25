@@ -133,7 +133,7 @@ v1은 1개의 진짜 endpoint(`POST /api/sd/working/batch`) + 빈 placeholder co
 ### 6.5 `slabResults` 응답 길이 (단건 endpoint)
 
 - `POST /api/sd/working/single` 응답 `slabResults`는 분할이 N매여도 길이 ≤ 1.
-  알고리즘이 마지막 슬랩 entity 한 개만 반환하기 때문. N개 row 보려면 `GET /api/sd/results?...&orderNo=...` 사용.
+  알고리즘이 마지막 Slab entity 한 개만 반환하기 때문. N개 row 보려면 `GET /api/sd/results?...&orderNo=...` 사용.
 - v1엔 단건 endpoint 자체가 없었으므로 새 quirk.
 
 ---
@@ -163,7 +163,7 @@ v1은 1개의 진짜 endpoint(`POST /api/sd/working/batch`) + 빈 placeholder co
 
 다른 cross-check가 먼저 trip하지 않도록 `pkgWgtLow ≤ pkgWgtHigh = 22,000`도 충족.
 
-### 7.4 S2 — 슬랩 매수가 4가 아닌 3
+### 7.4 S2 — Slab 매수가 4가 아닌 3
 
 SPEC.md 초고는 4매 가정이었으나 시드 `CAST_SPEC.LENGTH_HIGH = 12000`이 `maxSplitCountUpper`를 캡 → 골든 결과는 3매. SPEC.md(`§4.3`)와 위 기록이 충돌하면 골든 파일(`S2.json`)이 truth.
 

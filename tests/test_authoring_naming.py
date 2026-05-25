@@ -23,7 +23,7 @@ def _hr_plant_hypothesis() -> hp.EntityHypothesis:
         candidate_term_korean="열연공장 표준",
         candidate_term_english="HrSpec",
         domain_role="standard",
-        pk_role_summary="회사·소·열연공장·품종 4축 — 한 row = 한 열연공장의 한 품종에 대한 폭/길이 범위",
+        pk_role_summary="온톨로지·소·열연공장·품종 4축 — 한 row = 한 열연공장의 한 품종에 대한 폭/길이 범위",
         column_notes=[],
         relations_hint=["PK 의 PRODUCT_TYPE_CD 가 자식 entity 분리 신호"],
         domain_questions=[],
@@ -39,7 +39,7 @@ def _accepted_plant_constraint_option() -> op.OntologyOption:
         id="C",
         name="옵션 C — Plant + Constraint Composition",
         description=(
-            "HrPlant (열연공장, 회사·소·HR_PLANT_CD 식별) 와 그 산하의 "
+            "HrPlant (열연공장, 온톨로지·소·HR_PLANT_CD 식별) 와 그 산하의 "
             "HrPlantConstraint (품종별 폭/길이) 로 분리. PK 의 앞 3축은 plant, "
             "PRODUCT_TYPE_CD 는 자식 entity 의 키."
         ),
@@ -81,7 +81,7 @@ def test_naming_decision_round_trip():
                 korean_label="열연공장",
                 english_id="HrPlant",
                 role="root",
-                description_short="회사·소 단위의 물리 열연 설비",
+                description_short="온톨로지·소 단위의 물리 열연 설비",
             ),
             nm.EntityName(
                 korean_label="열연공장제약",

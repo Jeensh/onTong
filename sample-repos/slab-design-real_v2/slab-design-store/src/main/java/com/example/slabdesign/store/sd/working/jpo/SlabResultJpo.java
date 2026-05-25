@@ -35,7 +35,7 @@ public class SlabResultJpo {
     @Id @Column(name = "SLAB_NO", length = 20)
     private String slabNo;
 
-    // FK to ORDER_OS — composite (CMP_CD + ORG_CD + ORDER_NO). 회사·소코드는 PK 와 공유.
+    // FK to ORDER_OS — composite (CMP_CD + ORG_CD + ORDER_NO). 온톨로지·소코드는 PK 와 공유.
     @Column(name = "ORDER_NO", length = 20)
     private String orderNo;
 

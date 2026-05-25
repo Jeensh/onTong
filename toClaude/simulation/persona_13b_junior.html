@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>Phase 13b — 박주니어 영문 식별자 검증</title>
+<style>
+  body { font-family: -apple-system, "SF Pro Text", system-ui, sans-serif; max-width: 880px; margin: 2.2rem auto; padding: 0 1.4rem; color: #222; line-height: 1.55; }
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.6rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .87rem; margin: .6rem 0 1rem; }
+  th, td { border: 1px solid #d8d8d8; padding: .35rem .55rem; text-align: left; vertical-align: top; }
+  th { background: #f5f5f5; font-weight: 600; }
+  code { background: #f3f3f3; padding: 1px 5px; border-radius: 3px; font-size: .82rem; }
+  .ok { color: #137333; font-weight: 600; }
+  .warn { color: #b06b00; font-weight: 600; }
+  .bad { color: #a8201a; font-weight: 600; }
+  .note { background: #fffae6; border-left: 3px solid #f5c842; padding: .55rem .8rem; margin: .8rem 0; font-size: .9rem; }
+  .verdict { background: #eef6ff; border: 1px solid #b9d6f7; padding: .6rem .9rem; border-radius: 5px; }
+  ul { margin: .3rem 0 .6rem 1.2rem; }
+  li { margin: .15rem 0; }
+</style>
+</head>
+<body>
+
+<h1>Phase 13b 검증 — 박주니어 (입사 3개월차)</h1>
+<p style="color:#666; font-size:.88rem;">repo <code>slab-design-real-v2</code> · 8001 backend · 자바 식별자 3개 직접 호출</p>
+
+<h2>1. 결과 요약</h2>
+<table>
+  <thead><tr><th>질문</th><th>intent</th><th>search_terms (sources)</th><th>candidates</th><th>suggestions</th><th>turn 3</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>validateOrder 어디 있어?</code></td>
+      <td><span class="ok">locate</span> (1.0)</td>
+      <td><code>query='validateOrder'</code> <span class="ok">clean</span></td>
+      <td>5건 — ontology 0 / sim_v2 fallback (final_length_range 등)</td>
+      <td>—</td>
+      <td><span class="ok">executed_lookup 풀 payload</span><br/>body_text 18줄, file_path 절대경로, linked_term <code>term.scm.order.order</code>, callers 3행 (receiver_exact 2 + name_only 1), rules 5행</td>
+    </tr>
+    <tr>
+      <td><code>checkInventory 뭐함?</code></td>
+      <td><span class="ok">explain</span> (0.9)</td>
+      <td><code>query='checkInventory'</code> <span class="ok">clean</span></td>
+      <td><span class="warn">0건</span></td>
+      <td><span class="bad">[] 비어있음</span></td>
+      <td>n/a</td>
+    </tr>
+    <tr>
+      <td><code>OrderService 변경 영향?</code></td>
+      <td><span class="ok">impact</span> (1.0)</td>
+      <td><code>query='OrderService'</code> <span class="ok">clean</span></td>
+      <td>5건 — ontology 0 / sim_v2 fallback</td>
+      <td>[]</td>
+      <td><span class="ok">executed_impact</span> affected_methods 3건, confidence 1.0</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>2. 평가 (박주니어 입장)</h2>
+
+<p><strong>이전보다 도움이 되는가? — <span class="ok">Yes, 부분적으로</span></strong></p>
+<ul>
+  <li>이전엔 "<code>validateOrder 어디 있어?</code>" 풀 문장을 BM25 토큰화 → "어디"/"있어" 노이즈가 점수 흔들었음. 지금은 LLM이 <code>validateOrder</code>만 깔끔하게 뽑아 ontology 검색에 넘김 → provenance도 깔끔.</li>
+  <li>intent 라벨 (locate/explain/impact) 이 정확히 분기됨 → 박주니어가 "이 응답이 위치 답인지 영향도 답인지" 헷갈리지 않음.</li>
+  <li>Q1 turn 3에서 <code>body_text</code> + <code>file_path</code> + <code>linked_term</code> 풀 surface → "이 코드 안 열어봐도 IDE 열듯 본문이 보임".</li>
+</ul>
+
+<p><strong>영문 → 도메인 다리 (suggestion) 가 보이나? — <span class="bad">No</span></strong></p>
+<ul>
+  <li>Q2 <code>checkInventory</code>는 0-cand인데 suggestions <code>[]</code>. 코드는 정상 동작 — slab-design repo aliases에 "check"/"Inventory"가 안 들어있어서 매칭 안 됨.</li>
+  <li>즉 <em>도메인이 정말 모르는 영문 식별자</em>일수록 다리가 안 생긴다. "엣징" 같이 한국어로 물으면 alias hit이 나오겠지만, 박주니어는 한국어 도메인어 자체를 모름 → bridge가 catch-22.</li>
+</ul>
+
+<h2>3. 남은 마찰</h2>
+<ul>
+  <li><strong>sim_v2 fallback 품질</strong>: <code>validateOrder</code>/<code>OrderService</code> ontology miss 시 sim_v2가 무관한 <code>SdFinalLengthRange/Width/FirstWeight</code>를 동률 score 29로 surface. 근거가 명시 안 됨 → 박주니어는 왜 추천됐는지 모름.</li>
+  <li><strong>confidence 신호 부재</strong>: ontology=0, sim_v2=0.9인데 5개 후보 confidence 표면이 없어 "이건 그냥 그럴듯한 추측" 인지 알 수 없음.</li>
+  <li><strong>suggestions 의 영문 fallback</strong>: 0-cand + alias 매칭 실패 시 "혹시 <em>이런</em> 영문 식별자?" 류 fuzzy 제안 (FQN substring, method name similarity) 없음 — Phase 13b 의 진짜 빈자리.</li>
+</ul>
+
+<div class="verdict"><strong>결론</strong> — 영문 식별자 분류·추출은 <span class="ok">크게 개선</span>. 도메인 무지 신입을 위한 영문→한국어 다리는 <span class="bad">repo 어휘에 의존</span>해서 진짜 모르는 식별자엔 도움 못 줌. 다음 단계로 (a) sim_v2 fallback 후보에 confidence cap + reason 노출, (b) suggestions에 method-name fuzzy 후보 보강을 제안.</div>
+
+</body>
+</html>

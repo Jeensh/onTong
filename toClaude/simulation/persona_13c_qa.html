@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>최QA — Phase 13c boundary 검증</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:880px;margin:32px auto;padding:0 16px;color:#1f2937;line-height:1.5}
+  h1{font-size:22px;margin-bottom:4px}
+  .sub{color:#6b7280;font-size:13px;margin-bottom:18px}
+  .score{display:inline-block;background:#10b981;color:#fff;padding:4px 12px;border-radius:6px;font-weight:600}
+  .delta{color:#10b981;font-weight:600}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}
+  th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left;vertical-align:top}
+  th{background:#f3f4f6;font-weight:600}
+  .ok{color:#059669;font-weight:600}
+  .warn{color:#d97706;font-weight:600}
+  .bad{color:#dc2626;font-weight:600}
+  code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:12px}
+  .finding{background:#fef3c7;border-left:4px solid #f59e0b;padding:10px 14px;margin:10px 0;border-radius:4px}
+  .next{background:#dbeafe;border-left:4px solid #3b82f6;padding:10px 14px;margin:10px 0;border-radius:4px}
+  h2{font-size:16px;margin-top:22px;border-bottom:1px solid #e5e7eb;padding-bottom:4px}
+</style>
+</head>
+<body>
+<h1>최QA — Phase 13c boundary 검증</h1>
+<div class="sub">8년차 QA · 3개 boundary 시나리오 실측 (2026-05-18)</div>
+
+<p><span class="score">4.0 / 5</span> <span class="delta">(+1.5 vs 13b 2.5)</span> &nbsp;— hypothesis intent + conditions 채택 확인. 4점 (만점 아님) 이유는 아래 발견 1, 2.</p>
+
+<h2>3 시나리오 실측</h2>
+<table>
+<tr><th>#</th><th>질의</th><th>intent</th><th>conditions</th><th>cand</th><th>verdict</th><th>conf</th><th>evidence</th></tr>
+<tr><td>Q1</td><td>엣징 마진 &lt; 1.0</td><td class="ok">hypothesis</td><td class="ok">{var:"엣징 마진",op:"&lt;",value:"1.0"}</td><td class="bad">0</td><td class="bad">turn3 4xx</td><td>-</td><td>-</td></tr>
+<tr><td>Q2</td><td>두께 0.1mm 검증</td><td class="ok">hypothesis</td><td class="ok">{var:"두께",op:"=",value:"0.1",unit:"mm"}</td><td>2</td><td class="warn">unknown</td><td>0.20</td><td>6 BR</td></tr>
+<tr><td>Q3</td><td>주문 수량 = 0</td><td class="ok">hypothesis</td><td class="ok">{var:"주문 수량",op:"=",value:"0"}</td><td>5</td><td class="ok">likely_yes</td><td>0.75</td><td>5 BR<br>DG001-DG004 hit</td></tr>
+</table>
+
+<h2>예상 외 발견</h2>
+<div class="finding"><b>발견 1 — Confirm/Turn3 state machine 비대칭 (Q1).</b>
+candidates=0 인데 <code>confirm/2</code> 가 <code>ok:true, next_gate_kind:"executed_hypothesis"</code> 통과시킴. 직후 <code>respond/turn3</code> 는 <code>"selected_index=0 가 candidates 범위 밖 (len=0)"</code> 4xx. <span class="warn">UX 폭탄</span> — 사용자에게 "다음 단계 OK" 약속 후 다음 클릭에서 실패.</div>
+
+<div class="finding"><b>발견 2 — verdict 보수성 잘 작동 (Q2).</b>
+"두께 0.1mm" 에 <code>design_orchestrator</code> 매핑은 score 11 로 잘못 뽑혔지만, turn3 가 <code>unknown / 0.20</code> + reasoning "body 에서 조건 시그널 못 찾음" 으로 hallucination 피함. <span class="ok">overconfidence 방지 architecture 성공.</span> 반면 Q3 의 <code>likely_yes 0.75</code> + DG002 ("주문 폭/길이 모두 양수") evidence 는 boundary 와 정확히 매칭 — confidence calibration 합리적.</div>
+
+<h2>Phase 14 우선순위</h2>
+<div class="next"><b>P1 — Confirm guard.</b> <code>confirm/{turn}</code> 가 candidates=0 일 때 <code>ok:false</code> + suggestion 반환하도록 (Q1 4xx UX 차단). 5분 fix.</div>
+<div class="next"><b>P2 — 실 fixture 실행 verdict.</b> 현재 verdict 는 BR 시그널 매칭 추론. Q3 "주문수량=0" 을 실제 fixture 로 SdFinalLengthRangeAction.execute() invoke → DG002 NPE 캡처해야 <span class="ok">verdict=yes (confidence 1.0)</span> 도달. sim_v2 stubs 재사용 가능.</div>
+<div class="next"><b>P3 — Q1 ranking gap.</b> "엣징 마진" → 0 candidates 인데 <code>suggestions:["엣징그룹코드","edgingGroupCd"]</code> 는 surface — keyword fallback 은 살아있음. action_id 키워드 색인에 한글 단가 (마진/budget/잔량) 부족 의심.</div>
+
+</body>
+</html>

@@ -152,6 +152,13 @@ export default function Home() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        // R2-2: modeling 섹션은 자체 ⌘K palette (CmdKPalette) 가 있음 — 위키 문서 검색
+        // 다이얼로그를 동시에 띄우면 Enter/click 이 가로채여 entity navigation 실패.
+        // 페르소나 B (인시던트 SRE) 가 새벽 1시 도달성 -0.5점 평가의 직접 원인이었음.
+        if (activeSection === "modeling") {
+          // 핸들러 자체를 skip — WorkbenchShell 의 keydown listener 가 처리.
+          return;
+        }
         e.preventDefault();
         toggle();
         return;
@@ -181,7 +188,7 @@ export default function Home() {
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [toggle, treeCollapsed, aiCollapsed, aiPopout, handleDockBack]);
+  }, [toggle, treeCollapsed, aiCollapsed, aiPopout, handleDockBack, activeSection]);
 
   return (
     <div className="h-screen flex flex-col">

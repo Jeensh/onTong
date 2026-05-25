@@ -1144,3 +1144,888 @@ PYTHONPATH=$(pwd) ./venv/bin/python -m pytest tests/simulation/ -q
 ### differential 응답에서 `summary` 필드가 없음
 - 원인: 옛 cached differential 결과 — 3f 이전 데이터
 - 해결: 새 run 으로 differential 재호출. 또는 `RunHandleStore` 재시작
+
+---
+
+## Chat 재설계 Phase 1 — multiturn endpoint 시연 (2026-05-17)
+
+> 3 게이트 멀티턴 agent 인프라 연결 확인. Phase 1 은 *connectivity + persistence
+> 시연* 만 — 실제 gate logic (LLM 호출, candidates 채움) 은 Phase 2.
+
+### 시나리오 1 — 한국어 세션 시작 → confirm → replay
+
+```bash
+# 서버 시작
+.venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8001
+
+# 1) 세션 시작 (한국어 query)
+curl -s -X POST http://127.0.0.1:8001/api/section3/multiturn/start \
+  -H "Content-Type: application/json" \
+  -d '{"user_query":"엣징 사양 룩업 룰 시뮬","repo_id":"slab-design-real-v2"}' \
+  | python3 -m json.tool
+# → session_id, turn_no:1, GateTarget(intent="ambiguous", user_input provenance)
+
+# 2) 카드 [확인] 버튼 응답
+SID="<위 응답 session_id>"
+curl -s -X POST "http://127.0.0.1:8001/api/section3/multiturn/confirm/${SID}/1" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"confirm","user_response":{"selected_index":0}}'
+# → {"ok": true, "next_gate_kind": null}
+
+# 3) replay (decision_log hydrate)
+curl -s "http://127.0.0.1:8001/api/section3/multiturn/session/${SID}" | python3 -m json.tool
+# → session info + decisions[0] 에 user_response 병합된 상태
+```
+
+### 시나리오 2 — SSE snapshot stream (Phase 1 minimal)
+
+```bash
+curl -sN "http://127.0.0.1:8001/api/section3/multiturn/session/${SID}/stream"
+# → event: snapshot
+# → data: {"session_id":"...","status":"active","decisions":[...]}
+# (한 번 emit 후 종료. Phase 2 에서 실시간 gate 진행 event 로 확장)
+```
+
+### 기대 동작 (Phase 1)
+- `POST /respond/{sid}` → **501** (Phase 2 stub 의도된 동작)
+- `GET /session/unknown` → **404**
+- `POST /confirm/{sid}/999` → **404** (unknown turn)
+- `POST /start` 에 `repo_id` 누락 → **422**
+
+### 트러블슈팅
+
+#### `import backend.main` 실패 — multiturn ORM 등록 안 됨
+- 원인: `backend/main.py:285` 부근에서 `_section3_multiturn_orm` import 가 빠짐
+- 확인: `grep section3_multiturn_orm backend/main.py`
+- 해결: 누락 시 import 추가 + 서버 재시작
+
+#### 한국어가 unicode escape 로 보임
+- 정상. `payload_json` 직렬화 시 `ensure_ascii=False` 였어도 router 응답은 ascii 보존
+- 클라이언트 (브라우저 / Python) 에서 자동 복원
+- 확인: `python3 -c 'import json,sys;print(json.load(sys.stdin)["session"]["user_query"])'` 식으로 한글 출력 확인
+
+#### `section3_decision_log` 테이블 없음
+- 원인: `backend/main.py` 의 `_section3_multiturn_orm` import 가 `bootstrap_database()` 호출 *전* 에 와야
+- 확인: `grep -B2 bootstrap_database backend/main.py` 로 import 순서 확인
+
+---
+
+## Chat 재설계 Phase 2 Gate I — LLM intent + 후보 채움 (2026-05-17)
+
+> Phase 1 의 endpoint shape 위에 진짜 Gate I logic wire. `/start` 는 ambiguous stub
+> 유지, `/respond` 가 turn 2 에서 실제 intent 분류 + sim_v2/ontology 후보 병합.
+
+### 사전 요건
+- `.env` 의 `OPENAI_API_KEY` 설정 (없으면 /respond 호출 시 OpenAI 인증 실패)
+- 서버 기동: `set -a && source .env && set +a && uv run --no-sync uvicorn backend.main:app --host 127.0.0.1 --port 8001`
+
+### 시나리오 — simulate intent (실데이터)
+
+```bash
+SID=$(curl -sS -X POST http://127.0.0.1:8001/api/section3/multiturn/start \
+  -H 'Content-Type: application/json' \
+  -d '{"user_query":"주문 검증 시뮬해줘","repo_id":"slab-design-real-v2"}' \
+  | python3 -c 'import json,sys;print(json.load(sys.stdin)["session_id"])')
+
+curl -sS -X POST "http://127.0.0.1:8001/api/section3/multiturn/respond/${SID}" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"주문 검증 시뮬해줘"}' \
+  | python3 -m json.tool
+```
+
+기대:
+- `turn_no: 2`
+- `payload.intent: "simulate"` (LLM 분류)
+- `payload.candidates`: 5개 (slab-design-real-v2 의 실데이터)
+  - top: `정합성_검증` / `SdOrderValidator.validate(SDOrderEntity)` / score 10
+- `payload.sources`: 3개 (llm_inference + ontology + sim_v2) — Q5 비전 surface
+
+### 시나리오 — impact intent
+
+```bash
+SID=$(curl -sS -X POST http://127.0.0.1:8001/api/section3/multiturn/start \
+  -H 'Content-Type: application/json' \
+  -d '{"user_query":"cumulativeProductivity 바꾸면 영향?","repo_id":"slab-design-real-v2"}' \
+  | python3 -c 'import json,sys;print(json.load(sys.stdin)["session_id"])')
+
+curl -sS -X POST "http://127.0.0.1:8001/api/section3/multiturn/respond/${SID}" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"cumulativeProductivity 바꾸면 영향?"}' \
+  | python3 -c 'import json,sys;d=json.load(sys.stdin);print("intent:",d["payload"]["intent"]);print("cand:",len(d["payload"]["candidates"]))'
+```
+
+기대: `intent: impact` · `cand: 1` (cumulativeProductivity)
+
+### 기대 동작 (Phase 2 Gate I)
+- `/respond` 의 turn 2 → Gate I real (200)
+- `/respond` 의 turn 3+ → **501** ("Gate II/III 미구현")
+- `/respond/{unknown_sid}` → **404**
+- `/respond` 의 `message` 가 빈 문자열이면 → `session.user_query` 로 fallback
+
+### 트러블슈팅
+
+#### `/respond` 가 OpenAI 401 / 500 으로 실패
+- 원인: `OPENAI_API_KEY` 누락 또는 만료
+- 확인: `grep OPENAI_API_KEY .env` (값 있어야)
+- 회피 (테스트만): pytest 는 stub classifier 로 동작 — `tests/simulation/test_multiturn_router.py` 참고
+
+#### intent=ambiguous 만 나옴
+- 가능: LLM 이 분류 실패 → ambiguous fallback (`classify_with_llm` 의 unknown intent 안전망)
+- 확인: response 의 `sources[0].detail` 의 reasoning 문구 확인 (Korean OK)
+- query 가 너무 모호하면 정상 (Q5 비전: "빠진 내용은 빠진대로")
+
+#### 후보가 0개
+- 가능: sim_v2 `find_action_candidates` 가 query 토큰을 ontology.db 에서 못 찾음
+- 확인: `data/ontology.db` 의 actions 테이블에 데이터 있는지 (slab-design-real-v2 = 38 actions)
+- ontology 후보가 항상 0인 것은 정상 — production `get_ontology_client()` 의 default 는 `SimV2BackedOntologyClient` (search 는 sim_v2 가 담당하므로 중복 회피)
+
+---
+
+## Chat 재설계 Phase 2 Gate II — Java + Python + Fixtures (2026-05-17)
+
+> Gate I 의 후보를 사용자가 confirm 한 뒤 turn 3 에서 진짜 bundle 만듬: 실 Java body 추출 → W75 Python 변환 → entity schema (있으면) → W71 fixture 합성. 모두 한 GateBundle.
+
+### 사전 요건
+- Gate I 와 동일 — `.env` OPENAI_API_KEY 필요, port 8001 서버
+- `data/ontology.db` 에 slab-design-real-v2 actions + body_text 있어야 (38 actions 권장)
+
+### 풀 플로우 — simulate intent (Gate I → confirm → Gate II)
+
+```bash
+# turn 1 — start
+SID=$(curl -sS -X POST http://127.0.0.1:8001/api/section3/multiturn/start \
+  -H 'Content-Type: application/json' \
+  -d '{"user_query":"주문 검증 시뮬해줘","repo_id":"slab-design-real-v2"}' \
+  | python3 -c 'import json,sys;print(json.load(sys.stdin)["session_id"])')
+
+# turn 2 — Gate I (intent + candidates)
+curl -sS -X POST "http://127.0.0.1:8001/api/section3/multiturn/respond/${SID}" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"주문 검증 시뮬해줘"}' \
+  | python3 -c 'import json,sys;d=json.load(sys.stdin);print("intent:",d["payload"]["intent"]);print("top:",d["payload"]["candidates"][0]["label"])'
+
+# turn 2 confirm — selected_index=0
+curl -sS -X POST "http://127.0.0.1:8001/api/section3/multiturn/confirm/${SID}/2" \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"confirm","user_response":{"selected_index":0}}'
+
+# turn 3 — Gate II (bundle)
+curl -sS -X POST "http://127.0.0.1:8001/api/section3/multiturn/respond/${SID}" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"이 bundle 로 진행"}' \
+  | python3 -m json.tool
+```
+
+기대 (실데이터):
+- `payload.kind: "bundle_prepared"`
+- `payload.target.code_method_fqn: com.example...SdOrderValidator.validate(SDOrderEntity)`
+- `payload.java_source`: 400+ chars (실 Java body, `ValidationResult`, `checkStockOrder` 등)
+- `payload.python_source`: 400 chars (W75 idiom 변환)
+- `payload.schema_summary.entity_name: ""` · `fields: []` — sec2 API 부재 (Q5 "빠진 대로")
+- `payload.fixtures`: 1+ (W71 deterministic)
+- `payload.confidence`: 0.85 안팎 (body+translate+fixtures 성공, schema 부재로 -0.15)
+- `payload.sources`: 4개 (`['ontology', 'sim_v2', 'ontology', 'sim_v2']`)
+
+### 기대 동작 (Phase 2 Gate II)
+- turn 3 + simulate intent → Gate II real (200)
+- turn 3 + impact intent → **501** ("Gate III impact 미구현") · Gate II skip
+- turn 3 + ambiguous intent → **422** ("재분류 필요")
+- turn 3 without confirm → **422** ("turn 2 가 confirm 되지 않음")
+- turn 3 with `selected_index` 범위 밖 → **422**
+- turn 4 → **501** (Gate III sim 미구현)
+
+### 트러블슈팅
+
+#### `java_source` 가 빈 문자열
+- 원인: `sim_v2_bridge.load_body_text` 가 ontology.db 에서 못 찾음
+- 확인: `sqlite3 data/ontology.db "SELECT fqn FROM code_methods WHERE repo_id='slab-design-real-v2' AND fqn LIKE '%validate%'"` — fqn 일치 여부
+- 회피: target.code_method_fqn 의 시그니처 형식 차이 (parameter list 차이) 가능 — Gate I 의 candidates 가 ontology.db 에서 가져온 것과 동일한 fqn 이어야
+
+#### `python_source` 가 빈 문자열인데 `java_source` 는 있음
+- 원인: W75 translator 가 Java body 파싱 실패 또는 정의된 idiom 처리 못함
+- 정상 동작 — Q5 비전 "빠진 내용은 빠진대로". confidence 낮춰 surface
+- 확인: backend log 의 `translate 실패` 메시지
+
+#### `fixtures: []` 인데 python_source 는 있음
+- 원인: `sim_v2_bridge.load_action` 실패 또는 `synthesize_fixtures` 가 None
+- 확인: action_id 가 `actions.fqn` 과 일치하는지. `sqlite3 data/ontology.db "SELECT fqn FROM actions WHERE repo_id=? AND fqn=?"`
+
+---
+
+## Chat 재설계 Phase 2 Gate III — Executed (sim + impact) (2026-05-17)
+
+> Phase 2 마지막. simulate 흐름은 turn 4 에서 실행+invariant, impact 흐름은 turn 3 에서 caller_graph+진단. 두 분기 모두 production 진입. session.status="done" 갱신.
+
+### 사전 요건
+- 이전 Gate I/II 와 동일 — `.env` OPENAI_API_KEY, port 8001, `data/ontology.db` 시드
+
+### 풀 플로우 — Simulate (turn 1 → 4)
+
+```bash
+SID=$(curl -sS -X POST http://127.0.0.1:8001/api/section3/multiturn/start \
+  -H 'Content-Type: application/json' \
+  -d '{"user_query":"주문 검증 시뮬해줘","repo_id":"slab-design-real-v2"}' \
+  | python3 -c 'import json,sys;print(json.load(sys.stdin)["session_id"])')
+
+# turn 2 — Gate I
+curl -sS -X POST "http://127.0.0.1:8001/api/section3/multiturn/respond/${SID}" \
+  -H 'Content-Type: application/json' -d '{"message":"주문 검증 시뮬해줘"}' > /dev/null
+
+# confirm
+curl -sS -X POST "http://127.0.0.1:8001/api/section3/multiturn/confirm/${SID}/2" \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"confirm","user_response":{"selected_index":0}}'
+
+# turn 3 — Gate II
+curl -sS -X POST "http://127.0.0.1:8001/api/section3/multiturn/respond/${SID}" \
+  -H 'Content-Type: application/json' -d '{"message":"이 bundle"}' > /dev/null
+
+# turn 4 — Gate III sim
+curl -sS -X POST "http://127.0.0.1:8001/api/section3/multiturn/respond/${SID}" \
+  -H 'Content-Type: application/json' -d '{"message":"실행"}' \
+  | python3 -m json.tool
+```
+
+기대 (turn 4):
+- `payload.kind: "executed_simulation"`
+- `payload.invariant_status`: clean / fail_* / error 중 하나
+- `payload.results`: case 별 status (PASS/FAIL/ERROR/SKIPPED)
+- `payload.sources: [{"source":"sim_v2",...}]`
+- 세션 종료: `GET /session/{sid}` 의 `session.status = "done"`
+
+### 풀 플로우 — Impact (turn 1 → 3)
+
+```bash
+SID=$(curl -sS -X POST http://127.0.0.1:8001/api/section3/multiturn/start \
+  -H 'Content-Type: application/json' \
+  -d '{"user_query":"cumulativeProductivity 바꾸면 영향?","repo_id":"slab-design-real-v2"}' \
+  | python3 -c 'import json,sys;print(json.load(sys.stdin)["session_id"])')
+
+curl -sS -X POST "http://127.0.0.1:8001/api/section3/multiturn/respond/${SID}" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"cumulativeProductivity 바꾸면 영향?"}' > /dev/null
+curl -sS -X POST "http://127.0.0.1:8001/api/section3/multiturn/confirm/${SID}/2" \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"confirm","user_response":{"selected_index":0}}' > /dev/null
+
+# turn 3 — Gate III impact (Gate II skip)
+curl -sS -X POST "http://127.0.0.1:8001/api/section3/multiturn/respond/${SID}" \
+  -H 'Content-Type: application/json' -d '{"message":"검토"}' \
+  | python3 -m json.tool
+```
+
+기대:
+- `payload.kind: "executed_impact"`
+- `payload.affected_methods`: caller_graph (현재 Phase 4 swap 전이라 빈 결과)
+- `payload.sim_v2_findings`: Finding[] (info: "N/M fixtures pass · K stubs" 또는 warn/error)
+- `payload.confidence`: 1.0 (diagnose 모두 PASS) ~ 0.2 (blocked)
+- `payload.sources: [{"source":"ontology",...},{"source":"sim_v2",...}]`
+- 세션 종료
+
+### 기대 동작 (Phase 2 Gate III)
+- simulate path turn 4 → executed_simulation real (200) → `session.status="done"`
+- impact path turn 3 → executed_impact real (200) → `session.status="done"`
+- session done 후 추가 /respond → **501** ("session 이미 완료")
+
+### 트러블슈팅
+
+#### `invariant_status: "error"` · 모든 case ERROR
+- 원인: W74 typed-return stub 부족 → run_fixtures_in_process 가 외부 의존성 호출 실패
+- 정상 동작 — Q5 비전 "빠진 대로". confidence 낮춰 surface
+- 확인: backend log 의 `run_fixtures_in_process` 결과
+- 해결: ontology.db 의 W74 stub 데이터 보충 (Phase 4 협업 #1)
+
+#### `affected_methods: []` (impact 분기)
+- 원인: `SimV2BackedOntologyClient.get_caller_graph` 가 빈 결과 반환 (의도된 Phase 1~3 동작)
+- 확인: `payload.sources` 의 ontology entry 의 `confidence: 0.0` 표기
+- 해결: Phase 4 의 `HTTPOntologyClient` wire 후 sec2 API 의 caller_graph 사용
+
+#### impact 분기에서 quick_diagnose findings 가 모두 blocked
+- 원인: `sim_v2_bridge.quick_diagnose_action` 의 W71→W74→W72 quick loop 중 한 단계 실패
+- finding 의 `primary_failure` 메시지로 원인 추적: "body_text 없음" / "translate 실패" / "fixture 합성 실패"
+- confidence 도 낮게 (0.2~0.4) — 사용자 측에서 신뢰도 판단 가능
+
+---
+
+## Chat 재설계 Phase 3 — Frontend MultiturnChat (2026-05-17)
+
+> Phase 2 백엔드 위에 한국어 UI. `Section 3 → 멀티턴 (v2)` nav 진입.
+
+### 사전 요건
+- 백엔드 (port 8001) + `.env` OPENAI_API_KEY
+- `npm run dev` 로 frontend (port 3000)
+
+### 시연 시나리오 — Simulate (4 turn)
+
+브라우저: `http://localhost:3000/?view=multiturn`
+
+1. **빈 상태**: repo_id 기본 `slab-design-real-v2` + 4 예시 grid. "주문 검증 시뮬" 클릭 또는 직접 입력 → [시작]
+2. **자동 turn 진행**: turn 1 (ambiguous stub) 은 hidden. 곧바로 LLM intent 분류 호출.
+3. **GateTargetCard 출현** (turn 2):
+   - intent 배지 = "시뮬레이션"
+   - 5 candidates radio (top = 정합성_검증, "추천" 라벨)
+   - [이걸로 진행] 클릭
+4. **GateBundleCard 출현** (turn 3):
+   - Python tab (default) → W75 변환된 코드
+   - Java tab → 실 Java body
+   - Fixtures tab → W71 fixture 표
+   - Schema tab → "Q5 빠진 내용은 빠진대로" 안내 (entity_schema 부재)
+   - confidence 0.85 표시
+   - [실행 (Gate III)] 클릭
+5. **GateExecutedSimulationCard 출현** (turn 4):
+   - invariant 배지 (clean / fail_* / error)
+   - PASS/FAIL/ERROR/SKIPPED count
+   - case 결과 표
+   - "✓ 세션 완료"
+
+### 시연 시나리오 — Impact (3 turn)
+
+1. "cumulativeProductivity 바꾸면 어디 영향?" 예시 클릭 → [시작]
+2. **GateTargetCard** (turn 2): intent = "영향도 검토" 배지, 1 candidate
+3. [이걸로 진행]
+4. **GateExecutedImpactCard** (turn 3):
+   - confidence 막대 (100%)
+   - affected_methods: "Section 2 API 미연결" 안내 (caller_graph 부재)
+   - findings: "12/12 fixtures pass · 3 stubs" (info)
+   - "✓ 세션 완료"
+
+### Provenance surface
+
+모든 카드 footer 에 "근거" 라벨 + 색칠된 칩:
+- 🔵 `ontology` (Section 2)
+- 🟣 `sim_v2`
+- 🟡 `LLM`
+- ⚪ `user`
+
+각 칩 hover → detail (e.g. `search_action_by_keyword(query='주문 검증 시뮬해줘', repo_id='slab-design-real-v2')`)
+
+### 트러블슈팅 (Frontend)
+
+#### `?view=multiturn` 진입 시 404 또는 다른 view 표시
+- 원인: dev server 재기동 안 함 (Section3Section.tsx 변경 반영 안 됨)
+- 해결: `npm run dev` 재시작 또는 hot reload 확인
+
+#### 카드가 안 뜨고 "처리 중…" 만 계속
+- 원인: backend /respond 가 OpenAI 호출 중 timeout (정상은 2~5초)
+- 확인: backend log 의 `respond` 요청 진행 상황
+- 백엔드 OPENAI_API_KEY 누락 시: error banner 에 "OpenAI" 관련 detail 표시
+
+#### HTTP 422 "turn 2 가 confirm 되지 않음"
+- 정상 메시지 — confirm 버튼 안 누르고 다음 단계 시도한 경우. UI 자동 진행이 정상이면 발생 안 함
+- 발생하면: hook 의 sequence 버그. confirm + respond 연쇄가 깨졌는지 dev tools 확인
+
+#### "Section 2 API 미연결" 박스가 항상 떠 있음
+- 정상 — `SimV2BackedOntologyClient` 가 default. `get_entity_schema` / `get_caller_graph` 빈 결과 반환 (Q5 vision)
+- 해결: Phase 4 의 `HybridOntologyClient` swap 후 Section 2 데이터 surface
+
+---
+
+## Chat 재설계 Phase 4 — HybridOntologyClient + state machine (2026-05-18)
+
+> sec2 HTTP API 점진 swap + `confirm` 의 next_gate_kind explicit 계산.
+
+### sec2 HTTP wire 활성화
+
+`.env` 또는 export:
+```bash
+export ONTONG_SECTION2_API_URL=http://localhost:8001
+# (또는 sec2 가 별도 호스트면 그쪽)
+```
+
+설정되면 `get_ontology_client()` 가 `HybridOntologyClient` 반환.
+설정 안 되면 `SimV2BackedOntologyClient` (Phase 2~3 동작).
+
+### 시연 — Hybrid 동작 확인
+
+서버 기동 (`ONTONG_SECTION2_API_URL` 설정 후):
+```bash
+SID=$(curl -sS -X POST http://127.0.0.1:8001/api/section3/multiturn/start \
+  -H 'Content-Type: application/json' \
+  -d '{"user_query":"주문 검증 시뮬","repo_id":"slab-design-real-v2"}' \
+  | python3 -c 'import json,sys;print(json.load(sys.stdin)["session_id"])')
+curl -sS -X POST "http://127.0.0.1:8001/api/section3/multiturn/respond/${SID}" \
+  -H 'Content-Type: application/json' -d '{"message":"주문 검증 시뮬"}' \
+  | python3 -c 'import json,sys;d=json.load(sys.stdin);print([s for s in d["payload"]["sources"] if s["source"]=="ontology"])'
+```
+
+sec2 가 응답하면 ontology Provenance confidence > 0, sec2 endpoint 없거나 unreachable 이면 0.0 + sim_v2 fallback 의 candidates 가 surface.
+
+### 시연 — next_gate_kind state machine
+
+```bash
+# turn 2 confirm → next = bundle_prepared (simulate path)
+curl -sS -X POST "http://127.0.0.1:8001/api/section3/multiturn/confirm/${SID}/2" \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"confirm","user_response":{"selected_index":0}}'
+# → {"ok":true,"next_gate_kind":"bundle_prepared"}
+
+# impact intent 의 turn 2 confirm → next = executed_impact
+# bundle_prepared (turn 3) confirm → next = executed_simulation
+# retry → 해당 gate 재실행
+```
+
+### 트러블슈팅
+
+#### `ONTONG_SECTION2_API_URL` 설정했는데 ontology Provenance confidence 가 항상 0
+- 원인: sec2 API 가 endpoint 응답 안 함 (배포 안 됨 / URL 오타)
+- 확인: 직접 호출 — `curl ${ONTONG_SECTION2_API_URL}/api/ontology/search?q=test&repo_id=x`
+- 정상이면 200 + JSON 응답. 아니면 sec2 측 배포 상태 점검
+- 회피: env 변수 제거 → `SimV2BackedOntologyClient` 로 자동 fallback
+
+#### `next_gate_kind: null` 인데 turn 다음 단계 모름
+- 원인: 의도된 동작 — ambiguous intent 또는 session 종료 후
+- 확인: 직전 decision 의 payload.kind ("executed_simulation" / "executed_impact" → 종료)
+- 또는 intent="ambiguous" → 재분류 필요 (다른 단어로 새 세션)
+
+---
+
+## Chat 재설계 Phase 5 — SSE 실시간 server-push (2026-05-18)
+
+> polling 기반 UI 가 SSE subscribe 로 전환. 클라이언트가 mutation 후 별도 GET 안 해도 server 가 push.
+
+### 동작
+
+브라우저 진입 (`http://localhost:3000/?view=multiturn`) 후 세션 시작:
+1. `useMultiturnSession` 이 자동 EventSource open (`/api/section3/multiturn/session/{sid}/stream`)
+2. backend SSE 가 0.5초 폴 + 변경 시 `event: snapshot` emit
+3. frontend 가 onmessage 마다 state.decisions / session.status 자동 갱신
+4. session.status="done" 시 `event: done` → EventSource close (reconnect 안 함)
+5. 30초 tick 소진 시 close → EventSource 가 자동 reconnect (long-lived 효과)
+
+### SSE event 종류
+
+| event | 의미 |
+|---|---|
+| `snapshot` | decisions/status 변경. data = SessionResponse-like |
+| `done` | session 종료. close 후 reconnect 안 함 |
+| `gone` | session 삭제됨 |
+
+### 시연 (curl)
+
+```bash
+SID=$(curl -sS -X POST http://127.0.0.1:8001/api/section3/multiturn/start \
+  -H 'Content-Type: application/json' \
+  -d '{"user_query":"x","repo_id":"slab-design-real-v2"}' \
+  | python3 -c 'import json,sys;print(json.load(sys.stdin)["session_id"])')
+
+# active session → snapshot 즉시 emit, 그 후 30초까지 변경 monitoring
+curl -sN --max-time 5 "http://127.0.0.1:8001/api/section3/multiturn/session/${SID}/stream"
+```
+
+### UI hint — next_gate_kind
+
+`POST /confirm` 후 응답의 `next_gate_kind` 가 SessionHeader 에 `→ bundle_prepared` 같이 surface. session.status="done" 시 hint 숨김 (이미 종료).
+
+### 트러블슈팅
+
+#### EventSource 가 계속 재연결 (네트워크 탭 매 30초)
+- 정상 동작 — 백엔드 SSE 의 30초 lifetime 패턴. 브라우저 EventSource 가 자동 reconnect
+- 의도: long-lived 연결 + 짧은 keep-alive 사이클 (heartbeat 대체)
+
+#### SSE 가 멈춰 보임 (snapshot 안 옴)
+- 가능: session.status="done" 이미 도달 → SSE close (정상)
+- 확인: `GET /api/section3/multiturn/session/{sid}` 의 session.status 확인
+
+#### confirm 후 SessionHeader 의 `→ {nextGateKind}` 안 보임
+- 원인: confirm 응답의 next_gate_kind 가 null (ambiguous intent / Gate III 후)
+- 정상 — state machine 종료 의미
+
+---
+
+## Phase 6 — modeling ontology.db 시드 (2026-05-18)
+
+> sec2 endpoint 본체 wire 가 빈 ontology.db + sec3 fallback 으로 작동했었음. seed script 실행 후 sec2 endpoint 가 실 데이터 surface → sec3 hybrid 본체 활용.
+
+### 시드 실행
+
+```bash
+uv run python scripts/seed_modeling_from_sim_v2.py
+```
+
+slab-v2-handoff.db 의 12 테이블 (code_methods 985, call_sites 1290, actions 38, ...) → ontology.db INSERT OR IGNORE.
+
+### 동작 차이
+
+| 항목 | 시드 전 | 시드 후 |
+|---|---|---|
+| `GET /api/ontology/actions` | `[]` | 38 actions |
+| `GET /api/ontology/code-methods/{fqn}/body` | 404 | body_text 431 chars |
+| `GET /api/ontology/code-methods/{fqn}/callers` | `{"callers":[]}` | 1+ caller |
+| Gate II `payload.confidence` | 0.85 (schema 부재) | 1.0 (sec2 schema surface) |
+| Gate II Provenance ontology confidence | 1.0 (body) / 0.0 (schema) | 1.0 / 1.0 (양쪽 sec2 surface) |
+| Gate III impact `affected_methods` | 0 | 1+ |
+
+### 환경 변수 활성화
+
+`ONTONG_SECTION2_API_URL=http://127.0.0.1:8001` 으로 backend 기동 시 sec3 가 HybridOntologyClient 사용 → sec2 endpoint 본체 호출.
+
+```bash
+ONTONG_SECTION2_API_URL=http://127.0.0.1:8001 \
+  uv run uvicorn backend.main:app --host 127.0.0.1 --port 8001
+```
+
+### 트러블슈팅
+
+#### 시드 후에도 affected_methods 비어있음
+- 가능: receiver type 부재로 매칭 실패 (특정 method)
+- 확인: `sqlite3 data/ontology.db "SELECT * FROM call_sites WHERE callee_simple_name='<simpleName>' LIMIT 5"`
+- best-effort fallback 으로 receiver 부재 시 simple_name 만 매칭 — 그래도 0 이면 정말 caller 없음
+
+#### Gate II confidence 가 시드 전과 동일 (0.85)
+- 가능: `ONTONG_SECTION2_API_URL` env 안 설정 → `SimV2BackedOntologyClient` 만 사용 (sec2 본체 wire 안 함)
+- 확인: backend 시작 시 logs / env 확인. env 설정하면 confidence 1.0 surface
+
+---
+
+## Phase 7~10 — finalization (2026-05-18)
+
+> "전부 진행해" 사용자 지시로 남은 4개 외부 의존 항목 모두 production 처리.
+
+### Phase 7 — v1 chat deprecation
+
+신/구 chat 진입점 비교:
+
+| 항목 | v1 (deprecated) | v2 (권장) |
+|---|---|---|
+| URL | `/?view=bridge` | `/?view=multiturn` |
+| Backend endpoint | `/api/section3/chat` (deprecation 헤더 포함) | `/api/section3/multiturn/*` (5 endpoint) |
+| UI | `BridgeChatPanel` (amber 배너 + dismissible) | `MultiturnChat` |
+| 멀티턴 | X (한 번에 1 question/response) | O (Gate I~III) |
+| Provenance surface | 일부 | 4 source 전체 |
+
+#### Deprecation 헤더 확인
+
+```bash
+curl -i -X POST http://127.0.0.1:8001/api/section3/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"x","history":[]}' | head -10
+```
+
+응답 헤더에 다음 4종 surface:
+```
+X-Deprecated: true
+Warning: 299 - "Section 3 chat v1 is deprecated; migrate to /api/section3/multiturn/* (Phase 1~6 complete)"
+X-Deprecation-Date: 2026-05-18
+X-Replacement: /api/section3/multiturn/start
+```
+
+### Phase 8 — Idiom diffs surface
+
+Gate II 결과의 GateBundleCard 에 "Idiom diff" 탭 신규. W75 가 다시 쓴 Java idiom 을 java→python 매핑 표로 보여줌:
+
+```
+idiom              Java                Python
+String.length      o.length()          len(o)
+List.isEmpty       items.isEmpty()     (not items)
+Math.abs           Math.abs(x)         abs(x)
+Optional.isPresent opt.isPresent()     (opt is not None)
+```
+
+상세는 W75 의 50+ idiom 카탈로그 자동 매칭.
+
+#### 확인 방법
+1. `/?view=multiturn` 진입 → "주문 검증" 등 자연어 입력
+2. Gate I → 후보 선택 → confirm
+3. Gate II 카드에서 "Idiom diff (N)" 탭 클릭
+4. N=0 시: body 가 Java idiom 을 사용 안 함 (예: `getCmpCd` 같은 getter 만)
+
+### Phase 9 — W74 typed-return stubs (Gate III sim ERROR 감소)
+
+Gate III sim 실행 시 stub method 호출 결과가 String/int/BigDecimal/... 타입으로 자동 매핑됨. 결과:
+- `FAIL_RETURN_TYPE` invariant 사례 감소
+- `getCmpCd()` → `""` (Java String 매핑)
+- `getCount()` → `0` (Java int)
+- `getPrice()` → `Decimal("0")` (Java BigDecimal)
+
+#### 동작 확인
+
+```bash
+uv run python -c "
+import os
+os.environ['ONTONG_DB_PATH'] = 'data/ontology.db'
+from backend.modeling.persistence.database import get_engine, reset_engine_for_tests
+from sqlalchemy.orm import Session
+from backend.sim_v2.core.verification.sandbox_stubs import derive_method_return_defaults
+reset_engine_for_tests()
+with Session(get_engine()) as s:
+    d = derive_method_return_defaults(s, 'slab-design-real')
+print(f'{len(d)} method return defaults')
+for k in sorted(list(d.keys())[:10]):
+    print(f'  {k} -> {d[k]!r}')
+"
+```
+
+기대 출력: 100+ method 별 typed default (`getCmpCd -> ''`, `getPrice -> Decimal('0')` 등).
+
+### Phase 10 — Caller graph 정확도 (5단계 match_kind)
+
+Gate III impact 의 affected_methods 표에 "match" + "신뢰" 컬럼 추가. caller 와 callee 의 매칭 강도를 5단계로 surface:
+
+| match_kind | strength | 의미 |
+|---|---|---|
+| `receiver_exact` | 0.95 | callee_receiver_static_type 이 fqn 정확 일치 |
+| `receiver_short` | 0.85 | callee_receiver_static_type 이 short name 일치 |
+| `runtime_type` | 0.85 | possible_runtime_types 중 매칭 |
+| `package_proximity` | 0.70 | parser 가 receiver 못 잡았고 caller/callee 같은 package |
+| `name_only` | 0.50 | simple_name 만 일치 (best-effort, false positive 가능) |
+
+#### min_strength 필터 사용
+
+```bash
+curl "http://127.0.0.1:8001/api/ontology/code-methods/example.slabdesign.facade.sd.rest.orders.SdOrderController.detail(String,String,String)/callers?min_strength=0.7"
+```
+
+응답에서 약한 신호 (name_only=0.5) 가 제거됨.
+
+### 트러블슈팅
+
+#### Idiom diff 탭이 항상 비어 있음
+- 가능: body 가 단순 getter / setter 만 사용 (Java idiom 없음)
+- 가능: translate 실패 (java_source 빈 문자열)
+- 확인: Java 소스 탭에 body 가 있는지 + Python 탭에도 코드가 있는지
+
+#### affected_methods 표가 모두 name_only 매치
+- 가능: 시드 데이터의 call_sites 가 receiver type 부재 (parser 한계)
+- 정상 — 현재 1290 row 가 모두 receiver 빈 상태. `min_strength=0.7` 로 필터링하면 package_proximity 만 남음
+
+#### v1 chat 배너 닫고 싶음
+- "닫기" 클릭 시 현재 세션에서만 숨김 (localStorage 미사용)
+- 새로고침하면 다시 표시 — 의도적: deprecation 인지 유지 목적
+
+---
+
+## Phase 11.5 — Dashboard 정리 + repo 인식 (2026-05-18)
+
+대시보드 절반 (Neo4j 노드/관계 카드, legacy 빠른진입, dev-only tip) 이 깨진 / 모순된 상태였음 — 전면 재작성. 이제 SQLite ontology.db 의 repo 별 실 데이터만 노출.
+
+### API 검증
+
+```bash
+# 적재된 repo 별 카운트 8 종
+curl -s "http://localhost:8001/api/section3/repos" | python3 -m json.tool
+# 기대:
+# {
+#   "repos": [{"repo_id": "slab-design-real-v2",
+#              "counts": {"actions": 130, "code_methods": 1081, "code_types": 150,
+#                         "business_terms": 76, "business_rules": 17,
+#                         "realizations": 135, "call_sites": 2298, "sessions": 66}}]
+# }
+
+# repo 필터된 multiturn 세션
+curl -s "http://localhost:8001/api/section3/multiturn/sessions?repo_id=slab-design-real-v2&limit=3" | python3 -m json.tool
+```
+
+### UI 시연
+
+1. http://localhost:3000/?view=dashboard 진입
+2. **상단 Repo 칩** — 현재 `slab-design-real-v2` 1 개. 칩에 "1081m / 130a / 66s" 미니 요약. 다중 repo 적재 시 알파벳 정렬되어 모두 표시.
+3. **8 카운트 카드** — 선택된 repo 의 실 데이터 (천단위 콤마 포맷). 색상 tone 8 종 (blue/emerald/cyan/pink/amber/violet/orange/slate).
+4. **최근 세션 (repo 필터)** — header 우측에 selected repo_id 함께 표시. repo 칩 변경 시 자동 재로딩. 검색 input 은 200ms debounce.
+5. 세션 클릭 → URL `?view=multiturn&sid=<UUID>` 로 이동 (Phase 11 그대로).
+
+### 트러블슈팅
+
+#### Repo 칩이 0 개로 뜸
+- backend `/api/section3/repos` 가 200 + `{"repos": []}` 반환 시 — ontology.db 가 비어있음. modeling 측에서 repo import 후 재시도.
+- 401/500 — backend 미기동 또는 ORM 마이그레이션 누락. `lsof -i :8001` 확인 + uvicorn 재기동.
+
+#### Repo 칩은 있는데 모든 카드가 0
+- `/repos` 결과 확인 후 0 이면 import 가 partial 한 상태. 보통 actions / code_methods 만 채워지고 business_terms 가 0 인 경우는 정상 (Section 2 후속 작업 필요).
+
+#### 다른 repo 선택해도 세션 리스트가 안 바뀜
+- 브라우저 캐시 — F5. 또는 backend `/multiturn/sessions?repo_id=<id>` curl 로 직접 확인.
+
+## Phase 11 — Session History Browser (2026-05-18, Option B)
+
+대시보드 가치 분석 (`toClaude/simulation/dashboard_value_analysis.html`) 의 권장 옵션 — 매몰돼 있던 `/session/{sid}/replay` 자산을 surface + 3 인 팀 운영 페인 (어제 그 분석 어디 갔지) 해결.
+
+### 시연 흐름
+
+#### 1. API 직접 검증
+
+```bash
+# 최근 세션 N 개 (latest first, turn_count + last_gate_kind 채워짐)
+curl -s "http://localhost:8001/api/section3/multiturn/sessions?limit=5" | python3 -m json.tool
+
+# user_query substring 검색 (한국어 URL-encode 필수)
+curl -sG "http://localhost:8001/api/section3/multiturn/sessions" \
+  --data-urlencode "search=주문" | python3 -c "import sys, json; print(len(json.load(sys.stdin)['sessions']))"
+
+# repo_id 필터
+curl -s "http://localhost:8001/api/section3/multiturn/sessions?repo_id=slab-design-real-v2" | python3 -c "import sys, json; print(len(json.load(sys.stdin)['sessions']))"
+```
+
+기대:
+- 각 세션이 `{id, repo_id, status, user_query, created_at, last_activity_at, turn_count, last_gate_kind}` 를 가짐
+- 정렬: last_activity_at desc — 최근 활동 세션이 맨 위
+- limit clamp: 1~200, 기본 50
+
+#### 2. UI 시연 — 대시보드 진입
+
+1. http://localhost:3000/?view=dashboard 접속
+2. ontology 통계 카드 아래 새 섹션 "📋 최근 세션" 표시
+3. 각 row: `[YY-MM-DD HH:MM] [status badge] [turn_count] [Gate 라벨] "user_query"` + `sid(8 chars) · repo_id`
+4. 검색 입력 (debounce 200ms) — 입력 즉시 백엔드 filter
+
+#### 3. UI 시연 — 세션 클릭 → 멀티턴 replay
+
+1. row 클릭 → URL 이 `?view=multiturn&sid=<UUID>` 로 변경 + pushState
+2. MultiturnChat 가 `initialSid` 받아 자동 `loadSession(sid)` 호출
+3. 과거 결정 (Gate I/II/III 카드) 즉시 렌더 — 새 sim_v2 호출 0 (payload_json 이 source-of-truth)
+4. SSE 스트림은 session.status === "done" 이면 즉시 close
+
+#### 4. 새 대화 시작
+
+- header "새 대화" 버튼 → `reset()` + `clearSid()` → URL 에서 sid 제거 + EmptyState 복귀
+
+### 검증 결과 (2026-05-18)
+
+- pytest tests/simulation/test_multiturn_session_list.py — **14 PASS** (persistence 8 + endpoint 6)
+- 기존 multiturn router/persistence — **59 PASS** (regression 0)
+- `npx tsc --noEmit` clean
+- localhost:8001 실 데이터 sanity:
+  - 기존 16+ 세션 (thickness / cumulativeProductivity / 주문 검증 등) 정상 surface
+  - turn_count 1~3 분포 (turn 1 = /start stub, turn 2 = Gate I real, turn 3 = Gate II 또는 Gate III impact)
+  - last_gate_kind = target_selected / bundle_prepared 혼합
+
+### 트러블슈팅
+
+#### "최근 세션" 섹션이 영구 비어 있음
+- 가능: backend 가 재기동 후 `ONTONG_DB_PATH` 가 빈 DB 가리킴 → 확인: `ls -la data/ontology.db`
+- 가능: GET /sessions endpoint 가 미반영 (stale uvicorn) → `lsof -i :8001 -t | xargs kill` 후 재기동
+
+#### 한글 search 가 무응답
+- URL-encode 누락 가능 — curl 은 `--data-urlencode`, fetch 는 `URLSearchParams` (이미 client 가 처리)
+
+#### session 클릭 후 화면이 빈 상태
+- `loadSession` 이 호출됐는지 콘솔에서 `apiGetSession` 확인
+- 가능: session_id 가 DB 에서 삭제되었음 (CASCADE) → "새 대화" 로 복귀
+
+
+---
+
+## Phase 13b — search keyword extraction + 0-cand fallback (2026-05-18)
+
+> 김PM / 박주니어 페르소나 잔여 마찰 (search 가 풀 query 던져서 0 cand) 해결.
+
+### 사전 조건
+- backend `http://localhost:8001` 동작 + repo `slab-design-real-v2` (76 business_terms 시드 필요).
+
+### 시연 시나리오
+
+#### 1. search_terms 추출 — 검색 정확도 향상
+
+```bash
+START_JSON=$(curl -s -X POST http://localhost:8001/api/section3/multiturn/start \
+  -H 'Content-Type: application/json' \
+  -d '{"user_query":"엣징 마진 변경하면 어디 영향?","repo_id":"slab-design-real-v2"}')
+SID=$(echo "$START_JSON" | grep -o '"session_id":"[^"]*"' | cut -d'"' -f4)
+curl -s -X POST "http://localhost:8001/api/section3/multiturn/respond/$SID" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"엣징 마진 변경하면 어디 영향?"}' | python3 -m json.tool
+```
+
+기대:
+- `intent`: `"impact"` (confidence ≥ 0.85)
+- `sources[]` 의 ontology / sim_v2 항목에서 `query='엣징 마진'` — 풀 문장 (`엣징 마진 변경하면 어디 영향?`) 이 아니라 핵심 키워드만 search 에 사용된다.
+- `suggestions`: `["엣징그룹코드","edgingGroupCd"]` 같은 인접어 surface (candidates 0 일 때).
+
+#### 2. 0-cand fallback — suggestions surface
+
+```bash
+START_JSON=$(curl -s -X POST http://localhost:8001/api/section3/multiturn/start \
+  -H 'Content-Type: application/json' \
+  -d '{"user_query":"엣징 마진 변경하면 어디 영향?","repo_id":"slab-design-real-v2"}')
+SID=$(echo "$START_JSON" | grep -o '"session_id":"[^"]*"' | cut -d'"' -f4)
+RESP=$(curl -s -X POST "http://localhost:8001/api/section3/multiturn/respond/$SID" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"엣징 마진 변경하면 어디 영향?"}')
+echo "$RESP" | grep -o '"suggestions":\[[^]]*\]'
+```
+
+기대 출력 (예):
+```
+"suggestions":["엣징그룹코드","edgingGroupCd"]
+```
+
+---
+
+## Phase 13c — hypothesis intent + conditions + executed_hypothesis (2026-05-18)
+
+> 최QA 페르소나 boundary value 질의 1:1 해결. silent wrong target 위험 verdict + confidence 로 honest surface.
+
+### 시연 시나리오
+
+#### 1. hypothesis intent + conditions 추출 — boundary value 보존
+
+```bash
+START_JSON=$(curl -s -X POST http://localhost:8001/api/section3/multiturn/start \
+  -H 'Content-Type: application/json' \
+  -d '{"user_query":"두께 0.1mm 인 슬라브 입력하면 검증 실패하나?","repo_id":"slab-design-real-v2"}')
+SID=$(echo "$START_JSON" | grep -o '"session_id":"[^"]*"' | cut -d'"' -f4)
+curl -s -X POST "http://localhost:8001/api/section3/multiturn/respond/$SID" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"두께 0.1mm 인 슬라브 입력하면 검증 실패하나?"}' | python3 -m json.tool
+```
+
+기대:
+- `intent`: `"hypothesis"`
+- `conditions`: `[{"var":"두께","op":"=","value":"0.1","unit":"mm"}]` — boundary value (0.1) + unit (mm) 보존
+- `candidates[]`: 매칭 후보 (예: SdDesigner.design / SdThicknessAction 등)
+
+#### 2. executed_hypothesis verdict + evidence — turn 3
+
+```bash
+# Step 1: turn 2 (위 시나리오 1)
+# Step 2: confirm
+curl -s -X POST "http://localhost:8001/api/section3/multiturn/confirm/$SID/2" \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"confirm","user_response":{"selected_index":0}}'
+# Step 3: turn 3
+curl -s -X POST "http://localhost:8001/api/section3/multiturn/respond/$SID" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":""}' | python3 -m json.tool
+```
+
+기대:
+- `kind`: `"executed_hypothesis"`
+- `verdict`: `"likely_yes"` | `"likely_no"` | `"unknown"` — heuristic 기반 (body 안에 var/value/op 시그널 + business_rule.statement 매칭 시그널 합산)
+- `reasoning`: 1~2 문장 (한국어 OK)
+- `evidence[]`: BusinessRuleEvidence — declared_on_term 기반 rules 5~10 행 (fqn / statement / severity)
+- `confidence`: 0.2 (unknown) ~ 0.75 (강한 시그널)
+
+#### 3. silent wrong target 검증 — verdict=unknown 으로 honest surface
+
+```bash
+# 시니어 페르소나 시나리오 — 잘못된 method 가 top-1 으로 picked 되어도
+# verdict + confidence 가 honest 하게 신호한다.
+START_JSON=$(curl -s -X POST http://localhost:8001/api/section3/multiturn/start \
+  -H 'Content-Type: application/json' \
+  -d '{"user_query":"엣징그룹코드가 E001 이면 SdEdging 처리 어떻게 분기?","repo_id":"slab-design-real-v2"}')
+SID=$(echo "$START_JSON" | grep -o '"session_id":"[^"]*"' | cut -d'"' -f4)
+curl -s -X POST "http://localhost:8001/api/section3/multiturn/respond/$SID" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"엣징그룹코드가 E001 이면 SdEdging 처리 어떻게 분기?"}' > /dev/null
+curl -s -X POST "http://localhost:8001/api/section3/multiturn/confirm/$SID/2" \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"confirm","user_response":{"selected_index":0}}' > /dev/null
+RESP=$(curl -s -X POST "http://localhost:8001/api/section3/multiturn/respond/$SID" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":""}')
+echo "$RESP" | python3 -c "import sys, json; d = json.load(sys.stdin)['payload']; print('verdict:', d['verdict']); print('confidence:', d['confidence']); print('reasoning:', d['reasoning'])"
+```
+
+기대 (시니어 페르소나 검증 결과):
+- 만약 wrong target picked → `verdict: "unknown"`, `confidence: 0.20`, `reasoning: "...다른 method 일 가능성"`
+- Phase 13b 처럼 silent PASS 가 아닌, honest uncertainty surface.
+
+### 트러블슈팅
+
+#### confirm 후 turn 3 4xx — candidates=0 일 때
+- Phase 14 후보 (state machine bug). 임시 우회: candidates 가 있는 query 부터 시연.
+
+#### verdict 가 항상 unknown
+- body 안에 conditions 의 var/value/op 가 매칭이 안 됨 — top candidate 가 wrong target 일 가능성. recommendation_index 가 0 이라도 다른 candidate (selected_index=1~) 로 confirm 시도.
+
+#### intent 가 hypothesis 가 아닌 explain 으로 분류
+- LLM 이 boundary value (숫자 + 비교 연산자) 시그널 못 잡음. user_query 를 "X 가 N 이면 결과?" 식으로 명확히.

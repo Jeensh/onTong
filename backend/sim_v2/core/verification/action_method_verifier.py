@@ -55,6 +55,30 @@ class ActionVerification(BaseModel):
 _JAVA_LANGUAGE = Language(tsjava.language())
 
 
+def _load_class_field_scope(
+    session: Session, code_method_fqn: str, repo_id: str,
+) -> dict[str, str]:
+    """Fetch `{field_name: field_type}` for the class owning this method.
+
+    Used to teach the translator that bare identifiers may be implicit-this
+    field refs (Java) so it can emit `self.X` in Python. Returns empty dict
+    when class is unknown or has no fields — safe no-op for the caller.
+    """
+    # Enclosing class FQN = method_fqn without the .method(...) suffix
+    base = code_method_fqn.split("(", 1)[0]
+    if "." not in base:
+        return {}
+    class_fqn = base.rsplit(".", 1)[0]
+    rows = session.execute(
+        text(
+            "SELECT name, type FROM code_fields "
+            "WHERE type_fqn = :cfqn"
+        ),
+        {"cfqn": class_fqn},
+    ).fetchall()
+    return {r[0]: (r[1] or "") for r in rows if r[0]}
+
+
 def _parse_method_declaration(body_text: str):
     """Wrap a body in a synthetic class+method and extract the method_declaration.
     Returns None if no method_declaration is found.
@@ -114,7 +138,11 @@ def verify_action(session: Session, action: ActionView) -> ActionVerification:
             status="PARSE_ERROR",
         )
 
-    result = JavaToPythonTranslator().translate(method_node, indent=0)
+    # Risk 1 fix — load class field scope so translator emits `self.X` for
+    # Java implicit-this field refs (e.g. `traces` inside `traces()` resolves
+    # to the function in Python, masking the field. `self.traces` is correct).
+    class_field_scope = _load_class_field_scope(session, action.code_method_fqn, action.repo_id)
+    result = JavaToPythonTranslator(class_field_scope=class_field_scope).translate(method_node, indent=0)
     if result.signature_locked:
         return ActionVerification(
             action_fqn=action.fqn,

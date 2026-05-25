@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>최QA + 김PM 페르소나 — Phase 14D (verdict heuristic 정밀화)</title>
+<style>
+  body { font-family: -apple-system, "Apple SD Gothic Neo", sans-serif; max-width: 920px; margin: 32px auto; padding: 0 24px; color: #1a1a1a; line-height: 1.55; }
+  h1 { font-size: 22px; border-bottom: 2px solid #1a73e8; padding-bottom: 6px; }
+  h2 { font-size: 16px; margin-top: 26px; color: #1a73e8; }
+  h3 { font-size: 14px; margin: 14px 0 6px; }
+  .pass { color: #1b873f; font-weight: 600; }
+  .fail { color: #c5221f; font-weight: 600; }
+  .warn { color: #b06000; font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 8px 0; }
+  th, td { border: 1px solid #d0d7de; padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: #f5f7fa; }
+  code { background: #f0f1f3; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+  .verdict { background: #e8f5e9; border: 1px solid #1b873f; padding: 12px 14px; border-radius: 6px; margin: 16px 0; }
+  .verdict.warn { background: #fff8e1; border-color: #b06000; }
+  .small { color: #555; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>최QA + 김PM 페르소나 — Phase 14D 검증 (2026-05-18)</h1>
+<p class="small">verdict heuristic 정밀화 4축 (a/b/c/d) + var-miss noise = likely_no 강등. 백엔드 <code>localhost:8001</code> · repo <code>slab-design-real-v2</code> 실측.</p>
+
+<h2>1. 3 시나리오 실측 (REST 풀 사이클)</h2>
+<table>
+<thead><tr><th>#</th><th>질의</th><th>target</th><th>signals</th><th>verdict / conf</th><th>판정</th></tr></thead>
+<tbody>
+<tr><td>S1</td><td>"주문 수량이 0 이면 어떤 에러?"</td><td><code>SdFinalLengthRangeAction.execute</code> (cand 0)</td><td>body=0 rule=4</td><td><code>likely_yes</code> / 0.75</td><td class="pass">유지</td></tr>
+<tr><td>S2</td><td>"폭이 0 이면?"</td><td><code>SdDesigner.design</code> overload (cand 0)</td><td>body=0 rule=0</td><td><code>unknown</code> / 0.20</td><td class="pass">노이즈 차단</td></tr>
+<tr><td>S3</td><td>"두께가 0 이면 어떻게?"</td><td><code>SdDesigner.design</code> (wrong target)</td><td>body=0 rule=0</td><td><code>unknown</code> / 0.20</td><td class="pass">honest</td></tr>
+</tbody>
+</table>
+
+<h2>2. heuristic 4축 직접 검증 (_infer_verdict 단위)</h2>
+<table>
+<thead><tr><th>축</th><th>케이스</th><th>예상</th><th>실측</th></tr></thead>
+<tbody>
+<tr><td>(b) word-boundary</td><td><code>"int index0=0; counter=0"</code> + var=counter</td><td>value "0" 가 "index0" 안에 substring 안 잡힘</td><td class="pass">body_sig=4 (counter exact + co-occurrence boost)</td></tr>
+<tr><td>(d) expression regex</td><td><code>"if (x &lt; 0)"</code> + var=x op=&lt; val=0</td><td><code>likely_yes</code> + +3 boost</td><td class="pass">body_sig=7 reason="정확한 expression `x &lt; ...` 매칭"</td></tr>
+<tr><td>var-miss</td><td>body 에 var 없음 / op·val 만 hit</td><td><code>likely_no</code> (이전 likely_yes false positive)</td><td class="pass">reason="변수 매칭 없음 — 연산자/값만으로는 판단 불가"</td></tr>
+<tr><td>(a) multi-token AND</td><td>var="order qty" / body 에 두 token 분산</td><td>두 token AND 매칭 시 hit</td><td class="pass">body_sig=1</td></tr>
+<tr><td>(c) co-occurrence</td><td>같은 line 에 var+val</td><td>+2 boost</td><td class="pass">body_sig 4→7 점프</td></tr>
+</tbody>
+</table>
+<p class="small">unit suite <code>test_multiturn_phase14d_body_match.py</code> 8 / 8 PASS.</p>
+
+<h2>3. 세 페르소나 평가</h2>
+
+<h3>최QA — 13c PM 발견 해결?</h3>
+<p>S2 가 회귀 케이스. 13c 시점엔 body=0 인데 op 단독 hit 으로 likely_yes 가 떴다. 14D 에서 S2 는 <code>unknown</code>/0.20 으로 강등. var 매칭 없으면 rule 보강 없는 한 신뢰 못 한다는 원칙이 코드 라인 305 (<code>matched_var</code> 게이트) + 310 (var-miss → likely_no) 양쪽에 박혔다. <span class="pass">false positive 해결.</span></p>
+
+<h3>김PM — verdict 신뢰감</h3>
+<p>S1 reasoning <em>"business_rule 4 행 — body 직접 검증 안 됨"</em> 이 출처를 자백. S3 reasoning <em>"body/rule 모두 시그널 못 찾음 — 다른 method 가능성"</em> 으로 잘못된 target 일 수 있음을 흘림. <span class="pass">출처-우선 reasoning</span> 으로 verdict 검증 가능.</p>
+
+<h3>시니어 회귀 — silent wrong target</h3>
+<p>S3 (<code>SdDesigner.design</code> forwarder 91 char) 가 hypothesis target 으로 잘못 선택돼도 verdict=<code>unknown</code>. 이전엔 op "=" + value "0" substring 만으로 likely_yes 가능. <span class="pass">honest surface.</span> ranking 자체 보정은 14D 범위 밖.</p>
+
+<div class="verdict">
+<strong>합산: <span class="pass">14D PASS</span></strong>. 4축 모두 코드+실측 확인. body=0→rule fallback 의 reasoning 이 명시. var-miss noise 가 likely_no 로 강등.
+</div>
+
+<h2>4. 잔여 risk</h2>
+<ul>
+<li>S1/S3 candidate ranking 이 hypothesis 의도와 부정합 — ranking 보정이 다음 marginal 가치.</li>
+<li>condition extractor 가 op="=" 으로 추출 → Java body 의 "==" 불일치로 expression regex (d) 가 S1/S3 에서 fall-through. 연산자 매핑 추가 시 boost surface.</li>
+</ul>
+
+</body>
+</html>

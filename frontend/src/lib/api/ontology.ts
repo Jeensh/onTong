@@ -298,6 +298,10 @@ export const ontologyApi = {
     fetchJson<CallSiteDTO[]>(
       `/api/ontology/code-methods/${encodeURIComponent(caller_method_fqn)}/call-sites`,
     ),
+  getMethodCallers: (callee_method_fqn: string, opts?: { repo_id?: string; min_strength?: number }) =>
+    fetchJson<{ callers: { fqn: string; distance: number; via: string; match_kind: string; strength: number }[] }>(
+      `/api/ontology/code-methods/${encodeURIComponent(callee_method_fqn)}/callers${qs(opts ?? {})}`,
+    ),
 
   // Action
   listActions: (opts?: {
@@ -347,6 +351,8 @@ export const ontologyApi = {
   // Search
   search: (q: string, opts?: { repo_id?: string; limit?: number }) =>
     fetchJson<SearchHitDTO[]>(`/api/ontology/search${qs({ q, ...opts })}`),
+  searchSuggest: (q: string, opts?: { repo_id?: string; n?: number }) =>
+    fetchJson<SearchHitDTO[]>(`/api/ontology/search/suggest${qs({ q, ...opts })}`),
 
   // ---------------------------------------------------------------------------
   // Repo Import (P3-2) + Recommendation (P3-3)
@@ -404,6 +410,17 @@ export const ontologyApi = {
       { method: "POST" },
     ),
 
+  // Entity memo — 우측 패널 자유 메모 (ontology 본체 무관)
+  getMemo: (repo_id: string, kind: MemoKind, entity_id: string) =>
+    fetchJson<MemoDTO | null>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/memos/${kind}/${encodeURIComponent(entity_id)}`,
+    ),
+  putMemo: (repo_id: string, kind: MemoKind, entity_id: string, body: string) =>
+    fetchJson<MemoDTO>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/memos/${kind}/${encodeURIComponent(entity_id)}`,
+      { method: "PUT", body: JSON.stringify({ body }) },
+    ),
+
   // P3-5 Graph
   getOntologyGraph: (
     repo_id: string,
@@ -425,6 +442,62 @@ export const ontologyApi = {
   getModules: (repo_id: string, min_classes = 0) =>
     fetchJson<ModulesResponseDTO>(
       `/api/ontology/repos/${encodeURIComponent(repo_id)}/modules${qs({ min_classes })}`,
+    ),
+
+  // Manual entity create (Term / Action / BR / Anchor) — 2026-05-18
+  createTerm: (repo_id: string, body: TermCreateBody) =>
+    fetchJson<CreateResult>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/terms`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  createAction: (repo_id: string, body: ActionCreateBody) =>
+    fetchJson<CreateResult>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/actions`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  createBusinessRule: (repo_id: string, body: BusinessRuleCreateBody) =>
+    fetchJson<CreateResult>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/business-rules`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  createAnchorBinding: (repo_id: string, body: AnchorBindingCreateBody) =>
+    fetchJson<CreateResult>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/anchor-bindings`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+
+  // Coverage mode — 도메인 진척률 + 우선 처리 대상 (graph redesign Option 3 B 분업)
+  getCoverage: (repo_id: string, recent_days = 7) =>
+    fetchJson<CoverageResponseDTO>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/graph/coverage${qs({ recent_days })}`,
+    ),
+  getCoveragePriority: (
+    repo_id: string,
+    domain: string,
+    opts?: { lens?: string; limit?: number; recent_days?: number },
+  ) =>
+    fetchJson<PriorityResponseDTO>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/graph/coverage/${encodeURIComponent(domain)}/priority${qs(opts ?? {})}`,
+    ),
+
+  // Impact mode — focus 중심 양방향 ripple
+  getImpact: (
+    repo_id: string,
+    opts: {
+      focus: string;
+      focus_kind: "action" | "term" | "code_type" | "code_method";
+      hops?: number;
+      direction?: "forward" | "backward" | "both";
+      min_strength?: number;
+      include_methods?: boolean;
+    },
+  ) =>
+    fetchJson<ImpactResponseDTO>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/graph/impact${qs(opts)}`,
+    ),
+  expandImpactMethods: (repo_id: string, code_type_fqn: string) =>
+    fetchJson<ExpandMethodResponseDTO>(
+      `/api/ontology/repos/${encodeURIComponent(repo_id)}/graph/impact/expand-method${qs({ code_type_fqn })}`,
     ),
 
   // R4-T2.2 Perspective CRUD
@@ -675,6 +748,104 @@ export interface OntologyGraphDTO {
   hops: number | null;
 }
 
+// ---------------------------------------------------------------------------
+// Coverage / Impact DTOs (graph redesign — Option 3 daily + event 분업)
+// ---------------------------------------------------------------------------
+export interface DomainCellDTO {
+  domain: string;
+  total: number;
+  by_kind: Record<string, number>;
+  confirmed: number;
+  draft: number;
+  unmapped: number;
+  orphan_count: number;
+  recent_count: number;
+  confirmed_ratio: number;
+}
+
+export interface CoverageSummaryDTO {
+  total: number;
+  confirmed_ratio: number;
+  stalled_domains: string[];
+}
+
+export interface CoverageResponseDTO {
+  repo_id: string;
+  domains: DomainCellDTO[];
+  summary: CoverageSummaryDTO;
+}
+
+export interface PriorityEntityDTO {
+  kind: string;                   // action / term / code_type
+  fqn: string;
+  label: string;
+  verification_level: string | null;
+  confirmed: boolean;
+  priority_score: number;          // 0~10
+  reasons: string[];               // ["draft","orphan","recent"]
+}
+
+export interface PriorityResponseDTO {
+  domain: string;
+  lens: string[];
+  entities: PriorityEntityDTO[];
+  total_match: number;
+}
+
+export type ImpactFocusKind = "action" | "term" | "code_type" | "code_method";
+
+export interface ImpactNodeDTO {
+  id: string;                      // composite "kind|fqn"
+  fqn: string;
+  kind: string;                    // term / action / code_type / code_method
+  label: string;
+  distance: number;
+  direction: "focus" | "forward" | "backward" | "both";
+  risk_score: number;
+  confirmed: boolean;
+  extra: Record<string, unknown>;
+}
+
+export interface ImpactEdgeDTO {
+  id: string;
+  source: string;
+  target: string;
+  kind: string;                    // call / realization / declared_on / param / contains
+  match_kind: string | null;
+  strength: number;
+  direction: "forward" | "backward";
+}
+
+export interface ImpactResponseDTO {
+  repo_id: string;
+  focus: { kind: string; fqn: string; label: string };
+  nodes: ImpactNodeDTO[];
+  edges: ImpactEdgeDTO[];
+  forward_count: number;
+  backward_count: number;
+  risk_top: Array<{ fqn: string; kind: string; risk_score: number; label?: string }>;
+  re_verify_targets: Array<{ fqn: string; kind: string; reason?: string }>;
+  truncated_at_hop: number | null;
+  expand_method_targets: string[];
+}
+
+export interface MethodNodeDTO {
+  fqn: string;
+  name: string;
+  parent_type_fqn: string;
+  return_type: string;
+  role: string;
+  line_start: number | null;
+  line_end: number | null;
+  has_anchor: boolean;
+  realizes_action_fqns: string[];
+}
+
+export interface ExpandMethodResponseDTO {
+  code_type_fqn: string;
+  methods: MethodNodeDTO[];
+}
+
 // V7 Modules tree (D plan)
 export interface ModuleNodeDTO {
   path: string;
@@ -814,4 +985,67 @@ export interface RecommendationResponseDTO {
     confidence: number;
     reason: string;
   }>;
+}
+
+// ---------------------------------------------------------------------------
+// Manual entity create DTOs (2026-05-18)
+// ---------------------------------------------------------------------------
+export interface TermCreateBody {
+  fqn: string;
+  label: string;
+  kind: TermKind;
+  domain?: string;
+  description?: string;
+  aliases?: string[];
+  is_abstract?: boolean;
+  is_interface?: boolean;
+  is_root_entity?: boolean;
+  struct_like_hint?: boolean;
+  value_type?: string | null;
+  unit?: string | null;
+  enum_values?: string[] | null;
+}
+
+export interface ActionCreateBody {
+  fqn: string;
+  label: string;
+  kind: ActionKind;
+  domain?: string;
+  description?: string;
+  aliases?: string[];
+  declared_on_term?: string | null;
+}
+
+export interface BusinessRuleCreateBody {
+  fqn: string;
+  statement: string;
+  severity?: "hard" | "soft";
+  terms_ref?: string[];
+  source?: string;
+}
+
+export interface AnchorBindingCreateBody {
+  anchor_locator: string;
+  code_method_fqn: string;
+  target_action_fqn: string;
+  target_slot: string;
+  rationale?: string;
+}
+
+export interface CreateResult {
+  ok: boolean;
+  fqn: string;
+  kind: "term" | "action" | "business_rule" | "anchor";
+}
+
+// Memo (자유 형식 entity 별 메모) — 우측 패널 메모 탭
+export type MemoKind = "action" | "term" | "codeType" | "rule" | "anchor";
+
+export interface MemoDTO {
+  repo_id: string;
+  entity_kind: MemoKind;
+  entity_id: string;
+  body: string;
+  updated_at: string;
+  updated_by: string | null;
 }

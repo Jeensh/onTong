@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  * 룩업 흐름:
  *   1. SDOrder.confirmedPlantCd[0] (제강 위치) → smCd
  *   2. PlantMappingService.getMapping(smCd) → (castCd, machineCd)
- *   3. CastSpecService.lookup(회사/소/제강/연주/머신/품종) → CastSpecEntity
+ *   3. CastSpecService.lookup(온톨로지/소/제강/연주/머신/품종) → CastSpecEntity
  *   4. CastSpecEntity.slabThickness → SDSlabEntity.slabThickness
  *
  * 실패 시 AlgorithmException (DG101) — SdDesigner 가 catch + history 적재.

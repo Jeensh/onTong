@@ -21,7 +21,7 @@ import java.util.Optional;
  *
  * 두 단계 룩업:
  *   1. findGroup: (강종/품종/고객/열연목표폭) 조건 매칭 + 우선순위 ASC, 첫 row 반환 (없으면 null)
- *   2. findSpec: (회사/소/그룹코드) 정확매칭 → 미존재 시 '*' fallback
+ *   2. findSpec: (온톨로지/소/그룹코드) 정확매칭 → 미존재 시 '*' fallback
  *      - 양쪽 모두 미존재 시 IllegalStateException (사용자 사양: DG 코드 미할당)
  *
  * @author 김XX (2017-08-21)

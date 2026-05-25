@@ -3,7 +3,7 @@
 /**
  * Perspective dropdown (R4-T3.4) — toolbar 한 칸. 저장된 view 목록 + 적용 + 새로 저장.
  *
- * Saved Perspective 클릭 → spec 적용 (mode/focus/target/n_max/compound + activePerspectiveId).
+ * Saved Perspective 클릭 → spec 적용 (mode/focus/target/n_max + activePerspectiveId).
  * "현 view 저장" 클릭 → prompt 로 이름 받아 createPerspective.
  * Active perspective 가 있으면 "x" 로 해제 (ad-hoc 으로 돌아감).
  */
@@ -26,13 +26,11 @@ export function PerspectiveDropdown({ repoId }: Props) {
   const activeId = useWorkbench((s) => s.activePerspectiveId);
   const setActiveId = useWorkbench((s) => s.setActivePerspectiveId);
   const applyGraphState = useWorkbench((s) => s.applyGraphState);
-  const setCompound = useWorkbench((s) => s.setGraphCompound);
   // 현재 graph state (저장 시 spec 빌드용)
   const mode = useWorkbench((s) => s.graphMode);
   const focus = useWorkbench((s) => s.graphFocus);
   const target = useWorkbench((s) => s.graphTarget);
   const nMax = useWorkbench((s) => s.graphNMax);
-  const compound = useWorkbench((s) => s.graphCompound);
 
   const reload = async () => {
     setLoading(true);
@@ -70,7 +68,6 @@ export function PerspectiveDropdown({ repoId }: Props) {
       target: p.spec.target_fqn ?? null,
       nMax: p.spec.n_max,
     });
-    if (typeof p.spec.compound === "boolean") setCompound(p.spec.compound);
     setActiveId(p.id);
     setOpen(false);
   };
@@ -92,7 +89,7 @@ export function PerspectiveDropdown({ repoId }: Props) {
             "type_realization_primary", "type_realization_partial",
             "realization", "contains",
           ],
-          compound,
+          compound: false,
           filter: {},
           lens: null,
         },
@@ -160,7 +157,7 @@ export function PerspectiveDropdown({ repoId }: Props) {
               onClick={saveCurrent}
               disabled={busy}
               className="flex items-center gap-1 text-[11px] text-primary hover:text-primary/80"
-              title="현재 view (mode/focus/n_max/compound) 저장"
+              title="현재 view (mode/focus/n_max) 저장"
             >
               {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <BookmarkPlus className="w-3 h-3" />}
               현 view 저장
@@ -190,7 +187,6 @@ export function PerspectiveDropdown({ repoId }: Props) {
                     <div className="text-[10px] text-muted-foreground truncate">
                       {p.spec.mode}
                       {p.spec.focus_fqn && ` · focus=${p.spec.focus_fqn.split(".").slice(-2).join(".")}`}
-                      {p.spec.compound && " · compound"}
                       {p.spec.n_max !== 60 && ` · n=${p.spec.n_max}`}
                     </div>
                   </button>

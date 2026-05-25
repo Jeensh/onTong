@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>시뮬레이션 에이전트 — 검증 보고서</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+      "Pretendard", "Helvetica Neue", Arial, sans-serif;
+    background: #f8fafc; color: #0f172a; line-height: 1.65;
+  }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  header.cover {
+    border: 1px solid #e2e8f0; border-radius: 12px;
+    padding: 28px; margin-bottom: 28px;
+    background: linear-gradient(135deg, #ffffff 0%, #fff7ed 100%);
+    box-shadow: 0 4px 12px rgba(15,23,42,0.04);
+  }
+  header.cover h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  header.cover .subtitle { color: #64748b; font-size: 14px; margin: 0; }
+  header.cover .meta { margin-top: 14px; font-size: 12px; color: #475569; }
+  header.cover .meta code { background: #fef3c7; padding: 1px 6px; border-radius: 3px; color: #92400e; }
+
+  section { margin: 22px 0; border: 1px solid #e2e8f0; border-radius: 10px;
+    background: white; overflow: hidden;
+  }
+  section > header {
+    padding: 14px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  section > header .id {
+    font-family: monospace; font-size: 12px; color: #d97706;
+    border: 1.5px solid #f59e0b; padding: 2px 8px; border-radius: 4px; font-weight: 600;
+  }
+  section > header h2 { margin: 0; font-size: 16px; }
+  section .body { padding: 16px 20px; font-size: 13.5px; }
+  section .body p { margin: 0 0 10px; }
+  section .body ul { margin: 4px 0 10px 1.2em; padding: 0; }
+  section .body li { font-size: 13px; margin-bottom: 4px; }
+
+  table.data {
+    width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12.5px;
+  }
+  table.data th { background: #f1f5f9; text-align: left; padding: 7px 10px; font-weight: 500; font-size: 11px; color: #475569; border-bottom: 1px solid #cbd5e1; }
+  table.data td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; }
+  table.data code { font-size: 11px; background: #ecfdf5; padding: 1px 5px; border-radius: 3px; color: #047857; }
+  table.data .ok { color: #059669; font-weight: 600; }
+
+  pre.shell {
+    background: #0f172a; color: #cbd5e1; padding: 12px 16px;
+    border-radius: 6px; font-size: 11.5px; overflow-x: auto; line-height: 1.6;
+  }
+  pre.shell .key { color: #fbbf24; }
+  pre.shell .val { color: #6ee7b7; }
+  pre.shell .comment { color: #64748b; }
+
+  .stat-row {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 10px 0;
+  }
+  .stat {
+    text-align: center; padding: 10px;
+    border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc;
+  }
+  .stat .num { display: block; font-size: 18px; font-weight: 700; color: #0f172a; }
+  .stat .lbl { display: block; font-size: 10.5px; color: #64748b; margin-top: 2px; }
+
+  .api-grid {
+    display: grid; grid-template-columns: 1fr 2fr; gap: 8px; font-size: 12px; margin: 8px 0;
+  }
+  .api-grid .ep {
+    font-family: monospace; font-size: 11px; padding: 4px 8px; background: #ecfdf5;
+    border: 1px solid #a7f3d0; border-radius: 4px; color: #065f46;
+  }
+  .api-grid .desc { color: #475569; padding: 4px 0; }
+
+  footer.sum {
+    margin-top: 40px; padding: 22px; background: white;
+    border: 1px solid #e2e8f0; border-radius: 10px;
+  }
+  footer.sum h3 { margin: 0 0 12px; font-size: 16px; }
+  footer.sum ul { margin: 0; padding-left: 1.2em; }
+  footer.sum li { font-size: 13px; margin-bottom: 6px; }
+  footer.sum .warn { color: #b45309; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="cover">
+  <h1>시뮬레이션 에이전트 — 검증 보고서</h1>
+  <p class="subtitle">
+    "온톨로지 응답 기반으로 시뮬에이전트가 만들어진 게 맞는지 전반적인 검증 + hypothesis grounding 정합성"
+    사용자 요구 (#58 + #62) 에 대한 객체적·재현 가능 답변.
+  </p>
+  <div class="meta">
+    브랜치 <code>jyu-simul</code> · 작업 일자 <code>2026-05-22</code> · 검증 <code>실 endpoint 호출 + SQL 직접 조회</code>
+  </div>
+</header>
+
+<section>
+  <header><span class="id">A</span><h2>ontology 데이터 풍부도</h2></header>
+  <div class="body">
+    <p><code class="mono">data/ontology.db</code> 의 <code class="mono">repo_id='slab-design-real-v2'</code> 기준:</p>
+    <div class="stat-row">
+      <div class="stat"><span class="num">83</span><span class="lbl">business_terms</span></div>
+      <div class="stat"><span class="num">136</span><span class="lbl">actions (sim_verified)</span></div>
+      <div class="stat"><span class="num">148</span><span class="lbl">realizations</span></div>
+      <div class="stat"><span class="num">163</span><span class="lbl">anchor_bindings</span></div>
+      <div class="stat"><span class="num">22</span><span class="lbl">business_rules</span></div>
+    </div>
+    <div class="stat-row" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="stat"><span class="num">150</span><span class="lbl">code_types</span></div>
+      <div class="stat"><span class="num">1,081</span><span class="lbl">code_methods (body 포함)</span></div>
+      <div class="stat"><span class="num">2,298</span><span class="lbl">call_sites</span></div>
+    </div>
+
+    <p style="margin-top: 14px;"><strong>샘플 term description 풍부도</strong></p>
+    <table class="data">
+      <thead><tr><th>fqn</th><th>label</th><th>description 길이</th></tr></thead>
+      <tbody>
+        <tr><td><code>term.scm.order.order</code></td><td>주문</td><td>527 chars</td></tr>
+        <tr><td><code>term.scm.slab.slab</code></td><td>Slab</td><td>527 chars</td></tr>
+        <tr><td><code>term.scm.working_controller</code></td><td>WorkingController</td><td>410 chars</td></tr>
+      </tbody>
+    </table>
+
+    <p><strong>샘플 action 풍부도</strong></p>
+    <table class="data">
+      <thead><tr><th>fqn</th><th>params (bytes)</th><th>effects (bytes)</th><th>sub_actions</th></tr></thead>
+      <tbody>
+        <tr><td><code>action.scm.second_wgt_high_실행</code></td><td>203</td><td>1,373</td><td>2</td></tr>
+        <tr><td><code>action.scm.slab.design_orchestrator</code></td><td>2</td><td>1,341</td><td>2</td></tr>
+        <tr><td><code>action.scm.split_range_실행</code></td><td>203</td><td>1,284</td><td>2</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <header><span class="id">B</span><h2>시뮬에이전트가 활용하는 ontology API</h2></header>
+  <div class="body">
+    <p>시뮬에이전트의 backend 가 ontology DB 와 외부 Java 서버를 어떻게 호출하고, 그 결과를 어떻게 결합해 응답하는지의 전체 매핑.</p>
+    <div class="api-grid">
+      <div class="ep">POST /start (모든 intent)</div><div class="desc">business_terms LIKE 매칭 → _detected_terms 첨부 (token → label · fqn · definition)</div>
+      <div class="ep">POST /start (impact)</div><div class="desc">_enrich_impact_payload — _target_change · _affected_orders · _affected_rules · _affected_steps · _affected_actions · _affected_apis · _intent_focus</div>
+      <div class="ep">POST /start (simulate + ORD)</div><div class="desc">Java :8080 /api/sd/working/single?trace=true 실제 호출 — slabResults + 21-step trace</div>
+      <div class="ep">POST /start (hypothesis)</div><div class="desc">hypothesis_workflow.run_hypothesis — seed SD_PRODUCTIVITY_STD + Java :8080 호출</div>
+      <div class="ep">POST /start (locate)</div><div class="desc">_enrich_locate_payload — code_methods (body_text/name/fqn) LIKE + line range · keyword 매칭</div>
+      <div class="ep">GET /graph/{sid}</div><div class="desc">ontology.get_caller_graph — 1-hop callers/callees + declared_on_term edge</div>
+      <div class="ep">GET /method/body</div><div class="desc">ontology.get_method_body + code_methods row — body · line · annotations · callers · callees</div>
+      <div class="ep">GET /data/tables · /data/table/{name}</div><div class="desc">JPA file grep + seed SQL 파싱 — 14 table schema + seed rows</div>
+      <div class="ep">POST /term_lookup</div><div class="desc">business_terms (label/aliases) 매칭 — 자연어 토큰 → term</div>
+      <div class="ep">GET /suggested_questions</div><div class="desc">seed orders + JPA javadoc + business_terms — 10건 동적 질문 + grounded_terms</div>
+      <div class="ep">POST /hypothesis/stream</div><div class="desc">SSE — 4 stage event 순차 전송 (text/event-stream)</div>
+      <div class="ep">DELETE /sessions/{sid}</div><div class="desc">section3_simulation_session CASCADE 삭제</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <header><span class="id">C</span><h2>impact intent 풍부화 검증</h2></header>
+  <div class="body">
+    <p>query: <code class="mono">"CAST_SPEC 의 slab두께 240으로 바꾸면 어떤 step 영향?"</code></p>
+    <p><code>/start</code> → carousel → <code>/respond select_candidate(0)</code> 후 executed payload:</p>
+    <table class="data">
+      <thead><tr><th>필드</th><th>값</th></tr></thead>
+      <tbody>
+        <tr><td><code>_detected_terms</code></td><td>1건 (token "두께" → <code>term.scm.thickness</code>)</td></tr>
+        <tr><td><code>_target_change</code></td><td><code>CAST_SPEC.SLAB_THICKNESS · before=230.0 → after=240 · product=COIL</code></td></tr>
+        <tr><td><code>affected_methods</code></td><td>3건 (SdDesigner.design · SdDriver.batchDesign · SdDriver.singleDesign — real Java fqn)</td></tr>
+        <tr><td><code>_affected_rules</code></td><td>1건 (terms_ref_json 매칭)</td></tr>
+        <tr><td><code>_affected_orders</code></td><td>5건 (PRODUCT_CD=COIL 매칭 — ORD20260510001~5 모두)</td></tr>
+        <tr><td><code>_affected_steps</code></td><td>0건 (SdXxxAction 직접 호출자가 아니라 매핑 안 됨 — 정상)</td></tr>
+        <tr><td><code>_intent_focus</code></td><td><code>step</code> (질문에 "step" 키워드 감지)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <header><span class="id">D</span><h2>hypothesis grounding 정합성</h2></header>
+  <div class="body">
+    <p>POST <code class="mono">/hypothesis/run</code> body: <code class="mono">{base_grade:SS400, new_grade:SS500, multiplier:0.95, base_order_no:ORD20260510001}</code></p>
+    <table class="data">
+      <thead><tr><th>검증 항목</th><th>결과</th></tr></thead>
+      <tbody>
+        <tr><td>1. existing_productivity_rows 가 seed 의 SS400 row 인가</td><td class="ok">✓ 8 rows (SM 0.98 · HR 0.97 · HRF 0.96 · CR 0.95 · ANL1 0.99 · ANL2 0.99 · GAL 0.97 · CRF 0.94)</td></tr>
+        <tr><td>2. virtual_productivity_rows 가 multiplier 정확히 적용</td><td class="ok">✓ orig 0.98 × 0.95 = 0.9310 → vrt 0.931 (일치)</td></tr>
+        <tr><td>3. baseline_slab 이 Java :8080 진짜 호출</td><td class="ok">✓ slabWgt 13,288.01 (golden S1 과 byte-equal)</td></tr>
+        <tr><td>4. projected_slab 의 단중 계열에 ratio 적용</td><td class="ok">✓ 13,288 → 12,624 (-5.0%)</td></tr>
+        <tr><td>5. 두께·폭·길이는 강종 무관 (HR_SPEC) → 변경 없음</td><td class="ok">✓ projection 모델 정합</td></tr>
+        <tr><td>6. ontology business_terms 에 "강종" term 존재</td><td class="ok">✓ term.scm.shared.grade 등록</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <header><span class="id">E</span><h2>SSE 스트리밍 검증</h2></header>
+  <div class="body">
+    <p>POST <code class="mono">/hypothesis/stream</code> 호출 → 4 stage 순차 SSE event:</p>
+<pre class="shell"><span class="comment"># curl -N -X POST http://127.0.0.1:8001/api/section3/simulation/hypothesis/stream ...</span>
+data: {<span class="key">"stage"</span>: 1, <span class="key">"label"</span>: <span class="val">"기존 데이터 분석"</span>,      <span class="key">"data"</span>: {...}}
+data: {<span class="key">"stage"</span>: 2, <span class="key">"label"</span>: <span class="val">"가상 강종 합성"</span>,        <span class="key">"data"</span>: {...}}
+data: {<span class="key">"stage"</span>: 3, <span class="key">"label"</span>: <span class="val">"가상 주문 합성"</span>,        <span class="key">"data"</span>: {...}}
+data: {<span class="key">"stage"</span>: 4, <span class="key">"label"</span>: <span class="val">"Slab 결과 비교 (추론)"</span>, <span class="key">"data"</span>: {...}}
+data: {<span class="key">"stage"</span>: <span class="val">"done"</span>, <span class="key">"label"</span>: <span class="val">"완료"</span>}</pre>
+    <p>frontend <code>_HypothesisWorkflowView</code> 가 SSE reader 로 stream 받아 stage 별 카드를 progressive 등장 (400ms 간격).</p>
+  </div>
+</section>
+
+<footer class="sum">
+  <h3>결론</h3>
+  <ul>
+    <li>ontology 의 <strong>83 terms · 136 actions · 148 realizations · 163 anchors · 22 rules</strong> 모두 시뮬에이전트의 endpoint 와 결과 surface 에서 실제로 활용됨.</li>
+    <li><code>hypothesis_workflow</code> 의 baseline 은 Java :8080 의 21-step 실제 알고리즘 결과 (golden S1 byte-equal). projection 은 productivity 비율 모델.</li>
+    <li><code>impact</code> 의 <code>_target_change</code> 는 seed 의 before value 직접 조회. <code>_affected_orders</code> 는 PRODUCT_CD 매칭으로 5건 surface.</li>
+    <li>모든 <code>detected_terms</code> 는 <code>business_terms.label/aliases_json</code> LIKE 매칭 결과.</li>
+    <li>SSE 스트리밍이 4-stage 순차 progressive UX 제공.</li>
+  </ul>
+  <h3 style="margin-top: 16px;">알려진 한계 (후속 작업)</h3>
+  <ul>
+    <li class="warn"><code>_affected_steps</code> 가 indirect call 까지는 추적 못 함 (caller_graph 가 SimV2 mock 이라 1-hop 한계).</li>
+    <li class="warn"><code>affected_actions</code> 는 declared_on_term 매칭만 — actions 의 inputs/outputs 분석은 미구현.</li>
+    <li class="warn">ontology API 정식 endpoint <code>/api/ontology/*</code> 가 modeling 서버에서 나오면 mock 의존성 제거 가능.</li>
+  </ul>
+</footer>
+
+<p style="text-align:center; color:#94a3b8; font-size:11px; margin-top:32px;">
+  Section 3 · 시뮬레이션 에이전트 검증 보고서 · jyu-simul · 2026-05-22
+</p>
+
+</div>
+</body>
+</html>

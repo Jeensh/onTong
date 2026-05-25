@@ -6,7 +6,7 @@ import java.util.Objects;
 
 /**
  * sd · std · HR_MAX_WGT composite PK.
- * (회사, 소구분, 열연코드, 두께, 폭) — 5 컬럼.
+ * (온톨로지, 소구분, 열연코드, 두께, 폭) — 5 컬럼.
  * 두께·폭은 2차원 sheet 룩업의 cell 좌표.
  */
 public class HrMaxWgtPK implements Serializable {

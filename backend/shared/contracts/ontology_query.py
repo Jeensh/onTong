@@ -108,6 +108,14 @@ class OntologyQueryClient(Protocol):
         role: str | None = None,            # CodeTypeRole value
     ) -> list[CodeTypeDTO]: ...
     def get_call_sites(self, caller_method_fqn: str) -> list[CallSiteDTO]: ...
+    def get_method(self, code_method_fqn: str) -> CodeMethodDTO | None:
+        """단일 method lookup. body_text / params / return_type 등 전체 surface."""
+        ...
+    def get_method_callers(
+        self, callee_method_fqn: str, repo_id: str | None = None,
+    ) -> list[CallSiteDTO]:
+        """역방향 caller 검색 — best-effort (Java 정적 분석 한계)."""
+        ...
 
     # ---- Action ----
     def get_action(self, fqn: str) -> ActionDTO | None: ...
@@ -137,4 +145,10 @@ class OntologyQueryClient(Protocol):
         self, query: str, repo_id: str | None = None, limit: int = 20,
     ) -> list[SearchHitDTO]:
         """FTS 통합 — Term / Action / CodeType / CodeMethod / Rule 모두."""
+        ...
+
+    def suggest(
+        self, query: str, repo_id: str | None = None, n: int = 5,
+    ) -> list[SearchHitDTO]:
+        """0-hit fallback — fuzzy label 매칭으로 근사 추천 (did-you-mean)."""
         ...

@@ -74,7 +74,7 @@ def test_format_hypothesis_render_includes_korean_terms_and_concerns():
         candidate_term_korean="열연공장",
         candidate_term_english="HrPlant",
         domain_role="standard",
-        pk_role_summary="회사·소·열연공장 + 품종 식별",
+        pk_role_summary="온톨로지·소·열연공장 + 품종 식별",
         column_notes=[hp.ColumnNote(db_column="WIDTH_LOW", note="폭 하한")],
         relations_hint=["품종별로 자식 entity 가능성"],
         domain_questions=["소유 sub-system?"],

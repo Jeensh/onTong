@@ -38,21 +38,21 @@
 | 의도 | 21 step이 fail/retry 없이 진행되는 baseline |
 | `designPendQty` | 10,000 kg / pkg 8,000–18,000 |
 | `orderWgt` | 10,000–12,000 kg, 폭 1200, 길이 8500 |
-| 기대 결과 | **슬랩 1매**, `splitCount = 1`, `errorCode = null`, `slabResults` 1행 |
+| 기대 결과 | **Slab 1매**, `splitCount = 1`, `errorCode = null`, `slabResults` 1행 |
 | trace 관전 | step 1–7 ONE_SHOT, step 8–13 AA_LOOP iteration=1 (수렴), step 14 SKIP, step 15–21 FINAL/SAVE |
 
 ---
 
-## S2 — 다중 슬랩 + A-a inner loop
+## S2 — 다중 Slab + A-a inner loop
 
 | | |
 |---|---|
 | `orderNo` | `ORD20260510002` |
 | `confirmedPlantCd` | `K1      ` (SM, HR만) |
-| 의도 | `designPendQty` 50–60톤, 슬랩 다매 분할 |
+| 의도 | `designPendQty` 50–60톤, Slab 다매 분할 |
 | `designPendQty` | 55,000 kg / pkg 8,000–25,000 |
 | `orderWgt` | 10,000–13,000 kg, 폭 1100, **길이 32,000(긴 코일)** — `firstWgtHigh`가 커서 알고리즘이 HR_MAX/secondWgt 캡 |
-| 기대 결과 | **슬랩 3매**, `splitCount = 2` (A-a final adjust로 매수가 split 보다 1↑) |
+| 기대 결과 | **Slab 3매**, `splitCount = 2` (A-a final adjust로 매수가 split 보다 1↑) |
 | trace 관전 | step 8–13 iteration 다회. step 13 `slabCountInProgress = 3` 수렴 |
 
 > **3매 vs 4매?** SPEC.md 초고는 4매 가정이었으나 시드 `CAST_SPEC.LENGTH_HIGH = 12000`이 `maxSplitCountUpper`를 캡하면서 3매가 실제 골든 결과. SCENARIOS의 truth는 골든 파일 (`S2.json`).
@@ -68,7 +68,7 @@
 | 의도 | step 9의 첫 분할수 시도가 step 10의 `pendQty in [splitWgtLow, splitWgtHigh]` 조건에서 fail → step 13으로 newCount 하향 후 재진입 |
 | `designPendQty` | 35,000 kg / pkg 18,000–26,000 |
 | `orderWgt` | 20,000–25,000 kg (좁은 밴드) |
-| 기대 결과 | **슬랩 2매**, `splitCount = 1` → A-a recalc → `slabCountInProgress = 2` |
+| 기대 결과 | **Slab 2매**, `splitCount = 1` → A-a recalc → `slabCountInProgress = 2` |
 | trace 관전 | step 9 처음에는 slabCount=1. step 10 RETRY 후 step 13 `newCount=2`로 PASS. iteration 카운터 1 → 2 |
 
 ---
@@ -83,7 +83,7 @@
 | `designPendQty` | 10,000 kg, **`designPendQtyHigh = 12,000`** |
 | `pkgWgt` | **`pkgWgtLow = 20,000`**, `pkgWgtHigh = 22,000` (Low > pendHigh!) |
 | `gradeCd` | `SS41`, `customerCd` = `CUST-FAIL` (별도 EDGING 그룹 — 도달은 안 함) |
-| 기대 결과 | **슬랩 0매**, `errorCode = "DG004"`, `errorMessage` 한국어, `SLAB_DESIGN_HIST` 1행(stepNo 0 — VALIDATION) |
+| 기대 결과 | **Slab 0매**, `errorCode = "DG004"`, `errorMessage` 한국어, `SLAB_DESIGN_HIST` 1행(stepNo 0 — VALIDATION) |
 | trace 관전 | trace 1행만, `status = SKIP`, `phase = "PHASE_1"`, `stepName = "VALIDATION_FAILED"` |
 
 ---
@@ -97,7 +97,7 @@
 | 의도 | step 2 `HR` 외 가장 짧은 활성 시퀀스. CRF는 누적 productivity에만 영향, step 흐름엔 무영향 |
 | `designPendQty` | 8,000 kg / pkg 5,000–12,000 |
 | `orderWgt` | 6,000–10,000 kg, 폭 1100, 길이 7000 |
-| 기대 결과 | **슬랩 1매**, `splitCount = 1`, productivity = `prod_SM × prod_HR × prod_CRF` |
+| 기대 결과 | **Slab 1매**, `splitCount = 1`, productivity = `prod_SM × prod_HR × prod_CRF` |
 | trace 관전 | S1과 거의 동일 흐름이지만 누적 productivity 값이 다름 → 이후 단중 컷 다름 |
 
 ---
@@ -132,7 +132,7 @@ GOLDEN_REGEN=true \
 이후 사람이:
 
 1. `git diff slab-design-boot/src/test/resources/golden/` 로 변경분 검토
-2. step 변경의 의도와 일치하는지 확인 (DG 코드, 슬랩 수, 결과 폭/길이/단중)
+2. step 변경의 의도와 일치하는지 확인 (DG 코드, Slab 수, 결과 폭/길이/단중)
 3. 통과 시 commit
 4. 다음 회귀에서 동일 normalize 후 byte-equal로 검사
 

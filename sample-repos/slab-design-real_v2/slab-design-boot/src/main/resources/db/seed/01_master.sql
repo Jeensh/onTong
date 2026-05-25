@@ -1,171 +1,216 @@
 -- ============================================================
--- 01_master.sql -- spec & rule master rows for 5 golden scenarios
--- Loaded by spring.sql.init after JPA ddl-auto creates schema.
--- All scenarios use cmpCd='K' orgCd='1'.
--- See SeedService for TRUNCATE order; this file populates only master tables.
+-- 01_master.sql -- 풍부한 기준 데이터 (2026-05-25 사용자 요구로 재작성)
+--
+-- ORDER 데이터는 02_orders.sql 에서 모두 제거됨. 시뮬레이션 에이전트가 ontology +
+-- 기준 데이터만으로 가상 주문을 합성 → 21-step slab 설계 시뮬을 수행한다.
+--
+-- 본 파일은 slab-design-real_v2 시스템 walkthrough.md 와 JPO Javadoc 의 제약을
+-- 모두 반영해 유형·케이스별로 다양한 row 를 채워, 어떤 가상 주문이 와도 lookup 이
+-- 매칭되도록 한다.
+--
+-- 온톨로지·소 코드: 모두 'K' / '1' (단일 사업소)
+-- 공장 코드 자리: confirmedPlantCd 8자리 — SM(0) HR(1) HRF(2) CR(3) ANL1(4) ANL2(5) GAL(6) CRF(7)
 -- ============================================================
 
--- ------------------------------------------------------------
--- CAST_SPEC -- 연주설비사양기준 (제강+품종 -> slab thickness, width range, length range)
+-- ============================================================
+-- CAST_SPEC (연주설비사양기준) — Slab 두께 + 폭/길이/단중 범위
 -- PK: (CMP_CD, ORG_CD, SM_CD, CAST_CD, MACHINE_CD, PRODUCT_CD)
--- All 5 scenarios use confirmedPlantCd[0]='K' -> SM_CD='K'.
--- PlantMappingService is hard-coded to A/B/C/D so for U13 we just use the same SM='K'
--- with placeholder CAST_CD/MACHINE_CD ('CC1','M1') -- algorithm still works once the
--- mapping is updated; for now no-row-found triggers DG10x at run time, not at INSERT.
--- ------------------------------------------------------------
-INSERT INTO CAST_SPEC (CMP_CD, ORG_CD, SM_CD, CAST_CD, MACHINE_CD, PRODUCT_CD,
-                       SLAB_THICKNESS, WIDTH_LOW, WIDTH_HIGH, LENGTH_LOW, LENGTH_HIGH,
-                       WGT_LOW, WGT_HIGH)
-VALUES ('K', '1', 'K', 'CC1', 'M1', 'COIL',
-        230.00, 800.00, 2000.00, 4000.00, 12000.00,
-        10000.000, 30000.000);
+--
+-- 4 SM × 3 cast × 1 machine × 3 product = 다양한 두께·폭 조합.
+-- COIL  (코일)            — 두께 230mm, 폭 800~2000
+-- FS    (열연강판)         — 두께 250mm, 폭 800~2200
+-- PLATE (후판)            — 두께 320mm, 폭 1500~3500 (별도 광폭)
+-- ============================================================
+INSERT INTO CAST_SPEC VALUES ('K','1','K','CC1','M1','COIL',  230.00,  800.00, 2000.00, 4000.00, 12000.00, 10000.000, 30000.000);
+INSERT INTO CAST_SPEC VALUES ('K','1','K','CC1','M1','FS',    250.00,  800.00, 2200.00, 4000.00, 12000.00, 10000.000, 32000.000);
+INSERT INTO CAST_SPEC VALUES ('K','1','K','CC1','M1','PLATE', 320.00, 1500.00, 3500.00, 5000.00, 14000.00, 18000.000, 45000.000);
+INSERT INTO CAST_SPEC VALUES ('K','1','K','CC2','M1','COIL',  240.00,  900.00, 1900.00, 4500.00, 11500.00, 11000.000, 29000.000);
+INSERT INTO CAST_SPEC VALUES ('K','1','K','CC2','M1','FS',    260.00,  900.00, 2100.00, 4500.00, 11500.00, 11000.000, 31000.000);
+-- 광폭 전용 (M2)
+INSERT INTO CAST_SPEC VALUES ('K','1','K','CC3','M2','COIL',  225.00,  900.00, 2200.00, 4000.00, 13000.00, 10500.000, 32000.000);
+INSERT INTO CAST_SPEC VALUES ('K','1','K','CC3','M2','PLATE', 300.00, 1800.00, 3800.00, 5000.00, 15000.00, 20000.000, 48000.000);
+-- 일반 + 박판 (P=L 다른 SM)
+INSERT INTO CAST_SPEC VALUES ('K','1','L','CC1','M1','COIL',  220.00,  800.00, 1800.00, 4000.00, 11000.00,  9500.000, 27000.000);
+INSERT INTO CAST_SPEC VALUES ('K','1','L','CC1','M1','FS',    240.00,  800.00, 2000.00, 4000.00, 11000.00,  9500.000, 28500.000);
+-- 박Slab (P=A 박Slab 전용 SM)
+INSERT INTO CAST_SPEC VALUES ('K','1','A','CC1','M1','COIL',  180.00,  900.00, 1500.00, 4000.00, 10500.00,  7000.000, 22000.000);
 
-INSERT INTO CAST_SPEC (CMP_CD, ORG_CD, SM_CD, CAST_CD, MACHINE_CD, PRODUCT_CD,
-                       SLAB_THICKNESS, WIDTH_LOW, WIDTH_HIGH, LENGTH_LOW, LENGTH_HIGH,
-                       WGT_LOW, WGT_HIGH)
-VALUES ('K', '1', 'K', 'CC1', 'M1', 'FS',
-        250.00, 800.00, 2200.00, 4000.00, 12000.00,
-        10000.000, 32000.000);
-
--- SS41-specific row in case PlantMapping pulls a different cast for SS41 paths
--- (we use the SAME PK for COIL+SS41 since PK has no GRADE column; redundant entries
--- with GRADE-bearing tables handle SS41 sizing). The single COIL row above suffices
--- because CAST_SPEC has no GRADE column -- thickness depends only on (SM,CAST,MACHINE,PRODUCT).
-
--- ------------------------------------------------------------
--- HR_SPEC -- 열연설비사양기준 (열연공장+품종 -> width / length range)
+-- ============================================================
+-- HR_SPEC (열연설비사양기준) — 열연 라인별 폭·길이 범위
 -- PK: (CMP_CD, ORG_CD, HR_PLANT_CD, PRODUCT_CD)
--- All HR-active scenarios (S1/S2/S3/S5) use confirmedPlantCd[1]='1' so HR_PLANT_CD='1'
--- (the digit also doubles as the HR_TGT_WIDTH_N column index in SelectedHrTgtWidthResolver).
--- S4 short-circuits at validation (DG004) so HR_SPEC is never consulted there.
--- ------------------------------------------------------------
-INSERT INTO HR_SPEC (CMP_CD, ORG_CD, HR_PLANT_CD, PRODUCT_CD,
-                     WIDTH_LOW, WIDTH_HIGH, LENGTH_LOW, LENGTH_HIGH)
-VALUES ('K', '1', '1', 'COIL',
-        750.00, 2100.00, 3500.00, 13000.00);
+--
+-- HR_PLANT_CD = confirmedPlantCd[1] (열연 공장 자리)
+--   '1' — 1열연 (표준)
+--   '2' — 2열연 (광폭 가능)
+--   '3' — 3열연 (박판 전용)
+-- ============================================================
+INSERT INTO HR_SPEC VALUES ('K','1','1','COIL',  750.00, 2100.00, 3500.00, 13000.00);
+INSERT INTO HR_SPEC VALUES ('K','1','1','FS',    750.00, 2300.00, 3500.00, 13000.00);
+INSERT INTO HR_SPEC VALUES ('K','1','1','PLATE', 1500.00,3500.00, 5000.00, 14000.00);
+INSERT INTO HR_SPEC VALUES ('K','1','2','COIL',  900.00, 2400.00, 4000.00, 14000.00);
+INSERT INTO HR_SPEC VALUES ('K','1','2','FS',    900.00, 2500.00, 4000.00, 14000.00);
+INSERT INTO HR_SPEC VALUES ('K','1','2','PLATE', 1800.00,3800.00, 5000.00, 15000.00);
+INSERT INTO HR_SPEC VALUES ('K','1','3','COIL',  700.00, 1600.00, 3000.00, 11000.00);
+INSERT INTO HR_SPEC VALUES ('K','1','3','FS',    700.00, 1800.00, 3000.00, 11000.00);
 
-INSERT INTO HR_SPEC (CMP_CD, ORG_CD, HR_PLANT_CD, PRODUCT_CD,
-                     WIDTH_LOW, WIDTH_HIGH, LENGTH_LOW, LENGTH_HIGH)
-VALUES ('K', '1', '1', 'FS',
-        750.00, 2300.00, 3500.00, 13000.00);
-
--- ------------------------------------------------------------
--- EDGING_GROUP -- (강종, 품종, 고객사, 열연목표폭) -> EDGING_GROUP_CD
+-- ============================================================
+-- EDGING_GROUP (Edging 그룹 매핑) — (강종, 품종, 고객사) → EDGING_GROUP_CD
 -- PK: (CMP_CD, ORG_CD, PRIORITY)
--- One row per (grade, customer) combination used by the 5 scenarios.
--- ------------------------------------------------------------
-INSERT INTO EDGING_GROUP (CMP_CD, ORG_CD, PRIORITY,
-                          EDGING_GROUP_CD, GRADE_CD, PRODUCT_CD, CUSTOMER_CD,
-                          HR_TGT_WIDTH_LOW, HR_TGT_WIDTH_HIGH)
-VALUES ('K', '1', 1,
-        'EG-A', 'SS400', 'COIL', 'CUST-001',
-        500.00, 2500.00);
+--
+-- 매칭 조건: AND (gradeCd, productCd, customerCd) + hrTgtWidth ∈ [LOW, HIGH]
+-- PRIORITY ASC 로 첫 매칭 채택.
+-- ============================================================
+-- SS400 + COIL — 고객별 + 폭대역별
+INSERT INTO EDGING_GROUP VALUES ('K','1', 1, 'EG-NARROW',  'SS400','COIL', 'CUST-001',  500.00, 1200.00);
+INSERT INTO EDGING_GROUP VALUES ('K','1', 2, 'EG-STD',     'SS400','COIL', 'CUST-001', 1200.00, 1800.00);
+INSERT INTO EDGING_GROUP VALUES ('K','1', 3, 'EG-WIDE',    'SS400','COIL', 'CUST-001', 1800.00, 2500.00);
+INSERT INTO EDGING_GROUP VALUES ('K','1', 4, 'EG-VIP',     'SS400','COIL', 'CUST-VIP',  500.00, 2500.00);
+-- SS490 + COIL
+INSERT INTO EDGING_GROUP VALUES ('K','1',10, 'EG-S490',    'SS490','COIL', 'CUST-002',  600.00, 2200.00);
+INSERT INTO EDGING_GROUP VALUES ('K','1',11, 'EG-S490VIP', 'SS490','COIL', 'CUST-VIP',  500.00, 2400.00);
+-- SM355 + COIL
+INSERT INTO EDGING_GROUP VALUES ('K','1',20, 'EG-SM355',   'SM355','COIL', 'CUST-002',  800.00, 2000.00);
+-- FS (열연강판)
+INSERT INTO EDGING_GROUP VALUES ('K','1',30, 'EG-FS-A',    'SS400','FS',   'CUST-001', 1000.00, 2200.00);
+INSERT INTO EDGING_GROUP VALUES ('K','1',31, 'EG-FS-WIDE', 'SS400','FS',   'CUST-001', 2200.00, 2500.00);
+-- PLATE (후판)
+INSERT INTO EDGING_GROUP VALUES ('K','1',40, 'EG-PLATE',   'SS400','PLATE','CUST-003', 1500.00, 3500.00);
+INSERT INTO EDGING_GROUP VALUES ('K','1',41, 'EG-PLATE-W', 'SS400','PLATE','CUST-003', 3500.00, 3800.00);
+-- catchall (CUST-FAIL — S4 시나리오 검증용 — validator 통과 못 함)
+INSERT INTO EDGING_GROUP VALUES ('K','1',99, 'EG-FAIL',    'SS41', 'COIL', 'CUST-FAIL', 500.00, 2500.00);
 
-INSERT INTO EDGING_GROUP (CMP_CD, ORG_CD, PRIORITY,
-                          EDGING_GROUP_CD, GRADE_CD, PRODUCT_CD, CUSTOMER_CD,
-                          HR_TGT_WIDTH_LOW, HR_TGT_WIDTH_HIGH)
-VALUES ('K', '1', 2,
-        'EG-B', 'SS41', 'COIL', 'CUST-FAIL',
-        500.00, 2500.00);
+-- ============================================================
+-- EDGING_SPEC — 각 EDGING_GROUP_CD 의 폭 보정 cap
+-- PK: (CMP_CD, ORG_CD, EDGING_GROUP_CD)
+-- '*' = catchall
+-- ============================================================
+INSERT INTO EDGING_SPEC VALUES ('K','1','EG-NARROW',  -30.00,  30.00);
+INSERT INTO EDGING_SPEC VALUES ('K','1','EG-STD',     -50.00,  50.00);
+INSERT INTO EDGING_SPEC VALUES ('K','1','EG-WIDE',    -80.00,  80.00);
+INSERT INTO EDGING_SPEC VALUES ('K','1','EG-VIP',     -25.00,  25.00);
+INSERT INTO EDGING_SPEC VALUES ('K','1','EG-S490',    -40.00,  40.00);
+INSERT INTO EDGING_SPEC VALUES ('K','1','EG-S490VIP', -30.00,  30.00);
+INSERT INTO EDGING_SPEC VALUES ('K','1','EG-SM355',   -60.00,  60.00);
+INSERT INTO EDGING_SPEC VALUES ('K','1','EG-FS-A',    -70.00,  70.00);
+INSERT INTO EDGING_SPEC VALUES ('K','1','EG-FS-WIDE',-100.00, 100.00);
+INSERT INTO EDGING_SPEC VALUES ('K','1','EG-PLATE',  -120.00, 120.00);
+INSERT INTO EDGING_SPEC VALUES ('K','1','EG-PLATE-W',-150.00, 150.00);
+INSERT INTO EDGING_SPEC VALUES ('K','1','EG-FAIL',    -50.00,  50.00);
+INSERT INTO EDGING_SPEC VALUES ('K','1','*',         -100.00, 100.00);
 
--- ------------------------------------------------------------
--- EDGING_SPEC -- edging cap_low/high per group
--- PK: (CMP_CD, ORG_CD, EDGING_GROUP_CD).  '*' is catchall fallback.
--- ------------------------------------------------------------
-INSERT INTO EDGING_SPEC (CMP_CD, ORG_CD, EDGING_GROUP_CD,
-                         EDGING_CAP_LOW, EDGING_CAP_HIGH)
-VALUES ('K', '1', 'EG-A', -50.00, 50.00);
-
-INSERT INTO EDGING_SPEC (CMP_CD, ORG_CD, EDGING_GROUP_CD,
-                         EDGING_CAP_LOW, EDGING_CAP_HIGH)
-VALUES ('K', '1', 'EG-B', -50.00, 50.00);
-
-INSERT INTO EDGING_SPEC (CMP_CD, ORG_CD, EDGING_GROUP_CD,
-                         EDGING_CAP_LOW, EDGING_CAP_HIGH)
-VALUES ('K', '1', '*', -100.00, 100.00);
-
--- ------------------------------------------------------------
--- CUSTOMER_STD -- 고객사 단중 제한 (단위: kg)
+-- ============================================================
+-- CUSTOMER_STD — 고객사 단중 제한 (kg)
 -- PK: (CMP_CD, ORG_CD, PRIORITY)
--- CUST-001: comfortable range 5,000-25,000 kg per coil (admits S1/S2/S3/S5).
--- CUST-FAIL: NOT consulted at runtime — S4 short-circuits at validator (DG004) before
---            algorithm reaches CUSTOMER_STD lookup. Kept here for completeness.
--- NOTE: All weights stored as kg to align with SdFirstWeightAction's mm³×g/cm³×1e-6 = kg.
--- ------------------------------------------------------------
-INSERT INTO CUSTOMER_STD (CMP_CD, ORG_CD, PRIORITY,
-                          PRODUCT_CD, CUSTOMER_CD,
-                          PKG_WGT_LOW, PKG_WGT_HIGH)
-VALUES ('K', '1', 1,
-        'COI', 'CUST-001',
-        5000.000, 25000.000);
+-- 고객별 다양한 단중 허용 폭
+-- ============================================================
+INSERT INTO CUSTOMER_STD VALUES ('K','1', 1, 'COIL',  'CUST-001',    5000.000, 25000.000);  -- 표준
+INSERT INTO CUSTOMER_STD VALUES ('K','1', 2, 'COIL',  'CUST-002',    8000.000, 22000.000);  -- 중간
+INSERT INTO CUSTOMER_STD VALUES ('K','1', 3, 'COIL',  'CUST-003',   12000.000, 30000.000);  -- 후판 고객
+INSERT INTO CUSTOMER_STD VALUES ('K','1', 4, 'COIL',  'CUST-VIP',    3000.000, 28000.000);  -- VIP — 넓은 허용
+INSERT INTO CUSTOMER_STD VALUES ('K','1', 5, 'COIL',  'CUST-SMALL',  2000.000, 12000.000);  -- 소형
+INSERT INTO CUSTOMER_STD VALUES ('K','1', 6, 'FS',    'CUST-001',    6000.000, 28000.000);
+INSERT INTO CUSTOMER_STD VALUES ('K','1', 7, 'FS',    'CUST-002',    8000.000, 24000.000);
+INSERT INTO CUSTOMER_STD VALUES ('K','1', 8, 'PLATE', 'CUST-003',   15000.000, 45000.000);
+INSERT INTO CUSTOMER_STD VALUES ('K','1', 9, 'PLATE', 'CUST-VIP',   18000.000, 48000.000);
+INSERT INTO CUSTOMER_STD VALUES ('K','1',99, 'COIL',  'CUST-FAIL',    100.000,   200.000);  -- 시나리오 검증용 — 비현실적 좁은 범위
 
-INSERT INTO CUSTOMER_STD (CMP_CD, ORG_CD, PRIORITY,
-                          PRODUCT_CD, CUSTOMER_CD,
-                          PKG_WGT_LOW, PKG_WGT_HIGH)
-VALUES ('K', '1', 2,
-        'COI', 'CUST-FAIL',
-        100.000, 200.000);
-
--- ------------------------------------------------------------
--- HR_MIN_WGT -- 압연 MIN 단중 (2D sheet on thickness x width); 단위: kg
+-- ============================================================
+-- HR_MIN_WGT — 압연 MIN 단중 (kg) · 2D ceiling lookup (THICKNESS × WIDTH)
 -- PK: (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH)
--- Typical slab MIN weight ~5,000 kg (5 tonnes) at 230mm thickness.
--- ------------------------------------------------------------
-INSERT INTO HR_MIN_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MIN_WGT)
-VALUES ('K', '1', '1', 230.00, 1200.00, 5000.000);
-INSERT INTO HR_MIN_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MIN_WGT)
-VALUES ('K', '1', '1', 230.00, 1500.00, 5000.000);
-INSERT INTO HR_MIN_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MIN_WGT)
-VALUES ('K', '1', '1', 230.00, 2200.00, 5000.000);
-INSERT INTO HR_MIN_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MIN_WGT)
-VALUES ('K', '1', '1', 250.00, 1500.00, 5000.000);
-INSERT INTO HR_MIN_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MIN_WGT)
-VALUES ('K', '1', '1', 250.00, 2200.00, 5000.000);
+-- 두께/폭이 클수록 MIN_WGT 도 약간 증가 (열연 안정 가동 조건)
+-- ============================================================
+-- HR_CD '1' (1열연)
+INSERT INTO HR_MIN_WGT VALUES ('K','1','1',180.00, 1000.00, 4000.000);
+INSERT INTO HR_MIN_WGT VALUES ('K','1','1',180.00, 1500.00, 4500.000);
+INSERT INTO HR_MIN_WGT VALUES ('K','1','1',180.00, 2100.00, 5000.000);
+INSERT INTO HR_MIN_WGT VALUES ('K','1','1',230.00, 1200.00, 5000.000);
+INSERT INTO HR_MIN_WGT VALUES ('K','1','1',230.00, 1500.00, 5500.000);
+INSERT INTO HR_MIN_WGT VALUES ('K','1','1',230.00, 1800.00, 5800.000);
+INSERT INTO HR_MIN_WGT VALUES ('K','1','1',230.00, 2100.00, 6200.000);
+INSERT INTO HR_MIN_WGT VALUES ('K','1','1',250.00, 1500.00, 6000.000);
+INSERT INTO HR_MIN_WGT VALUES ('K','1','1',250.00, 2300.00, 6500.000);
+INSERT INTO HR_MIN_WGT VALUES ('K','1','1',320.00, 1800.00, 8000.000);
+INSERT INTO HR_MIN_WGT VALUES ('K','1','1',320.00, 3500.00, 9000.000);
+-- HR_CD '2' (2열연 — 광폭)
+INSERT INTO HR_MIN_WGT VALUES ('K','1','2',230.00, 1500.00, 5500.000);
+INSERT INTO HR_MIN_WGT VALUES ('K','1','2',230.00, 2400.00, 6500.000);
+INSERT INTO HR_MIN_WGT VALUES ('K','1','2',320.00, 2000.00, 8500.000);
+INSERT INTO HR_MIN_WGT VALUES ('K','1','2',320.00, 3800.00, 9500.000);
+-- HR_CD '3' (3열연 — 박판)
+INSERT INTO HR_MIN_WGT VALUES ('K','1','3',180.00, 1000.00, 3500.000);
+INSERT INTO HR_MIN_WGT VALUES ('K','1','3',180.00, 1600.00, 4000.000);
 
--- ------------------------------------------------------------
--- HR_MAX_WGT -- 압연 MAX 단중 (same shape as HR_MIN_WGT); 단위: kg
--- Typical slab MAX weight ~30,000 kg (30 tonnes).
--- ------------------------------------------------------------
-INSERT INTO HR_MAX_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MAX_WGT)
-VALUES ('K', '1', '1', 230.00, 1200.00, 30000.000);
-INSERT INTO HR_MAX_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MAX_WGT)
-VALUES ('K', '1', '1', 230.00, 1500.00, 30000.000);
-INSERT INTO HR_MAX_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MAX_WGT)
-VALUES ('K', '1', '1', 230.00, 2200.00, 30000.000);
-INSERT INTO HR_MAX_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MAX_WGT)
-VALUES ('K', '1', '1', 250.00, 1500.00, 30000.000);
-INSERT INTO HR_MAX_WGT (CMP_CD, ORG_CD, HR_CD, THICKNESS, WIDTH, MAX_WGT)
-VALUES ('K', '1', '1', 250.00, 2200.00, 30000.000);
+-- ============================================================
+-- HR_MAX_WGT — 압연 MAX 단중 (kg) · 같은 2D 격자
+-- 광폭이고 두꺼울수록 MAX 허용 ↑
+-- ============================================================
+INSERT INTO HR_MAX_WGT VALUES ('K','1','1',180.00, 1000.00, 22000.000);
+INSERT INTO HR_MAX_WGT VALUES ('K','1','1',180.00, 1500.00, 24000.000);
+INSERT INTO HR_MAX_WGT VALUES ('K','1','1',180.00, 2100.00, 26000.000);
+INSERT INTO HR_MAX_WGT VALUES ('K','1','1',230.00, 1200.00, 28000.000);
+INSERT INTO HR_MAX_WGT VALUES ('K','1','1',230.00, 1500.00, 30000.000);
+INSERT INTO HR_MAX_WGT VALUES ('K','1','1',230.00, 1800.00, 31000.000);
+INSERT INTO HR_MAX_WGT VALUES ('K','1','1',230.00, 2100.00, 32000.000);
+INSERT INTO HR_MAX_WGT VALUES ('K','1','1',250.00, 1500.00, 31000.000);
+INSERT INTO HR_MAX_WGT VALUES ('K','1','1',250.00, 2300.00, 33000.000);
+INSERT INTO HR_MAX_WGT VALUES ('K','1','1',320.00, 1800.00, 40000.000);
+INSERT INTO HR_MAX_WGT VALUES ('K','1','1',320.00, 3500.00, 45000.000);
+INSERT INTO HR_MAX_WGT VALUES ('K','1','2',230.00, 1500.00, 32000.000);
+INSERT INTO HR_MAX_WGT VALUES ('K','1','2',230.00, 2400.00, 34000.000);
+INSERT INTO HR_MAX_WGT VALUES ('K','1','2',320.00, 2000.00, 44000.000);
+INSERT INTO HR_MAX_WGT VALUES ('K','1','2',320.00, 3800.00, 48000.000);
+INSERT INTO HR_MAX_WGT VALUES ('K','1','3',180.00, 1000.00, 18000.000);
+INSERT INTO HR_MAX_WGT VALUES ('K','1','3',180.00, 1600.00, 20000.000);
 
--- ------------------------------------------------------------
--- SD_PRODUCTIVITY_STD -- 공정별 실수율
+-- ============================================================
+-- SD_PRODUCTIVITY_STD — 공정별 실수율 (0~1)
 -- PK: (CMP_CD, ORG_CD, PROC_CD, GRADE_CD, PRODUCT_CD, CUSTOMER_CD)
--- Coverage:
---   S1 active SM,CR with SS400+COIL+CUST-001
---   S2 active SM,HR with SS400+COIL+CUST-001
---   S3 active SM,HR,HRF,CR with SS400+COIL+CUST-001
---   S4 active SM,HR with SS41+COIL+CUST-FAIL
---   S5 active SM,CRF with SS400+COIL+CUST-001
--- ------------------------------------------------------------
-INSERT INTO SD_PRODUCTIVITY_STD (CMP_CD, ORG_CD, PROC_CD, GRADE_CD, PRODUCT_CD, CUSTOMER_CD, PRODUCTIVITY)
-VALUES ('K', '1', 'SM',  'SS400', 'COIL', 'CUST-001', 0.9800);
-INSERT INTO SD_PRODUCTIVITY_STD (CMP_CD, ORG_CD, PROC_CD, GRADE_CD, PRODUCT_CD, CUSTOMER_CD, PRODUCTIVITY)
-VALUES ('K', '1', 'HR',  'SS400', 'COIL', 'CUST-001', 0.9700);
-INSERT INTO SD_PRODUCTIVITY_STD (CMP_CD, ORG_CD, PROC_CD, GRADE_CD, PRODUCT_CD, CUSTOMER_CD, PRODUCTIVITY)
-VALUES ('K', '1', 'HRF', 'SS400', 'COIL', 'CUST-001', 0.9600);
-INSERT INTO SD_PRODUCTIVITY_STD (CMP_CD, ORG_CD, PROC_CD, GRADE_CD, PRODUCT_CD, CUSTOMER_CD, PRODUCTIVITY)
-VALUES ('K', '1', 'CR',  'SS400', 'COIL', 'CUST-001', 0.9500);
-INSERT INTO SD_PRODUCTIVITY_STD (CMP_CD, ORG_CD, PROC_CD, GRADE_CD, PRODUCT_CD, CUSTOMER_CD, PRODUCTIVITY)
-VALUES ('K', '1', 'ANL1','SS400', 'COIL', 'CUST-001', 0.9900);
-INSERT INTO SD_PRODUCTIVITY_STD (CMP_CD, ORG_CD, PROC_CD, GRADE_CD, PRODUCT_CD, CUSTOMER_CD, PRODUCTIVITY)
-VALUES ('K', '1', 'ANL2','SS400', 'COIL', 'CUST-001', 0.9900);
-INSERT INTO SD_PRODUCTIVITY_STD (CMP_CD, ORG_CD, PROC_CD, GRADE_CD, PRODUCT_CD, CUSTOMER_CD, PRODUCTIVITY)
-VALUES ('K', '1', 'GAL', 'SS400', 'COIL', 'CUST-001', 0.9700);
-INSERT INTO SD_PRODUCTIVITY_STD (CMP_CD, ORG_CD, PROC_CD, GRADE_CD, PRODUCT_CD, CUSTOMER_CD, PRODUCTIVITY)
-VALUES ('K', '1', 'CRF', 'SS400', 'COIL', 'CUST-001', 0.9400);
+--
+-- 공정 8종: SM HR HRF CR ANL1 ANL2 GAL CRF
+-- 강종 × 품종 × 고객 다양한 조합 — 누적실수율 계산 (Phase 1)
+-- ============================================================
+-- SS400 / COIL / CUST-001 (표준)
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','SM',  'SS400','COIL','CUST-001', 0.9800);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','HR',  'SS400','COIL','CUST-001', 0.9700);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','HRF', 'SS400','COIL','CUST-001', 0.9600);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','CR',  'SS400','COIL','CUST-001', 0.9500);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','ANL1','SS400','COIL','CUST-001', 0.9900);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','ANL2','SS400','COIL','CUST-001', 0.9900);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','GAL', 'SS400','COIL','CUST-001', 0.9700);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','CRF', 'SS400','COIL','CUST-001', 0.9400);
 
--- SS41 + CUST-FAIL coverage for S4
-INSERT INTO SD_PRODUCTIVITY_STD (CMP_CD, ORG_CD, PROC_CD, GRADE_CD, PRODUCT_CD, CUSTOMER_CD, PRODUCTIVITY)
-VALUES ('K', '1', 'SM', 'SS41', 'COIL', 'CUST-FAIL', 0.9800);
-INSERT INTO SD_PRODUCTIVITY_STD (CMP_CD, ORG_CD, PROC_CD, GRADE_CD, PRODUCT_CD, CUSTOMER_CD, PRODUCTIVITY)
-VALUES ('K', '1', 'HR', 'SS41', 'COIL', 'CUST-FAIL', 0.9700);
+-- SS400 / COIL / CUST-002 (약간 낮은 실수율)
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','SM',  'SS400','COIL','CUST-002', 0.9750);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','HR',  'SS400','COIL','CUST-002', 0.9650);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','CR',  'SS400','COIL','CUST-002', 0.9450);
+
+-- SS400 / COIL / CUST-VIP (가장 높은 실수율 — 프리미엄 라인)
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','SM',  'SS400','COIL','CUST-VIP', 0.9900);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','HR',  'SS400','COIL','CUST-VIP', 0.9800);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','HRF', 'SS400','COIL','CUST-VIP', 0.9700);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','CR',  'SS400','COIL','CUST-VIP', 0.9700);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','GAL', 'SS400','COIL','CUST-VIP', 0.9750);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','CRF', 'SS400','COIL','CUST-VIP', 0.9550);
+
+-- SS490 / COIL / CUST-002
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','SM',  'SS490','COIL','CUST-002', 0.9700);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','HR',  'SS490','COIL','CUST-002', 0.9600);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','CR',  'SS490','COIL','CUST-002', 0.9400);
+
+-- SM355 / COIL / CUST-002
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','SM',  'SM355','COIL','CUST-002', 0.9650);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','HR',  'SM355','COIL','CUST-002', 0.9550);
+
+-- SS400 / FS
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','SM',  'SS400','FS','CUST-001', 0.9750);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','HR',  'SS400','FS','CUST-001', 0.9700);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','HRF', 'SS400','FS','CUST-001', 0.9600);
+
+-- SS400 / PLATE (후판은 압연만)
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','SM',  'SS400','PLATE','CUST-003', 0.9800);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','HR',  'SS400','PLATE','CUST-003', 0.9650);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','HRF', 'SS400','PLATE','CUST-003', 0.9550);
+
+-- SS41 / COIL / CUST-FAIL (검증용)
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','SM',  'SS41','COIL','CUST-FAIL', 0.9800);
+INSERT INTO SD_PRODUCTIVITY_STD VALUES ('K','1','HR',  'SS41','COIL','CUST-FAIL', 0.9700);

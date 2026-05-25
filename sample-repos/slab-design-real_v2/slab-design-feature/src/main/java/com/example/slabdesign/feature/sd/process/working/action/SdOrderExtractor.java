@@ -24,7 +24,7 @@ import java.util.List;
  * Phase 1 1단계: 4 ORDER 테이블 (OS / OM / QD / CHEMICAL) 을 Join 하여
  * SDOrderEntity 통합. ORDER_OS 의 진도(C/D) + 종결플래그(NULL/0 통과) 필터 적용.
  *
- * 구현: ORDER_OS 의 필터링된 row 들을 먼저 가져온 뒤, 각 row 의 (회사·소·주문번호) 복합키로
+ * 구현: ORDER_OS 의 필터링된 row 들을 먼저 가져온 뒤, 각 row 의 (온톨로지·소·주문번호) 복합키로
  * OM/QD/CHEMICAL 을 Repository.findById 로 조회. SDOrderLogic 의 리플렉션 매핑이 4 JPO 의
  * 동명 필드를 통합하여 단일 SDOrderEntity 로 변환.
  *
@@ -56,7 +56,7 @@ public class SdOrderExtractor {
     /**
      * 설계 대상 주문 추출. 정합성 점검은 별도 단계 (SdOrderValidator) 에서.
      *
-     * @param cmpCd 회사코드
+     * @param cmpCd 온톨로지코드
      * @param orgCd 소코드 (K=광양, P=포항)
      * @return 진도/종결 필터 통과한 SDOrderEntity 리스트 (4 JPO 통합 완료, 작업용 필드는 미설정)
      */

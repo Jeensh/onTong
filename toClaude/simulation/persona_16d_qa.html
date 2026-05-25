@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Persona QA · Phase 16D 검증</title>
+<style>
+ body{font:14px/1.55 -apple-system,sans-serif;max-width:920px;margin:24px auto;padding:0 18px;color:#111}
+ h1{font-size:20px;margin:0 0 6px} h2{font-size:15px;margin:18px 0 6px;border-bottom:1px solid #ddd;padding-bottom:3px}
+ .meta{color:#666;font-size:12px;margin-bottom:14px}
+ table{border-collapse:collapse;width:100%;font-size:13px;margin:6px 0}
+ th,td{border:1px solid #d8d8d8;padding:5px 7px;vertical-align:top;text-align:left}
+ th{background:#f5f5f7}
+ .ok{color:#0a7a2f;font-weight:600}
+ .miss{color:#b86a00;font-weight:600}
+ code{background:#f4f4f6;padding:1px 5px;border-radius:3px;font-size:12px}
+ .verdict{display:inline-block;padding:1px 6px;border-radius:3px;background:#eef3ff;color:#1b3f8a;font-size:11px}
+ .warn{background:#fff4e5;border-left:3px solid #c87800;padding:6px 9px;margin:4px 0;font-size:12px}
+ .clean{background:#f0faf2;border-left:3px solid #2f9e44;padding:6px 9px;margin:4px 0;font-size:12px}
+ .small{color:#555;font-size:11px}
+</style>
+</head>
+<body>
+
+<h1>Persona QA — Phase 16D 검증 (W1c + W4 라이브)</h1>
+<div class="meta">repo <code>slab-design-real-v2</code> · backend <code>:8001</code> · 5 시나리오 + 보너스 1 · 단위 7/7 PASS</div>
+
+<h2>1. 결론</h2>
+<p>
+<b>W4 (target_is_test) + W1c (alias_gap)</b> 사양대로 동작. 풀-스택 6 시나리오에서 W4 두 건 surface (PM 15C 케이스 + 보너스),
+정상 4 건 <b>false-positive 0</b>. 다음 우선순위 = <b>UI badge</b> — backend 는 <code>sources[].detail</code> 의
+<code>integrity_warning=…</code> 로 emit 하지만 <code>frontend/src</code> 내 grep <span class="ok">0 hit</span>, 사용자는 못 봄.
+</p>
+
+<h2>2. 시나리오 결과</h2>
+<table>
+<tr><th>#</th><th>질문</th><th>top target</th><th>verdict</th><th>matched_var</th><th>기대</th><th>실측</th></tr>
+<tr><td>1</td><td>엣징 그룹코드가 누락이면 어떤 에러?</td><td><code>…SdWidthRangeActionTest.dg103_edgingGroupMisses_throws()</code></td><td><span class="verdict">unknown</span></td><td>—</td><td>W4 발화</td><td class="ok">W4 ✓</td></tr>
+<tr><td>2</td><td>주문 수량이 0 이면 어떤 에러?</td><td><code>SdOrderValidator.validate(SDOrderEntity)</code></td><td><span class="verdict">yes</span></td><td><code>Order</code></td><td>warning 0</td><td class="ok">clean ✓</td></tr>
+<tr><td>3</td><td>validateOrder 어디 있어?</td><td><code>SdOrderValidator.validate(...)</code></td><td>locate (hypothesis 아님)</td><td>—</td><td>warning 0</td><td class="ok">clean ✓</td></tr>
+<tr><td>4</td><td>compileTime -1 시?</td><td><code>SdHistoryController.byOrder(...)</code></td><td><span class="verdict">likely_no</span></td><td><code>""</code></td><td>W1c 미발화</td><td class="ok">gating ✓</td></tr>
+<tr><td>B</td><td>슬라브 두께가 음수면 어떤 에러?</td><td><code>SdThicknessAction.execute(...)</code></td><td><span class="verdict">yes</span></td><td><code>thickness</code></td><td>warning 0</td><td class="ok">clean ✓</td></tr>
+<tr><td>B2</td><td>plant 마스터에 매핑이 없으면?</td><td><code>…SdThicknessActionTest.dg101_plantMappingMisses_throws()</code></td><td>unknown</td><td>—</td><td>W4 발화</td><td class="ok">W4 ✓</td></tr>
+</table>
+
+<h2>3. 발화 메시지 (실 raw)</h2>
+<div class="warn"><b>S1 — W4</b><br>
+<code>integrity_warning=target_is_test (target '…SdWidthRangeActionTest.dg103_edgingGroupMisses_throws()' 가 Test/Mock 패턴 — ranking 이 production code 대신 테스트/모킹 클래스를 선택했을 가능성)</code></div>
+<div class="warn"><b>B2 — W4</b><br>
+<code>integrity_warning=target_is_test (target '…SdThicknessActionTest.dg101_plantMappingMisses_throws()' …)</code></div>
+<div class="clean"><b>S2 / S3 / S4 / B</b> — sources 안에 <code>integrity_warning=</code> 토큰 <b>전무</b>. gating 정확.</div>
+
+<h2>4. 평가</h2>
+<ul>
+ <li><b>W4 정확도 — 우수.</b> 15C 가 발견한 <code>SdWidthRangeActionTest</code> 그대로 catch. 보너스 <code>SdThicknessActionTest</code> 도 동일 — 패턴 generalisation OK.</li>
+ <li><b>W1c gating — 정확.</b> S4 (<code>matched_var=""</code> + verdict=<code>likely_no</code>) 미발화, S2/B (matched_var 채움) clean. <span class="small">verdict=yes + matched_var="" + rule≥2 3중 조건의 자연스런 질의는 라이브 미발견 — 단위 7/7 PASS.</span></li>
+ <li><b>False-positive — 0.</b> production target + matched_var 채움 4 건 모두 warning 없음.</li>
+ <li><b>UI surface 미완.</b> <code>BridgeChatPanel</code> / <code>MultiturnChat</code> / Gate*Card 어디도 token 미파싱 → 1 순위.</li>
+ <li><b>S1 verdict=unknown 부작용.</b> Test target 이라 conditions 추출 실패 → 답이 unknown 으로 떨어지지만 W4 메시지가 그 원인을 정확히 surface — UI badge 가 더 시급한 이유.</li>
+</ul>
+
+<h2>5. 다음 권고 — UI badge</h2>
+<ol>
+ <li><code>sources[].detail</code> 에서 <code>integrity_warning=([a-z_]+)</code> 정규식 파싱 → 종류별 칩 (W4=빨강 "Test 의심", W1c=주황 "Alias gap", body_unsupported_*=노랑).</li>
+ <li>Gate-III 카드 헤더 옆 칩 + hover 시 detail 본문.</li>
+ <li>W4 발화 시 "다른 후보 보기" 버튼 동반 → top1 Test 일 때 production rank-2 로 점프.</li>
+</ol>
+
+</body>
+</html>

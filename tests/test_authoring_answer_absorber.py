@@ -25,7 +25,7 @@ def _sample_batch() -> iv.InterviewBatch:
             iv.InterviewQuestion(
                 id="meaning",
                 prompt="HrPlant 한 row 가 의미하는 것을 한 줄로 알려주세요.",
-                my_guess="회사·소·열연공장·품종 조합의 폭/길이 가능 범위",
+                my_guess="온톨로지·소·열연공장·품종 조합의 폭/길이 가능 범위",
                 placeholder="예: 맞음 / 정확히는 ...",
                 importance="critical",
             ),

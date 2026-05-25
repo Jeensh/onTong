@@ -23,7 +23,15 @@ export function WorkbenchShell() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        toggleCmdK();
+        // 좌측 검색 input 에 입력 중이었으면 그 텍스트를 ⌘K 로 이어받음 — 페르소나 P3 의
+        // focus 충돌 해소. textarea 는 제외 (긴 글 작성 중 우발적 트리거 방지).
+        const ae = document.activeElement;
+        let initial = "";
+        if (ae && ae.tagName === "INPUT") {
+          const v = (ae as HTMLInputElement).value;
+          if (v && v.trim().length > 0) initial = v.trim();
+        }
+        toggleCmdK(undefined, initial);
       }
       if (e.key === "Escape") {
         toggleCmdK(false);

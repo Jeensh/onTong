@@ -6,16 +6,16 @@ import { useWorkbench } from "./store";
 import { cn } from "@/lib/utils";
 
 const LEVELS = [
-  { key: "unmapped", label: "U", color: "text-destructive border-destructive bg-destructive/10" },
-  { key: "draft", label: "D", color: "text-amber-400 border-amber-400 bg-amber-400/10" },
-  { key: "signature_locked", label: "SL", color: "text-muted-foreground border-border" },
-  { key: "body_anchored", label: "BA", color: "text-muted-foreground border-border" },
-  { key: "sim_verified", label: "SV", color: "text-emerald-400 border-emerald-400 bg-emerald-400/10" },
-  { key: "pr_proven", label: "PR", color: "text-emerald-400 border-emerald-400 bg-emerald-400/10" },
+  { key: "unmapped",         label: "U",  full: "UNMAPPED",         dot: "bg-destructive"    },
+  { key: "draft",            label: "D",  full: "DRAFT",            dot: "bg-amber-400"      },
+  { key: "signature_locked", label: "SL", full: "SIGNATURE_LOCKED", dot: "bg-muted-foreground/60" },
+  { key: "body_anchored",    label: "BA", full: "BODY_ANCHORED",    dot: "bg-sky-400"        },
+  { key: "sim_verified",     label: "SV", full: "SIM_VERIFIED",     dot: "bg-emerald-400"    },
+  { key: "pr_proven",        label: "PR", full: "PR_PROVEN",        dot: "bg-emerald-500"    },
 ];
 
 export function StatusBar() {
-  const { activeRepoId, direction } = useWorkbench();
+  const { activeRepoId } = useWorkbench();
   const [progress, setProgress] = useState<{ total: number; byLevel: Record<string, number> }>({
     total: 0,
     byLevel: {},
@@ -46,31 +46,35 @@ export function StatusBar() {
 
   return (
     <footer
-      className="flex items-center gap-3 px-3 bg-card border-t border-border text-[11px] text-muted-foreground"
+      className="flex items-center gap-4 px-3 bg-card border-t border-border text-[11px] text-muted-foreground"
       style={{ gridArea: "status" }}
     >
-      <span className="flex items-center gap-1">
-        {LEVELS.map((lv) => (
-          <span
-            key={lv.key}
-            className={cn(
-              "inline-flex items-center gap-1 text-[10px] px-1 py-0 rounded-full border",
-              lv.color,
-            )}
-          >
-            <span className="font-semibold">{lv.label}</span>
-            {progress.byLevel[lv.key] ?? 0}
-          </span>
-        ))}
-      </span>
-      <span>
-        총 <strong className="text-foreground">{progress.total}</strong> actions ·
-        BODY_ANCHORED+ <strong className="text-emerald-400">{bodyAnchoredOrAbove}</strong> ({pct}%)
+      <div className="flex items-center gap-2.5">
+        {LEVELS.map((lv) => {
+          const count = progress.byLevel[lv.key] ?? 0;
+          return (
+            <span
+              key={lv.key}
+              className="inline-flex items-center gap-1 text-[10.5px]"
+              title={`${lv.full}: ${count}`}
+            >
+              <span className={cn("w-1.5 h-1.5 rounded-full", lv.dot, count === 0 && "opacity-30")} />
+              <span className={cn("font-mono tabular-nums", count > 0 ? "text-foreground" : "text-muted-foreground/60")}>
+                {lv.label} {count}
+              </span>
+            </span>
+          );
+        })}
+      </div>
+      <span className="w-px h-3 bg-border" />
+      <span className="text-[10.5px]">
+        <span className="font-mono tabular-nums text-foreground">{progress.total}</span>
+        <span className="text-muted-foreground/70"> actions ·</span>{" "}
+        <span className="font-mono tabular-nums text-emerald-500">{bodyAnchoredOrAbove}</span>
+        <span className="text-muted-foreground/70"> body-anchored+ </span>
+        <span className="font-mono tabular-nums text-foreground">({pct}%)</span>
       </span>
       <div className="flex-1" />
-      <span className={direction === "fwd" ? "text-primary" : "text-amber-400"}>
-        {direction === "fwd" ? "🔍 Forward" : "🔧 Backward"} 모드
-      </span>
     </footer>
   );
 }

@@ -300,7 +300,7 @@ def test_resolution_audit_log_hit() -> None:
 
 def test_resolution_audit_log_miss_allows_null_fqn() -> None:
     log = ResolutionAuditLog(
-        query_term="슬랩 폭 조정",
+        query_term="Slab 폭 조정",
         resolved_term_fqn=None,
         resolution_source=ResolutionSource.MISS,
         confidence=0.0,

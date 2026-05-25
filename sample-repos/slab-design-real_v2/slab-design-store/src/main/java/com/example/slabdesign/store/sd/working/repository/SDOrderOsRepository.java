@@ -32,6 +32,6 @@ public interface SDOrderOsRepository extends JpaRepository<SDOrderOsJpo, SDOrder
     List<SDOrderOsJpo> findDesignable(@Param("cmpCd") String cmpCd,
                                       @Param("orgCd") String orgCd);
 
-    /** 회사·소 단위 페이지 단위 주문 목록 (REST 브라우징용). */
+    /** 온톨로지·소 단위 페이지 단위 주문 목록 (REST 브라우징용). */
     List<SDOrderOsJpo> findByCmpCdAndOrgCd(String cmpCd, String orgCd, Pageable pageable);
 }

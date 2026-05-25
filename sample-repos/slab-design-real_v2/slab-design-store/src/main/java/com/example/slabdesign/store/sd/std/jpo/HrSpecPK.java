@@ -5,7 +5,7 @@ import java.util.Objects;
 
 /**
  * sd · std · HR_SPEC composite PK.
- * (회사코드, 소구분코드, 열연공장코드, 품종) — 4 컬럼.
+ * (온톨로지코드, 소구분코드, 열연공장코드, 품종) — 4 컬럼.
  */
 public class HrSpecPK implements Serializable {
 

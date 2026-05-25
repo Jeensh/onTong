@@ -5,7 +5,7 @@ import com.example.slabdesign.store.sd.working.jpo.SlabResultJpo;
 import org.springframework.stereotype.Component;
 
 /**
- * sd · working · 슬랩 도메인 변환 로직.
+ * sd · working · Slab 도메인 변환 로직.
  *
  * SLAB_RESULT JPO ↔ SDSlabEntity 변환 (DB값 portion 만).
  * 작업용 필드는 변환 대상 외 — 알고리즘이 메모리에서 직접 set/get.

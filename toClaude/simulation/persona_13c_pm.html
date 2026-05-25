@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>김PM 페르소나 검증 — Phase 13c (hypothesis intent)</title>
+<style>
+  body { font-family: -apple-system, "Apple SD Gothic Neo", sans-serif; max-width: 880px; margin: 32px auto; padding: 0 24px; color: #1a1a1a; line-height: 1.55; }
+  h1 { font-size: 22px; border-bottom: 2px solid #1a73e8; padding-bottom: 6px; }
+  h2 { font-size: 16px; margin-top: 28px; color: #1a73e8; }
+  h3 { font-size: 14px; margin: 14px 0 6px; }
+  .q { background: #f5f7fa; padding: 10px 12px; border-left: 3px solid #1a73e8; border-radius: 4px; margin: 8px 0; font-size: 13px; }
+  .pass { color: #1b873f; font-weight: 600; }
+  .fail { color: #c5221f; font-weight: 600; }
+  .warn { color: #b06000; font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 8px 0; }
+  th, td { border: 1px solid #d0d7de; padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: #f5f7fa; }
+  code { background: #f0f1f3; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+  .verdict { background: #e8f5e9; border: 1px solid #1b873f; padding: 12px 14px; border-radius: 6px; margin: 16px 0; }
+  .score { font-size: 18px; font-weight: 700; color: #1a73e8; }
+  ol, ul { margin: 4px 0 8px 18px; }
+  li { margin: 3px 0; }
+</style>
+</head>
+<body>
+
+<h1>김PM 페르소나 — Phase 13c 검증 (2026-05-18)</h1>
+<p style="color:#666;font-size:13px;">제조 IT PM 5년차 시점. 자바 못 읽음. boundary 검증 질의에 답을 기대. repo=<code>slab-design-real-v2</code>.</p>
+
+<h2>1. 결과 요약 (3 시나리오)</h2>
+<table>
+<thead><tr><th>질문</th><th>intent</th><th>conditions 추출</th><th>candidates</th><th>verdict / 결과</th><th>판정</th></tr></thead>
+<tbody>
+<tr>
+  <td>Q1. "엣징 마진이 1.0 미만이면 슬라브 사이즈 어떻게?"</td>
+  <td><code>hypothesis</code> <span class="pass">✓</span></td>
+  <td>var=엣징 마진, op=&lt;, value=1.0 <span class="pass">✓</span></td>
+  <td>0 (suggestions: 엣징그룹코드)</td>
+  <td>turn 3 진입 불가 — candidates 0</td>
+  <td class="fail">막힘</td>
+</tr>
+<tr>
+  <td>Q2. "주문 수량이 0 인 케이스 처리 어떻게?"</td>
+  <td><code>hypothesis</code> <span class="pass">✓</span></td>
+  <td>var=주문 수량, op==, value=0 <span class="pass">✓</span></td>
+  <td>5 (top: <code>SdFinalLengthRangeAction.execute</code>)</td>
+  <td>verdict=<code>likely_yes</code>, conf 0.75, 5 rules</td>
+  <td class="pass">개선</td>
+</tr>
+<tr>
+  <td>Q3 회귀. "엣징 마진 변경하면 어디 영향?"</td>
+  <td><code>impact</code> <span class="pass">✓</span></td>
+  <td>(impact 는 conditions N/A)</td>
+  <td>0 (suggestions: 엣징그룹코드)</td>
+  <td>—</td>
+  <td class="warn">회귀 부분</td>
+</tr>
+<tr>
+  <td>Q3' 회귀 (정상). "두께 검증 변경하면 어디 영향?"</td>
+  <td><code>impact</code> <span class="pass">✓</span></td>
+  <td>—</td>
+  <td>3 (top: <code>SdOrderValidator.validate</code>)</td>
+  <td>10 affected_methods, conf 1.0</td>
+  <td class="pass">정상</td>
+</tr>
+</tbody>
+</table>
+
+<h2>2. Phase 13c 신규 기능 검증</h2>
+
+<h3>(가) hypothesis intent 분류 — <span class="pass">3/3 PASS</span></h3>
+<p>"~면 어떻게" / "~인 케이스" 질문에 hypothesis intent 정확 매칭. confidence 0.9. LLM reasoning 도 한국어로 PM 가독.</p>
+
+<h3>(나) conditions 추출 — <span class="pass">3/3 PASS</span></h3>
+<p>3개 질문 모두 <code>var/op/value/unit</code> 4-필드 정확 추출. 변수명이 비즈니스 용어(엣징 마진, 주문 수량) 그대로 살아있음 — 김PM 시점에서 "내 질문 정확히 읽었네" 신뢰감 ↑.</p>
+
+<h3>(다) executed_hypothesis 응답 (Q2) — <span class="pass">PASS, 단 본문 신호 0</span></h3>
+<p>Q2 결과: <code>verdict=likely_yes</code>, reasoning="business_rule 4 행이 조건과 관련 — body 직접 검증 안 됨", evidence 5 행 (DG001~DG005), confidence 0.75. 김PM 이 보기에 <strong>판단 근거가 명시적</strong>이고 confidence 도 "확신은 아니지만 룰북에서 관련된 항목 있음" 으로 정직하게 표현됨.</p>
+
+<h2>3. 김PM 시점 평가</h2>
+
+<div class="verdict">
+<strong>전체 가치 (5점 만점): <span class="score">3.5 / 5</span></strong><br>
+근거: (1) Q2 완전 작동 — 기존엔 hypothesis 가 simulate 로 오인되어 무거운 Gate II 진입했으나 이제 가벼운 룰북 매칭으로 즉답, (2) verdict 단계화(likely_yes / unknown 등) 가 "예/아니오" 강제 대비 PM 친절, (3) <strong>치명적 마찰: Q1/Q3 의 "엣징 마진" 단어가 candidates 0</strong> — Phase 13b 의 suggestions surface 는 살아있지만 그게 candidate 미생성 → executed 진입 차단으로 이어짐. 50% 시나리오에서 답을 얻지 못함.
+</div>
+
+<h3>"여기에 어떻게 처리되나" 답 획득?</h3>
+<ul>
+  <li>Q1 (엣징 마진): <span class="fail">No</span> — candidates 0 으로 진입 차단. PM 은 suggestions "엣징그룹코드" 보고 재타이핑해야.</li>
+  <li>Q2 (주문 수량 0): <span class="pass">Yes</span> — verdict + 5 룰북 라인 + reasoning 으로 즉답.</li>
+  <li>Q3 (엣징 마진 영향): <span class="fail">No</span> — 같은 데이터 갭. 회귀 자체는 정상 (두께 검증으로 검증 시 10 affected_methods + 0.85 strength).</li>
+</ul>
+
+<h3>evidence 의 business_rule statements 가 PM 가독한가?</h3>
+<p><span class="pass">Yes.</span> Q2 evidence: "재고주문(STOCK_CODE=1)은 설계 대상 아님 (DG001)" / "주문 폭/길이 모두 양수 (DG002)" — 자바 없이 비즈니스 용어로 읽힘. DG001~DG005 라벨은 PM 이 "정합성 검증 5종" 으로 인지 가능.</p>
+
+<h3>verdict 가 신뢰감 / 혼란?</h3>
+<p><span class="pass">신뢰감 ↑.</span> <code>likely_yes</code> + reasoning "body 직접 검증 안 됨" 이 정직함. "Yes" 가 아니라 "likely" 인 이유까지 명시 — PM 시점에서 "AI 가 확실하지 않은 부분도 솔직히 말함" 으로 해석.</p>
+
+<h3>회귀 확인 — impact intent 동작?</h3>
+<p><span class="pass">정상.</span> "두께 검증" 으로 검증 시 affected_methods 10건 + match_kind=runtime_type + strength=0.85 + sim_v2 quick_diagnose 1/1 pass. Phase 13b 결과와 동일.</p>
+
+<h2>4. 흥미로운 발견</h2>
+<ol>
+  <li><strong>conditions 가 backend 까지 흘러감 but body_signals=0</strong>. Q2 sources 에 <code>body_signals=0 rule_signals=4</code> 명시 — 즉 LLM 이 추출한 conditions 를 body text 와 매칭하는 단계가 아직 없음. 룰북에만 의존. body 내 "qty == 0" 같은 분기 자동 탐지가 들어가면 confidence 가 0.75 → 0.95 도약 가능.</li>
+  <li><strong>"엣징 마진" 데이터 갭 = Phase 13b 와 동일 위치</strong>. ranking boost 가 안 작동하는 게 아니라 <em>해당 BusinessTerm 자체가 modeling 시드에 없음</em>. suggestions 가 "엣징그룹코드" 로 안내해도 PM 이 다시 타이핑해야 — 1-click 재검색이 여전히 없음 (Phase 13b 미해결 마찰 #2 그대로).</li>
+</ol>
+
+<h2>5. Phase 14 우선순위 추천</h2>
+<ol>
+  <li><strong>suggestions chip → 1-click 자동 재검색</strong> (Phase 13b 부터 미해결): 프론트엔드 chip 클릭 → 새 turn 자동 발사. Q1/Q3 같은 어휘 미스매치 시나리오의 차단을 해소. 백엔드 변경 0, 프론트 hook 만.</li>
+  <li><strong>conditions × body text 매칭</strong>: <code>build_gate_hypothesis</code> 내부에서 추출된 conditions 의 var 토큰(예: "qty", "수량") 을 body_text 와 substring 매칭 + 분기문(if/&lt;/&gt;) 패턴 매칭. body_signals &gt; 0 이면 confidence 0.75 → 0.9 boost + reasoning 에 "body L23: if (qty &lt;= 0) return fail" 같은 인용 추가. PM 시점 "여기에 처리됨" 답이 더 구체적.</li>
+  <li><strong>candidates 0 일 때 suggestions 자동 expansion</strong>: 현재 suggestions 가 surface 만 됨. backend 가 suggestions[0] 으로 검색 1회 더 시도해서 candidates 채우는 fallback. PM 의 재타이핑 부담 제거.</li>
+</ol>
+
+<p style="color:#666;font-size:12px;margin-top:32px;">검증 백엔드 :8001. 세션 6 개 (Q1×4 attempt, Q2×1, Q3×2). hypothesis intent 의 핵심 가설 — "PM 의 boundary 질문을 즉답" — 은 절반 시나리오 (Q2) 에서 입증됨. 나머지 절반 (Q1/Q3) 은 데이터 갭 + suggestions 1-click 부재로 막힘.</p>
+
+</body>
+</html>

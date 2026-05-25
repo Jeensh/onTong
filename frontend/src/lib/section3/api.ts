@@ -233,6 +233,28 @@ export async function getStats(): Promise<{ nodes: Record<string, number>; relat
   return r.json();
 }
 
+export interface RepoCounts {
+  actions: number;
+  code_methods: number;
+  code_types: number;
+  business_terms: number;
+  business_rules: number;
+  realizations: number;
+  call_sites: number;
+  sessions: number;
+}
+
+export interface RepoSummary {
+  repo_id: string;
+  counts: RepoCounts;
+}
+
+export async function listRepos(): Promise<{ repos: RepoSummary[] }> {
+  const r = await fetch(`${BASE}/repos`);
+  if (!r.ok) throw new Error(`repos: ${r.status}`);
+  return r.json();
+}
+
 export async function termSearch(q: string): Promise<Array<{ id: string; name: string; english?: string; category?: string; description?: string }>> {
   const r = await fetch(`${BASE}/term-search?q=${encodeURIComponent(q)}`);
   if (!r.ok) throw new Error(`term-search: ${r.status}`);

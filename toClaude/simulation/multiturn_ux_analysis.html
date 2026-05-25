@@ -1,0 +1,992 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>멀티턴 agent — 4 페르소나 실사용 분석</title>
+<style>
+  :root {
+    --bg:       #fafaf7;
+    --fg:       #1a1a1a;
+    --muted:    #6c6c6c;
+    --line:     #e5e3dc;
+    --orange:   #d9531e;
+    --green:    #2f8f5d;
+    --indigo:   #4858a8;
+    --purple:   #8e3aa1;
+    --warn:     #b8761a;
+    --red:      #b32a2a;
+    --card-bg:  #fff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Noto Sans KR", "Segoe UI", sans-serif;
+    line-height: 1.55; margin: 0;
+    padding: 28px 24px 100px;
+    max-width: 1180px; margin-left: auto; margin-right: auto;
+  }
+  header.hero {
+    border-left: 6px solid var(--red);
+    padding: 16px 22px;
+    background: linear-gradient(90deg, rgba(179,42,42,0.10), transparent);
+    margin-bottom: 22px;
+  }
+  header.hero h1 { font-size: 23px; margin: 0 0 6px; }
+  header.hero .sub { color: var(--muted); font-size: 14px; margin: 0; }
+  nav.toc {
+    background: var(--card-bg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 10px 16px; margin: 0 0 22px; font-size: 13px;
+  }
+  nav.toc strong { color: var(--indigo); margin-right: 8px; }
+  nav.toc a {
+    color: var(--fg); text-decoration: none;
+    border-bottom: 1px dashed var(--indigo);
+    margin-right: 14px; line-height: 2;
+  }
+  nav.toc a:hover { color: var(--orange); }
+
+  h2 {
+    font-size: 19px; margin: 28px 0 12px;
+    padding-bottom: 6px; border-bottom: 1px solid var(--line);
+  }
+  h3 { font-size: 16px; margin: 18px 0 8px; }
+  p { margin: 8px 0; }
+  small.note { color: var(--muted); font-size: 12px; }
+  code.inline {
+    background: rgba(72,88,168,0.10);
+    padding: 1px 6px; border-radius: 3px; font-size: 12.5px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  /* TL;DR strip */
+  .tldr {
+    background: #1a1a1a; color: #f5f3ec;
+    padding: 14px 18px; border-radius: 6px; margin: 0 0 22px;
+    font-size: 13.5px; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 16px;
+  }
+  .tldr .col .lbl {
+    color: #999; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 4px;
+  }
+  .tldr .col .v { font-size: 15px; font-weight: 600; }
+  .tldr .col .v.red { color: #ff9b6a; }
+  .tldr .col .v.amber { color: #ffba59; }
+  .tldr .col .v.green { color: #6fd49a; }
+  @media (max-width: 720px) { .tldr { grid-template-columns: 1fr 1fr; } }
+
+  /* Persona cards */
+  .persona-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 14px; margin: 14px 0;
+  }
+  @media (max-width: 720px) { .persona-grid { grid-template-columns: 1fr; } }
+  .persona-card {
+    border: 1px solid var(--line); background: var(--card-bg);
+    border-radius: 8px; padding: 16px 18px;
+  }
+  .persona-card.pm     { border-top: 3px solid var(--indigo); }
+  .persona-card.jr     { border-top: 3px solid var(--green); }
+  .persona-card.sr     { border-top: 3px solid var(--orange); }
+  .persona-card.qa     { border-top: 3px solid var(--purple); }
+  .persona-card h3 {
+    margin: 0 0 6px; font-size: 16px; display: flex; align-items: center; gap: 6px;
+  }
+  .persona-card h3 .icon {
+    font-size: 18px;
+  }
+  .persona-card .role { color: var(--muted); font-size: 12px; }
+  .persona-card .profile { font-size: 13px; margin: 8px 0; }
+  .persona-card .quote {
+    font-style: italic; color: var(--muted);
+    background: rgba(0,0,0,0.03); padding: 8px 10px; border-radius: 4px;
+    font-size: 12.5px; margin: 8px 0;
+    border-left: 2px solid var(--line);
+  }
+  .persona-card.pm .quote { border-left-color: var(--indigo); }
+  .persona-card.jr .quote { border-left-color: var(--green); }
+  .persona-card.sr .quote { border-left-color: var(--orange); }
+  .persona-card.qa .quote { border-left-color: var(--purple); }
+  .persona-card .stats { display: flex; gap: 12px; margin-top: 6px; font-size: 11px; }
+  .persona-card .stat .num { font-weight: 700; }
+  .persona-card .stat.fail .num { color: var(--red); }
+  .persona-card .stat.partial .num { color: var(--warn); }
+  .persona-card .stat.ok .num { color: var(--green); }
+
+  /* Pain point taxonomy */
+  .pain-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 720px) { .pain-grid { grid-template-columns: 1fr; } }
+  .pain {
+    border: 1px solid var(--line); border-radius: 6px;
+    background: var(--card-bg); padding: 12px 14px;
+    border-left: 4px solid var(--line);
+  }
+  .pain.crit  { border-left-color: var(--red); }
+  .pain.high  { border-left-color: var(--orange); }
+  .pain.med   { border-left-color: var(--warn); }
+  .pain h4 {
+    font-size: 14px; margin: 0 0 4px;
+    display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  }
+  .pain h4 .sev {
+    font-size: 10px; padding: 2px 8px; border-radius: 10px;
+    background: rgba(0,0,0,0.05); color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .pain.crit h4 .sev { background: rgba(179,42,42,0.12); color: var(--red); }
+  .pain.high h4 .sev { background: rgba(217,83,30,0.12); color: var(--orange); }
+  .pain.med  h4 .sev { background: rgba(184,118,26,0.12); color: var(--warn); }
+  .pain .desc { font-size: 13px; margin: 4px 0 6px; }
+  .pain .evidence {
+    font-size: 12px; color: var(--muted);
+    background: rgba(0,0,0,0.025); padding: 6px 8px; border-radius: 4px;
+    font-style: italic;
+    margin: 4px 0 0;
+  }
+  .pain .affects {
+    margin-top: 6px; font-size: 11px;
+    display: flex; gap: 4px; flex-wrap: wrap;
+  }
+  .pain .affects .p {
+    background: rgba(0,0,0,0.05); padding: 1px 7px; border-radius: 9px;
+    font-weight: 600;
+  }
+  .pain .affects .p.pm { background: rgba(72,88,168,0.15);  color: var(--indigo); }
+  .pain .affects .p.jr { background: rgba(47,143,93,0.15);  color: var(--green); }
+  .pain .affects .p.sr { background: rgba(217,83,30,0.15);  color: var(--orange); }
+  .pain .affects .p.qa { background: rgba(142,58,161,0.15); color: var(--purple); }
+
+  /* Trace tables */
+  .trace-tabs { display: flex; gap: 6px; margin: 12px 0 8px; flex-wrap: wrap; }
+  .trace-tab {
+    background: #fff; border: 1px solid var(--line); border-radius: 4px;
+    padding: 6px 14px; cursor: pointer; font: inherit; font-size: 13px;
+    transition: background 0.15s;
+  }
+  .trace-tab:hover { background: rgba(0,0,0,0.03); }
+  .trace-tab.active {
+    background: #1a1a1a; color: #fff; border-color: #1a1a1a;
+  }
+  .trace-tab .badge {
+    display: inline-block; margin-left: 6px; width: 18px; height: 18px;
+    background: rgba(0,0,0,0.08); border-radius: 50%;
+    text-align: center; line-height: 18px; font-size: 11px;
+  }
+  .trace-tab.active .badge { background: rgba(255,255,255,0.18); }
+  .trace-content { display: none; }
+  .trace-content.active { display: block; }
+
+  .trace-row {
+    border: 1px solid var(--line); border-radius: 6px;
+    background: var(--card-bg); margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .trace-row .head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; background: rgba(0,0,0,0.025);
+    border-bottom: 1px solid var(--line); cursor: pointer;
+  }
+  .trace-row .head .q { flex: 1; font-size: 13.5px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .trace-row .head .v {
+    font-size: 11px; padding: 2px 7px; border-radius: 9px;
+    background: rgba(0,0,0,0.06);
+  }
+  .trace-row .head .v.ok    { background: rgba(47,143,93,0.18);  color: var(--green); }
+  .trace-row .head .v.warn  { background: rgba(184,118,26,0.18); color: var(--warn); }
+  .trace-row .head .v.fail  { background: rgba(179,42,42,0.15);  color: var(--red); }
+  .trace-row .body { padding: 12px 14px; font-size: 13px; display: block; }
+  .trace-row.collapsed .body { display: none; }
+  .trace-row .stage {
+    margin: 6px 0; padding-left: 10px;
+    border-left: 2px solid var(--line);
+  }
+  .trace-row .stage .step {
+    font-weight: 600; font-size: 12px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .trace-row .stage .ret {
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px;
+    color: var(--fg); margin-top: 2px;
+  }
+  .trace-row .friction {
+    background: rgba(179,42,42,0.05);
+    border-left: 3px solid var(--red);
+    padding: 8px 12px; margin-top: 8px; border-radius: 4px;
+    font-size: 12.5px;
+  }
+  .trace-row .friction strong { color: var(--red); }
+  .trace-row .wish {
+    background: rgba(47,143,93,0.06);
+    border-left: 3px solid var(--green);
+    padding: 8px 12px; margin-top: 6px; border-radius: 4px;
+    font-size: 12.5px;
+  }
+  .trace-row .wish strong { color: var(--green); }
+
+  /* Improvement directions */
+  .dir-grid {
+    display: grid; grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .dir {
+    background: var(--card-bg); border: 1px solid var(--line);
+    border-radius: 8px; padding: 14px 18px;
+    display: grid; grid-template-columns: auto 1fr auto; gap: 16px;
+    align-items: center;
+  }
+  @media (max-width: 720px) { .dir { grid-template-columns: 1fr; } }
+  .dir .rank {
+    background: #1a1a1a; color: #fff;
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+  }
+  .dir .main h4 {
+    margin: 0 0 4px; font-size: 15px;
+  }
+  .dir .main .desc { font-size: 13px; color: var(--muted); }
+  .dir .main .solves { margin-top: 6px; font-size: 11.5px; }
+  .dir .main .solves .tag {
+    display: inline-block; background: rgba(0,0,0,0.05);
+    padding: 1px 7px; border-radius: 9px; margin-right: 4px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .dir .meta { font-size: 11px; text-align: right; }
+  .dir .meta div { line-height: 1.45; }
+  .dir .meta .impact .v   { color: var(--green); font-weight: 700; }
+  .dir .meta .cost   .v   { color: var(--warn); font-weight: 700; }
+
+  /* Matrix */
+  .matrix-wrap {
+    background: var(--card-bg); border: 1px solid var(--line);
+    border-radius: 6px; padding: 16px; margin: 14px 0;
+  }
+  svg.matrix { width: 100%; height: 380px; display: block; }
+  .matrix-axis-label { font-size: 11px; fill: var(--muted); }
+  .matrix-tick       { font-size: 10px; fill: var(--muted); }
+  .matrix-grid       { stroke: var(--line); stroke-dasharray: 3 3; }
+  .matrix-dot        { cursor: pointer; }
+  .matrix-dot:hover  { stroke: var(--indigo); stroke-width: 2; }
+  .matrix-label      { font-size: 12px; font-weight: 700; pointer-events: none; }
+  .quadrant-label    { font-size: 10px; fill: var(--muted); font-style: italic; }
+
+  /* Decision input */
+  .decision-box {
+    background: #fff; border: 2px solid var(--orange);
+    border-radius: 8px; padding: 18px 20px; margin: 28px 0 14px;
+  }
+  .decision-box h3 { margin-top: 0; color: var(--orange); }
+  .decision-box textarea {
+    width: 100%; min-height: 100px; padding: 10px;
+    border: 1px solid var(--line); border-radius: 4px;
+    font: inherit; font-size: 14px; resize: vertical;
+  }
+  .decision-box .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+  details summary { cursor: pointer; }
+  details summary:hover { color: var(--orange); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>멀티턴 agent — 4 페르소나가 실제로 써본 결과</h1>
+  <p class="sub">
+    각 페르소나가 자기 표현법으로 실 backend (`localhost:8001`) 에 쿼리 3 건씩, 풀 multiturn 사이클 시도.
+    이 페이지는 발견된 마찰 + 개선 방향을 정리.
+  </p>
+</header>
+
+<div class="tldr">
+  <div class="col">
+    <div class="lbl">실험된 쿼리</div>
+    <div class="v">12 (페르소나당 3)</div>
+  </div>
+  <div class="col">
+    <div class="lbl">풀 사이클 완주</div>
+    <div class="v red">3 / 12</div>
+  </div>
+  <div class="col">
+    <div class="lbl">ambiguous 데드락</div>
+    <div class="v red">5 / 12</div>
+  </div>
+  <div class="col">
+    <div class="lbl">의미있는 PASS</div>
+    <div class="v amber">~0 / 12</div>
+  </div>
+</div>
+
+<p style="font-size:14px; background:rgba(179,42,42,0.05); border-left:3px solid var(--red); padding:10px 14px;">
+  <strong>한 줄 결론:</strong> 현 multiturn 은 운영자에게 <b>유용한 도구가 아직 아님</b>.
+  intent 3 종 (simulate/impact/ambiguous) 은 운영 현실의 자연어 다양성에 비해 너무 좁고,
+  ambiguous 분류는 출구가 없으며, ranking 이 도메인 키워드를 helper/test 클래스에 자주 빼앗기고,
+  Gate III 의 "PASS" / "confidence 1.0" 가 실제로는 stub 화/데이터 부재 인 상황에서도 surface 되어 <b>잘못된 안전 신호</b>를 줌.
+</p>
+
+<nav class="toc">
+  <strong>목차:</strong>
+  <a href="#personas">페르소나</a>
+  <a href="#painpoints">Pain Points</a>
+  <a href="#traces">상세 trace</a>
+  <a href="#directions">개선 방향 10</a>
+  <a href="#matrix">우선순위 매트릭스</a>
+  <a href="#decide">결정</a>
+</nav>
+
+<!-- ===================================================== -->
+<section id="personas">
+  <h2>1. 페르소나 4명</h2>
+  <div class="persona-grid">
+    <div class="persona-card pm">
+      <h3><span class="icon">👔</span> 김PM <span style="color:var(--muted); font-size:12px;">— 비즈니스 분석가, 35세</span></h3>
+      <div class="role">슬랩 도메인 5년. Java 못 읽음. 비즈니스 용어 풍부.</div>
+      <div class="profile">
+        모호하게 시작 → 후보 보고 점진 좁힘.
+        "정책 바꾸면 어디 영향?" 이 핵심 use case.
+      </div>
+      <div class="quote">"엣징 마진 변경하면 어디 영향?"</div>
+      <div class="stats">
+        <span class="stat fail"><span class="num">0/3</span> 풀 완주</span>
+        <span class="stat fail"><span class="num">2/3</span> 0-cand</span>
+        <span class="stat fail"><span class="num">3/3</span> ambiguous/dead-end</span>
+      </div>
+    </div>
+
+    <div class="persona-card jr">
+      <h3><span class="icon">🧑‍💻</span> 박주니어 <span style="color:var(--muted); font-size:12px;">— 신입 개발자, 2개월차</span></h3>
+      <div class="role">Java 익숙. 도메인 무지. 영문 메서드명으로 시작.</div>
+      <div class="profile">
+        메서드명 / 클래스명 던지고 "이게 뭐임?" 부터.
+        빠른 코드 이해 + body / caller 보기 위주.
+      </div>
+      <div class="quote">"validateOrder 이거 뭐함?"</div>
+      <div class="stats">
+        <span class="stat partial"><span class="num">1/3</span> 풀 완주(엉뚱한 메서드)</span>
+        <span class="stat fail"><span class="num">3/3</span> FQN 매칭 실패</span>
+        <span class="stat fail"><span class="num">3/3</span> file_path 빈값</span>
+      </div>
+    </div>
+
+    <div class="persona-card sr">
+      <h3><span class="icon">⚡</span> 이백호 <span style="color:var(--muted); font-size:12px;">— 시니어 엔지니어, 5년차</span></h3>
+      <div class="role">코드 + 도메인 둘 다 OK. 정확한 표기 + 약식 혼용.</div>
+      <div class="profile">
+        빠르게 정확한 결과 원함. PR 전 회귀 영향 분석 자주.
+        ambiguous 응답에 매우 짜증.
+      </div>
+      <div class="quote">"calc cumulative productivity 영향도 좀"</div>
+      <div class="stats">
+        <span class="stat ok"><span class="num">2/3</span> 풀 완주</span>
+        <span class="stat fail"><span class="num">2/3</span> 랭킹 신뢰 깨짐</span>
+        <span class="stat fail"><span class="num">1/3</span> 잘못된 confidence 1.0</span>
+      </div>
+    </div>
+
+    <div class="persona-card qa">
+      <h3><span class="icon">🔬</span> 최테스터 <span style="color:var(--muted); font-size:12px;">— QA 엔지니어, 28세</span></h3>
+      <div class="role">도메인 친숙. 코드 일부. 가정문 / 엣지케이스 사냥.</div>
+      <div class="profile">
+        "X 면 Y 되나?" 식 hypothesis 검증.
+        탐색적 사용 (쳐보고 다음 결정).
+      </div>
+      <div class="quote">"두께가 음수면 어떻게 되나?"</div>
+      <div class="stats">
+        <span class="stat partial"><span class="num">0/3</span> 가설값 fixture 반영</span>
+        <span class="stat fail"><span class="num">3/3</span> MagicMock-blind PASS</span>
+        <span class="stat fail"><span class="num">3/3</span> yes/no verdict 없음</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================== -->
+<section id="painpoints">
+  <h2>2. Pain Point 분류 — 어떤 카테고리에서 깨지는가</h2>
+  <div class="pain-grid">
+
+    <div class="pain crit">
+      <h4>A. 도메인 사전 부재 (Korean ↔ English 매핑) <span class="sev">CRITICAL</span></h4>
+      <div class="desc">
+        "엣징 마진" 같은 운영 핵심 용어가 영문 코드 식별자와 매핑되지 않아 0 candidate.
+      </div>
+      <div class="evidence">"엣징 마진 변경하면 어디 영향?" → <code>candidates: 0</code>. 후속 안내도 없음.</div>
+      <div class="affects"><span class="p pm">김PM</span><span class="p qa">최테스터</span></div>
+    </div>
+
+    <div class="pain crit">
+      <h4>B. ambiguous = 출구 없음 <span class="sev">CRITICAL</span></h4>
+      <div class="desc">
+        ambiguous 분류 + 빈 candidates 면 같은 session 으로 재시도 불가 (HTTP 422).
+        새 session 강제. 탐색적 사용 (한 번 쳐보고 다음) 완전 단절.
+      </div>
+      <div class="evidence">박주니어 / 최테스터 모두 첫 시도 ambiguous → 막혀서 새 세션 시작 필수.</div>
+      <div class="affects"><span class="p pm">김PM</span><span class="p jr">박주니어</span><span class="p qa">최테스터</span></div>
+    </div>
+
+    <div class="pain crit">
+      <h4>C. Intent 3 종은 너무 좁음 <span class="sev">CRITICAL</span></h4>
+      <div class="desc">
+        simulate / impact / ambiguous 만으론 운영 현실 못 담음. 핵심 누락:
+        <code class="inline">locate</code> ("어디서 계산?"),
+        <code class="inline">explain</code> ("뭐함?"),
+        <code class="inline">question</code> (yes/no),
+        <code class="inline">simulate_hypothesis</code> ("X 면 Y?").
+      </div>
+      <div class="evidence">박주니어 "cumulativeProductivity 어디서 계산해?" → impact 로 분류 → 12/12 fixture pass 가 응답. 사용자가 원한 body+caller 는 surface 안 됨.</div>
+      <div class="affects"><span class="p jr">박주니어</span><span class="p qa">최테스터</span><span class="p pm">김PM</span></div>
+    </div>
+
+    <div class="pain crit">
+      <h4>D. PASS 가 거짓 신호 (MagicMock-blind) <span class="sev">CRITICAL</span></h4>
+      <div class="desc">
+        stub 이 MagicMock 반환 → output 이 <code class="inline">&lt;MagicMock&gt;</code> / <code class="inline">raised TypeError</code> 이어도 status PASS.
+        QA 의 가설 검증, 시니어의 회귀 안전 신호로 둘 다 무효.
+      </div>
+      <div class="evidence">이백호 "thickness 검증 시뮬" → PASS + <code>output: "raised AttributeError"</code>. 4 페르소나 12 쿼리 중 "의미있는 PASS" ~0건.</div>
+      <div class="affects"><span class="p sr">이백호</span><span class="p qa">최테스터</span><span class="p jr">박주니어</span></div>
+    </div>
+
+    <div class="pain crit">
+      <h4>E. Gate III impact 빈 결과 + confidence 1.0 = 잘못된 안전 <span class="sev">CRITICAL</span></h4>
+      <div class="desc">
+        affected_methods 빈 배열인데 confidence 1.0. 시니어가 PR 전 영향 분석으로 받으면 "안전" 으로 오해 → 사고 위험.
+        실제로 caller endpoint 직호출하면 1+ 행 존재.
+      </div>
+      <div class="evidence">이백호 "calc cumulative productivity 영향도" → affected_methods [], 그러나 <code>/code-methods/.../callers</code> 호출하면 SdDesigner.design 1건 surface.</div>
+      <div class="affects"><span class="p sr">이백호</span><span class="p jr">박주니어</span></div>
+    </div>
+
+    <div class="pain high">
+      <h4>F. 랭킹이 도메인 무지 — helper 가 action 을 이김 <span class="sev">HIGH</span></h4>
+      <div class="desc">
+        "thickness 검증" → ValidationResult.pass/fail (score 9.0) > SdThicknessAction.execute (3.0).
+        "주문 검증" → SdOrderController.list 가 SdOrderValidator.validate 위에. recommended_index=0 도 잘못된 후보.
+      </div>
+      <div class="evidence">김PM / 박주니어 / 이백호 모두 동일 패턴 — 4 페르소나 중 3.</div>
+      <div class="affects"><span class="p pm">김PM</span><span class="p jr">박주니어</span><span class="p sr">이백호</span></div>
+    </div>
+
+    <div class="pain high">
+      <h4>G. FQN 부분 매칭 무시 <span class="sev">HIGH</span></h4>
+      <div class="desc">
+        시니어가 <code>"SdOrderValidator.validate"</code> 콕 찍어도 top-5 에 없음.
+        명시적 클래스.메서드 표기는 사용자의 강한 시그널인데 점수 부스트 없음.
+      </div>
+      <div class="evidence">이백호 쿼리 3 → SdDesigner.design 이 1위. SdOrderValidator 부재.</div>
+      <div class="affects"><span class="p sr">이백호</span><span class="p jr">박주니어</span></div>
+    </div>
+
+    <div class="pain high">
+      <h4>H. 한글 라벨 / file_path 미surface <span class="sev">HIGH</span></h4>
+      <div class="desc">
+        후보 5개가 모두 Java FQN 노출. body_preview 의 한글 주석은 작게만.
+        file_path/line_start 가 빈 문자열 → "vscode 에서 열기" 불가능.
+      </div>
+      <div class="evidence">박주니어 "후보 5 개 다 file_path:''" / 김PM "전부 FQN 이라 어지러움".</div>
+      <div class="affects"><span class="p pm">김PM</span><span class="p jr">박주니어</span></div>
+    </div>
+
+    <div class="pain high">
+      <h4>I. 가설값 fixture 반영 안 됨 <span class="sev">HIGH</span></h4>
+      <div class="desc">
+        QA 가 "음수 / null / 0" 같이 경계값을 자연어로 명시해도 synthesize_fixtures 가 default null 만 채움.
+        가설 검증 = 0건.
+      </div>
+      <div class="evidence">"두께가 음수면" → fixture {arg0: null}. "엣징 마진 0 이면" → fixture 어디에도 0 안 들어감.</div>
+      <div class="affects"><span class="p qa">최테스터</span></div>
+    </div>
+
+    <div class="pain med">
+      <h4>J. 0-cand / 모름 silent 응답 <span class="sev">MEDIUM</span></h4>
+      <div class="desc">
+        후보 못 찾으면 그냥 빈 배열. 동의어 / 인접 키워드 / "이 용어 미모델링" 같은 자기인지 메시지 0.
+      </div>
+      <div class="evidence">김PM "왜 못 찾았는지 한 마디 설명이 없음. 다른 표현 시도해야 하는지조차 모름".</div>
+      <div class="affects"><span class="p pm">김PM</span><span class="p qa">최테스터</span></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===================================================== -->
+<section id="traces">
+  <h2>3. 페르소나별 상세 trace (펼쳐서 확인)</h2>
+  <p>아래 탭에서 페르소나 선택. 각 쿼리는 클릭해서 펼치고 닫을 수 있음.</p>
+  <div class="trace-tabs">
+    <button class="trace-tab active" data-tab="pm">김PM<span class="badge">3</span></button>
+    <button class="trace-tab" data-tab="jr">박주니어<span class="badge">3</span></button>
+    <button class="trace-tab" data-tab="sr">이백호<span class="badge">3</span></button>
+    <button class="trace-tab" data-tab="qa">최테스터<span class="badge">3</span></button>
+  </div>
+
+  <!-- PM traces -->
+  <div class="trace-content active" data-tab="pm">
+    <div class="trace-row">
+      <div class="head"><div class="q">"엣징 마진 변경하면 어디 영향?"</div><div class="v fail">0-cand / dead-end</div></div>
+      <div class="body">
+        <div class="stage"><div class="step">Gate I</div><div class="ret">intent=impact (0.9), candidates: 0</div></div>
+        <div class="stage"><div class="step">Confirm</div><div class="ret">ok=true, next_gate_kind=executed_impact (그러나 cand=0)</div></div>
+        <div class="stage"><div class="step">Respond</div><div class="ret">422 "selected_index=0 가 candidates 범위 밖"</div></div>
+        <div class="friction">
+          <strong>김PM 입장</strong> — "엣징 마진" 은 5 년 일해온 핵심어. 0 cand = "이 시스템은 우리 비즈니스를 모른다" 결론.
+          왜 못 찾았는지 안내 0, 동의어 제안 0.
+        </div>
+        <div class="wish">
+          <strong>원하는 것</strong> — "엣징 마진 → edging / margin / 두께 마진 중 어느 쪽?" 같은 역질문, 또는 "유사 키워드: 두께, 폭, 길이" 제안.
+        </div>
+      </div>
+    </div>
+
+    <div class="trace-row collapsed">
+      <div class="head"><div class="q">"두께 룰 좀 보여줘"</div><div class="v fail">ambiguous + 0-cand</div></div>
+      <div class="body">
+        <div class="stage"><div class="step">Gate I</div><div class="ret">intent=ambiguous (0.7), candidates: 0</div></div>
+        <div class="stage"><div class="step">Confirm</div><div class="ret">next_gate_kind=null (출구 없음)</div></div>
+        <div class="stage"><div class="step">Respond</div><div class="ret">422 "ambiguous — 재분류 필요" (방법은 안 알려줌)</div></div>
+        <div class="friction">
+          <strong>김PM 입장</strong> — "두께 룰" 너무 평범한 자연어. simulate/impact 라는 카테고리 자체를 모르는데 분류 강요.
+          ambiguous + 0 cand = 완전 막힘. "재분류" 가 뭐 하는 건지 운영자 모름.
+        </div>
+        <div class="wish">
+          <strong>원하는 것</strong> — 그냥 "두께" 키워드로 메서드/Action 리스트라도. ambiguous 대신 "영향 보실래요? 실제 값 넣고 돌릴까요?" 평어 선택지.
+        </div>
+      </div>
+    </div>
+
+    <div class="trace-row collapsed">
+      <div class="head"><div class="q">"주문 검증 어디서 해?"</div><div class="v warn">ambiguous + 5-cand / dead-end</div></div>
+      <div class="body">
+        <div class="stage"><div class="step">Gate I</div><div class="ret">intent=ambiguous (0.7), candidates: 5 (list, detail, validate, design, FinalLengthRange)</div></div>
+        <div class="stage"><div class="step">recommended_index</div><div class="ret">0 = list (≠ 정답 validate)</div></div>
+        <div class="stage"><div class="step">Confirm cand 2 = validate</div><div class="ret">next_gate_kind=null (ambiguous 이라)</div></div>
+        <div class="stage"><div class="step">Respond</div><div class="ret">422 "ambiguous — 재분류 필요"</div></div>
+        <div class="friction">
+          <strong>김PM 입장</strong> — 후보 5개 다 Java FQN, 한글 단서는 body_preview 안에 묻힘.
+          추천이 list 인데 정답은 validate. score 13.0 vs 10.0 운영자에겐 노이즈.
+          또 ambiguous + cand 5 인데도 confirm 으로 intent 해소 안 됨.
+        </div>
+        <div class="wish">
+          <strong>원하는 것</strong> — 한글 label first. ambiguous 라도 cand 클릭 = intent 해소. score 숨기고 "가장 가까워 보임" 평어.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JR traces -->
+  <div class="trace-content" data-tab="jr">
+    <div class="trace-row">
+      <div class="head"><div class="q">"validateOrder 이거 뭐함?"</div><div class="v fail">ambiguous + 매칭 실패</div></div>
+      <div class="body">
+        <div class="stage"><div class="step">Gate I</div><div class="ret">intent=ambiguous (0.7), candidates: 5 (1·2위 SdOrderController.list/.detail, validate 부재)</div></div>
+        <div class="stage"><div class="step">Confirm + Respond</div><div class="ret">422 "ambiguous — 재분류 필요"</div></div>
+        <div class="friction">
+          <strong>박주니어 입장</strong> — "validateOrder" 라고 콕 찍었는데 list/detail 이 1·2위. 글자 일치도 무시되는 듯.
+          ambiguous 면 "재분류" 라는데 뭘 다시 쳐야 하는지 예시 0.
+        </div>
+        <div class="wish">
+          <strong>원하는 것</strong> — "ambiguous 면 '[simulate] / [impact]' 버튼 + 자연어 예시". 글자 substring 매치 시 부스트.
+        </div>
+      </div>
+    </div>
+
+    <div class="trace-row collapsed">
+      <div class="head"><div class="q">"SdOrderValidator 시뮬해보고 싶어"</div><div class="v warn">simulate / 엉뚱한 메서드 시뮬</div></div>
+      <div class="body">
+        <div class="stage"><div class="step">Gate I</div><div class="ret">intent=simulate (0.9), candidates: 5 (1·2위 SdOrderController.list/.detail, SdOrderValidator 자체 부재)</div></div>
+        <div class="stage"><div class="step">Confirm 0 + Gate II</div><div class="ret">SdOrderController.list Java body + python + 1 fixture</div></div>
+        <div class="stage"><div class="step">Gate III sim</div><div class="ret">PASS + output: "raised TypeError"</div></div>
+        <div class="friction">
+          <strong>박주니어 입장</strong> — SdOrderValidator 친 결과로 SdOrderController 시뮬됨. 알아보기 어려움.
+          PASS 와 TypeError 동시 = 의미 무.
+        </div>
+        <div class="wish">
+          <strong>원하는 것</strong> — 사용자 친 클래스명과 후보 fqn 의 일치 부분 하이라이트. "validator 못 찾음 → controller 보여주는 중" disclaimer.
+          PASS / TypeError 모순은 명시적 표시.
+        </div>
+      </div>
+    </div>
+
+    <div class="trace-row collapsed">
+      <div class="head"><div class="q">"cumulativeProductivity 이 변수 어디서 계산해?"</div><div class="v fail">의도-응답 불일치</div></div>
+      <div class="body">
+        <div class="stage"><div class="step">Gate I</div><div class="ret">intent=impact (목표는 locate 인데 impact 로 분류), candidates: 5</div></div>
+        <div class="stage"><div class="step">Gate III impact</div><div class="ret">affected_methods: [], 12/12 fixtures pass, confidence 1.0</div></div>
+        <div class="friction">
+          <strong>박주니어 입장</strong> — "어디서 계산?" 물었는데 "12/12 fixtures pass" 가 답. 본문도 caller 도 surface 안 됨.
+          affected_methods 빈 배열인데 confidence 1.0 → "영향 없음" 으로 오해.
+        </div>
+        <div class="wish">
+          <strong>원하는 것</strong> — locate / explain intent 신설. body + file_path + callers 만 응답. "데이터 없음" 과 "영향 없음" 구분.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SR traces -->
+  <div class="trace-content" data-tab="sr">
+    <div class="trace-row">
+      <div class="head"><div class="q">"thickness 검증 시뮬"</div><div class="v warn">랭킹 이상 + degenerate PASS</div></div>
+      <div class="body">
+        <div class="stage"><div class="step">Gate I</div><div class="ret">intent=simulate, candidates: ValidationResult.pass (9.0), .fail (9.0), SdThicknessAction.execute (3.0)</div></div>
+        <div class="stage"><div class="step">Gate II / III</div><div class="ret">PASS + output: "raised AttributeError"</div></div>
+        <div class="friction">
+          <strong>이백호 입장</strong> — "thickness 검증" 인데 helper (ValidationResult.pass/fail) 가 도메인 액션 (SdThicknessAction.execute) 보다 위.
+          PASS + AttributeError = fixture-degenerate null arg → 신뢰 무.
+        </div>
+        <div class="wish">
+          <strong>원하는 것</strong> — Sd*Action / *Validator / *Service 패턴 +5 부스트, *Result / Util -3 패널티.
+          stub-degenerate 결과는 status=INCONCLUSIVE.
+        </div>
+      </div>
+    </div>
+
+    <div class="trace-row collapsed">
+      <div class="head"><div class="q">"calc cumulative productivity 영향도 좀"</div><div class="v fail">빈 affected + confidence 1.0</div></div>
+      <div class="body">
+        <div class="stage"><div class="step">Gate I</div><div class="ret">intent=impact, candidate 1위 ProductivityService.cumulativeProductivity (정답)</div></div>
+        <div class="stage"><div class="step">Gate III impact</div><div class="ret">affected_methods: [], confidence 1.0, 12/12 fixtures pass</div></div>
+        <div class="stage"><div class="step">/code-methods/.../callers 직호출</div><div class="ret">SdDesigner.design 1건 surface (Gate III 가 누락)</div></div>
+        <div class="friction">
+          <strong>이백호 입장</strong> — 후보 매칭은 정확. 그러나 Gate III impact 가 caller 를 surface 안 하면서 confidence 1.0 = 잘못된 "안전" 신호. PR 전 의지하면 사고.
+        </div>
+        <div class="wish">
+          <strong>원하는 것</strong> — caller endpoint 결과 그대로 surface. confidence 는 caller 수 기반. 빈 결과면 confidence 0.
+        </div>
+      </div>
+    </div>
+
+    <div class="trace-row collapsed">
+      <div class="head"><div class="q">"SdOrderValidator.validate 시뮬 한번"</div><div class="v fail">FQN 무시</div></div>
+      <div class="body">
+        <div class="stage"><div class="step">Gate I</div><div class="ret">intent=simulate, candidates: SdDesigner.design (17.0!), FinalLengthRange, FinalWidthRange — SdOrderValidator.validate 부재</div></div>
+        <div class="stage"><div class="step">Gate II</div><div class="ret">SdDesigner.design 본문 (1줄 짜리 return design(order, null))</div></div>
+        <div class="friction">
+          <strong>이백호 입장</strong> — 클래스.메서드 콕 찍었는데 substring/FQN 매칭 부스트 없음. 시간 낭비.
+        </div>
+        <div class="wish">
+          <strong>원하는 것</strong> — 쿼리에 . 있고 PascalCase Class 이면 +15 부스트 + cand 10 개로 확장.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QA traces -->
+  <div class="trace-content" data-tab="qa">
+    <div class="trace-row">
+      <div class="head"><div class="q">"두께가 음수면 어떻게 되나?"</div><div class="v fail">가설 + ambiguous</div></div>
+      <div class="body">
+        <div class="stage"><div class="step">Gate I</div><div class="ret">intent=ambiguous, candidates: 0. 같은 SID 재시도 → 422</div></div>
+        <div class="stage"><div class="step">새 SID + "두께 검증 메서드 시뮬"</div><div class="ret">4 cand → 풀 사이클. fixture {arg0: null}, output: MagicMock, status PASS</div></div>
+        <div class="friction">
+          <strong>최테스터 입장</strong> — "음수면" 의 "음수" 가 fixture 에 0 반영. yes/no 답 어디에도 surface 안 됨. PASS 가 MagicMock-blind.
+        </div>
+        <div class="wish">
+          <strong>원하는 것</strong> — simulate_hypothesis intent. "음수" 키워드 → fixture 에 -1 / -0.01 같은 음수 주입. yes/no verdict.
+        </div>
+      </div>
+    </div>
+
+    <div class="trace-row collapsed">
+      <div class="head"><div class="q">"주문 ID 가 null 일 때 시뮬해줘"</div><div class="v warn">fixture null 우연 일치</div></div>
+      <div class="body">
+        <div class="stage"><div class="step">Gate I + Gate II</div><div class="ret">intent=simulate, 정합성_검증 cand, fixture {arg0:null, arg1:null}</div></div>
+        <div class="stage"><div class="step">Gate III sim</div><div class="ret">PASS + output: MagicMock(checkStockOrder())</div></div>
+        <div class="friction">
+          <strong>최테스터 입장</strong> — fixture null 은 default 값이지 "내가 null 시도 한다" 결과 아님. NPE 발생/catch 도 surface 안 됨.
+        </div>
+        <div class="wish">
+          <strong>원하는 것</strong> — fixture 의 각 arg 출처 trace (user_pinned / default / schema_default).
+        </div>
+      </div>
+    </div>
+
+    <div class="trace-row collapsed">
+      <div class="head"><div class="q">"엣징 마진이 0 이면 검증 통과해?"</div><div class="v fail">yes/no 답 부재</div></div>
+      <div class="body">
+        <div class="stage"><div class="step">Gate I</div><div class="ret">첫 ambiguous → 새 SID + 표현 변경 후 simulate 진입. 정합성_검증 cand.</div></div>
+        <div class="stage"><div class="step">Gate III</div><div class="ret">PASS + MagicMock. "0" 한 번도 fixture 에 안 들어감.</div></div>
+        <div class="friction">
+          <strong>최테스터 입장</strong> — yes/no 질문 자체가 intent 없음. "통과 / 미통과" 결론 surface 0. boundary value 0 도 무주입.
+        </div>
+        <div class="wish">
+          <strong>원하는 것</strong> — intent=question. 결과 패널 top 에 "예 / 아니오 / 모호" verdict 라인.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================== -->
+<section id="directions">
+  <h2>4. 개선 방향 10 — 임팩트 / 비용 추정</h2>
+  <p>각 방향은 위에서 발견한 Pain 와 직접 연결. 비용은 backend / frontend 변경 규모 추정.</p>
+  <div class="dir-grid">
+
+    <div class="dir">
+      <div class="rank">1</div>
+      <div class="main">
+        <h4>Intent vocabulary 확장 (3 → 6+ 종)</h4>
+        <div class="desc">simulate / impact / ambiguous 외에 <code class="inline">locate</code> / <code class="inline">explain</code> / <code class="inline">question</code> / <code class="inline">simulate_hypothesis</code> 추가. LLM prompt + Gate I 카드 갱신 + Gate II/III 분기.</div>
+        <div class="solves">해결: <span class="tag">C</span><span class="tag">D</span><span class="tag">I</span></div>
+      </div>
+      <div class="meta">
+        <div class="impact">임팩트 <span class="v">★★★★</span></div>
+        <div class="cost">비용 <span class="v">중</span></div>
+      </div>
+    </div>
+
+    <div class="dir">
+      <div class="rank">2</div>
+      <div class="main">
+        <h4>Ambiguous 출구 — 같은 session 으로 재분류</h4>
+        <div class="desc">Gate I 가 ambiguous + cand>0 일 때 confirm = intent 해소. ambiguous + cand=0 이면 동의어 / "이게 X 면 [simulate] / Y 면 [impact]" 버튼 surface.</div>
+        <div class="solves">해결: <span class="tag">B</span><span class="tag">J</span></div>
+      </div>
+      <div class="meta">
+        <div class="impact">임팩트 <span class="v">★★★★</span></div>
+        <div class="cost">비용 <span class="v">저</span></div>
+      </div>
+    </div>
+
+    <div class="dir">
+      <div class="rank">3</div>
+      <div class="main">
+        <h4>도메인 사전 시드 (Korean ↔ English 매핑)</h4>
+        <div class="desc">"엣징" ↔ edging / "마진" ↔ margin / "정합성" ↔ validation 같은 상위 50 도메인 용어 매핑 테이블. intent / candidate 검색 시 적용.</div>
+        <div class="solves">해결: <span class="tag">A</span><span class="tag">J</span></div>
+      </div>
+      <div class="meta">
+        <div class="impact">임팩트 <span class="v">★★★★</span></div>
+        <div class="cost">비용 <span class="v">중</span></div>
+      </div>
+    </div>
+
+    <div class="dir">
+      <div class="rank">4</div>
+      <div class="main">
+        <h4>Truthful PASS — MagicMock / stub-degenerate 검출</h4>
+        <div class="desc">output 이 MagicMock / "raised &lt;Error&gt;" 면 status=INCONCLUSIVE / DEGENERATE. PASS 는 진짜 실행 통과만. 결과 카드에 disclaimer.</div>
+        <div class="solves">해결: <span class="tag">D</span></div>
+      </div>
+      <div class="meta">
+        <div class="impact">임팩트 <span class="v">★★★</span></div>
+        <div class="cost">비용 <span class="v">저</span></div>
+      </div>
+    </div>
+
+    <div class="dir">
+      <div class="rank">5</div>
+      <div class="main">
+        <h4>Gate III impact 의 빈 결과 = no_data 명시</h4>
+        <div class="desc">caller_graph confidence 0 → affected_methods 빈 배열 surface 금지. <code class="inline">"data_status": "no_caller_data"</code> 명시. 전체 confidence 도 0 으로 떨어뜨림.</div>
+        <div class="solves">해결: <span class="tag">E</span></div>
+      </div>
+      <div class="meta">
+        <div class="impact">임팩트 <span class="v">★★★</span></div>
+        <div class="cost">비용 <span class="v">저</span></div>
+      </div>
+    </div>
+
+    <div class="dir">
+      <div class="rank">6</div>
+      <div class="main">
+        <h4>랭킹 도메인 부스트 + FQN substring 부스트</h4>
+        <div class="desc">Sd*Action / *Validator / *Service +5 ; helper *Result / Util -3 ; 쿼리에 <code class="inline">.</code> 또는 PascalCase Class 포함 시 +15. raw score 는 UI 에서 숨김 (high/medium/low 평어).</div>
+        <div class="solves">해결: <span class="tag">F</span><span class="tag">G</span></div>
+      </div>
+      <div class="meta">
+        <div class="impact">임팩트 <span class="v">★★★</span></div>
+        <div class="cost">비용 <span class="v">저</span></div>
+      </div>
+    </div>
+
+    <div class="dir">
+      <div class="rank">7</div>
+      <div class="main">
+        <h4>한글 label first + file_path / line_start 채우기</h4>
+        <div class="desc">카드 상단에 한글 label / body_preview 한글 주석. FQN 은 접어두기. file_path + line 은 sec2 이미 있으므로 candidate 응답에 채워넣어 "에디터에서 열기" 가능.</div>
+        <div class="solves">해결: <span class="tag">H</span></div>
+      </div>
+      <div class="meta">
+        <div class="impact">임팩트 <span class="v">★★</span></div>
+        <div class="cost">비용 <span class="v">저</span></div>
+      </div>
+    </div>
+
+    <div class="dir">
+      <div class="rank">8</div>
+      <div class="main">
+        <h4>Boundary value fixture injection</h4>
+        <div class="desc">자연어에 "음수 / null / 0 / 빈 값 / 최대 / 최소" 키워드 감지 → synthesize_fixtures 에 boundary fixture 자동 추가 (현재 1 case → 4-5 case). fixture 의 각 arg 에 출처 trace.</div>
+        <div class="solves">해결: <span class="tag">I</span><span class="tag">D</span></div>
+      </div>
+      <div class="meta">
+        <div class="impact">임팩트 <span class="v">★★</span></div>
+        <div class="cost">비용 <span class="v">중</span></div>
+      </div>
+    </div>
+
+    <div class="dir">
+      <div class="rank">9</div>
+      <div class="main">
+        <h4>0-cand 일 때 graceful fallback</h4>
+        <div class="desc">"용어 미모델링" 자기 인지 + 동의어 추천 + 전체 actions 브라우즈 모드. 빈 화면 0.</div>
+        <div class="solves">해결: <span class="tag">A</span><span class="tag">J</span></div>
+      </div>
+      <div class="meta">
+        <div class="impact">임팩트 <span class="v">★★</span></div>
+        <div class="cost">비용 <span class="v">저</span></div>
+      </div>
+    </div>
+
+    <div class="dir">
+      <div class="rank">10</div>
+      <div class="main">
+        <h4>Yes/No verdict surface — intent=question 결과 패널</h4>
+        <div class="desc">question intent 의 응답 카드 top 에 "예 (근거: 조건 만족) / 아니오 (근거: ...) / 모호" 라인. 결과의 의미를 자연어로 결합.</div>
+        <div class="solves">해결: <span class="tag">C</span></div>
+      </div>
+      <div class="meta">
+        <div class="impact">임팩트 <span class="v">★★</span></div>
+        <div class="cost">비용 <span class="v">저</span></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===================================================== -->
+<section id="matrix">
+  <h2>5. 우선순위 매트릭스 — 비용 × 임팩트</h2>
+  <p>좌상단 (저비용·고임팩트) 가 명백한 즉시 도입 대상.</p>
+  <div class="matrix-wrap">
+    <svg viewBox="0 0 720 380" class="matrix">
+      <!-- Grid -->
+      <line class="matrix-grid" x1="70" y1="40"  x2="690" y2="40" />
+      <line class="matrix-grid" x1="70" y1="120" x2="690" y2="120" />
+      <line class="matrix-grid" x1="70" y1="200" x2="690" y2="200" />
+      <line class="matrix-grid" x1="70" y1="280" x2="690" y2="280" />
+      <line class="matrix-grid" x1="200" y1="40" x2="200" y2="320" />
+      <line class="matrix-grid" x1="380" y1="40" x2="380" y2="320" />
+      <line class="matrix-grid" x1="560" y1="40" x2="560" y2="320" />
+
+      <!-- Axes -->
+      <line x1="70"  y1="320" x2="690" y2="320" stroke="#1a1a1a" stroke-width="1.5"/>
+      <line x1="70"  y1="40"  x2="70"  y2="320" stroke="#1a1a1a" stroke-width="1.5"/>
+
+      <!-- Tick labels -->
+      <text class="matrix-tick" x="200" y="338" text-anchor="middle">저</text>
+      <text class="matrix-tick" x="380" y="338" text-anchor="middle">중</text>
+      <text class="matrix-tick" x="560" y="338" text-anchor="middle">고</text>
+      <text class="matrix-tick" x="62" y="200" text-anchor="end">중</text>
+      <text class="matrix-tick" x="62" y="120" text-anchor="end">고</text>
+      <text class="matrix-tick" x="62" y="44"  text-anchor="end">최고</text>
+
+      <!-- Axis labels -->
+      <text class="matrix-axis-label" x="380" y="358" text-anchor="middle">구현 비용 →</text>
+      <text class="matrix-axis-label" x="22" y="180" text-anchor="middle" transform="rotate(-90 22 180)">임팩트 →</text>
+
+      <!-- Quadrant labels -->
+      <text class="quadrant-label" x="135" y="60"  text-anchor="middle">★ 즉시 도입</text>
+      <text class="quadrant-label" x="625" y="60"  text-anchor="middle">조건부 도입</text>
+      <text class="quadrant-label" x="135" y="305" text-anchor="middle">선택</text>
+      <text class="quadrant-label" x="625" y="305" text-anchor="middle">보류</text>
+
+      <!-- Direction dots -->
+      <!-- 1. intent 확장 → cost 중, 임팩트 최고 -->
+      <g><circle class="matrix-dot" cx="380" cy="55"  r="16" fill="#d9531e"/><text class="matrix-label" x="380" y="60" text-anchor="middle" fill="#fff">1</text></g>
+      <!-- 2. ambiguous 출구 → cost 저, 임팩트 최고 -->
+      <g><circle class="matrix-dot" cx="200" cy="55"  r="16" fill="#2f8f5d"/><text class="matrix-label" x="200" y="60" text-anchor="middle" fill="#fff">2</text></g>
+      <!-- 3. 도메인 사전 → cost 중, 임팩트 최고 -->
+      <g><circle class="matrix-dot" cx="380" cy="80"  r="16" fill="#d9531e"/><text class="matrix-label" x="380" y="85" text-anchor="middle" fill="#fff">3</text></g>
+      <!-- 4. truthful PASS → 저, 고 -->
+      <g><circle class="matrix-dot" cx="200" cy="120" r="14" fill="#2f8f5d"/><text class="matrix-label" x="200" y="124" text-anchor="middle" fill="#fff">4</text></g>
+      <!-- 5. impact no_data → 저, 고 -->
+      <g><circle class="matrix-dot" cx="200" cy="140" r="14" fill="#2f8f5d"/><text class="matrix-label" x="200" y="144" text-anchor="middle" fill="#fff">5</text></g>
+      <!-- 6. 랭킹 부스트 → 저, 고 -->
+      <g><circle class="matrix-dot" cx="200" cy="160" r="14" fill="#2f8f5d"/><text class="matrix-label" x="200" y="164" text-anchor="middle" fill="#fff">6</text></g>
+      <!-- 7. label first → 저, 중 -->
+      <g><circle class="matrix-dot" cx="200" cy="210" r="12" fill="#4858a8"/><text class="matrix-label" x="200" y="214" text-anchor="middle" fill="#fff">7</text></g>
+      <!-- 8. boundary fixture → 중, 중 -->
+      <g><circle class="matrix-dot" cx="380" cy="200" r="12" fill="#b8761a"/><text class="matrix-label" x="380" y="204" text-anchor="middle" fill="#fff">8</text></g>
+      <!-- 9. 0-cand fallback → 저, 중 -->
+      <g><circle class="matrix-dot" cx="200" cy="230" r="12" fill="#4858a8"/><text class="matrix-label" x="200" y="234" text-anchor="middle" fill="#fff">9</text></g>
+      <!-- 10. yes/no verdict → 저, 중 -->
+      <g><circle class="matrix-dot" cx="200" cy="250" r="12" fill="#4858a8"/><text class="matrix-label" x="200" y="254" text-anchor="middle" fill="#fff">10</text></g>
+    </svg>
+  </div>
+  <p>
+    <small class="note">
+      좌상단 <b>2, 4, 5, 6</b> 은 저비용 + 임팩트 큼 → 즉시 도입 후보. <b>1, 3</b> 은 비용 중 정도이나 임팩트가 가장 높아 strong second wave.
+      <b>8</b> 은 QA 페르소나 한정 가치 → 도메인 사전 / intent 확장 후 평가.
+    </small>
+  </p>
+</section>
+
+<!-- ===================================================== -->
+<section id="decide">
+  <h2>6. 추천 묶음 + 결정</h2>
+  <p>위 매트릭스의 좌상단 4 개를 1 phase 로 묶으면 김PM / 박주니어 / 이백호 / 최테스터 모두 즉시 체감 차이를 봄.</p>
+
+  <details open>
+    <summary><strong>추천 Phase 12 — "Operator Mode 도입" (1 묶음)</strong></summary>
+    <p>구성: 방향 <b>2 + 4 + 5 + 6</b>. 각각 backend 위주, frontend 는 새 상태 표기만.</p>
+    <ul>
+      <li><b>2.</b> Ambiguous 같은 session 재분류 + cand confirm = intent 해소 + 0-cand 동의어 / 버튼 suggestion</li>
+      <li><b>4.</b> Truthful PASS — MagicMock / raised &lt;Error&gt; → status INCONCLUSIVE</li>
+      <li><b>5.</b> Gate III impact no_data 명시 + confidence 0</li>
+      <li><b>6.</b> 랭킹 부스트 (Sd*Action +5 / *Result -3 / FQN substring +15)</li>
+    </ul>
+    <p style="margin-top:8px">예상 변경: backend ~6 개 모듈 + tests / frontend ~3 개 컴포넌트. 1 phase 분량.</p>
+  </details>
+
+  <details>
+    <summary><strong>그 다음 Phase 13 — "Vocabulary Expansion"</strong></summary>
+    <p>구성: 방향 <b>1 + 3</b>. intent 확장 + 도메인 사전.</p>
+    <p>이게 가장 임팩트 크지만 LLM prompt 재설계 + 사전 시드 + Gate II/III 분기 추가라 phase 12 보다 비용 큼. phase 12 의 신호 확인 후 진입 권장.</p>
+  </details>
+
+  <details>
+    <summary><strong>Phase 14 — Polish (선택)</strong></summary>
+    <p>구성: 방향 <b>7 + 8 + 9 + 10</b>. label / file_path / boundary fixture / yes/no verdict.</p>
+    <p>각각 독립적이라 phase 12-13 잘 정착되면 부분 도입 가능.</p>
+  </details>
+
+  <div class="decision-box">
+    <h3>결정</h3>
+    <textarea id="decisionInput" placeholder="예: Phase 12 로 진행하자. 4 개 묶음 중 6번 (랭킹) 부터. / 또는 1번 (intent 확장) 부터 먼저 PoC 해보자 — 도메인 사전은 별도로..."></textarea>
+    <p class="hint">localStorage 자동 저장. 다음 세션에서 이 HTML 다시 열어 확인 가능.</p>
+  </div>
+</section>
+
+<script>
+  // Tab toggle
+  document.querySelectorAll('.trace-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const t = tab.dataset.tab;
+      document.querySelectorAll('.trace-tab').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.trace-content').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelector(`.trace-content[data-tab="${t}"]`).classList.add('active');
+    });
+  });
+
+  // Trace row collapse toggle
+  document.querySelectorAll('.trace-row .head').forEach(h => {
+    h.addEventListener('click', () => h.parentElement.classList.toggle('collapsed'));
+  });
+
+  // Decision input localStorage
+  const ta = document.getElementById('decisionInput');
+  const KEY = 'ontong_multiturn_ux_decision';
+  if (ta) {
+    ta.value = localStorage.getItem(KEY) || '';
+    ta.addEventListener('input', () => localStorage.setItem(KEY, ta.value));
+  }
+</script>
+
+</body>
+</html>

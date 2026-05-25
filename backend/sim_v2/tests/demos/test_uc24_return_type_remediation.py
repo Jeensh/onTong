@@ -79,7 +79,7 @@ def test_remediate_slab_design_real_includes_wrap_as_list_for_orders():
 
 @requires_production_db
 def test_remediate_slab_design_real_includes_declare_output():
-    """The known case: 슬랩설계_실행 has no output but method returns SDSlabEntity."""
+    """The known case: Slab설계_실행 has no output but method returns SDSlabEntity."""
     session = open_readonly_session()
     try:
         r = remediate_repo(session, "slab-design-real")

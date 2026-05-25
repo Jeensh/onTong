@@ -175,7 +175,7 @@ export function NodePreviewPanel({
         <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
           {KIND_LABEL_KO[node.kind]}
         </span>
-        <span className="font-semibold truncate flex-1" title={node.label}>
+        <span className="font-semibold truncate flex-1 min-w-0" title={node.label}>
           {node.label}
         </span>
         {actionFeedback && (
@@ -201,7 +201,9 @@ export function NodePreviewPanel({
       <div className="flex-1 overflow-y-auto px-4 py-3 grid grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
         {/* Left col — meta */}
         <div className="space-y-1.5">
-          <Field label="fqn"><code className="font-mono text-[10.5px] break-all">{node.id}</code></Field>
+          <Field label="fqn">
+            <code className="font-mono text-[10.5px] block truncate" title={node.id}>{node.id}</code>
+          </Field>
           {node.role && <Field label="role">{node.role}</Field>}
           {node.domain && <Field label="domain"><code className="font-mono text-[11px]">{node.domain}</code></Field>}
           {node.kind === "action" && typeof node.extra?.verification === "string" && (

@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * sd · std · CAST_SPEC 룩업 서비스.
- * 6-축 composite key (회사/소/제강/연주/머신/품종) 정확매칭 룩업.
+ * 6-축 composite key (온톨로지/소/제강/연주/머신/품종) 정확매칭 룩업.
  */
 @Service
 public class CastSpecService {

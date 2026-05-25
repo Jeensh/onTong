@@ -12,6 +12,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from backend.modeling.audit.store import log_changes_bulk
 from backend.modeling.code_layer.recommender import build_recommendations
 from backend.modeling.code_layer.store import CodeLayerStore
 from backend.modeling.domain_layer.store import DomainLayerStore
@@ -95,6 +96,13 @@ def recommend(
         persisted_counts["actions"] = n_a
         n_r = mstore.upsert_type_realizations(repo_id, [c.suggested for c in realizations])
         persisted_counts["type_realizations"] = n_r
+
+        # audit: automatic recommend persist 도 추적 (changed_by=None) — 'recently changed' lens 에서 user-only filter
+        # 적용되므로 dashboard 에 빨간색으로 안 보임. 단 history tab 에는 노출됨.
+        log_changes_bulk([
+            *[{"repo_id": repo_id, "entity_kind": "term", "entity_id": c.suggested.fqn, "change_kind": "create"} for c in terms],
+            *[{"repo_id": repo_id, "entity_kind": "action", "entity_id": c.suggested.fqn, "change_kind": "create"} for c in actions],
+        ])
 
         logger.info(
             "recommend persisted: repo=%s terms=%d actions=%d realizations=%d",

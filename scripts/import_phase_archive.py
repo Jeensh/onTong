@@ -26,10 +26,10 @@ SOURCE_TAG = "archive-html"
 # ──────────────────────────────────────────────────────────────────
 ATOMICS: list[dict] = [
     # ── Phase A (7) ─────────────────────────────────────────────
-    {"fqn": "term.scm.shared.cmp", "label": "회사", "domain": "scm.shared",
-     "description": "모든 entity 공유 — 회사 코드. 길이 2 string.",
+    {"fqn": "term.scm.shared.cmp", "label": "온톨로지", "domain": "scm.shared",
+     "description": "모든 entity 공유 — 온톨로지 코드. 길이 2 string.",
      "value_type": "string", "unit": None, "range_json": None, "enum_values_json": None,
-     "aliases_json": json.dumps(["회사", "company"], ensure_ascii=False)},
+     "aliases_json": json.dumps(["온톨로지", "company"], ensure_ascii=False)},
     {"fqn": "term.scm.shared.org", "label": "소", "domain": "scm.shared",
      "description": "모든 entity 공유 — 사업소 코드. 길이 1 string.",
      "value_type": "string", "unit": None, "range_json": None, "enum_values_json": None,
@@ -86,10 +86,10 @@ ATOMICS: list[dict] = [
      "description": "unique per (cmp, org). 길이 20 string.",
      "value_type": "string", "unit": None, "range_json": None, "enum_values_json": None,
      "aliases_json": json.dumps(["주문번호", "orderNo"], ensure_ascii=False)},
-    {"fqn": "term.scm.shared.slab_no", "label": "슬랩번호", "domain": "scm.shared",
+    {"fqn": "term.scm.shared.slab_no", "label": "Slab번호", "domain": "scm.shared",
      "description": "generated_by SlabNoSequence. 길이 20 string.",
      "value_type": "string", "unit": None, "range_json": None, "enum_values_json": None,
-     "aliases_json": json.dumps(["슬랩번호", "slabNo"], ensure_ascii=False)},
+     "aliases_json": json.dumps(["Slab번호", "slabNo"], ensure_ascii=False)},
     {"fqn": "term.scm.shared.specific_gravity", "label": "비중", "domain": "scm.shared",
      "description": "강종별 비중 (specific gravity).",
      "value_type": "decimal", "unit": None, "range_json": json.dumps({"min": 0.0}),

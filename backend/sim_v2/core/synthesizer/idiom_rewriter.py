@@ -187,30 +187,58 @@ def rewrite_method_invocation(
     receiver_type: str | None,
     method_name: str,
     arg_strs: list[str],
+    *,
+    trace: list[dict] | None = None,
 ) -> str | None:
     """Try to rewrite a Java idiom invocation to Python.
 
     Returns the rewritten Python expression, or None if no idiom matched
     (caller should fall back to default `receiver.method(args)` emission).
+
+    `trace` (optional): caller-owned list. On a successful match, this function
+    appends a dict `{idiom_name, java_snippet, python_snippet, tier, arity}`.
+    Used by Section 3 Gate II to surface which Java idioms were rewritten.
     """
     arity = len(arg_strs)
+    args_repr = ", ".join(arg_strs)
+
+    def _record(tier: str, idiom_name: str, python: str) -> None:
+        if trace is None:
+            return
+        java_snippet = (
+            f"{receiver_src}.{method_name}({args_repr})"
+            if receiver_src else f"{method_name}({args_repr})"
+        )
+        trace.append({
+            "idiom_name": idiom_name,
+            "java_snippet": java_snippet,
+            "python_snippet": python,
+            "tier": tier,
+            "arity": arity,
+        })
 
     # 1) Static-class idioms (Math.abs / String.valueOf / Integer.parseInt / ...)
     static_key = (receiver_src, method_name, arity)
     if static_key in _STATIC_IDIOMS:
-        return _STATIC_IDIOMS[static_key](receiver_src, arg_strs)
+        py = _STATIC_IDIOMS[static_key](receiver_src, arg_strs)
+        _record("static", f"{receiver_src}.{method_name}", py)
+        return py
 
     # 2) Typed-receiver idioms — receiver_type known
     family = _normalize_type(receiver_type)
     if family:
         typed_key = (family, method_name, arity)
         if typed_key in _TYPED_IDIOMS:
-            return _TYPED_IDIOMS[typed_key](receiver_src, arg_strs)
+            py = _TYPED_IDIOMS[typed_key](receiver_src, arg_strs)
+            _record("typed", f"{family}.{method_name}", py)
+            return py
 
     # 3) Unknown-receiver idioms — safe regardless of type
     unknown_key = (method_name, arity)
     if unknown_key in _UNKNOWN_IDIOMS:
-        return _UNKNOWN_IDIOMS[unknown_key](receiver_src, arg_strs)
+        py = _UNKNOWN_IDIOMS[unknown_key](receiver_src, arg_strs)
+        _record("unknown", method_name, py)
+        return py
 
     return None
 

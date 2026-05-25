@@ -15,6 +15,7 @@ from backend.sim_v2.core.verification.sandbox_stubs import (
     derive_anchor_constants,
     derive_class_stub,
     derive_entity_stub_from_code_types,
+    derive_method_return_defaults,
     derive_repository_stub,
     find_unbound_names,
     is_bean_name,
@@ -42,8 +43,26 @@ def fixture_db():
                 fqn TEXT, fields_json TEXT, repo_id TEXT
             )
         """))
+        conn.execute(text("""
+            CREATE TABLE code_methods (
+                fqn TEXT PRIMARY KEY,
+                return_type TEXT,
+                repo_id TEXT
+            )
+        """))
     yield engine
     engine.dispose()
+
+
+def _insert_code_method(engine, fqn, return_type, repo_id="r"):
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO code_methods(fqn, return_type, repo_id) "
+                "VALUES (:f, :r, :rid)"
+            ),
+            {"f": fqn, "r": return_type, "rid": repo_id},
+        )
 
 
 def _insert_anchor(engine, locator, fqn, repo_id="r"):
@@ -371,3 +390,87 @@ def test_build_stub_namespace_with_entity_lookup(fixture_db):
     obj.id    # ok
     with pytest.raises(AttributeError):
         obj.no_such_field
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 9 — typed-return defaults (W74 FAIL_RETURN_TYPE reduction)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_typed_return_defaults_maps_primitive_types(fixture_db):
+    _insert_code_method(fixture_db, "com.x.O.getCmpCd()", "String")
+    _insert_code_method(fixture_db, "com.x.O.getCount()", "int")
+    _insert_code_method(fixture_db, "com.x.O.isValid()", "boolean")
+    _insert_code_method(fixture_db, "com.x.O.getPrice()", "BigDecimal")
+    _insert_code_method(fixture_db, "com.x.O.runSomething()", "void")  # skipped
+    with Session(fixture_db) as s:
+        defaults = derive_method_return_defaults(s, "r")
+    assert defaults["getCmpCd"] == ""
+    assert defaults["getCount"] == 0
+    assert defaults["isValid"] is False
+    assert defaults["getPrice"] == Decimal("0")
+    assert "runSomething" not in defaults  # void skipped
+
+
+def test_typed_return_defaults_drops_ambiguous_overload(fixture_db):
+    """동일 simple_name 이지만 서로 다른 family → drop (불확실)."""
+    _insert_code_method(fixture_db, "com.x.A.handle()", "String")
+    _insert_code_method(fixture_db, "com.x.B.handle()", "int")
+    with Session(fixture_db) as s:
+        defaults = derive_method_return_defaults(s, "r")
+    assert "handle" not in defaults
+
+
+def test_typed_return_defaults_keeps_consistent_overload(fixture_db):
+    """동일 simple_name + 같은 family → keep."""
+    _insert_code_method(fixture_db, "com.x.A.findCode()", "String")
+    _insert_code_method(fixture_db, "com.x.B.findCode()", "String")
+    with Session(fixture_db) as s:
+        defaults = derive_method_return_defaults(s, "r")
+    assert defaults["findCode"] == ""
+
+
+def test_typed_return_defaults_strips_generics(fixture_db):
+    _insert_code_method(fixture_db, "com.x.X.list()", "List<SlabJpo>")
+    _insert_code_method(fixture_db, "com.x.X.mapped()", "Map<String, Integer>")
+    with Session(fixture_db) as s:
+        defaults = derive_method_return_defaults(s, "r")
+    assert defaults["list"] == []
+    assert defaults["mapped"] == {}
+
+
+def test_repository_stub_installs_typed_return():
+    defaults = {"getCmpCd": "", "getCount": 0}
+    stub = derive_repository_stub("orderRepo", method_return_defaults=defaults)
+    assert stub.getCmpCd() == ""
+    assert stub.getCount() == 0
+    # 다른 이름은 여전히 MagicMock
+    assert not isinstance(stub.notInDefaults(), str)
+
+
+def test_class_stub_instance_installs_typed_return():
+    defaults = {"getCmpCd": "", "getPrice": Decimal("0")}
+    klass = derive_class_stub("Order", method_return_defaults=defaults)
+    inst = klass()
+    assert inst.getCmpCd() == ""
+    assert inst.getPrice() == Decimal("0")
+
+
+def test_build_stub_namespace_autoloads_typed_returns(fixture_db):
+    _insert_code_method(fixture_db, "com.x.O.getCmpCd()", "String")
+    src = "def f(self):\n    return orderRepo.getCmpCd()\n"
+    with Session(fixture_db) as s:
+        ns = build_stub_namespace(s, "method", "r", src)
+    assert ns["orderRepo"].getCmpCd() == ""
+
+
+def test_build_stub_namespace_explicit_empty_defaults_disables_typed(fixture_db):
+    """method_return_defaults={} 명시 시 autoload 안 함 → 기존 MagicMock 동작."""
+    _insert_code_method(fixture_db, "com.x.O.getCmpCd()", "String")
+    src = "def f(self):\n    return orderRepo.getCmpCd()\n"
+    with Session(fixture_db) as s:
+        ns = build_stub_namespace(
+            s, "method", "r", src, method_return_defaults={},
+        )
+    # 명시적 {} 이므로 typed 적용 X → MagicMock
+    assert ns["orderRepo"].getCmpCd() != ""

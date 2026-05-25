@@ -5,7 +5,7 @@ import java.util.Objects;
 
 /**
  * sd · history · SLAB_DESIGN_HIST composite PK.
- * (회사코드, 소코드, 이력 ID) — 3 컬럼.
+ * (온톨로지코드, 소코드, 이력 ID) — 3 컬럼.
  */
 public class SlabDesignHistPK implements Serializable {
 

@@ -151,3 +151,156 @@ class TestCodeLayerStore:
 
         ambig = store.list_ambiguous_call_sites(repo_id="r1")
         assert len(ambig) == 1
+
+
+def _types_with_caller_method() -> list[CodeType]:
+    """`_sample_types()` + OrderService.process + com.other.Foo.bar — FK 만족용."""
+    types = list(_sample_types())
+    types.append(CodeType(
+        fqn="com.scm.OrderService", simple_name="OrderService",
+        package="com.scm", kind=CodeTypeKind.CLASS, role=CodeTypeRole.UNKNOWN,
+        methods=[
+            CodeMethod(
+                fqn="com.scm.OrderService.process", name="process",
+                parent_type_fqn="com.scm.OrderService", role=MethodRole.BUSINESS,
+            ),
+        ],
+    ))
+    types.append(CodeType(
+        fqn="com.other.Foo", simple_name="Foo",
+        package="com.other", kind=CodeTypeKind.CLASS, role=CodeTypeRole.UNKNOWN,
+        methods=[
+            CodeMethod(
+                fqn="com.other.Foo.bar", name="bar",
+                parent_type_fqn="com.other.Foo", role=MethodRole.BUSINESS,
+            ),
+        ],
+    ))
+    return types
+
+
+class TestCallerGraphMatchKind:
+    """Phase 10 — get_method_callers_with_match heuristic 검증."""
+
+    def test_receiver_exact_match(self, fresh_db):
+        store = CodeLayerStore()
+        store.upsert_types(repo_id="r1", code_types=_types_with_caller_method())
+        store.upsert_call_sites(repo_id="r1", call_sites=[
+            CallSite(
+                id="c" * 16,
+                caller_method_fqn="com.scm.OrderService.process",
+                callee_simple_name="validate",
+                callee_receiver_static_type="com.scm.Order",
+                line=42,
+                confidence=1.0,
+                analysis_source=CallAnalysisSource.SINGLE_IMPL,
+            ),
+        ])
+        pairs = store.get_method_callers_with_match("com.scm.Order.validate")
+        assert len(pairs) == 1
+        cs, kind = pairs[0]
+        assert kind == "receiver_exact"
+        assert cs.caller_method_fqn == "com.scm.OrderService.process"
+
+    def test_receiver_short_match(self, fresh_db):
+        """parser 가 short name 만 잡았을 때도 surface."""
+        store = CodeLayerStore()
+        store.upsert_types(repo_id="r1", code_types=_types_with_caller_method())
+        store.upsert_call_sites(repo_id="r1", call_sites=[
+            CallSite(
+                id="c" * 16,
+                caller_method_fqn="com.scm.OrderService.process",
+                callee_simple_name="validate",
+                callee_receiver_static_type="Order",  # short name only
+                line=42,
+                confidence=1.0,
+                analysis_source=CallAnalysisSource.SINGLE_IMPL,
+            ),
+        ])
+        pairs = store.get_method_callers_with_match("com.scm.Order.validate")
+        assert any(k == "receiver_short" for _, k in pairs)
+
+    def test_runtime_type_short_match(self, fresh_db):
+        store = CodeLayerStore()
+        store.upsert_types(repo_id="r1", code_types=_types_with_caller_method())
+        store.upsert_call_sites(repo_id="r1", call_sites=[
+            CallSite(
+                id="c" * 16,
+                caller_method_fqn="com.scm.OrderService.process",
+                callee_simple_name="validate",
+                callee_receiver_static_type="",
+                line=42,
+                possible_runtime_types=[
+                    CallCandidate(
+                        code_type_fqn="RushOrder",  # short — parser 한계
+                        score=0.5, reason="후보",
+                    ),
+                ],
+                confidence=0.5,
+                analysis_source=CallAnalysisSource.STATIC_UNRESOLVED,
+            ),
+        ])
+        # callee = RushOrder.validate → short-name 매칭으로 runtime_type
+        pairs = store.get_method_callers_with_match("com.scm.RushOrder.validate")
+        kinds = {k for _, k in pairs}
+        assert "runtime_type" in kinds
+
+    def test_package_proximity_fallback(self, fresh_db):
+        """parser 가 receiver type 미수집 — caller package == callee package 시 강화."""
+        store = CodeLayerStore()
+        store.upsert_types(repo_id="r1", code_types=_types_with_caller_method())
+        store.upsert_call_sites(repo_id="r1", call_sites=[
+            CallSite(
+                id="c" * 16,
+                caller_method_fqn="com.scm.OrderService.process",
+                callee_simple_name="validate",
+                callee_receiver_static_type="",   # parser 못 잡음
+                line=42,
+                confidence=0.0,
+                analysis_source=CallAnalysisSource.STATIC_UNRESOLVED,
+            ),
+        ])
+        pairs = store.get_method_callers_with_match("com.scm.Order.validate")
+        assert len(pairs) == 1
+        _, kind = pairs[0]
+        # caller package = com.scm = receiver package → package_proximity
+        assert kind == "package_proximity"
+
+    def test_name_only_fallback_for_distant_caller(self, fresh_db):
+        """caller package 가 receiver package 와 다르면 name_only."""
+        store = CodeLayerStore()
+        store.upsert_types(repo_id="r1", code_types=_types_with_caller_method())
+        store.upsert_call_sites(repo_id="r1", call_sites=[
+            CallSite(
+                id="c" * 16,
+                caller_method_fqn="com.other.Foo.bar",  # different package
+                callee_simple_name="validate",
+                callee_receiver_static_type="",
+                line=42,
+                confidence=0.0,
+                analysis_source=CallAnalysisSource.STATIC_UNRESOLVED,
+            ),
+        ])
+        pairs = store.get_method_callers_with_match("com.scm.Order.validate")
+        assert len(pairs) == 1
+        _, kind = pairs[0]
+        assert kind == "name_only"
+
+    def test_get_method_callers_thin_wrapper(self, fresh_db):
+        """legacy `get_method_callers` 는 list[CallSite] thin wrapper."""
+        store = CodeLayerStore()
+        store.upsert_types(repo_id="r1", code_types=_types_with_caller_method())
+        store.upsert_call_sites(repo_id="r1", call_sites=[
+            CallSite(
+                id="c" * 16,
+                caller_method_fqn="com.scm.OrderService.process",
+                callee_simple_name="validate",
+                callee_receiver_static_type="com.scm.Order",
+                line=42,
+                confidence=1.0,
+                analysis_source=CallAnalysisSource.SINGLE_IMPL,
+            ),
+        ])
+        sites = store.get_method_callers("com.scm.Order.validate")
+        assert len(sites) == 1
+        assert sites[0].caller_method_fqn == "com.scm.OrderService.process"

@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>onTong · 시뮬레이션 담당자 Onboarding</title>
+<style>
+  :root {
+    --bg:           #f8fafc;
+    --panel:        #ffffff;
+    --border:       #e2e8f0;
+    --text:         #0f172a;
+    --muted:        #64748b;
+    --primary:      #2563eb;
+    --primary-bg:   #eff6ff;
+    --accent:       #ea580c;
+    --success:      #16a34a;
+    --success-bg:   #f0fdf4;
+    --warn:         #ca8a04;
+    --warn-bg:      #fefce8;
+    --danger:       #dc2626;
+    --code-bg:      #0f172a;
+    --code-text:    #e2e8f0;
+    --code-comment: #94a3b8;
+    --code-string:  #a5b4fc;
+    --code-keyword: #f472b6;
+    --shadow:       0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04);
+    --shadow-lg:    0 10px 25px -5px rgba(15,23,42,0.08), 0 8px 10px -6px rgba(15,23,42,0.04);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", "Apple SD Gothic Neo", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+
+  /* Layout */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 48px;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { position: static !important; }
+  }
+
+  /* Header */
+  header.hero {
+    background: linear-gradient(135deg, #1e40af 0%, #6d28d9 100%);
+    color: white;
+    padding: 56px 0 64px;
+    box-shadow: var(--shadow-lg);
+  }
+  .hero h1 {
+    margin: 0 0 8px;
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .hero .subtitle {
+    opacity: 0.9;
+    font-size: 16px;
+    margin-bottom: 24px;
+  }
+  .hero .meta {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    opacity: 0.95;
+  }
+  .hero .meta div { display: flex; align-items: center; gap: 6px; }
+  .hero .meta strong { font-weight: 600; }
+  .hero .branch {
+    background: rgba(255,255,255,0.15);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-family: "SF Mono", "Monaco", monospace;
+    font-size: 12px;
+  }
+
+  /* Sidebar nav */
+  .sidebar {
+    position: sticky;
+    top: 24px;
+    padding-top: 32px;
+  }
+  .sidebar nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-left: 2px solid var(--border);
+  }
+  .sidebar nav li a {
+    display: block;
+    padding: 8px 16px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13.5px;
+    border-left: 2px solid transparent;
+    margin-left: -2px;
+    transition: all 0.15s;
+  }
+  .sidebar nav li a:hover {
+    color: var(--text);
+    background: var(--panel);
+  }
+  .sidebar nav li a.active {
+    color: var(--primary);
+    border-left-color: var(--primary);
+    font-weight: 600;
+  }
+
+  /* Main content */
+  main { padding-top: 32px; padding-bottom: 64px; }
+  main h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 56px 0 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  main h2:first-of-type { margin-top: 0; }
+  main h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 28px 0 12px;
+    color: var(--text);
+  }
+  main p { margin: 8px 0 12px; }
+  main a { color: var(--primary); text-decoration: none; }
+  main a:hover { text-decoration: underline; }
+  main ul, main ol { margin: 8px 0 16px; padding-left: 24px; }
+  main li { margin: 4px 0; }
+  main code:not(pre code) {
+    font-family: "SF Mono", "Monaco", monospace;
+    font-size: 0.88em;
+    background: var(--primary-bg);
+    color: #1d4ed8;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 16px 0;
+    box-shadow: var(--shadow);
+  }
+  .card-hero {
+    background: linear-gradient(135deg, var(--primary-bg) 0%, #f5f3ff 100%);
+    border: 1px solid #c7d2fe;
+    padding: 24px;
+  }
+  .card-hero p:last-child { margin-bottom: 0; }
+
+  /* TL;DR list */
+  .tldr {
+    list-style: none;
+    counter-reset: tldr;
+    padding: 0;
+    margin: 0;
+  }
+  .tldr li {
+    counter-increment: tldr;
+    padding: 8px 0 8px 36px;
+    position: relative;
+  }
+  .tldr li::before {
+    content: counter(tldr);
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 24px;
+    height: 24px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  /* Code blocks */
+  .code-block {
+    position: relative;
+    background: var(--code-bg);
+    color: var(--code-text);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 12px 0;
+    box-shadow: var(--shadow);
+  }
+  .code-block .code-lang {
+    background: rgba(255,255,255,0.05);
+    color: var(--code-comment);
+    font-size: 11px;
+    padding: 6px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-family: "SF Mono", "Monaco", monospace;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .copy-btn {
+    background: rgba(255,255,255,0.08);
+    color: var(--code-text);
+    border: none;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+    transition: background 0.15s;
+  }
+  .copy-btn:hover { background: rgba(255,255,255,0.15); }
+  .copy-btn.copied { background: var(--success); color: white; }
+  .code-block pre {
+    margin: 0;
+    padding: 16px 18px;
+    font-family: "SF Mono", "Monaco", monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    overflow-x: auto;
+  }
+  .code-block .c { color: var(--code-comment); }      /* comment */
+  .code-block .s { color: var(--code-string); }       /* string */
+  .code-block .k { color: var(--code-keyword); }      /* keyword */
+
+  /* Step cards */
+  .step {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 20px;
+    align-items: start;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 16px 0;
+    box-shadow: var(--shadow);
+  }
+  .step-num {
+    width: 44px;
+    height: 44px;
+    background: var(--primary-bg);
+    color: var(--primary);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .step-body h3 { margin: 0 0 8px; }
+  .step-body > *:first-child { margin-top: 0; }
+  .step-body > *:last-child { margin-bottom: 0; }
+
+  /* Callouts */
+  .callout {
+    padding: 14px 18px;
+    border-radius: 8px;
+    margin: 16px 0;
+    border-left: 4px solid;
+    font-size: 14px;
+  }
+  .callout-info { background: var(--primary-bg); border-color: var(--primary); }
+  .callout-warn { background: var(--warn-bg); border-color: var(--warn); }
+  .callout-success { background: var(--success-bg); border-color: var(--success); }
+  .callout strong { color: var(--text); }
+  .callout p:first-child { margin-top: 0; }
+  .callout p:last-child { margin-bottom: 0; }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+    background: var(--panel);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  th, td {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    background: #f1f5f9;
+    font-weight: 600;
+    font-size: 12.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    letter-spacing: 0.03em;
+  }
+  tr:last-child td { border-bottom: none; }
+  td code {
+    font-family: "SF Mono", "Monaco", monospace;
+    font-size: 12px;
+    background: #f1f5f9;
+    color: var(--text);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  /* Stats grid */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .stat .num {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--primary);
+    display: block;
+    line-height: 1.1;
+    margin-bottom: 2px;
+  }
+  .stat .lbl {
+    font-size: 11.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .stat-success .num { color: var(--success); }
+
+  /* Code location grid */
+  .loc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 16px 0;
+  }
+  @media (max-width: 700px) {
+    .loc-grid { grid-template-columns: 1fr; }
+  }
+  .loc {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .loc-path {
+    font-family: "SF Mono", "Monaco", monospace;
+    font-size: 12px;
+    color: var(--accent);
+    margin-bottom: 4px;
+    word-break: break-all;
+  }
+  .loc-desc {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  /* Footer */
+  footer {
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    padding: 32px 0;
+    margin-top: 64px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  footer a { color: var(--primary); }
+
+  /* Misc */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-success { background: var(--success-bg); color: var(--success); }
+  .badge-info    { background: var(--primary-bg); color: var(--primary); }
+  .anchor-link {
+    color: var(--muted);
+    text-decoration: none;
+    opacity: 0;
+    margin-left: 8px;
+    font-weight: normal;
+    transition: opacity 0.15s;
+  }
+  h2:hover .anchor-link { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="container">
+    <h1>onTong 시뮬레이션 담당자 Onboarding</h1>
+    <div class="subtitle">
+      업그레이드된 Section 2 (modeling) ontology 위에서, 본인 시뮬레이션 에이전트를 Section 3 의 새 탭으로 추가하기 위한 가이드
+    </div>
+    <div class="meta">
+      <div>📌 브랜치 <span class="branch">share/section2-modeling-foundation</span></div>
+      <div>👤 <strong>From</strong> jeensh</div>
+      <div>📅 2026-05-21</div>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="layout">
+
+    <aside class="sidebar">
+      <nav>
+        <ul>
+          <li><a href="#tldr">TL;DR</a></li>
+          <li><a href="#step1">1. 브랜치 받기</a></li>
+          <li><a href="#step2">2. 환경 셋업</a></li>
+          <li><a href="#step3">3. 데이터 복구</a></li>
+          <li><a href="#step4">4. 기동 + 확인</a></li>
+          <li><a href="#step5">5. 본인 에이전트 추가</a></li>
+          <li><a href="#code">6. 핵심 코드 위치</a></li>
+          <li><a href="#refs">7. 추가 자료</a></li>
+          <li><a href="#caveat">8. 알아두면 좋은 것</a></li>
+          <li><a href="#help">9. 막히면</a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <main>
+
+      <section id="tldr">
+        <div class="card card-hero">
+          <h3 style="margin-top:0">TL;DR · 5분 안에 시작</h3>
+          <ol class="tldr">
+            <li>브랜치 받기 → 환경 셋업 (~5분)</li>
+            <li>slab-design-real-v2 import + snapshot reapply → <strong>136/136 sim_verified 즉시 복구</strong> (~3분)</li>
+            <li>backend + frontend 기동 → <code>http://localhost:3000</code> 에서 동작 확인</li>
+            <li>본인 에이전트 추가: <code>backend/section3/agents/</code> + <code>frontend/src/components/section3/</code> 에 탭형 nav 확장</li>
+          </ol>
+        </div>
+
+        <h3 style="margin-top:32px">데이터 현황 (slab-design-real-v2)</h3>
+        <div class="stats">
+          <div class="stat stat-success"><span class="num">136/136</span><span class="lbl">sim_verified</span></div>
+          <div class="stat"><span class="num">150</span><span class="lbl">code_types</span></div>
+          <div class="stat"><span class="num">1,081</span><span class="lbl">code_methods</span></div>
+          <div class="stat"><span class="num">2,298</span><span class="lbl">call_sites</span></div>
+          <div class="stat"><span class="num">83</span><span class="lbl">business_terms</span></div>
+          <div class="stat"><span class="num">22</span><span class="lbl">business_rules</span></div>
+          <div class="stat"><span class="num">148</span><span class="lbl">realizations</span></div>
+          <div class="stat"><span class="num">163</span><span class="lbl">anchor_bindings</span></div>
+        </div>
+      </section>
+
+      <h2 id="step1">1. 브랜치 받기</h2>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>Clone + checkout</h3>
+          <div class="code-block">
+            <div class="code-lang"><span>bash</span><button class="copy-btn" data-target="c1">복사</button></div>
+            <pre id="c1"><span class="k">git</span> clone https://github.com/Jeensh/onTong.git
+<span class="k">cd</span> onTong
+<span class="k">git</span> checkout share/section2-modeling-foundation</pre>
+          </div>
+        </div>
+      </div>
+
+      <h2 id="step2">2. 환경 셋업</h2>
+
+      <div class="step">
+        <div class="step-num">2a</div>
+        <div class="step-body">
+          <h3>Backend (Python 3.12)</h3>
+          <div class="code-block">
+            <div class="code-lang"><span>bash</span><button class="copy-btn" data-target="c2a">복사</button></div>
+            <pre id="c2a">python3.12 -m venv .venv
+<span class="k">source</span> .venv/bin/activate
+pip install -r requirements.txt</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2b</div>
+        <div class="step-body">
+          <h3>Frontend (Node 18+)</h3>
+          <div class="code-block">
+            <div class="code-lang"><span>bash</span><button class="copy-btn" data-target="c2b">복사</button></div>
+            <pre id="c2b"><span class="k">cd</span> frontend
+npm install   <span class="c"># 또는 pnpm / bun</span>
+<span class="k">cd</span> ..</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2c</div>
+        <div class="step-body">
+          <h3>LLM API key</h3>
+          <p>프로젝트 루트 <code>.env</code> 에 추가:</p>
+          <div class="code-block">
+            <div class="code-lang"><span>.env</span><button class="copy-btn" data-target="c2c">복사</button></div>
+            <pre id="c2c">OPENAI_API_KEY=sk-...</pre>
+          </div>
+          <div class="callout callout-warn">
+            <strong>⚠ 필수</strong> · 없으면 multiturn 의 intent classification 이 <code>ambiguous</code> 만 반환하고 candidates 가 비어요.
+          </div>
+        </div>
+      </div>
+
+      <h2 id="step3">3. 데이터 복구 — slab-design-real-v2</h2>
+
+      <div class="callout callout-info">
+        <p><strong>왜 복구가 필요한가</strong></p>
+        <p>실제 <code>data/ontology.db</code> (5.4MB) 는 <code>.gitignored</code> 라 git 에 없음. 대신 snapshot JSON 만 commit 됨. snapshot reapply 로 <strong>136/136 sim_verified + 83 terms + 22 rules + 148 realizations + 163 anchors</strong> 일괄 복구.</p>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3a</div>
+        <div class="step-body">
+          <h3>Java repo 확인</h3>
+          <p><code>sample-repos/slab-design-real_v2/</code> 가 있어야 함. 없으면 jeensh 에게 압축 요청.</p>
+          <div class="code-block">
+            <div class="code-lang"><span>bash</span><button class="copy-btn" data-target="c3a">복사</button></div>
+            <pre id="c3a">ls sample-repos/slab-design-real_v2/</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3b</div>
+        <div class="step-body">
+          <h3>Import</h3>
+          <div class="code-block">
+            <div class="code-lang"><span>bash</span><button class="copy-btn" data-target="c3b">복사</button></div>
+            <pre id="c3b"><span class="k">PYTHONPATH</span>=. .venv/bin/python -c <span class="s">"
+from backend.modeling.code_layer.importer import ImportJob, RepoImporter
+job = ImportJob(
+    id='onboard-import',
+    repo_id='slab-design-real-v2',
+    repo_path='/full/path/to/sample-repos/slab-design-real_v2',
+)
+RepoImporter().run(job)
+print('import done')
+"</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3c</div>
+        <div class="step-body">
+          <h3>Snapshot reapply (핵심)</h3>
+          <div class="code-block">
+            <div class="code-lang"><span>bash</span><button class="copy-btn" data-target="c3c">복사</button></div>
+            <pre id="c3c">.venv/bin/python scripts/reapply_modeling_enrichment.py \
+  --db data/ontology.db \
+  --snapshot data/enrichment_snapshot_slab_design_real_v2_20260520_152937.json \
+  --hybrid</pre>
+          </div>
+          <div class="callout callout-success">
+            <p><strong>✓ <code>--hybrid</code> flag 핵심</strong></p>
+            <p>native parser 가 <code>single_impl</code> / <code>annotation</code> 으로 ≥0.85 confidence 분류한 <strong>1,435 행은 보존</strong>하고, <code>static_unresolved</code> 만 snapshot 의 manual cleanup 라벨로 채움. </p>
+          </div>
+        </div>
+      </div>
+
+      <h2 id="step4">4. 기동 + 확인</h2>
+
+      <div class="step">
+        <div class="step-num">4a</div>
+        <div class="step-body">
+          <h3>Backend (port 8001)</h3>
+          <div class="code-block">
+            <div class="code-lang"><span>bash</span><button class="copy-btn" data-target="c4a">복사</button></div>
+            <pre id="c4a">.venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8001 --log-level info</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4b</div>
+        <div class="step-body">
+          <h3>Frontend (port 3000)</h3>
+          <div class="code-block">
+            <div class="code-lang"><span>bash</span><button class="copy-btn" data-target="c4b">복사</button></div>
+            <pre id="c4b"><span class="k">cd</span> frontend && npm run dev</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4c</div>
+        <div class="step-body">
+          <h3>동작 확인</h3>
+          <div class="code-block">
+            <div class="code-lang"><span>bash · API smoke</span><button class="copy-btn" data-target="c4c">복사</button></div>
+            <pre id="c4c"><span class="c"># 데이터 정상 surface 확인</span>
+curl http://127.0.0.1:8001/api/section3/repos | jq
+<span class="c"># → {"repos":[{"repo_id":"slab-design-real-v2","counts":{"actions":136,...}}]}</span>
+
+<span class="c"># 멀티턴 에이전트 동작</span>
+curl -X POST http://127.0.0.1:8001/api/section3/multiturn/start \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{"user_query":"thickness 검증 시뮬레이션","repo_id":"slab-design-real-v2"}'</span></pre>
+          </div>
+          <p>브라우저: <a href="http://localhost:3000?section=modeling"><code>?section=modeling</code></a> (Section 2) · <a href="http://localhost:3000?section=simulation"><code>?section=simulation</code></a> (Section 3 멀티턴)</p>
+        </div>
+      </div>
+
+      <h2 id="step5">5. 본인 에이전트를 Section 3 탭으로 추가</h2>
+
+      <div class="callout callout-info">
+        이 브랜치에 들어 있는 <strong>멀티턴 에이전트</strong> 는 reference 구현. 본인 에이전트를 같은 ontology base 위 다른 탭으로 자유롭게 추가.
+      </div>
+
+      <div class="step">
+        <div class="step-num">A</div>
+        <div class="step-body">
+          <h3>백엔드 router 신설</h3>
+          <p><code>backend/section3/api/myagent_router.py</code> 신설. 패턴 참고: <code>backend/section3/api/multiturn_router.py</code></p>
+          <div class="code-block">
+            <div class="code-lang"><span>python · backend/section3/api/myagent_router.py</span><button class="copy-btn" data-target="c5a">복사</button></div>
+            <pre id="c5a"><span class="k">from</span> fastapi <span class="k">import</span> APIRouter
+router = APIRouter(prefix=<span class="s">"/api/section3/myagent"</span>, tags=[<span class="s">"section3-myagent"</span>])
+
+<span class="k">@router</span>.post(<span class="s">"/start"</span>)
+<span class="k">def</span> start(...): ...
+
+<span class="k">@router</span>.post(<span class="s">"/respond/{session_id}"</span>)
+<span class="k">def</span> respond(...): ...</pre>
+          </div>
+          <p>등록: <code>backend/main.py</code> 에 <code>app.include_router(myagent_router.router)</code></p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">B</div>
+        <div class="step-body">
+          <h3>에이전트 로직</h3>
+          <p><code>backend/section3/agents/myagent/</code> 폴더 신설. 패턴 참고: <code>backend/section3/agents/multiturn/</code> (17 파일 구조)</p>
+
+          <h3>ontology 읽기 (이미 도구가 정리돼 있음)</h3>
+          <div class="code-block">
+            <div class="code-lang"><span>python</span><button class="copy-btn" data-target="c5b1">복사</button></div>
+            <pre id="c5b1"><span class="k">from</span> backend.sim_v2.core.ontology.domain_layer.production_domain_loader <span class="k">import</span> load_actions
+<span class="k">from</span> backend.modeling.code_layer.store <span class="k">import</span> session_scope
+
+<span class="k">with</span> session_scope() <span class="k">as</span> s:
+    actions = load_actions(s, repo_id=<span class="s">'slab-design-real-v2'</span>)
+    <span class="c"># → 136 actions 모두 surface (description, effects, code_method_fqn, ...)</span></pre>
+          </div>
+
+          <h3>시뮬레이션 실행 — translator + sandbox</h3>
+          <div class="code-block">
+            <div class="code-lang"><span>python</span><button class="copy-btn" data-target="c5b2">복사</button></div>
+            <pre id="c5b2"><span class="k">from</span> backend.sim_v2.core.synthesizer.java_translator <span class="k">import</span> JavaToPythonTranslator
+<span class="k">from</span> backend.sim_v2.core.verification.behavior_twin_runner <span class="k">import</span> BehaviorTwinRunner
+<span class="k">from</span> backend.sim_v2.core.verification.sandbox_stubs <span class="k">import</span> build_stub_namespace</pre>
+          </div>
+          <p>130 actions 모두 valid Python emit + 6 stuck actions runtime exec 검증 완료.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">C</div>
+        <div class="step-body">
+          <h3>Frontend 탭 추가</h3>
+          <p><code>frontend/src/components/section3/myagent/</code> 폴더 신설. 패턴 참고: <code>multiturn/</code> (13 컴포넌트)</p>
+          <p><code>frontend/src/components/section3/Section3Section.tsx</code> 의 <code>MAIN_NAV</code> 에 새 view 추가:</p>
+          <div class="code-block">
+            <div class="code-lang"><span>tsx</span><button class="copy-btn" data-target="c5c">복사</button></div>
+            <pre id="c5c"><span class="k">const</span> MAIN_NAV = [
+  <span class="c">// ...</span>
+  { id: <span class="s">'myagent'</span>, label: <span class="s">'본인 에이전트'</span>, icon: ... },
+];</pre>
+          </div>
+          <p>URL routing 패턴은 이미 <code>?view=myagent&sid=&lt;session-id&gt;</code> 로 동작.</p>
+        </div>
+      </div>
+
+      <h2 id="code">6. 핵심 코드 위치</h2>
+
+      <h3>Section 2 (modeling — 데이터 base)</h3>
+      <div class="loc-grid">
+        <div class="loc">
+          <div class="loc-path">backend/modeling/code_analysis/java_parser.py</div>
+          <div class="loc-desc">Java → 코드 그래프 (receiver_type 자동 채움)</div>
+        </div>
+        <div class="loc">
+          <div class="loc-path">backend/modeling/code_analysis/method_symbol_table.py</div>
+          <div class="loc-desc">per-method symbol scope (param/local/field)</div>
+        </div>
+        <div class="loc">
+          <div class="loc-path">backend/modeling/code_layer/store.py</div>
+          <div class="loc-desc">code_types / code_methods / code_fields / call_sites ORM</div>
+        </div>
+        <div class="loc">
+          <div class="loc-path">backend/modeling/mapping_layer/schema.py + store.py</div>
+          <div class="loc-desc">actions / realizations / type_realizations / anchor_bindings</div>
+        </div>
+        <div class="loc">
+          <div class="loc-path">backend/modeling/domain_layer/store.py</div>
+          <div class="loc-desc">business_terms / business_rules</div>
+        </div>
+        <div class="loc">
+          <div class="loc-path">backend/modeling/audit/, memos/</div>
+          <div class="loc-desc">Coverage / Impact 추적 + entity 메모</div>
+        </div>
+        <div class="loc">
+          <div class="loc-path">backend/modeling/api/*</div>
+          <div class="loc-desc">30+ REST endpoint (graph / ontology / queue / coverage / impact / memo)</div>
+        </div>
+      </div>
+
+      <h3>Section 3 (시뮬레이션 — 본인 탭이 들어갈 곳)</h3>
+      <div class="loc-grid">
+        <div class="loc">
+          <div class="loc-path">backend/section3/agents/multiturn/</div>
+          <div class="loc-desc">reference 멀티턴 에이전트 (17 모듈)</div>
+        </div>
+        <div class="loc">
+          <div class="loc-path">backend/section3/agents/{bridge,sandbox}_agent.py</div>
+          <div class="loc-desc">옛 v1 에이전트 (deprecate notice 있음)</div>
+        </div>
+        <div class="loc">
+          <div class="loc-path">backend/section3/sim_v2_bridge.py</div>
+          <div class="loc-desc">sim_v2 함수 wrap</div>
+        </div>
+        <div class="loc">
+          <div class="loc-path">backend/section3/api/multiturn_router.py</div>
+          <div class="loc-desc">멀티턴 REST 진입점 (참고)</div>
+        </div>
+        <div class="loc">
+          <div class="loc-path">frontend/src/components/section3/multiturn/</div>
+          <div class="loc-desc">reference 13 컴포넌트</div>
+        </div>
+        <div class="loc">
+          <div class="loc-path">frontend/src/components/section3/Section3Section.tsx</div>
+          <div class="loc-desc">nav + view routing</div>
+        </div>
+        <div class="loc">
+          <div class="loc-path">frontend/src/lib/section3/multiturn.ts</div>
+          <div class="loc-desc">HTTP client 패턴</div>
+        </div>
+      </div>
+
+      <h3>sim_v2 (Java → Python + sandbox)</h3>
+      <div class="loc-grid">
+        <div class="loc">
+          <div class="loc-path">backend/sim_v2/core/synthesizer/java_translator.py</div>
+          <div class="loc-desc">Java → Python (W75 idiom 포함, 5 patches)</div>
+        </div>
+        <div class="loc">
+          <div class="loc-path">backend/sim_v2/core/verification/behavior_twin_runner.py</div>
+          <div class="loc-desc">sandbox exec</div>
+        </div>
+        <div class="loc">
+          <div class="loc-path">backend/sim_v2/core/verification/sandbox_stubs.py</div>
+          <div class="loc-desc">stub namespace 합성</div>
+        </div>
+        <div class="loc">
+          <div class="loc-path">backend/sim_v2/core/verification/action_method_verifier.py</div>
+          <div class="loc-desc">translator gate (VERIFIED 판정)</div>
+        </div>
+        <div class="loc">
+          <div class="loc-path">backend/sim_v2/core/ontology/domain_layer/production_domain_loader.py</div>
+          <div class="loc-desc">actions 일괄 로드</div>
+        </div>
+      </div>
+
+      <h2 id="refs">7. 추가 자료</h2>
+      <table>
+        <thead><tr><th style="width:48%">문서</th><th>용도</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>toClaude/reports/2026-05-20-handoff-section2-modeling-foundation.md</code></td>
+            <td>이 가이드의 long-form 버전</td>
+          </tr>
+          <tr>
+            <td><code>toClaude/simulation/MODELING_DATA_AUDIT.md</code></td>
+            <td>Phase A~E + E-C arc (130 → 136 sim_verified 도달 과정)</td>
+          </tr>
+          <tr>
+            <td><code>toClaude/simulation/CHAT_REDESIGN_SPEC.md</code></td>
+            <td>멀티턴 에이전트 spec (6-gate 흐름)</td>
+          </tr>
+          <tr>
+            <td><code>toClaude/simulation/log/step_chat_redesign_phase*.md</code></td>
+            <td>Phase 1~11 단계별 작업 요약</td>
+          </tr>
+          <tr>
+            <td><code>toClaude/simulation/log/step_ec_parser_translator_rework.md</code></td>
+            <td>parser + translator rework 상세</td>
+          </tr>
+          <tr>
+            <td><code>toClaude/simulation/HANDOFF_phase21_for_artifact_session.md</code></td>
+            <td>발표/리포트 산출물 컨텍스트</td>
+          </tr>
+          <tr>
+            <td><code>toClaude/simulation/CHANGES.md</code></td>
+            <td>변경 로그</td>
+          </tr>
+          <tr>
+            <td><code>toClaude/_shared/agent_tools_schema.md</code></td>
+            <td>agent 가 호출 가능한 ontology tool 카탈로그</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2 id="caveat">8. 알아두면 좋은 것 (caveat)</h2>
+
+      <div class="callout callout-warn">
+        <strong>OPENAI_API_KEY 없으면</strong> intent classifier 가 항상 <code>ambiguous</code> → multiturn 데모 불가. <code>.env</code> 에 키 추가 필수.
+      </div>
+
+      <div class="callout callout-warn">
+        <strong>재 import 시 enrichment 보호</strong> · 매 import 직전 <code>python scripts/export_modeling_enrichment.py --repo-id slab-design-real-v2</code> 로 snapshot 갱신, 그 다음 import → reapply <code>--hybrid</code>. 안 그러면 본인이 쌓은 작업도 같이 날아감.
+      </div>
+
+      <div class="callout callout-info">
+        <strong><code>data/ontology.db.bak-pre-*</code></strong> · jeensh 가 남겨둔 백업들. 문제 생기면 복구 가능.
+      </div>
+
+      <div class="callout callout-info">
+        <strong>51개 needs_user_confirm</strong> · 외부 JDK 호출 (Objects.equals, JDBC 등) — 의도된 보류. 추가 처리 불필요.
+      </div>
+
+      <div class="callout callout-info">
+        <strong>6개 SQL-promoted sim_verified</strong> (<code>confirmed_by='translator_e_c3_runtime_verified'</code>) · test/utility 코드 (SdDesigner.*, TraceCollector.* 등). Runtime 실제 exec 까지 확인 완료.
+      </div>
+
+      <div class="callout callout-warn">
+        <strong>light theme</strong> · 프로젝트 UI 가 light theme 이라 amber 등 색상 변경 시 <code>amber-900</code> 같은 진한 색 사용 (밝게 가면 invisible).
+      </div>
+
+      <div class="callout callout-info">
+        <strong>cross-section 권한</strong> · jeensh 가 modeling + simulation 양쪽 작업했음. 본인 작업도 양쪽 손볼 수 있으면 좋고, 충돌 우려 시 분담 합의 권장.
+      </div>
+
+      <h2 id="help">9. 막히면</h2>
+
+      <div class="code-block">
+        <div class="code-lang"><span>bash · 검증 명령</span><button class="copy-btn" data-target="cV">복사</button></div>
+        <pre id="cV"><span class="c"># 통합 검증 (pytest + tsc + API + 채팅 + 충돌 오탐)</span>
+bash toClaude/_shared/verify.sh
+
+<span class="c"># 영역별 회귀</span>
+.venv/bin/python -m pytest tests/simulation/ -q                      <span class="c"># 멀티턴</span>
+.venv/bin/python -m pytest tests/code_layer/ tests/api/test_ontology_router.py -q  <span class="c"># Section 2</span>
+.venv/bin/python -m pytest backend/sim_v2/tests/core/synthesizer/ -q  <span class="c"># 합성기 399/399</span>
+
+<span class="c"># 6 stuck action runtime exec</span>
+<span class="k">PYTHONPATH</span>=. .venv/bin/python scripts/verify_stuck_actions_runtime.py</pre>
+      </div>
+
+      <p>그래도 막히면 Slack/메신저로 <strong>jeensh</strong> 핑.</p>
+
+      <div class="card" style="margin-top:48px; text-align:center; background:linear-gradient(135deg, #f0fdf4 0%, #ecfeff 100%); border-color:#86efac">
+        <h3 style="margin-top:0; color:var(--success)">Welcome aboard 🚀</h3>
+        <p style="margin-bottom:0; color:var(--text)">같은 ontology 위에서 두 에이전트가 나란히 동작하는 그림이 목표입니다.</p>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<footer>
+  <div class="container">
+    <p>onTong · share/section2-modeling-foundation · 2026-05-21<br>
+    Companion docs: <a href="2026-05-20-handoff-section2-modeling-foundation.md">handoff long-form</a> · <a href="2026-05-21-onboarding-simulation-developer.md">markdown 버전</a></p>
+  </div>
+</footer>
+
+<script>
+  // Copy button
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = document.getElementById(btn.dataset.target);
+      if (!target) return;
+      const text = target.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const original = btn.textContent;
+        btn.textContent = '✓ 복사됨';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.classList.remove('copied');
+        }, 1500);
+      });
+    });
+  });
+
+  // Sidebar active link tracking
+  const sections = document.querySelectorAll('main h2[id], section[id]');
+  const navLinks = document.querySelectorAll('.sidebar nav a');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        navLinks.forEach(link => {
+          link.classList.toggle('active', link.getAttribute('href') === '#' + id);
+        });
+      }
+    });
+  }, { rootMargin: '-100px 0px -60% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

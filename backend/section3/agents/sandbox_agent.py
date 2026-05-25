@@ -221,7 +221,7 @@ class SandboxAgent(BaseAgent):
         if translated is None:
             yield self.error("sim_v2 translator 실패")
             return
-        python_source, function_name = translated
+        python_source, function_name, _idiom_rewrites = translated
         yield self.code_gen(python_source)
 
         # 3. W71 fixture 합성

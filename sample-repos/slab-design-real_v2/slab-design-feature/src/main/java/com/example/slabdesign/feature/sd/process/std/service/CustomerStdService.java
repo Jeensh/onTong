@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * sd · std · CUSTOMER_STD 룩업 서비스.
  *
- * 매칭 조건: (회사, 소, 품명, 고객사) — PRIORITY ASC, 첫 row.
+ * 매칭 조건: (온톨로지, 소, 품명, 고객사) — PRIORITY ASC, 첫 row.
  * 미매칭 시 null 반환 (제한 없음 — 사용자 사양).
  */
 @Service

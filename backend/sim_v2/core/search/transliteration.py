@@ -55,11 +55,11 @@ _KR_TO_EN: dict[str, tuple[str, ...]] = {
     "공장":     ("plant",),
     "라인":     ("line",),
     "설계":     ("design",),
-    "슬랩":     ("slab",),
+    "Slab":     ("slab",),
     "강종":     ("grade",),
     "제품":     ("product",),
     "구분":     ("kind", "type"),
-    "회사":     ("company",),
+    "온톨로지":     ("company",),
     # 일반 단어
     "이름":     ("name",),
     "값":       ("value",),

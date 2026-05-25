@@ -39,12 +39,20 @@ function CommandDialog({
   children,
   className,
   showCloseButton = false,
+  shouldFilter,
+  filter,
+  value,
+  onValueChange,
   ...props
 }: Omit<React.ComponentProps<typeof Dialog>, "children"> & {
   title?: string
   description?: string
   className?: string
   showCloseButton?: boolean
+  shouldFilter?: React.ComponentProps<typeof CommandPrimitive>["shouldFilter"]
+  filter?: React.ComponentProps<typeof CommandPrimitive>["filter"]
+  value?: React.ComponentProps<typeof CommandPrimitive>["value"]
+  onValueChange?: React.ComponentProps<typeof CommandPrimitive>["onValueChange"]
   children: React.ReactNode
 }) {
   return (
@@ -63,8 +71,16 @@ function CommandDialog({
         {/* cmdk store context: CommandInput / CommandList / CommandItem 등이
             cmdk Command store 의 subscribe() 를 호출하므로 반드시 <Command>
             로 감싸야 한다. 빠지면 "Cannot read properties of undefined
-            (reading 'subscribe')" 에러. shadcn 표준 패턴. */}
-        <Command>{children}</Command>
+            (reading 'subscribe')" 에러. shadcn 표준 패턴.
+            shouldFilter/filter 는 cmdk 자체 필터 제어용 — 백엔드 ranking
+            을 그대로 surface 하고 싶을 때 shouldFilter={false}.
+            value/onValueChange — 첫 검색결과 자동 highlight 시 controlled value 필요. */}
+        <Command
+          shouldFilter={shouldFilter}
+          filter={filter}
+          value={value}
+          onValueChange={onValueChange}
+        >{children}</Command>
       </DialogContent>
     </Dialog>
   )

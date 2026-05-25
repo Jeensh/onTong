@@ -20,7 +20,7 @@ import java.math.MathContext;
  *
  *   단중상한 = min(1차단중상한, 압연max단중상한, 특정고객사단중상한, 실수율고려설계대기량상한)
  *
- * 룩업 폭 기준은 firstWidthHigh (주문 폭 ≠ 슬랩 폭일 수 있음).
+ * 룩업 폭 기준은 firstWidthHigh (주문 폭 ≠ Slab 폭일 수 있음).
  * CUSTOMER_STD 매칭은 우선순위 검색 (firstMatch) 으로 다중 행 fallback 지원.
  */
 @Component
@@ -29,7 +29,7 @@ public class SdSecondWgtHighAction {
     private static final int STEP_NO = 6;
     private static final String STEP_NAME = "SECOND_WGT_HIGH";
 
-    /** 절대 limit — 어느 슬랩도 이 단중을 넘을 수 없음 (운영 안전 sentinel). */
+    /** 절대 limit — 어느 Slab도 이 단중을 넘을 수 없음 (운영 안전 sentinel). */
     private static final BigDecimal ABSOLUTE_MAX_KG = BigDecimal.valueOf(SdConstants.NO_UPPER_BOUND);
 
     private final HrMaxWgtService hrMaxWgtService;
@@ -65,7 +65,7 @@ public class SdSecondWgtHighAction {
             order.getCustomerCd());
 
         // ---------- 실수율고려 설계대기량 상한 ----------
-        // 실수율(yield rate) 이 작을수록 더 많은 raw material 필요 → 슬랩 단중 상한 증가
+        // 실수율(yield rate) 이 작을수록 더 많은 raw material 필요 → Slab 단중 상한 증가
         // 공식: designPendQtyHigh / productivity (kg)
         BigDecimal yieldAdjustedDesignPendHigh = order.getDesignPendQtyHigh()
             .divide(order.getProductivity(), MathContext.DECIMAL64);

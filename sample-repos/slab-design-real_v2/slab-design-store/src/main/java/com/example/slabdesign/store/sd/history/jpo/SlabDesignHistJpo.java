@@ -30,7 +30,7 @@ public class SlabDesignHistJpo {
     @Id @Column(name = "HIST_ID", length = 30)
     private String histId;
 
-    /** FK → ORDER_OS (회사·소코드는 PK 와 공유). */
+    /** FK → ORDER_OS (온톨로지·소코드는 PK 와 공유). */
     @Column(name = "ORDER_NO", length = 20)
     private String orderNo;
 

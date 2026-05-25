@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>김PM 페르소나 검증 — Phase 13b (search_terms + suggestions)</title>
+<style>
+  body { font-family: -apple-system, "Apple SD Gothic Neo", sans-serif; max-width: 880px; margin: 32px auto; padding: 0 24px; color: #1a1a1a; line-height: 1.55; }
+  h1 { font-size: 22px; border-bottom: 2px solid #1a73e8; padding-bottom: 6px; }
+  h2 { font-size: 16px; margin-top: 28px; color: #1a73e8; }
+  h3 { font-size: 14px; margin: 14px 0 6px; }
+  .q { background: #f5f7fa; padding: 12px 14px; border-left: 3px solid #1a73e8; border-radius: 4px; margin: 8px 0; }
+  .pass { color: #1b873f; font-weight: 600; }
+  .fail { color: #c5221f; font-weight: 600; }
+  .warn { color: #b06000; font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 8px 0; }
+  th, td { border: 1px solid #d0d7de; padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: #f5f7fa; }
+  code { background: #f0f1f3; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+  .verdict { background: #e8f5e9; border: 1px solid #1b873f; padding: 12px 14px; border-radius: 6px; margin: 16px 0; }
+  ol, ul { margin: 4px 0 8px 18px; }
+  li { margin: 3px 0; }
+</style>
+</head>
+<body>
+
+<h1>김PM 페르소나 — Phase 13b 검증 (2026-05-18)</h1>
+<p style="color:#666;font-size:13px;">제조 IT PM 5년차 시점. 자바 못 읽음. 비즈니스 용어로만 판단. repo=<code>slab-design-real-v2</code>.</p>
+
+<h2>1. 결과 요약 (3 시나리오)</h2>
+<table>
+<thead><tr><th>질문</th><th>intent</th><th>검색 query</th><th>candidates</th><th>suggestions</th><th>판정</th></tr></thead>
+<tbody>
+<tr>
+  <td>"엣징 마진 변경하면 어디 영향?"</td>
+  <td>impact <span class="pass">OK</span></td>
+  <td><code>엣징 마진</code> <span class="pass">키워드만</span></td>
+  <td>0</td>
+  <td><code>엣징그룹코드</code>, <code>edgingGroupCd</code> <span class="pass">surface</span></td>
+  <td class="pass">개선</td>
+</tr>
+<tr>
+  <td>"두께 검증 로직 어디 있어?"</td>
+  <td>locate <span class="pass">OK</span></td>
+  <td><code>두께 검증</code> <span class="pass">키워드만</span></td>
+  <td>3 (top: <code>SdOrderValidator.validate</code>)</td>
+  <td>—</td>
+  <td class="warn">부분</td>
+</tr>
+<tr>
+  <td>"주문 검증 시뮬해줘"</td>
+  <td>simulate <span class="pass">OK</span></td>
+  <td><code>주문 검증</code> <span class="pass">키워드만</span></td>
+  <td>5 (top: <code>SdOrderValidator.validate</code>, score 34)</td>
+  <td>—</td>
+  <td class="pass">개선</td>
+</tr>
+</tbody>
+</table>
+
+<h2>2. 검증 포인트</h2>
+
+<h3>(가) search_terms 추출 — <span class="pass">PASS</span></h3>
+<p>세 질문 모두 풀 문장이 아닌 핵심 키워드만 검색에 전달됨. 이전 (풀 query) 대비 명백한 개선.</p>
+
+<h3>(나) suggestions 인접어 — <span class="pass">PASS (Q1 한정)</span></h3>
+<p>Q1 "엣징 마진" 검색 결과 0 → ontology aliases 기반으로 <code>엣징그룹코드</code>/<code>edgingGroupCd</code> 두 개 surface. 김PM 입장에서 "아, '마진' 말고 '그룹코드'로 부르나?" 힌트 획득.</p>
+
+<h3>(다) intent 정확도 — <span class="pass">3/3 PASS</span></h3>
+<p>impact / locate / simulate 모두 정확히 분류. confidence 0.9~1.0.</p>
+
+<h2>3. 김PM 시점 평가</h2>
+
+<div class="verdict">
+<strong>전체 판정: Yes — 이전보다 도움이 된다.</strong><br>
+이유: (1) 풀 문장이 사라져 검색 정확도 향상 가능성 확보, (2) Q1 처럼 어휘 미스매치일 때 "이렇게 부르세요" 가이드가 나옴 (이전엔 빈 화면), (3) Q3 같은 명확 질문은 top-1 매칭이 의도와 일치 (SdOrderValidator).
+</div>
+
+<h2>4. 남아있는 마찰 (구체)</h2>
+<ol>
+  <li><strong>Q2 "두께 검증" → top-1 이 <code>SdOrderValidator.validate</code> (general validator)</strong>. 김PM 은 "두께만 검증" 메서드를 기대 — 예: <code>checkOrderSize</code>, <code>SdThicknessAction</code>. 키워드 "검증"이 광범위해 두께-특화 메서드가 후순위로 밀린 가능성. 즉 search_terms 가 추출돼도 <em>도메인 중요도 가중치</em>가 두께를 못 끌어올림.</li>
+  <li><strong>Q1 "엣징 마진" candidates 0</strong>. suggestions 가 surface 됐지만 그 다음 단계 (사용자가 "엣징그룹코드"로 다시 묻기) 가 1-click 이 아님. UI/API 에서 suggestion 클릭 → 자동 재검색이 없음.</li>
+  <li><strong>"엣징 마진" suggestion 에 한국어 + 영어 (camelCase) 가 둘 다 나옴.</strong> 김PM 은 코드를 못 읽으니 <code>edgingGroupCd</code> 는 노이즈. 비즈니스 용어 1 개만 노출하는 게 친절.</li>
+  <li><strong>business_rule sources 5 개 (DG001~DG005) 가 항상 같이 surface</strong>. Q2/Q3 응답에 두께/엣징 무관한 재고주문/포장단중 rule 까지 붙어옴. 김PM 시점 "관련 없는 정보 노이즈" 로 보일 위험.</li>
+</ol>
+
+<h2>5. 추가 개선 우선순위 추천</h2>
+<ol>
+  <li><strong>도메인 중요도 가중치 추가</strong> (Q2 마찰): search_terms 중 "두께"가 BusinessTerm 이면 ranking boost. 일반 validator 보다 ThicknessAction 류 상위. 이미 Phase 12 에서 _apply_ranking_boost 패턴 있으므로 search_terms × declared_on_term 매칭 추가.</li>
+  <li><strong>suggestion 클릭 → 자동 turn 진행</strong> (Q1 마찰): 프론트엔드에서 suggestion 칩 클릭 시 새 message 로 자동 /respond 발사. 김PM 이 키보드 안 잡아도 됨.</li>
+  <li><strong>business_rule sources 의 query 관련성 필터</strong>: Q2/Q3 응답의 DG001~DG005 가 모든 응답에 dump 되는 게 아니라 search_terms 와 entity 매칭되는 rule 만 surface (예: 두께 → ThicknessAction 의 declared_on_term 과 연결된 rule).</li>
+</ol>
+
+<p style="color:#666;font-size:12px;margin-top:32px;">검증 데이터: 130 actions / 1081 methods / 76 terms / 17 rules. 백엔드 :8001. 세션 ID 3 개 (생략).</p>
+
+</body>
+</html>

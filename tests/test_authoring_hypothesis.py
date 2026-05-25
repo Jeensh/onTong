@@ -51,7 +51,7 @@ def test_entity_hypothesis_schema_round_trip():
         candidate_term_korean="열연공장",
         candidate_term_english="HrPlant",
         domain_role="equipment",
-        pk_role_summary="회사·소·열연공장 식별. 품종은 별도 자식 entity 의 키.",
+        pk_role_summary="온톨로지·소·열연공장 식별. 품종은 별도 자식 entity 의 키.",
         column_notes=[hp.ColumnNote(db_column="WIDTH_LOW", note="열연 폭 하한")],
         relations_hint=["품종별 제약은 자식 entity 로 분리될 후보"],
         domain_questions=[

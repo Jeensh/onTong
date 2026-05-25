@@ -46,7 +46,7 @@ public class SdOrderValidator {
     private ValidationResult checkStockOrder(SDOrderEntity o) {
         if (Integer.valueOf(1).equals(o.getStockCode())) {
             return ValidationResult.fail(SdErrorCode.VAL_STOCK_ORDER,
-                "재고주문 — 새 슬랩 설계 대상 아님");
+                "재고주문 — 새 Slab 설계 대상 아님");
         }
         return null;
     }

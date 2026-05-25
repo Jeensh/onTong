@@ -172,7 +172,11 @@ class DomainLayerStore:
     """
 
     # ---- write ----
-    def upsert_terms(self, repo_id: str, terms: Iterable[BusinessTerm]) -> int:
+    def upsert_terms(self, repo_id: str, terms: Iterable[BusinessTerm], *, force: bool = False) -> int:
+        """기본은 confirmed=True 행 보존. force=True 면 무조건 교체.
+
+        Why: recommend persist 같은 자동 호출이 사용자가 confirm 한 term 을 wipe 하는 사고 방지.
+        """
         count = 0
         with session_scope() as s:
             for t in terms:
@@ -182,6 +186,8 @@ class DomainLayerStore:
 
                 existing = s.get(BusinessTermRow, t.fqn)
                 if existing is not None:
+                    if existing.confirmed and not force:
+                        continue
                     s.delete(existing)
                     s.flush()
                 s.add(_term_to_row(t))

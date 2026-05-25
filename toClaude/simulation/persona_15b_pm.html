@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Phase 15A+15B — PM Review</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 880px; margin: 24px auto; padding: 16px; color: #1f2937; line-height: 1.55; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .meta { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
+  h2 { font-size: 15px; margin-top: 18px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; }
+  th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f9fafb; }
+  code { background: #f3f4f6; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+  .verdict { padding: 10px 14px; border-radius: 6px; font-weight: 600; }
+  .yes { background: #dcfce7; color: #166534; border-left: 4px solid #16a34a; }
+  .ok { color: #166534; font-weight: 600; }
+  .warn { color: #92400e; font-weight: 600; }
+  .fail { color: #991b1b; font-weight: 600; }
+  .stars { color: #f59e0b; font-weight: 700; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  li { margin: 2px 0; }
+  .quote { background: #eff6ff; border-left: 3px solid #3b82f6; padding: 6px 10px; font-size: 12px; margin: 8px 0; }
+</style>
+</head>
+<body>
+
+<h1>김PM 의 5분 점검 — "내 말을 알아듣냐"</h1>
+<div class="meta">5년차 PM 페르소나 · 2026-05-18 · 자연어 5 시나리오 · 코드 zero, 비즈 용어만</div>
+
+<div class="quote">
+<b>전제:</b> 저는 자바 안 봐요. SdTargetWidthAction 같은 거 외울 일도 없고요. 그냥 "폭 바꾸면 뭐 깨져?" 물으면 정확한 답이 나와야 합니다.
+</div>
+
+<h2>실측 — 5 시나리오 top-3</h2>
+<table>
+<tr><th>#</th><th>제 질문</th><th>top-1 (score)</th><th>top-2 / top-3</th><th>도메인 적중</th></tr>
+<tr>
+  <td>1</td><td><b>"폭 변경하면 어디 영향?"</b></td>
+  <td><code>target_width</code> (55)</td>
+  <td><code>final_width_range</code> 54 / <code>width_range</code> 54</td>
+  <td class="ok">★★★★★ — 3/3 width</td>
+</tr>
+<tr>
+  <td>2</td><td><b>"길이 설정 어떻게 동작?"</b></td>
+  <td><code>final_length_range</code> (29)</td>
+  <td><code>length_range</code> 29 / <code>target_length</code> 29</td>
+  <td class="ok">★★★★★ — 3/3 length</td>
+</tr>
+<tr>
+  <td>3</td><td><b>"중량 시뮬 돌려줘"</b></td>
+  <td><code>initial_slab_wgt</code> (54)</td>
+  <td><code>slab_wgt_recalc</code> 54 / <code>first_weight</code> 53</td>
+  <td class="ok">★★★★★ — 5/5 weight</td>
+</tr>
+<tr>
+  <td>4</td><td><b>"슬라브 매수 변경 시 영향?"</b></td>
+  <td><code>slab_count</code> (55)</td>
+  <td><code>SlabNoSequence.next</code> 36 / <code>SdDesigner.design</code> 24</td>
+  <td class="ok">★★★★☆ — top-1 정확, 보조 후보는 약</td>
+</tr>
+<tr>
+  <td>5</td><td><b>"엣징 마진 영향?"</b> (regression)</td>
+  <td colspan="2" class="warn">0 candidates — suggestion <code>["엣징그룹코드", "edgingGroupCd"]</code> fallback</td>
+  <td class="warn">★★★☆☆ — 깔끔한 빈손, 다음 단계 가이드</td>
+</tr>
+</table>
+
+<h2>PM 가치 — 15A/15B 가 저한테 뭘 해줬나</h2>
+<ul>
+  <li><b>silent wrong target 소멸:</b> 시나리오 1-4 모두 top-1 이 <code>declared_on_term</code> 도메인과 일치. 이전엔 "두께 시뮬" 했더니 <code>SdOrderValidator</code> 나오던 그 황당함이 사라짐.</li>
+  <li><b>expansion query 가 보임:</b> sources 에 <code>'폭 너비 width target width final width width range'</code> 같은 한↔영↔alias 묶음이 보여서 "왜 이게 나왔지?" 에 자체 설명이 됨.</li>
+  <li><b>14개 action 정정 효과:</b> width/length/weight 3 도메인 모두 top-3 가 100% 같은 term 으로 모임. 신뢰 가능.</li>
+  <li><b>0-cand 도 우아함:</b> 엣징은 시드 없는데도 "엣징그룹코드 / edgingGroupCd 한번 검색해 보세요" suggestion 으로 막다른 길 안 만듦.</li>
+</ul>
+
+<div class="verdict yes">PM 가치 점수: <span class="stars">9 / 10</span> — 이전엔 후보를 신뢰 못 해서 시니어한테 재확인 했는데, 이제 top-1 받아서 그대로 회의 자료로 씀</div>
+
+<h2>잔여 시드 가치 — 다음에 뭘 채워야?</h2>
+<ul>
+  <li><b>엣징 (높음):</b> 시나리오 5 가 증명. 엣징그룹코드는 영업·QC 회의에 자주 등장하는 용어. <code>term.scm.edging</code> + 관련 action declared_on_term 정정만으로 즉시 효과.</li>
+  <li><b>마진 / 압연 (중):</b> "압연 마진 영향" 같은 질문이 회사 내 다음 빈도. <code>second_wgt_*</code> 가 이미 weight 로 묶여있어서 빠진 건 마진 term 자체.</li>
+  <li><b>실수율 / 생산성 (중):</b> "실수율 조정하면?" PM 자주 묻는데 <code>SdSlabWgtRecalcAction</code> 안에 묻혀있음. business term 으로 표면화 필요.</li>
+  <li><b>plant 코드 / 제강·열연 위치 (낮):</b> hard rule 로는 이미 surface 됨. term 까지는 oversee.</li>
+</ul>
+
+</body>
+</html>

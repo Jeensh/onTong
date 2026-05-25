@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Phase 14B (MVP) — Senior Backend Review</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 900px; margin: 24px auto; padding: 16px; color: #1f2937; line-height: 1.55; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .meta { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
+  h2 { font-size: 15px; margin-top: 18px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; }
+  th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f9fafb; }
+  code { background: #f3f4f6; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+  .ok { color: #166534; font-weight: 600; }
+  .warn { color: #92400e; font-weight: 600; }
+  .fail { color: #991b1b; font-weight: 600; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  .verdict { padding: 10px 14px; border-radius: 6px; font-weight: 600; background: #ecfdf5; color: #065f46; border-left: 4px solid #10b981; }
+</style>
+</head>
+<body>
+
+<h1>Phase 14B (MVP) 검증 — 시니어 백엔드 평가</h1>
+<div class="meta">10년차 시니어 · 2026-05-18 · 5 케이스 라이브 (3 시나리오 + compat=True/None 확보용 변형 2)</div>
+
+<h2>실측 5 케이스</h2>
+<table>
+<tr><th>#</th><th>질의</th><th>target (top-1)</th><th>conds.var</th><th>params</th><th>compat</th><th>verdict / conf</th><th>fixture_compat source</th></tr>
+<tr>
+  <td>S1</td><td>주문 수량이 0 이면</td><td><code>SdFinalLengthRangeAction.execute</code></td><td>"주문 수량"</td><td>order, slab</td><td class="fail">fail</td>
+  <td><code>likely_no</code> / 0.75</td><td>fail · var miss</td>
+</tr>
+<tr>
+  <td>S1b</td><td>order 가 null 이면</td><td><code>SdOrderValidator.validate</code></td><td>"order"</td><td>order (SDOrderEntity)</td><td class="ok">ok</td>
+  <td class="ok"><code>yes</code> / 0.75</td><td>ok matched=['order'] conf=0.8</td>
+</tr>
+<tr>
+  <td>S2</td><td>zzz_undefined_var &lt; 1.0</td><td><code>SdOrderValidator.validate</code></td><td>"zzz_undefined_var"</td><td>order</td><td class="fail">fail</td>
+  <td><code>likely_no</code> / 0.55</td><td>fail · var miss</td>
+</tr>
+<tr>
+  <td>S3</td><td>isValid() true</td><td><code>SdHistoryController.byOrder</code></td><td>"isValid"</td><td>cmpCd, orgCd, orderNo</td><td class="fail">fail</td>
+  <td><code>likely_no</code> / 0.55</td><td>fail · var miss</td>
+</tr>
+<tr>
+  <td>S3b</td><td>validation pass true</td><td><code>ValidationResult.pass()</code></td><td>"validation pass"</td><td>(none)</td><td>None</td>
+  <td><code>likely_yes</code> / 0.75</td><td>(source 부재 — 정상)</td>
+</tr>
+</table>
+
+<h2>판정</h2>
+<ul>
+  <li><b>3 분기 모두 wire 동작</b> — compat=True (S1b) 는 <code>likely_yes → yes</code> 승격, compat=False (S1/S2/S3) 는 <code>likely_yes → likely_no</code> 강등, compat=None (S3b) 는 source 자체 미surface. 코드 path (gate_hypothesis.py L76–134) 가 실측과 일치.</li>
+  <li><b>Provenance 가 자백</b> — fail 케이스 detail 에 <code>reason=var [...] 가 어떤 method param 과도 매칭 안 됨</code> 으로 강등 근거 명시. 14D 의 "body=0 → rule fallback" 출처 자백 패턴을 fixture 계층으로 확장.</li>
+</ul>
+
+<h2>14B (MVP) 가 14D 대비 verdict 신뢰감에 도움되는가?</h2>
+<p class="ok">예 — 조건부로.</p>
+<ul>
+  <li><b>S1b 가 결정적 증거</b>. 14D 였으면 body_signals=5 만으로 <code>likely_yes</code>/0.75 였을 케이스가 14B 에서 <code>yes</code> 로 승격. "조건이 method 와 fixture-실행 가능한가" 의 1차 신호가 verdict ladder 에 진입.</li>
+  <li><b>S1 의 회귀 리스크</b>: 14D 에선 rule_signals=4 로 <code>likely_yes</code> 였던 케이스가 14B 에서 <code>likely_no</code> 로 강등됨. 원인 = condition extractor 가 "주문 수량" Korean 토큰을 뽑는데 Java params 는 영문 (<code>order</code>, <code>slab</code>). MVP 의 substring 매칭으론 영-한 거리를 못 메운다. <span class="warn">14D 가 더 정확했던 케이스가 존재</span> — 즉 14B 는 default-on 이면 false negative 를 늘릴 수 있다.</li>
+</ul>
+
+<h2>실 fixture 실행 (full scope) 와의 gap</h2>
+<ul>
+  <li><b>측정하는 것</b>: "이 hypothesis 가 fixture 로 동작 가능한가" 의 <em>name+type compat</em> 만. 실제 method 호출, 실제 입력 주입, 실제 분기 trace, 실제 throw 캡처는 0.</li>
+  <li><b>못 잡는 false-positive</b>: param name/type 은 맞지만 actual 분기 미실행 (e.g. order 가 null 이면 NPE — body 가 정말 그렇게 던지는지 검증 X).</li>
+  <li><b>못 잡는 false-negative</b>: var 가 param 명과 다른 이름 (Korean ↔ English, alias, nested field 접근) → S1 같은 강등 회귀.</li>
+  <li><b>판정</b>: <span class="warn">acceptable but not enough</span>. fixture readiness 의 1단계 (name compat) 만 가드. 실 실행이 들어와야 verdict='yes' 가 진짜 yes 가 된다.</li>
+</ul>
+
+<h2>다음 Phase 우선순위</h2>
+<ol>
+  <li><b>14B 보강 (precision)</b> — Korean↔English var-alias 보강 (term.aliases / ontology lookup) 으로 S1 회귀 차단. 1-day. <span class="ok">가장 cheap</span>.</li>
+  <li><b>14F anchor_bindings</b> — var → AST anchor 직접 결합. compat 체크가 substring 이 아닌 binding 기반이 되면 정확도 도약.</li>
+  <li><b>실 fixture invoke</b> — 가치 최고지만 multi-day. param synthesis + sandbox 안정화 + result 해석 모두 필요. 14F 이후가 정석.</li>
+</ol>
+
+<div class="verdict">합산: <span class="ok">14B PASS (with caveat)</span>. 3 분기 wire 모두 동작 + provenance 자백 패턴 확장. 단 S1 회귀가 시사하듯 default-on 이면 alias 보강 (1-day) 이 동반되어야 한다. 그 다음은 anchor_bindings → 실 invoke 순.</div>
+
+</body>
+</html>

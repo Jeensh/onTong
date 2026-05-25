@@ -28,7 +28,7 @@ public class SdResultController {
         this.repo = repo;
     }
 
-    @Operation(summary = "주문번호 기준 슬랩 결과 목록 (1 주문 → N 슬랩)")
+    @Operation(summary = "주문번호 기준 Slab 결과 목록 (1 주문 → N Slab)")
     @GetMapping
     public List<SlabResultJpo> byOrder(
             @RequestParam String cmpCd,
@@ -37,7 +37,7 @@ public class SdResultController {
         return repo.findByCmpCdAndOrgCdAndOrderNo(cmpCd, orgCd, orderNo);
     }
 
-    @Operation(summary = "슬랩 번호 단건 조회")
+    @Operation(summary = "Slab 번호 단건 조회")
     @GetMapping("/{slabNo}")
     public SlabResultJpo bySlabNo(@PathVariable String slabNo) {
         return repo.findFirstBySlabNo(slabNo)

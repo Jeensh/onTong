@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Phase 13c — 시니어 검증</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1.5rem; color: #1a1a1a; line-height: 1.55; }
+  h1 { border-bottom: 2px solid #0066cc; padding-bottom: 0.3rem; }
+  h2 { color: #0066cc; margin-top: 1.6rem; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0; font-size: 0.92rem; }
+  th, td { border: 1px solid #ccc; padding: 6px 9px; vertical-align: top; }
+  th { background: #f0f4ff; text-align: left; }
+  code { background: #eef; padding: 1px 5px; border-radius: 3px; font-size: 0.85em; }
+  .ok { color: #1a8a3a; font-weight: 600; }
+  .miss { color: #c8351c; font-weight: 600; }
+  .meh { color: #aa7a00; font-weight: 600; }
+  .verdict { background: #f8f9fc; border-left: 4px solid #0066cc; padding: 0.7rem 1rem; margin: 1rem 0; }
+  .finding { background: #fff7d6; border-left: 4px solid #d4a300; padding: 0.6rem 1rem; margin: 0.8rem 0; }
+</style>
+</head>
+<body>
+
+<h1>Phase 13c — 시니어 페르소나 검증</h1>
+<p><b>repo:</b> <code>slab-design-real-v2</code> · 라이브 8001 · intent <code>hypothesis</code> + conditions + verdict 신설</p>
+
+<h2>시나리오 결과 (turn 2 + turn 3)</h2>
+<table>
+<tr><th>Q</th><th>intent</th><th>conditions</th><th>top cand (score)</th><th>verdict</th><th>conf</th><th>evidence</th></tr>
+<tr><td>1. E001 분기</td><td class="ok">hypothesis</td><td class="ok">엣징그룹코드 = E001</td><td class="miss">batchDesign (12) — wrong</td><td class="ok">unknown</td><td class="ok">0.20</td><td>0행</td></tr>
+<tr><td>2. 두께&lt;0.1mm</td><td class="ok">hypothesis</td><td class="ok">두께 &lt; 0.1 mm</td><td class="ok">thickness_실행 (23) — 정타*</td><td class="meh">likely_no</td><td class="meh">0.55</td><td>5행 (DG001-3 wrong rules)</td></tr>
+<tr><td>3. calculateMargin&lt;0</td><td class="ok">hypothesis</td><td class="ok">calculateMargin 결과 &lt; 0</td><td class="ok">0개 (graceful)</td><td class="ok">HTTP 400</td><td>—</td><td>—</td></tr>
+</table>
+<p style="font-size: 0.85em; color: #555;">* Q2 는 "SdThicknessAction" 키워드 명시했을 때만 정타. 원문 그대로는 0-cand (LLM 키워드 누락).</p>
+
+<h2>Phase 13b vs 13c (한 줄)</h2>
+<div class="verdict">
+13b 는 silent wrong target 으로 "PASS" 만 던졌다. <b>13c 는 같은 wrong target 을 받아도 verdict=unknown + confidence 0.2 + reasoning "다른 method 일 가능성" 으로 미스를 surface 한다.</b>
+</div>
+
+<h2>핵심 발견 — wrong target detection 작동</h2>
+<div class="finding">
+<b>Q1 검증 (가장 중요).</b> top 후보 <code>batchDesign</code> 은 엣징과 무관한 wrong target. 13b 였다면 quick_diagnose PASS 로 끝났을 것. 13c 는 body 안에 <code>엣징그룹코드</code>/<code>E001</code> 토큰 0개 → <b>verdict=unknown, confidence=0.20, reasoning 직접 "다른 method 일 가능성"</b>. <span class="ok">정직</span>. <br><br>
+<b>Q2 미묘함.</b> 정타 target (SdThicknessAction) 인데 verdict=likely_no, confidence 0.55. body 에 "두께" 토큰은 있는데 <code>&lt;</code>/<code>0.1</code> 매칭 실패. evidence 5행은 DG001-3 (주문 검증 rules — 부정확). <span class="meh">heuristic 한계가 드러남</span> — 변수명/상수 inline 비교를 잡기엔 token 매칭만으론 부족.
+</div>
+
+<h2>평가</h2>
+<table>
+<tr><th>질문</th><th>답</th></tr>
+<tr><td>silent wrong target 위험 줄었나?</td><td class="ok">Yes. Q1 이 직접 증명. confidence 0.2 가 사용자에게 빨간 신호로 작동</td></tr>
+<tr><td>graceful fail?</td><td class="ok">Yes. Q3 미존재 메서드 → HTTP 400, 가짜 verdict 0건</td></tr>
+<tr><td>시니어 production?</td><td class="meh">조건부 Yes. confidence ≥0.75 만 신뢰, &lt;0.6 은 사람 재검. heuristic verdict 는 "탐지" 용도지 "답" 아님 — 사용자 교육 필수</td></tr>
+</table>
+
+<h2>Phase 14 핵심 우선순위</h2>
+<div class="verdict">
+<b>1순위 — fixture 실행 검증.</b> heuristic token 매칭은 Q2 같은 정타에서 likely_no 오판. boundary value 로 실제 sandbox 실행 → exception/result 기반 verdict 가 신뢰성의 다음 점프. <br>
+<b>2순위 — evidence relevance filter.</b> Q2 의 DG001-3 처럼 declared_on_term 만 매칭한 rules 가 verdict 와 무관하게 surface. var-name 직접 매칭으로 noise 제거. <br>
+<b>3순위 — 한·영 alias gap 보강.</b> Q2 원문에서 SdThicknessAction 매칭 실패 = 13b 부터 미해결. ranking 이전에 alias resolver.
+</div>
+
+</body>
+</html>

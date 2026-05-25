@@ -416,3 +416,35 @@
 .section3-typing-dot {
   animation: section3-typing-dots 1.4s ease-in-out infinite;
 }
+
+/* 2026-05-25 v4 — 결과 패널 카드 차근차근 등장 (사용자 요구로 stagger 300ms 로 확대) */
+@keyframes sim-card-fadein {
+  0%   { opacity: 0; transform: translateY(16px) scale(0.98); }
+  50%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.sim-anim-fadein {
+  animation: sim-card-fadein 0.55s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+/* 각 카드 stagger — 사용자가 박스 하나하나 인지할 수 있게 더 천천히 (300ms 간격) */
+.sim-stagger > *:nth-child(1) { animation-delay: 100ms; }
+.sim-stagger > *:nth-child(2) { animation-delay: 400ms; }
+.sim-stagger > *:nth-child(3) { animation-delay: 700ms; }
+.sim-stagger > *:nth-child(4) { animation-delay: 1000ms; }
+.sim-stagger > *:nth-child(5) { animation-delay: 1300ms; }
+.sim-stagger > *:nth-child(6) { animation-delay: 1600ms; }
+.sim-stagger > *:nth-child(7) { animation-delay: 1900ms; }
+.sim-stagger > *:nth-child(8) { animation-delay: 2200ms; }
+.sim-stagger > *:nth-child(9) { animation-delay: 2500ms; }
+.sim-stagger > *:nth-child(10) { animation-delay: 2800ms; }
+.sim-stagger > *:nth-child(11) { animation-delay: 3100ms; }
+.sim-stagger > *:nth-child(12) { animation-delay: 3400ms; }
+
+/* ── Next.js dev error overlay / build indicator 숨김 (사용자 요구 2026-05-25) ── */
+nextjs-portal,
+#__next-build-watcher,
+[data-nextjs-dialog],
+[data-nextjs-dialog-overlay],
+[data-nextjs-toast],
+.__next-dev-overlay-tools,
+#__next-prerender-indicator { display: none !important; }

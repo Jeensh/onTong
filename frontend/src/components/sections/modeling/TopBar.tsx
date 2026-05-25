@@ -8,12 +8,12 @@ import { RepoImportModal } from "./RepoImportModal";
 
 /**
  * TopBar (V7 IA, D plan) — 항상 어디 있는지 보이는 breadcrumb 노출.
- * `repo / view / selection / lens` 패턴.
+ * `repo / view / selection` 패턴.
  */
 export function TopBar() {
   const {
     activeRepoId, setGraphMode, toggleCmdK,
-    graphModeActive, selectedActionFqn, selectedCodeTypeFqn, selectedTermFqn, lens,
+    graphModeActive, selectedActionFqn, selectedCodeTypeFqn, selectedTermFqn,
   } = useWorkbench();
   const [importOpen, setImportOpen] = useState(false);
 
@@ -44,27 +44,21 @@ export function TopBar() {
             <Crumb label={selection} mono />
           </>
         )}
-        {lens !== "none" && (
-          <>
-            <ChevronRight className="w-3 h-3 shrink-0" />
-            <Crumb label={`Lens: ${lens}`} subtle />
-          </>
-        )}
       </nav>
 
       <button
         onClick={() => toggleCmdK(true)}
-        className="flex items-center gap-2 px-2.5 py-1 text-xs text-muted-foreground bg-muted rounded border border-border min-w-[180px] hover:text-foreground hover:bg-muted/70 shrink-0"
+        className="h-7 flex items-center gap-2 px-2.5 text-[11.5px] text-muted-foreground bg-muted rounded border border-border min-w-[180px] hover:text-foreground hover:bg-muted/70 shrink-0 transition-colors"
       >
         <Search className="w-3 h-3" />
         검색 / 명령
-        <kbd className="ml-auto text-[10px] px-1 py-0 bg-background rounded border border-border">⌘K</kbd>
+        <kbd className="ml-auto text-[10px] px-1 py-0 bg-background rounded border border-border font-mono">⌘K</kbd>
       </button>
       <Button
         variant="outline"
         size="sm"
         onClick={() => setImportOpen(true)}
-        className="gap-1.5 shrink-0"
+        className="h-7 px-2.5 text-[11.5px] gap-1.5 shrink-0"
         title="Java repo 분석 + 자동 매핑 추천"
       >
         <FolderInput className="w-3.5 h-3.5" /> Import
@@ -73,11 +67,17 @@ export function TopBar() {
         variant={graphModeActive ? "default" : "outline"}
         size="sm"
         onClick={() => setGraphMode(!graphModeActive)}
-        className="gap-1.5 shrink-0"
+        className="h-7 px-2.5 text-[11.5px] gap-1.5 shrink-0"
       >
         <Network className="w-3.5 h-3.5" /> 그래프
       </Button>
-      <Button size="sm" className="gap-1.5 shrink-0" disabled title="Simulation Engine — 다음 phase">
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-7 px-2.5 text-[11.5px] gap-1.5 shrink-0"
+        disabled
+        title="Simulation Engine — 다음 phase"
+      >
         <Play className="w-3.5 h-3.5" /> 시뮬
       </Button>
 
@@ -87,13 +87,12 @@ export function TopBar() {
 }
 
 function Crumb({
-  label, primary, mono, subtle,
-}: { label: string; primary?: boolean; mono?: boolean; subtle?: boolean }) {
+  label, primary, mono,
+}: { label: string; primary?: boolean; mono?: boolean }) {
   return (
     <span
       className={
         (primary ? "text-foreground font-semibold " : "") +
-        (subtle ? "text-muted-foreground/60 " : "") +
         (mono ? "font-mono text-[10.5px] " : "") +
         "truncate min-w-0"
       }

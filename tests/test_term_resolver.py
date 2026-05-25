@@ -285,7 +285,7 @@ def test_llm_fallback_hit_above_cutoff() -> None:
         llm_resolver=stub_llm,
         clock=lambda: _NOW,
     )
-    result = r.resolve("슬랩 폭 조정")
+    result = r.resolve("Slab 폭 조정")
     assert result.resolution_source is ResolutionSource.LLM
     assert result.matched_term_fqn == "inventory.safety_stock"
     assert result.confidence == pytest.approx(0.75)

@@ -19,6 +19,7 @@ Public API:
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from backend.sim_v2.core.synthesizer.bigdecimal_mapper import (
@@ -40,11 +41,17 @@ from backend.sim_v2.core.synthesizer.type_resolver import (
 
 @dataclass
 class TranslationResult:
-    """One translate() output — Python source + collected imports + notes."""
+    """One translate() output — Python source + collected imports + notes.
+
+    `idiom_rewrites` lists Java idioms rewritten via W75 (idiom_rewriter), each
+    a dict `{idiom_name, java_snippet, python_snippet, tier, arity}`. Used by
+    Section 3 Gate II to surface idiom diffs.
+    """
     python_source:    str
     imports_needed:   set[str] = field(default_factory=set)
     notes:            list[str] = field(default_factory=list)
     signature_locked: bool = False
+    idiom_rewrites:   list[dict] = field(default_factory=list)
 
 
 _EXPRESSION_TYPES = frozenset({
@@ -67,6 +74,9 @@ _EXPRESSION_TYPES = frozenset({
     "switch_expression",
 })
 
+_LEADING_CALL_TARGET = re.compile(r"\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+
+
 _STATEMENT_TYPES = frozenset({
     "return_statement",
     "local_variable_declaration",
@@ -78,6 +88,7 @@ _STATEMENT_TYPES = frozenset({
     "block",
     "throw_statement",
     "try_statement",
+    "try_with_resources_statement",
     "assert_statement",
     "break_statement",
     "continue_statement",
@@ -105,14 +116,21 @@ class JavaToPythonTranslator:
         plugin_contract=None,
         type_resolver: TypeResolver | None = None,
         this_type: str | None = None,
+        class_field_scope: dict[str, str] | None = None,
     ) -> None:
         self.plugin_contract = plugin_contract
         self.type_resolver: TypeResolver = type_resolver or BigDecimalAwareResolver()
         self.this_type = this_type  # FQN of enclosing class (W21 — for `this.field` resolution)
+        # Java allows implicit-this field references (`field` instead of
+        # `this.field`). Python doesn't — bare identifier resolves to function
+        # scope. When caller supplies field names + types here, emit `self.X`
+        # for matching bare identifiers (Risk 1 fix — TraceCollector.traces case).
+        self.class_field_scope: dict[str, str] = dict(class_field_scope or {})
         self._collected_imports: set[str] = set()
         self._collected_notes: list[str] = []
         self._signature_locked = False
         self._local_scope: dict[str, str] = {}
+        self._idiom_trace: list[dict] = []  # W75 — Phase 8 idiom_diffs surface
         self._trace_active: bool = False
         self._trace_counter: int = 0
         # W41 — multi-statement lambda → nested def hoisting.
@@ -121,6 +139,11 @@ class JavaToPythonTranslator:
         # `_translate_block` immediately before the statement that registered them.
         self._pending_hoists: list[str] = []
         self._lambda_counter: int = 0
+        # When a local var `X x = x(...);` would shadow a Java helper of the
+        # same name (legal in Java, fatal in Python — local-name rule makes the
+        # RHS lookup target the unbound local), the LHS is renamed to `_x` and
+        # all subsequent identifier references are rewritten via this alias.
+        self._local_alias: dict[str, str] = {}
 
     # ─────────────────────────────────────────────────────────────────────
     # Top-level entry
@@ -136,16 +159,19 @@ class JavaToPythonTranslator:
         self._collected_notes = []
         self._signature_locked = False
         self._local_scope = {}
+        self._idiom_trace = []
         self._trace_active = with_trace
         self._trace_counter = 0
         self._pending_hoists = []
         self._lambda_counter = 0
+        self._local_alias = {}
         source = self._dispatch(node, indent=indent)
         return TranslationResult(
             python_source=source,
             imports_needed=set(self._collected_imports),
             notes=list(self._collected_notes),
             signature_locked=self._signature_locked,
+            idiom_rewrites=list(self._idiom_trace),
         )
 
     # ─────────────────────────────────────────────────────────────────────
@@ -289,8 +315,55 @@ class JavaToPythonTranslator:
     def _text(self, node) -> str:
         return node.text.decode() if node else ""
 
+    # Python reserved keywords that may appear as Java identifiers (method names,
+    # field names, etc.) and need renaming when emitted into Python source.
+    # Examples from production: `ValidationResult.pass()` (Java's `pass` is a valid
+    # method name but Python's keyword). Rule: append underscore suffix.
+    _PYTHON_KEYWORDS_TO_RENAME = frozenset({
+        "pass", "yield", "lambda", "global", "nonlocal", "import", "from",
+        "as", "with", "raise", "except", "finally", "try", "assert",
+        "async", "await", "del",
+    })
+
+    def _safe_python_name(self, name: str) -> str:
+        """Rename Java identifier to avoid clashing with Python keywords.
+
+        e.g. `pass` → `pass_`, `yield` → `yield_`. Non-clashing names unchanged.
+        Used for method names + bare identifier references that would otherwise
+        emit invalid Python syntax (e.g. `def pass(...)` or `return pass`).
+        """
+        if name in self._PYTHON_KEYWORDS_TO_RENAME:
+            return name + "_"
+        return name
+
+    def _strip_generics(self, type_text: str) -> str:
+        """Strip Java generic arguments from a type text.
+
+        e.g. `ArrayList<>` → `ArrayList`, `List<String>` → `List`,
+             `Map<String, Integer>` → `Map`. Idempotent on non-generic types.
+        Used in object_creation_expression to handle diamond `<>` and explicit
+        type args which are not valid Python constructor syntax.
+        """
+        if not type_text:
+            return type_text
+        lt = type_text.find("<")
+        if lt == -1:
+            return type_text
+        return type_text[:lt].strip()
+
     def _translate_identifier(self, node, *, indent: int) -> str:
-        return self._text(node)
+        raw = self._text(node)
+        if raw in self._local_alias:
+            return self._local_alias[raw]
+        # Java implicit-this field ref → Python `self.X`. Skip when name is
+        # already a local/param/loop var (those are bound in Python scope).
+        if (
+            raw in self.class_field_scope
+            and raw not in self._local_scope
+            and raw not in self._local_alias
+        ):
+            return f"self.{raw}"
+        return self._safe_python_name(raw)
 
     def _translate_decimal_integer_literal(self, node, *, indent: int) -> str:
         return self._text(node).replace("_", "").rstrip("Ll")
@@ -463,7 +536,27 @@ class JavaToPythonTranslator:
         right = node.child_by_field_name("right")
         op_node = node.child_by_field_name("operator")
         op = self._text(op_node) or "="
-        return f"{self._dispatch(left, indent=0)} {op} {self._dispatch(right, indent=0)}"
+        left_src = self._dispatch(left, indent=0)
+        right_src = self._dispatch(right, indent=0)
+        # Java's assignment-as-expression idiom (e.g. `if ((r = checkX()) != null)`)
+        # is invalid Python with `=`. When the assignment is NOT a standalone
+        # statement (parent isn't `expression_statement`) and is a plain `=`,
+        # emit the walrus `:=` (Python 3.8+). Compound ops (`+=` etc.) aren't
+        # expressions in Python — signal-lock with a placeholder.
+        parent = getattr(node, "parent", None)
+        parent_type = parent.type if parent is not None else None
+        if parent_type != "expression_statement":
+            if op == "=" and left is not None and left.type == "identifier":
+                return f"({left_src} := {right_src})"
+            # Compound assignment-as-expression is a rare construct; lock it
+            # rather than risk wrong semantics. Emit a syntactically valid
+            # placeholder so the surrounding source still compiles.
+            self._signature_locked = True
+            self._collected_notes.append(
+                f"compound assignment-as-expression `{op}` not auto-translated"
+            )
+            return f"({left_src})  # UNMAPPED assignment-as-expression {op}"
+        return f"{left_src} {op} {right_src}"
 
     def _translate_array_access(self, node, *, indent: int) -> str:
         """Java `a[i]` → Python `a[i]` (same syntax, transparent)."""
@@ -539,7 +632,9 @@ class JavaToPythonTranslator:
     def _translate_object_creation_expression(self, node, *, indent: int) -> str:
         type_node = node.child_by_field_name("type")
         args_node = node.child_by_field_name("arguments")
-        type_text = self._text(type_node)
+        # Strip Java generic arguments (e.g. `ArrayList<>` → `ArrayList`,
+        # `List<String>` → `List`) — `<...>` is not valid Python ctor syntax.
+        type_text = self._strip_generics(self._text(type_node))
 
         # W30 — anonymous inner class detection: `new Type() { ... }`. The
         # body lives in expression position and would need multi-line hoisting,
@@ -583,7 +678,11 @@ class JavaToPythonTranslator:
         name_node = node.child_by_field_name("name")
         args_node = node.child_by_field_name("arguments")
 
-        method_name = self._text(name_node)
+        # Rename Python-keyword method names (e.g. `pass` → `pass_`) so the
+        # emitted source is syntactically valid Python. The renamed name must
+        # also be applied to the `def` (handled in _translate_method_declaration).
+        raw_method_name = self._text(name_node)
+        method_name = self._safe_python_name(raw_method_name)
 
         arg_strs: list[str] = []
         if args_node:
@@ -619,6 +718,13 @@ class JavaToPythonTranslator:
                 ]
                 return "{" + ", ".join(pairs) + "}"
 
+        # Java 10+ `Collection.copyOf(x)` → immutable copy. Map to Python
+        # constructor form (`list(x)` / `set(x)` / `dict(x)`).
+        if method_name == "copyOf" and receiver_src in ("List", "Set", "Map"):
+            arg = arg_strs[0] if arg_strs else ""
+            ctor = {"List": "list", "Set": "set", "Map": "dict"}[receiver_src]
+            return f"{ctor}({arg})"
+
         # Type-aware BigDecimal dispatch — receiver type known to be BigDecimal.
         # W51 — also fire on *unambiguous* BD arithmetic method names (subtract /
         # multiply / divide / remainder) when receiver type is unknown. These
@@ -648,8 +754,10 @@ class JavaToPythonTranslator:
 
         # W75 — Java idiom rewrites (String/Collection/Optional/Math/Objects).
         # Fires before the generic fallback. Returns None if no idiom matched.
+        # Phase 8: pass `trace` so caller can surface which idioms were rewritten.
         idiom = rewrite_method_invocation(
             receiver_src, receiver_type, method_name, arg_strs,
+            trace=self._idiom_trace,
         )
         if idiom is not None:
             return idiom
@@ -678,6 +786,12 @@ class JavaToPythonTranslator:
 
         W8: track `name → Type` in local_scope for downstream method dispatch.
         W16: when trace_active, append `_trace.step(...)` capturing newly bound var.
+
+        Java→Python shadow trap: `X x = x(...)` is legal Java (RHS resolves to a
+        helper named `x`), but Python pre-binds `x` as local so the RHS lookup
+        throws UnboundLocalError. When the RHS's first callable matches the LHS
+        name, rename LHS to `_<name>` and record an alias so later references
+        rewrite consistently.
         """
         type_node = node.child_by_field_name("type")
         declared_type = self._text(type_node) if type_node else None
@@ -689,13 +803,21 @@ class JavaToPythonTranslator:
                 name_node = child.child_by_field_name("name")
                 value_node = child.child_by_field_name("value")
                 name = self._text(name_node)
-                if declared_type:
-                    self._local_scope[name] = declared_type
-                declared_names.append(name)
                 if value_node:
                     value_src = self._dispatch(value_node, indent=0)
-                    var_lines.append(f"{self._pad(indent)}{name} = {value_src}")
+                    emit_name = name
+                    call_target = _LEADING_CALL_TARGET.match(value_src)
+                    if call_target and call_target.group(1) == name:
+                        emit_name = f"_{name}"
+                        self._local_alias[name] = emit_name
+                    if declared_type:
+                        self._local_scope[emit_name] = declared_type
+                    declared_names.append(emit_name)
+                    var_lines.append(f"{self._pad(indent)}{emit_name} = {value_src}")
                 else:
+                    if declared_type:
+                        self._local_scope[name] = declared_type
+                    declared_names.append(name)
                     var_lines.append(f"{self._pad(indent)}{name} = None  # Java default")
         emitted = "\n".join(var_lines)
         if declared_names:
@@ -716,7 +838,19 @@ class JavaToPythonTranslator:
                 lines.extend(self._pending_hoists)
                 self._pending_hoists = []
             lines.append(translated)
-        return "\n".join(lines) if lines else f"{self._pad(indent)}pass"
+        if not lines:
+            return f"{self._pad(indent)}pass"
+        # A body of only comments (e.g. placeholder test methods with
+        # `// intentionally empty`) emits no Python statements, just comment
+        # lines — which Python rejects ("expected an indented block"). Detect
+        # this and append a `pass` so the function is valid.
+        comment_only = all(
+            c.type in {"line_comment", "block_comment"}
+            for c in node.named_children
+        )
+        if comment_only:
+            lines.append(f"{self._pad(indent)}pass")
+        return "\n".join(lines)
 
     def _translate_method_declaration(self, node, *, indent: int) -> str:
         """Java method → Python def. Parameters bound in local_scope (W9.2)."""
@@ -724,7 +858,9 @@ class JavaToPythonTranslator:
         params_node = node.child_by_field_name("parameters")
         body_node = node.child_by_field_name("body")
 
-        method_name = self._text(name_node)
+        # Java method names like `pass` clash with Python keywords; rename so
+        # the emitted source compiles (e.g. `ValidationResult.pass()` → `pass_`).
+        method_name = self._safe_python_name(self._text(name_node))
         py_params: list[str] = ["self"]
         if params_node:
             for child in params_node.named_children:
@@ -985,25 +1121,24 @@ class JavaToPythonTranslator:
     def _translate_instanceof_expression(self, node, *, indent: int) -> str:
         """Java `x instanceof T` → Python `isinstance(x, T)`.
 
-        Java 16+ pattern (`x instanceof T t`) — additional identifier child
-        becomes a separate assignment, which doesn't translate cleanly to a
-        single expression. We emit `isinstance(x, T)` and warn.
+        Java 16+ pattern (`x instanceof T t`) → walrus form:
+        `(isinstance(x, T) and (t := x))` — binds the pattern variable
+        inline so it's available in the enclosing if/elif body. Generic args
+        (`Map<?, ?> m`) are stripped before the isinstance lookup since
+        Python's isinstance can't accept parameterized generics.
         """
         children = node.named_children
         if len(children) < 2:
             self._signature_locked = True
             return "# UNMAPPED instanceof (insufficient children)"
         value_src = self._dispatch(children[0], indent=0)
-        type_text = self._text(children[1])
-        # Map Java std types to Python equivalents for isinstance
+        type_text = self._strip_generics(self._text(children[1]))
         py_type = _INSTANCEOF_TYPE_MAP.get(type_text, type_text)
-        result = f"isinstance({value_src}, {py_type})"
+        base = f"isinstance({value_src}, {py_type})"
         if len(children) >= 3:
-            # Pattern variable (Java 16+) — note ambiguity
-            self._collected_notes.append(
-                f"instanceof pattern var ({self._text(children[2])}) not bound — manual assign needed"
-            )
-        return result
+            pattern_var = self._text(children[2])
+            return f"({base} and ({pattern_var} := {value_src}))"
+        return base
 
     def _translate_assert_statement(self, node, *, indent: int) -> str:
         """Java `assert cond` or `assert cond : msg` → Python `assert cond [, msg]`."""
@@ -1060,6 +1195,26 @@ class JavaToPythonTranslator:
             return f"{self._pad(indent)}# UNMAPPED switch (missing cond/block)"
 
         cond_src = _strip_outer_parens(self._dispatch(cond_node, indent=0))
+
+        # Detect Java 14+ arrow-form `switch_rule` children. The arrow form is
+        # frequently used as an *expression* (`return switch (x) { case '1' -> a; default -> null; };`),
+        # which the current line-oriented emitter cannot inline after `return `.
+        # Signal-lock with a Python-syntactically-valid placeholder so the
+        # translated source still compiles (sandbox can run other paths) and
+        # downstream verifiers see SIGNATURE_LOCKED instead of ERROR.
+        has_arrow_rule = any(
+            c.type == "switch_rule" for c in block_node.named_children
+        )
+        if has_arrow_rule:
+            self._signature_locked = True
+            self._collected_notes.append(
+                "switch_rule (Java 14+ arrow form) not auto-translated — "
+                "rewrite to classic `case X: ...; break;` for translation"
+            )
+            # Emit syntactically valid Python that yields None so the rest of
+            # the source compiles. `pass` is a statement; we need an expression
+            # because the caller (return_statement / assignment) is inlining.
+            return "None  # UNMAPPED switch arrow-form"
 
         # Walk switch_block_statement_group children → (label_value | "default", body)
         groups: list[tuple[str | None, list]] = []  # label_value=None means default
@@ -1127,7 +1282,9 @@ class JavaToPythonTranslator:
                 for stmt in effective_body:
                     lines.append(self._dispatch(stmt, indent=indent + 1))
 
-        return "\n".join(lines) if lines else f"{self._pad(indent)}pass"
+        # Empty groups → emit `None` (an expression, not a statement) so callers
+        # like `return <switch>` still produce valid Python (`return None`).
+        return "\n".join(lines) if lines else f"{self._pad(indent)}None"
 
     # ─────────────────────────────────────────────────────────────────────
     # Lambda + try-with-resources (W27)
@@ -1265,7 +1422,12 @@ class JavaToPythonTranslator:
             for sub in r_node.named_children:
                 if sub.type == "identifier" and name is None:
                     name = self._text(sub)
-                elif sub.type not in {"type_identifier", "generic_type", "modifiers"}:
+                elif sub.type not in {
+                    "type_identifier",
+                    "scoped_type_identifier",
+                    "generic_type",
+                    "modifiers",
+                }:
                     init = sub
             if name is None or init is None:
                 self._signature_locked = True

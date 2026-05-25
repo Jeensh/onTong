@@ -68,7 +68,7 @@ def _hr_spec_hypothesis() -> hp.EntityHypothesis:
         candidate_term_korean="열연공장 표준",
         candidate_term_english="HrSpec",
         domain_role="standard",
-        pk_role_summary="회사·소·열연공장·품종 4축 — 한 row = 한 열연공장의 한 품종에 대한 폭/길이 범위",
+        pk_role_summary="온톨로지·소·열연공장·품종 4축 — 한 row = 한 열연공장의 한 품종에 대한 폭/길이 범위",
         column_notes=[
             hp.ColumnNote(db_column="WIDTH_LOW", note="폭 하한 (mm)"),
             hp.ColumnNote(db_column="WIDTH_HIGH", note="폭 상한 (mm)"),

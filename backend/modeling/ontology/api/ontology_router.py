@@ -69,53 +69,51 @@ async def query_ontology(req: OntologyRequest) -> OntologyResponse:
         )
 
 
+_NODE_LABELS = (
+    "Term", "TermCategory", "Step", "Standard", "Variable",
+    "ErrorCode", "Class", "Method", "Table",
+)
+_REL_TYPES = (
+    "BELONGS_TO", "IS_A", "RELATED_TO", "PRECEDES", "DEPENDS_ON",
+    "USES_STANDARD", "REQUIRES_INPUT", "PRODUCES_OUTPUT", "CONSTRAINS",
+    "TRIGGERS_ON_FAIL", "REFERS_TO_PROCESS", "CONTAINS", "CALCULATES",
+    "IMPLEMENTS", "RELATES_TO_STANDARD", "MAPS_TO_STANDARD",
+)
+
+
 @router.get("/graph/stats")
 async def graph_stats() -> dict:
-    """온톨로지 노드/관계 통계 (디버깅/모니터링)."""
-    client = get_client()
-    nodes: dict[str, int] = {}
-    for label in (
-        "Term",
-        "TermCategory",
-        "Step",
-        "Standard",
-        "Variable",
-        "ErrorCode",
-        "Class",
-        "Method",
-        "Table",
-    ):
-        rows = client.query(f"MATCH (n:{label}) RETURN count(n) AS n")
-        nodes[label] = rows[0]["n"]
+    """온톨로지 노드/관계 통계 (디버깅/모니터링).
 
-    relations: dict[str, int] = {}
-    for rel in (
-        "BELONGS_TO",
-        "IS_A",
-        "RELATED_TO",
-        "PRECEDES",
-        "DEPENDS_ON",
-        "USES_STANDARD",
-        "REQUIRES_INPUT",
-        "PRODUCES_OUTPUT",
-        "CONSTRAINS",
-        "TRIGGERS_ON_FAIL",
-        "REFERS_TO_PROCESS",
-        "CONTAINS",
-        "CALCULATES",
-        "IMPLEMENTS",
-        "RELATES_TO_STANDARD",
-        "MAPS_TO_STANDARD",
-    ):
-        rows = client.query(f"MATCH ()-[r:{rel}]->() RETURN count(r) AS n")
-        relations[rel] = rows[0]["n"]
+    Neo4j 미가용 시 모두 0 으로 응답 — 다운스트림(UI 대시보드)을 깨뜨리지 않는다.
+    backend 가 SQLite 중심으로 이동했고 graph view 는 보조 기능이므로 graceful degradation.
+    """
+    nodes: dict[str, int] = {k: 0 for k in _NODE_LABELS}
+    relations: dict[str, int] = {k: 0 for k in _REL_TYPES}
+    totals = {"nodes": 0, "relations": 0}
+    backend_status: dict = {"available": True}
 
-    total_nodes = client.query("MATCH (n) RETURN count(n) AS n")[0]["n"]
-    total_rels = client.query("MATCH ()-[r]->() RETURN count(r) AS n")[0]["n"]
+    try:
+        client = get_client()
+        for label in _NODE_LABELS:
+            rows = client.query(f"MATCH (n:{label}) RETURN count(n) AS n")
+            nodes[label] = rows[0]["n"]
+        for rel in _REL_TYPES:
+            rows = client.query(f"MATCH ()-[r:{rel}]->() RETURN count(r) AS n")
+            relations[rel] = rows[0]["n"]
+        totals = {
+            "nodes": client.query("MATCH (n) RETURN count(n) AS n")[0]["n"],
+            "relations": client.query("MATCH ()-[r]->() RETURN count(r) AS n")[0]["n"],
+        }
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("graph_stats: Neo4j unavailable, returning zeros: %s", exc)
+        backend_status = {"available": False, "reason": str(exc)[:200]}
+
     return {
         "nodes": nodes,
         "relations": relations,
-        "totals": {"nodes": total_nodes, "relations": total_rels},
+        "totals": totals,
+        "backend": backend_status,
     }
 
 
@@ -124,17 +122,25 @@ async def search_terms(
     q: str = Query(..., min_length=1, description="검색어"),
     limit: int = Query(10, ge=1, le=100),
 ) -> list[dict]:
-    """업무 용어 자동완성. korean/english/aliases 모두 검색."""
-    client = get_client()
-    return client.query(
-        "MATCH (t:Term) "
-        "WHERE t.korean_name CONTAINS $q "
-        "   OR t.english_name CONTAINS $q "
-        "   OR ANY(alias IN t.aliases WHERE alias CONTAINS $q) "
-        "RETURN t.id AS id, t.korean_name AS name, "
-        "       t.english_name AS english, t.category AS category, "
-        "       t.description AS description "
-        "LIMIT $limit",
-        q=q,
-        limit=limit,
-    )
+    """업무 용어 자동완성. korean/english/aliases 모두 검색.
+
+    Neo4j 미가용 시 빈 리스트 반환 — 자동완성이 없어도 다른 검색 경로(SQLite-backed
+    `/api/ontology/search`)가 살아 있으므로 UI 가 멎지 않는다.
+    """
+    try:
+        client = get_client()
+        return client.query(
+            "MATCH (t:Term) "
+            "WHERE t.korean_name CONTAINS $q "
+            "   OR t.english_name CONTAINS $q "
+            "   OR ANY(alias IN t.aliases WHERE alias CONTAINS $q) "
+            "RETURN t.id AS id, t.korean_name AS name, "
+            "       t.english_name AS english, t.category AS category, "
+            "       t.description AS description "
+            "LIMIT $limit",
+            q=q,
+            limit=limit,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("term_search: Neo4j unavailable, returning empty: %s", exc)
+        return []

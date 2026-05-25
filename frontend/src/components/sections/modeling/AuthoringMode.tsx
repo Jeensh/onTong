@@ -20,6 +20,12 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import {
+  PenLine, PlusCircle, RotateCcw, Link2, FileSearch, Lightbulb,
+  MessagesSquare, ListChecks, AlertTriangle, Layers, Archive,
+  Check, ChevronRight, BookOpen, ArrowRight, Loader2, AlertCircle, Folder,
+  type LucideIcon,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -57,7 +63,6 @@ export function AuthoringMode() {
   const messages = useAuthoring((s) => s.messages);
   const loading = useAuthoring((s) => s.loading);
   const error = useAuthoring((s) => s.error);
-  const costUsd = useAuthoring((s) => s.costUsd);
   const turnNo = useAuthoring((s) => s.turnNo);
   const resumeSession = useAuthoring((s) => s.resumeSession);
   const completedEntities = useAuthoring((s) => s.completedEntities);
@@ -83,22 +88,29 @@ export function AuthoringMode() {
           <Toolbar />
           <SelectionBanner />
           {error && (
-            <div className="px-3 py-2 text-[12px] text-rose-400 border-b border-rose-400/40 bg-rose-400/5">
-              ⚠️ {error}
+            <div className="px-3 py-2 text-[12px] text-rose-400 border-b border-rose-400/40 bg-rose-400/5 flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              <span>{error}</span>
             </div>
           )}
           <ChatThread messages={messages} loading={loading} />
           <div className="h-7 border-t border-border bg-muted/40 px-3 flex items-center text-[11px] text-muted-foreground gap-3">
             {session ? (
               <>
-                <span>session: <code className="font-mono">{session.id.slice(0, 8)}…</code></span>
+                <span>session <code className="font-mono text-foreground">{session.id.slice(0, 8)}</code></span>
+                <span className="opacity-50">·</span>
                 <span>turn {turnNo}</span>
+                <span className="opacity-50">·</span>
                 <span>
                   entity {completedEntities.length}
-                  {currentExtracted ? ` (+1 진행)` : ""}
+                  {currentExtracted ? ` (+1)` : ""}
                 </span>
-                <span>cost ${costUsd.toFixed(4)}</span>
-                {loading && <span className="text-primary">⏳ 진행 중...</span>}
+                {loading && (
+                  <span className="ml-auto flex items-center gap-1 text-primary">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    진행 중
+                  </span>
+                )}
               </>
             ) : (
               <span>세션 없음 — 새 인터뷰를 시작하세요.</span>
@@ -129,23 +141,26 @@ function SelectionBanner() {
 
   if (!session) {
     return (
-      <div className="px-3 py-2 border-b border-border bg-muted/20 text-[11.5px] text-muted-foreground">
-        세션 없음 — 우측 상단 toolbar 의 <strong>🆕 새 세션</strong> 부터 시작
+      <div className="px-3 py-2 border-b border-border bg-muted/20 text-[11.5px] text-muted-foreground flex items-center gap-1.5">
+        <PlusCircle className="w-3.5 h-3.5 shrink-0 text-primary/60" />
+        <span>세션 없음 — 우측 상단 <span className="font-medium text-foreground">새 세션</span> 부터 시작</span>
       </div>
     );
   }
 
   if (!selectedFqn) {
     return (
-      <div className="px-3 py-2.5 border-b border-amber-400/40 bg-amber-400/5 text-[11.5px] text-amber-300">
-        <div className="font-semibold mb-0.5">📂 좌측에서 Java 클래스 선택</div>
-        <div className="text-amber-300/80">
-          좌측 패키지 트리 → 패키지 클릭 → <strong>하단 inventory 패널</strong>에서 클래스 클릭.
-          <br />
-          (선택 없이 ① 코드 추출 시 bundled <code>HrSpecJpo</code> (JPA Entity 데모) 사용)
+      <div className="px-3 py-2.5 border-b border-amber-400/40 bg-amber-400/5 text-[11.5px] text-amber-900">
+        <div className="font-semibold mb-1 flex items-center gap-1.5">
+          <Folder className="w-3.5 h-3.5" />
+          좌측에서 Java 클래스 선택
         </div>
-        <div className="text-[10px] text-amber-300/60 mt-1">
-          <code>@Entity</code> = 가설/인터뷰까지 풀 pipeline · 외 클래스 (<code>@Service</code>/<code>@Controller</code>/POJO) = 추출만, hypothesis 는 Phase C 에서 확장
+        <div className="text-amber-900 leading-relaxed">
+          좌측 패키지 트리 → 패키지 클릭 → 하단 inventory 에서 클래스 클릭.
+          선택 없이 <span className="font-medium">Extract</span> 시 bundled <code className="text-amber-900">HrSpecJpo</code> 데모 사용.
+        </div>
+        <div className="text-[10px] text-amber-900 mt-1.5">
+          <code>@Entity</code> 풀 pipeline · 외 클래스 (<code>@Service</code>/<code>@Controller</code>/POJO) Extract 만 (hypothesis 는 Phase C 확장)
         </div>
       </div>
     );
@@ -153,13 +168,13 @@ function SelectionBanner() {
 
   return (
     <div className="px-3 py-2.5 border-b border-emerald-400/40 bg-emerald-400/5 text-[11.5px]">
-      <div className="flex items-baseline gap-2">
-        <span className="text-emerald-400 font-semibold">✓ 선택됨</span>
-        <code className="font-mono text-[12px] text-foreground">{simpleName}</code>
+      <div className="flex items-center gap-2">
+        <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+        <code className="font-mono text-[12px] text-foreground font-semibold">{simpleName}</code>
         <span className="text-[10.5px] text-muted-foreground truncate">{pkg}</span>
       </div>
-      <div className="text-[10.5px] text-muted-foreground mt-0.5">
-        toolbar 의 <strong>① 코드 추출 ({simpleName})</strong> 클릭 또는 좌측 트리에서 다른 클래스 선택
+      <div className="text-[10.5px] text-muted-foreground mt-1 ml-5">
+        toolbar 의 <span className="font-medium text-foreground">Extract</span> 클릭 또는 좌측 트리에서 다른 클래스 선택
       </div>
     </div>
   );
@@ -215,135 +230,147 @@ function Toolbar() {
     await runExtract({ fqn: selectedFqn, repoId: activeRepoId });
   };
 
+  const isEntityKind = hypothesis?.kind === "entity";
+  const genericLocked = extracted?.kind === "generic";
+
   return (
-    <div className="min-h-9 px-3 py-1 border-b border-border flex items-center gap-2 flex-wrap flex-shrink-0">
-      <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mr-2">
-        ✏️ Authoring
-      </span>
-      <Button size="sm" variant="outline" onClick={onStart} disabled={loading}>
-        🆕 새 세션
-      </Button>
-      <ResumeSessionButton />
-      <CopySessionUrlButton />
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={onExtract}
-        disabled={loading || !session || !!extracted}
-        title={
-          selectedSimpleName
-            ? `클래스 선택: ${selectedSimpleName} (자동 분기 — @Entity 면 JPA 풀 pipeline, 외 클래스면 추출만)`
-            : "좌측 트리에서 Java 클래스 선택 (없으면 bundled HrSpec JPA 데모). @Entity 만 가설/인터뷰까지 진행 — 외 클래스는 추출만, Phase C 에서 확장."
-        }
-      >
-        ① 코드 추출{selectedSimpleName && ` (${selectedSimpleName})`}
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={runHypothesize}
-        disabled={loading || !extracted || extracted.kind === "generic" || !!hypothesis}
-        title={
-          extracted && extracted.kind === "generic"
-            ? "Generic 클래스는 hypothesis 미지원 — JPA Entity / Service 클래스 선택"
-            : extracted && extracted.kind === "service"
-              ? "Service hypothesis (Phase C-2) — 인터뷰까지 진행 가능 (C-3a). 옵션/갭/명명/archive 는 Entity 전용 (C-3 후속)"
-              : undefined
-        }
-      >
-        ② 가설
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={runInterview}
-        disabled={loading || !hypothesis || !!batch}
-        title={
-          hypothesis && hypothesis.kind !== "entity"
-            ? `${hypothesis.kind === "service" ? "Service" : "Action"} 인터뷰 (Phase C-3a) — 5~7 짧은 한국어 질문 생성`
-            : undefined
-        }
-      >
-        ③ 인터뷰
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={runOptions}
-        disabled={loading || !answers || !!acceptedOption || (hypothesis?.kind !== "entity")}
-        title={
-          hypothesis && hypothesis.kind !== "entity"
-            ? "⑤ 옵션은 Entity 가설 전용 (Phase C-3 후속에서 Service/Action 확장 예정)"
-            : undefined
-        }
-      >
-        ⑤ 옵션
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={runGaps}
-        disabled={loading || !answers || (hypothesis?.kind !== "entity")}
-        title={
-          hypothesis && hypothesis.kind !== "entity"
-            ? "⑥ 갭은 Entity 가설 전용 (Phase C-3 후속에서 Service/Action 확장 예정)"
-            : undefined
-        }
-      >
-        ⑥ 갭
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={runPatternCheck}
-        disabled={loading || !acceptedOptionForToolbar || (hypothesis?.kind !== "entity")}
-        title={
-          hypothesis && hypothesis.kind !== "entity"
-            ? "⑦ 패턴은 Entity 가설 전용 (Phase C-3 후속에서 Service/Action 확장 예정)"
-            : "cap 7 — 기존 ontology 패턴과의 정합성 검사"
-        }
-      >
-        ⑦ 패턴
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={runNextStep}
-        disabled={loading || !session}
-        title="cap 10 — 다음 단계 추천"
-      >
-        ⑩ 다음 단계
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={runArchive}
-        disabled={loading || !names || !!archive || (hypothesis?.kind !== "entity")}
-        title={
-          hypothesis && hypothesis.kind !== "entity"
-            ? "⑨ Archive 는 Entity 가설 전용 (Phase C-3 후속에서 Service/Action 확장 예정)"
-            : undefined
-        }
-      >
-        ⑨ Archive
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => runConfirm(DEFAULT_REPO_ID, "scm")}
-        disabled={loading || !names || persistedFqns.length > 0 || (hypothesis?.kind !== "entity")}
-        className="border-emerald-400 text-emerald-400 hover:bg-emerald-400/10"
-        title={
-          hypothesis && hypothesis.kind !== "entity"
-            ? "✓ Confirm 은 Entity 가설 전용 (Phase C-3 후속에서 Service/Action 확장 예정)"
-            : undefined
-        }
-      >
-        ✓ Confirm
-      </Button>
-      <NextEntityButton />
-      <ComprehensiveArchiveButton />
+    <div className="flex-shrink-0 border-b border-border bg-card">
+      {/* Header row: brand left / session ops + primary Confirm right */}
+      <div className="flex items-center h-9 px-3 gap-2 border-b border-border/40">
+        <div className="flex items-center gap-1.5 text-foreground">
+          <PenLine className="w-3.5 h-3.5 text-primary" />
+          <span className="text-[12.5px] font-semibold tracking-wide">Authoring</span>
+        </div>
+        <div className="flex-1" />
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onStart}
+          disabled={loading}
+          className="h-7 px-2.5 text-[11.5px] gap-1"
+        >
+          <PlusCircle className="w-3 h-3" />
+          새 세션
+        </Button>
+        <ResumeSessionButton />
+        <CopySessionUrlButton />
+        <div className="w-px h-5 bg-border mx-1" />
+        <Button
+          size="sm"
+          onClick={() => runConfirm(DEFAULT_REPO_ID, "scm")}
+          disabled={loading || !names || persistedFqns.length > 0 || !isEntityKind}
+          className="h-7 px-3 text-[11.5px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+          title={isEntityKind ? "Ontology 로 영구 commit" : "Entity 가설 전용 (Phase C-3 후속)"}
+        >
+          <Check className="w-3 h-3" />
+          Confirm
+        </Button>
+      </div>
+      {/* Pipeline row: linear steps + meta on right (no wrap, scroll if extreme) */}
+      <div className="flex items-center h-9 px-3 gap-0.5 overflow-x-auto">
+        <PipelineStep
+          icon={FileSearch}
+          label="추출"
+          onClick={onExtract}
+          disabled={loading || !session || !!extracted}
+          title={
+            selectedSimpleName
+              ? `Extract ${selectedSimpleName} — @Entity 풀 pipeline / 외 클래스는 추출만`
+              : "Extract — 좌측 트리에서 Java 클래스 선택 (없으면 bundled HrSpec 데모)"
+          }
+        />
+        <PipelineStep
+          icon={Lightbulb}
+          label="가설"
+          onClick={runHypothesize}
+          disabled={loading || !extracted || genericLocked || !!hypothesis}
+          title={
+            genericLocked
+              ? "Hypothesis — Generic 클래스는 미지원"
+              : extracted?.kind === "service"
+                ? "Hypothesis — Service (cap 2)"
+                : "Hypothesis — 도메인 가설 생성 (cap 2)"
+          }
+        />
+        <PipelineStep
+          icon={MessagesSquare}
+          label="인터뷰"
+          onClick={runInterview}
+          disabled={loading || !hypothesis || !!batch}
+          title="Interview — 5~7 짧은 한국어 질문 (cap 3)"
+        />
+        <PipelineStep
+          icon={ListChecks}
+          label="옵션"
+          onClick={runOptions}
+          disabled={loading || !answers || !!acceptedOption || !isEntityKind}
+          title={isEntityKind ? "Options — 옵션 테이블 (cap 5)" : "Options — Entity 가설 전용"}
+        />
+        <PipelineStep
+          icon={AlertTriangle}
+          label="갭"
+          onClick={runGaps}
+          disabled={loading || !answers || !isEntityKind}
+          title={isEntityKind ? "Gaps — 갭 분석 (cap 6)" : "Gaps — Entity 가설 전용"}
+        />
+        <PipelineStep
+          icon={Layers}
+          label="패턴"
+          onClick={runPatternCheck}
+          disabled={loading || !acceptedOptionForToolbar || !isEntityKind}
+          title={isEntityKind ? "Pattern — 패턴 정합성 (cap 7)" : "Pattern — Entity 가설 전용"}
+        />
+        <PipelineStep
+          icon={Archive}
+          label="저장"
+          onClick={runArchive}
+          disabled={loading || !names || !!archive || !isEntityKind}
+          title={isEntityKind ? "Archive — Entity archive (cap 9)" : "Archive — Entity 가설 전용"}
+        />
+        <div className="flex-1 min-w-1" />
+        <button
+          type="button"
+          onClick={runNextStep}
+          disabled={loading || !session}
+          title="다음 단계 추천 (cap 10) — LLM 이 현재 상태 보고 어떤 step 실행할지 추천"
+          className="h-7 w-7 rounded flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+        >
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+        <NextEntityButton />
+        <ComprehensiveArchiveButton />
+      </div>
     </div>
+  );
+}
+
+// ── 공통 pipeline step button ────────────────────────────────────────
+function PipelineStep({
+  icon: Icon, label, onClick, disabled, title,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={cn(
+        "h-7 px-2 rounded text-[11px] inline-flex items-center gap-1 transition-colors shrink-0",
+        "border border-transparent",
+        disabled
+          ? "text-muted-foreground/40"
+          : "text-foreground hover:bg-muted hover:border-border",
+      )}
+    >
+      <Icon className={cn("w-3.5 h-3.5", disabled ? "opacity-50" : "text-primary/80")} />
+      {label}
+    </button>
   );
 }
 
@@ -373,11 +400,12 @@ function ComprehensiveArchiveButton() {
           : "최소 2 entity 부터 의미 있음 — 지금도 single-entity 보고서 생성 가능"
       }
       className={cn(
-        "border-cyan-400 text-cyan-400 hover:bg-cyan-400/10",
+        "h-7 px-2.5 text-[11.5px] gap-1 border-cyan-400/60 text-cyan-400 hover:bg-cyan-400/10 hover:border-cyan-400",
         !ready && "opacity-60",
       )}
     >
-      📚 종합 archive
+      <BookOpen className="w-3 h-3" />
+      종합 archive
     </Button>
   );
 }
@@ -439,9 +467,11 @@ function ResumeSessionButton() {
         variant="outline"
         onClick={toggle}
         disabled={loading || !!session || fetching}
+        className="h-7 px-2.5 text-[11.5px] gap-1"
         title="기존 active 세션 목록 → 클릭하여 이어서 진행"
       >
-        ↻ 이어서{fetching ? "..." : ""}
+        {fetching ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+        이어서
       </Button>
       {open && (
         <div
@@ -518,9 +548,11 @@ function CopySessionUrlButton() {
       size="sm"
       variant="outline"
       onClick={onClick}
+      className="h-7 px-2.5 text-[11.5px] gap-1"
       title="Resume URL 복사 — 새 탭에서 열면 자동 이어서 진행"
     >
-      {copied ? "✓ 복사됨" : "🔗 URL"}
+      {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Link2 className="w-3 h-3" />}
+      {copied ? "복사됨" : "URL"}
     </Button>
   );
 }
@@ -566,11 +598,12 @@ function NextEntityButton() {
           : "Archive/Confirm 후 권장 — 클릭 시 history 저장 + 다음 JPA Entity 추천"
       }
       className={cn(
-        "border-violet-400 text-violet-400 hover:bg-violet-400/10",
+        "h-7 px-2.5 text-[11.5px] gap-1 border-violet-400/60 text-violet-400 hover:bg-violet-400/10 hover:border-violet-400",
         !ready && "opacity-60",
       )}
     >
-      ⤳ 다음 Entity
+      <ArrowRight className="w-3 h-3" />
+      다음 Entity
     </Button>
   );
 }
@@ -582,18 +615,33 @@ function ChatThread({ messages, loading }: { messages: ChatMessage[]; loading: b
 
   return (
     <div className="flex-1 overflow-auto p-3 space-y-2">
-      {messages.length === 0 && (
-        <div className="text-[12px] text-muted-foreground italic px-2 py-8 text-center">
-          새 세션을 시작한 뒤 ① 코드 추출 부터 진행하세요.
-        </div>
-      )}
+      {messages.length === 0 && <ChatEmptyState />}
       {messages.map((m) => (
         <ChatBubble key={m.id} m={m} />
       ))}
       {activeTrace.stage && <LiveToolTraceCard trace={activeTrace} />}
       {loading && !activeTrace.stage && (
-        <div className="text-[11px] text-muted-foreground animate-pulse px-2">⏳ LLM 호출 중...</div>
+        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground px-2 animate-pulse">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          LLM 호출 중
+        </div>
       )}
+    </div>
+  );
+}
+
+function ChatEmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+        <PenLine className="w-5 h-5 text-primary/70" />
+      </div>
+      <div className="text-[13px] font-medium text-foreground mb-1">Authoring 세션 준비</div>
+      <div className="text-[11.5px] text-muted-foreground max-w-[280px] leading-relaxed">
+        <span className="font-medium text-foreground">새 세션</span> 시작 후
+        <span className="font-medium text-foreground"> Extract</span> 로
+        Java 클래스 분석 → 가설 → 인터뷰 → Confirm 순으로 진행합니다.
+      </div>
     </div>
   );
 }
@@ -878,8 +926,8 @@ function ServiceExtractedView({ s }: { s: ExtractedService }) {
         {s.rest_endpoints.length > 0 && <> · REST {s.rest_endpoints.length}</>}
         {s.publishes_events.length > 0 && <> · events {s.publishes_events.length}</>}
       </div>
-      <div className="text-[10px] text-amber-300/80 mt-1">
-        ⓘ 추출만 완료 — Service hypothesis / 인터뷰는 Phase C-2 에서 지원
+      <div className="text-[11px] text-amber-900 font-medium mt-1.5 px-2 py-1 rounded border border-amber-400/50 bg-amber-400/15">
+        ⓘ Service hypothesis + 인터뷰 지원 (Phase C-3a) — 옵션/갭/명명/archive 는 후속
       </div>
     </div>
   );
@@ -904,7 +952,7 @@ function GenericExtractedView({ c }: { c: ExtractedGenericClass }) {
           <> · annotations: {c.class_annotations.slice(0, 3).join(", ")}{c.class_annotations.length > 3 && " …"}</>
         )}
       </div>
-      <div className="text-[10px] text-amber-300/80 mt-1">
+      <div className="text-[11px] text-amber-900 font-medium mt-1.5 px-2 py-1 rounded border border-amber-400/50 bg-amber-400/15">
         ⓘ 추출만 완료 — 가설 / 인터뷰 등 downstream 은 JPA Entity 만 지원 (Phase C 에서 확장 예정)
       </div>
     </div>
@@ -923,7 +971,7 @@ function HypothesisView({ h }: { h: EntityHypothesis }) {
       <div className="font-semibold mb-1">
         🧠 가설: <span className="text-violet-400">{h.candidate_term_korean}</span>
         <code className="ml-2 text-[11px] font-mono text-muted-foreground">{h.candidate_term_english}</code>
-        <span className="ml-2 text-[10px] px-1.5 py-px rounded-full border border-amber-400 text-amber-400 bg-amber-400/10">
+        <span className="ml-2 text-[10px] px-1.5 py-px rounded-full border border-amber-400 text-amber-900 bg-amber-400/10">
           conf {h.confidence.toFixed(2)}
         </span>
       </div>
@@ -944,13 +992,13 @@ function ServiceHypothesisView({ h }: { h: ServiceHypothesis }) {
         <span className="ml-2 text-[10px] px-1.5 py-px rounded-full border border-sky-400 text-sky-400 bg-sky-400/10">
           {h.service_role}
         </span>
-        <span className="ml-2 text-[10px] px-1.5 py-px rounded-full border border-amber-400 text-amber-400 bg-amber-400/10">
+        <span className="ml-2 text-[10px] px-1.5 py-px rounded-full border border-amber-400 text-amber-900 bg-amber-400/10">
           conf {h.confidence.toFixed(2)}
         </span>
       </div>
       <div className="text-[11.5px] text-muted-foreground">{h.responsibility_summary}</div>
       {h.write_boundary_summary && (
-        <div className="text-[11px] text-amber-300/90 mt-1">✍ {h.write_boundary_summary}</div>
+        <div className="text-[11px] text-amber-900 mt-1">✍ {h.write_boundary_summary}</div>
       )}
       {h.key_use_cases.length > 0 && (
         <div className="text-[11px] text-muted-foreground mt-1">
@@ -960,7 +1008,7 @@ function ServiceHypothesisView({ h }: { h: ServiceHypothesis }) {
       {h.concerns.length > 0 && (
         <div className="text-[11px] text-rose-400 mt-1">⚠ {h.concerns[0]}</div>
       )}
-      <div className="text-[10px] text-amber-300/70 mt-1">
+      <div className="text-[11px] text-amber-900 font-medium mt-1.5 px-2 py-1 rounded border border-amber-400/50 bg-amber-400/15">
         ⓘ Service hypothesis + 인터뷰 지원 (Phase C-3a) — 옵션/갭/명명/archive 는 후속
       </div>
     </div>
@@ -976,7 +1024,7 @@ function ActionHypothesisView({ h }: { h: ActionHypothesis }) {
         <span className="ml-2 text-[10px] px-1.5 py-px rounded-full border border-orange-400 text-orange-400 bg-orange-400/10">
           {h.action_kind_guess}
         </span>
-        <span className="ml-2 text-[10px] px-1.5 py-px rounded-full border border-amber-400 text-amber-400 bg-amber-400/10">
+        <span className="ml-2 text-[10px] px-1.5 py-px rounded-full border border-amber-400 text-amber-900 bg-amber-400/10">
           conf {h.confidence.toFixed(2)}
         </span>
       </div>
@@ -991,7 +1039,7 @@ function ActionHypothesisView({ h }: { h: ActionHypothesis }) {
       {h.concerns.length > 0 && (
         <div className="text-[11px] text-rose-400 mt-1">⚠ {h.concerns[0]}</div>
       )}
-      <div className="text-[10px] text-amber-300/70 mt-1">
+      <div className="text-[11px] text-amber-900 font-medium mt-1.5 px-2 py-1 rounded border border-amber-400/50 bg-amber-400/15">
         ⓘ Action hypothesis + 인터뷰 지원 (Phase C-3a) — BR 확정/옵션 등 downstream 은 후속
       </div>
     </div>
@@ -1017,7 +1065,7 @@ function InterviewView({ batch }: { batch: InterviewBatch }) {
 
   return (
     <div>
-      <div className="font-semibold text-amber-400 mb-1">
+      <div className="font-semibold text-amber-900 mb-1">
         ❓ 인터뷰 ({batch.questions.length} 질문)
       </div>
       <div className="text-[11.5px] text-muted-foreground mb-2">{batch.intro}</div>
@@ -1112,7 +1160,7 @@ function AbsorbedView({ a }: { a: AbsorbedAnswers }) {
     <div>
       <div className="font-semibold mb-1">📥 답변 정리됨 ({answered}/{Object.keys(a.per_question).length})</div>
       {a.contradictions.length > 0 && (
-        <div className="text-[11.5px] text-amber-400 mt-1">
+        <div className="text-[11.5px] text-amber-900 mt-1">
           ⚠ 가설과 모순: {a.contradictions[0]}
         </div>
       )}
@@ -1200,7 +1248,7 @@ function PatternView({ p }: { p: PatternCheck }) {
     p.consistency_score >= 0.8
       ? "text-emerald-400"
       : p.consistency_score >= 0.5
-      ? "text-amber-400"
+      ? "text-amber-900"
       : "text-rose-400";
   const recColor = (() => {
     switch (p.recommendation) {
@@ -1209,7 +1257,7 @@ function PatternView({ p }: { p: PatternCheck }) {
       case "옵션 재고려":
         return "text-rose-400";
       case "사용자 의견 필요":
-        return "text-amber-400";
+        return "text-amber-900";
     }
   })();
   return (
@@ -1317,7 +1365,7 @@ function NextEntityView({ r }: { r: NextEntityRecommendation }) {
     pk_overlap: "border-emerald-400 text-emerald-400",
     same_package: "border-blue-400 text-blue-400",
     uncovered_domain: "border-violet-400 text-violet-400",
-    frequent_caller: "border-amber-400 text-amber-400",
+    frequent_caller: "border-amber-400 text-amber-900",
     inheritance_chain: "border-cyan-400 text-cyan-400",
   };
 
@@ -1475,7 +1523,6 @@ function PreviewPanel() {
   const archive = useAuthoring((s) => s.archive);
   const gaps = useAuthoring((s) => s.gaps);
   const persistedFqns = useAuthoring((s) => s.persistedFqns);
-  const costUsd = useAuthoring((s) => s.costUsd);
 
   return (
     <div className="h-full overflow-auto bg-card p-3 space-y-3 text-[12px]">
@@ -1489,9 +1536,6 @@ function PreviewPanel() {
             {session.entity_focus && (
               <div className="text-[11px] text-violet-400">focus: {session.entity_focus}</div>
             )}
-            <div className="text-[11px]">
-              💰 누적 비용: <strong>${costUsd.toFixed(4)}</strong>
-            </div>
           </div>
         ) : (
           <div className="text-muted-foreground italic text-[11px]">세션 없음</div>
@@ -1534,7 +1578,7 @@ function PreviewPanel() {
                         ✓ saved
                       </span>
                     ) : (
-                      <span className="text-[10px] text-amber-400 border border-amber-400 bg-amber-400/10 px-1 rounded">
+                      <span className="text-[10px] text-amber-900 border border-amber-400 bg-amber-400/10 px-1 rounded">
                         draft
                       </span>
                     )}
@@ -1772,7 +1816,7 @@ function HypothesisCard() {
         )}
       </div>
       {contradictionCount > 0 && (
-        <div className="text-[10.5px] text-amber-400 mb-1">
+        <div className="text-[10.5px] text-amber-900 mb-1">
           ⚠ 답변에서 가설과 모순 {contradictionCount}건 — 가설 다시 보기 권장
         </div>
       )}

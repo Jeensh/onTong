@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Phase 16C — QA 검증 (Integrity Warnings)</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 960px; margin: 24px auto; padding: 16px; color: #1f2937; line-height: 1.55; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .meta { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
+  h2 { font-size: 15px; margin-top: 20px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; }
+  th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f9fafb; }
+  code { background: #f3f4f6; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+  .ok { color: #166534; font-weight: 600; }
+  .warn { color: #92400e; font-weight: 600; }
+  .fail { color: #991b1b; font-weight: 600; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  .verdict { padding: 10px 14px; border-radius: 6px; font-weight: 600; background: #ecfdf5; color: #065f46; border-left: 4px solid #10b981; margin: 12px 0; }
+  .gap { padding: 10px 14px; border-radius: 6px; background: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b; margin: 12px 0; }
+  .small { font-size: 11px; color: #6b7280; }
+</style>
+</head>
+<body>
+
+<h1>Phase 16C 검증 — QA 평가 (Integrity Warnings)</h1>
+<div class="meta">최QA · 2026-05-18 · backend 8001 라이브 · repo <code>slab-design-real-v2</code> · 6 시나리오 실측 (지정 5 + 보너스 1)</div>
+
+<h2>실측 결과 — verdict / signals / warning 매트릭스</h2>
+<table>
+<tr><th>#</th><th>질의</th><th>target</th><th>verdict / conf</th><th>body / rule / fixture</th><th>warning</th><th>판정</th></tr>
+<tr>
+  <td>S1</td><td>주문 수량 0 이면 에러? <code>hypothesis</code></td>
+  <td><code>SdOrderValidator.validate</code></td>
+  <td class="ok"><code>yes</code> / 0.75</td>
+  <td>body=2 · rule=0 · fixture=ok</td>
+  <td class="ok">無 (정상)</td>
+  <td class="ok">기대 일치 — matched_var=Order + fixture pass, body 강함, W1-W3 어느 패턴도 불일치</td>
+</tr>
+<tr>
+  <td>S2</td><td>두께 0.1mm 검증 실패? <code>hypothesis</code></td>
+  <td><code>SdThicknessAction.execute</code></td>
+  <td class="ok"><code>yes</code> / 0.75</td>
+  <td>body=2 · rule=0 · fixture=ok</td>
+  <td class="ok">無 (정상)</td>
+  <td class="ok">기대 일치 — 16B 한·영 alias 갭 해결 케이스, 정상 surface, false positive 0</td>
+</tr>
+<tr>
+  <td>S3</td><td>compileTime -1 이면? <code>hypothesis</code></td>
+  <td><code>SdHistoryController.byOrder</code></td>
+  <td class="warn"><code>likely_no</code> / 0.55</td>
+  <td>body=1 · rule=0 · fixture=fail</td>
+  <td class="ok">無 (정상)</td>
+  <td class="ok">기대 일치 — verdict=likely_no 가 이미 약함을 자백, W3 미발화 (fixture_compat=fail) 맞음</td>
+</tr>
+<tr>
+  <td>S4</td><td>엣징 마진 1.0 미만? <code>hypothesis</code></td>
+  <td><code>SdWidthRangeActionTest.dg103…</code></td>
+  <td class="warn"><code>likely_no</code> / 0.55</td>
+  <td>body=1 · rule=1 · fixture=N/A</td>
+  <td class="ok">無 (정상)</td>
+  <td class="warn">테스트 클래스로 target 잘못 매핑 (16C 범위 외). 단 verdict=likely_no 이므로 warning 미발화는 합리. <strong>의미</strong>: 16C 는 ranking 오류는 못 잡음</td>
+</tr>
+<tr>
+  <td>S5</td><td>두께 검증 시뮬해줘 <code>simulate</code></td>
+  <td><code>SdThicknessAction.execute</code></td>
+  <td class="ok"><code>bundle_prepared</code> / 0.85</td>
+  <td>—</td>
+  <td class="ok">無 (의도)</td>
+  <td class="ok">기대 일치 — simulate 분기, hypothesis 아님, warning 코드 호출 안 됨</td>
+</tr>
+<tr>
+  <td>S+</td><td>(보너스) STOCK_CODE=1 재고주문 처리? <code>hypothesis</code></td>
+  <td><code>SdOrderValidator.validate</code></td>
+  <td class="warn"><code>likely_yes</code> / 0.85</td>
+  <td>body=1 · rule=2 · fixture=fail</td>
+  <td class="fail"><code>body_unsupported_rule_only</code></td>
+  <td class="ok"><strong>W1b 정확 발화</strong> — reasoning "rule 기반 추정" + rule=2 매칭, conf=0.5 surface</td>
+</tr>
+</table>
+
+<h2>평가</h2>
+<div class="verdict">통과 — 16C 는 QA 입장에서 명확히 가치 있음. 정상 5/5 false-positive 0, 모순 케이스 (S+) 정확히 W1b surface, "확실한 근거" Q5 비전을 한 단계 더 충족.</div>
+
+<h2>W1~W3 정의 합리성</h2>
+<ul>
+  <li><strong>W1 (no_rule):</strong> body_unsupported + rule=0 → 합리. verdict 가 fixture 만으로 yes 라면 발화 필요. 실측 미발화 (현 verdict 알고리즘이 verdict=unknown 으로 떨어뜨림 — 안전).</li>
+  <li class="ok"><strong>W1b (rule_only):</strong> body_unsupported + rule≥1 → <strong>실제 발화 확인 (S+)</strong>. 의도된 fallback 을 명시적으로 사용자에게 알리는 핵심 패턴. <em>유지 권장</em>.</li>
+  <li><strong>W2 (no_strong_evidence):</strong> compat=fail + rule=0 + body&lt;2 → 현재 verdict 알고리즘이 이 조합을 verdict=unknown 또는 likely_no 로 강등하므로 거의 발화 안 함. 안전망 역할 OK.</li>
+  <li><strong>W3 (cross_evidence_mismatch):</strong> likely_no/no + compat=ok + body≥3 → 합리. 실측 발화 없음 (조건 강함). 회귀 catcher 로 유지 가치 있음.</li>
+</ul>
+
+<h2>추가 권장</h2>
+<ul>
+  <li class="warn"><strong>W1c 신설</strong>: verdict=yes/likely_yes + <code>matched_var==''</code> (alias 한·영 갭) + rule≥2 → <code>body_unsupported_alias_gap</code>. S+ 케이스가 정확히 이 분류 — "rule_only" 보다 root cause 더 명확 (alias 사전 보강 필요).</li>
+  <li><strong>W4 후보</strong>: target action 이 <code>*Test</code> / <code>Mock*</code> 클래스 → <code>integrity_warning=target_is_test</code> (S4 잡힘). ranking 단계가 본질이지만 surface 까지 도와줌.</li>
+  <li><strong>UI surface</strong>: 현재 sources[] detail 문자열에 묻혀 있음. <code>EvidenceCard</code> 에 빨간 배지로 별도 노출 권장 (사용자 가독성).</li>
+</ul>
+
+<h2>최종 판정</h2>
+<div class="verdict">16C 머지 유지 권장. W1b 가 실 데이터에서 검증됨, false positive 0/5. W1c (alias gap) + W4 (test target) 후속 권장.</div>
+
+</body>
+</html>

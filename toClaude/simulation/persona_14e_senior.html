@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Phase 14E — Senior Backend Review</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 880px; margin: 24px auto; padding: 16px; color: #1f2937; line-height: 1.55; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .meta { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
+  h2 { font-size: 15px; margin-top: 18px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; }
+  th, td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f9fafb; }
+  code { background: #f3f4f6; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+  .verdict { padding: 10px 14px; border-radius: 6px; font-weight: 600; }
+  .cond-yes { background: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b; }
+  .ok { color: #166534; font-weight: 600; }
+  .warn { color: #92400e; font-weight: 600; }
+  .fail { color: #991b1b; font-weight: 600; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  li { margin: 2px 0; }
+</style>
+</head>
+<body>
+
+<h1>Phase 14E 검증 — 시니어 백엔드 평가</h1>
+<div class="meta">10년차 시니어 페르소나 · 2026-05-18 · 4 케이스 라이브 검증</div>
+
+<h2>실측 결과</h2>
+<table>
+<tr><th>케이스</th><th>expansion query</th><th>top-1 (score)</th><th>판정</th></tr>
+<tr>
+  <td><b>1. "두께 검증 시뮬"</b> (13b 재현)</td>
+  <td><code>'두께 검증'</code> — <b>미발현</b></td>
+  <td>SdOrderValidator.validate (23)</td>
+  <td class="fail">silent wrong target 유지</td>
+</tr>
+<tr>
+  <td><b>2. "검증결과 확인"</b></td>
+  <td><code>'검증결과 검증 결과 ValidationResult 정합성 점검 결과 Validator 결과'</code></td>
+  <td>ValidationResult.pass/fail (<b>50</b>, +10 boost 확인)</td>
+  <td class="ok">정확</td>
+</tr>
+<tr>
+  <td><b>3. "주문 검증 시뮬"</b> (control)</td>
+  <td><code>'주문 검증 통합 주문 Order SDOrderEntity 주문 엔티티'</code></td>
+  <td>SdOrderValidator (<b>58</b>, +10 declared_on_term)</td>
+  <td class="ok">정확 (의도 일치)</td>
+</tr>
+<tr>
+  <td><b>4. "누적생산성"</b> (control)</td>
+  <td>미발현 (term 미등록)</td>
+  <td>(candidate 0)</td>
+  <td class="ok">false positive 없음</td>
+</tr>
+</table>
+
+<h2>핵심 발견</h2>
+<ul>
+  <li><b>Mechanism 견고</b>: case 2/3 에서 alias expansion + +10 declared_on_term boost 정확 동작. score 23→50/58 분리로 결정성 회복.</li>
+  <li><b>Strict token 효과</b>: case 1 candidate 3개로 축소 (fuzzy 라면 helper 5~10 surface). 단 "두께" term 미등록이라 expansion dormant.</li>
+  <li><b>13b vs 14E</b>: case 1 silent wrong target 동일 (data gap). case 2 term 등록 케이스 명백 개선. case 3 회귀 없음.</li>
+  <li><b>시드 의존성</b>: <code>term.scm.thickness</code> + SdThicknessAction.declared_on_term 채우면 case 1 도 +10 boost 로 top-1 자동 역전. 14E 코드 변경 0.</li>
+</ul>
+
+<h2>평가: <span class="verdict cond-yes">Conditional Yes</span></h2>
+<ul>
+  <li><b>Yes</b>: 메커니즘·결정성·회귀 검증 통과. case 2/3 production OK.</li>
+  <li><b>Conditional</b>: 데모 1순위 케이스 ("두께") 여전히 wrong → "고쳤다는데 똑같다" 위험. demo 전 시드 1 term + 1 column ROI 최고.</li>
+  <li><b>Next</b>: 시드 land → case 1 재검증 + 13b 페르소나 5건 재실행.</li>
+</ul>
+
+</body>
+</html>

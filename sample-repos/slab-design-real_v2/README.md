@@ -1,6 +1,6 @@
 # slab-design-real_v2
 
-자체 완결 실행 가능한 21-step 슬랩 설계 데모 + 시뮬레이션 검증 baseline.
+자체 완결 실행 가능한 21-step Slab 설계 데모 + 시뮬레이션 검증 baseline.
 
 v1 (`sample-repos/slab-design-real/`)의 정적 fixture 한계를 넘어, **빌드/실행/REST 호출/단위·통합 테스트**가 모두 자체 완결되는 청결한 baseline. 외부 의존성은 JDK 21 하나뿐 (Maven Wrapper 동봉, H2 in-memory DB).
 
@@ -46,11 +46,11 @@ API 사용 예시는 `docs/API.md` 참고.
 
 | ID | orderNo | confirmedPlantCd | 의도 | 기대 결과 |
 |----|---------|------------------|-----|----------|
-| S1 | `ORD20260510001` | `K1 K    ` (SM/HR/CR) | 일반 COIL 골든 패스 | 슬랩 1매 (split=1) |
-| S2 | `ORD20260510002` | `K1      ` (SM/HR) | 다중 슬랩 + A-a inner loop | 슬랩 3매 (split=2 → final split adjust) |
-| S3 | `ORD20260510003` | `K1KK    ` (SM/HR/HRF/CR) | A-a inner-loop fallback | 슬랩 2매 (split=1 → A-a recalc) |
+| S1 | `ORD20260510001` | `K1 K    ` (SM/HR/CR) | 일반 COIL 골든 패스 | Slab 1매 (split=1) |
+| S2 | `ORD20260510002` | `K1      ` (SM/HR) | 다중 Slab + A-a inner loop | Slab 3매 (split=2 → final split adjust) |
+| S3 | `ORD20260510003` | `K1KK    ` (SM/HR/HRF/CR) | A-a inner-loop fallback | Slab 2매 (split=1 → A-a recalc) |
 | S4 | `ORD20260510004` | `K1      ` (SM/HR) | DG004 validator cross-check fail | 설계 실패 + history 1행 |
-| S5 | `ORD20260510005` | `K1     K` (SM/HR/CRF) | 최소 활성 공정 | 슬랩 1매 |
+| S5 | `ORD20260510005` | `K1     K` (SM/HR/CRF) | 최소 활성 공정 | Slab 1매 |
 
 ---
 

@@ -231,3 +231,61 @@ def test_map_with_double_generic():
         "d", "Map<String, Integer>", "containsKey", ["'k'"],
     )
     assert out == "('k' in d)"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 11) Phase 8 — trace recording (idiom_diffs surface for Section 3 Gate II)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_trace_records_static_idiom():
+    trace: list[dict] = []
+    rewrite_method_invocation("Math", None, "abs", ["x"], trace=trace)
+    assert len(trace) == 1
+    entry = trace[0]
+    assert entry["idiom_name"] == "Math.abs"
+    assert entry["java_snippet"] == "Math.abs(x)"
+    assert entry["python_snippet"] == "abs(x)"
+    assert entry["tier"] == "static"
+    assert entry["arity"] == 1
+
+
+def test_trace_records_typed_idiom():
+    trace: list[dict] = []
+    rewrite_method_invocation("items", "List", "isEmpty", [], trace=trace)
+    assert len(trace) == 1
+    assert trace[0]["idiom_name"] == "List.isEmpty"
+    assert trace[0]["java_snippet"] == "items.isEmpty()"
+    assert trace[0]["python_snippet"] == "(not items)"
+    assert trace[0]["tier"] == "typed"
+
+
+def test_trace_records_unknown_tier_idiom():
+    trace: list[dict] = []
+    rewrite_method_invocation("s", None, "length", [], trace=trace)
+    assert len(trace) == 1
+    assert trace[0]["tier"] == "unknown"
+    assert trace[0]["idiom_name"] == "length"
+
+
+def test_trace_skips_non_match():
+    trace: list[dict] = []
+    out = rewrite_method_invocation("o", None, "getCmpCd", [], trace=trace)
+    assert out is None
+    assert trace == []  # no idiom matched → no record
+
+
+def test_trace_accumulates_across_calls():
+    trace: list[dict] = []
+    rewrite_method_invocation("Math", None, "abs", ["x"], trace=trace)
+    rewrite_method_invocation("items", "List", "size", [], trace=trace)
+    rewrite_method_invocation("s", None, "trim", [], trace=trace)
+    assert len(trace) == 3
+    tiers = [e["tier"] for e in trace]
+    assert tiers == ["static", "typed", "unknown"]
+
+
+def test_trace_optional_no_kwarg_preserves_backward_compat():
+    """trace kwarg 미전달 시 기존 동작 유지 (return string)."""
+    assert rewrite_method_invocation("Math", None, "abs", ["x"]) == "abs(x)"
+    assert rewrite_method_invocation("o", None, "getCmpCd", []) is None

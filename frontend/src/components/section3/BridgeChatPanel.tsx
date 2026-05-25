@@ -14,7 +14,7 @@
  */
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, MessageSquare, Sparkles, Lightbulb, User, Bot, Trash2 } from "lucide-react";
+import { Send, Loader2, MessageSquare, Sparkles, Lightbulb, User, Bot, Trash2, AlertTriangle, ArrowRight } from "lucide-react";
 import { chat, getStats, termSearch, type StreamEvent, type AgentFinalPayload } from "@/lib/section3/api";
 import { StreamTimeline } from "./rich/StreamTimeline";
 import { RichResultCard } from "./rich/RichResultCard";
@@ -134,6 +134,9 @@ export function BridgeChatPanel() {
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-background to-muted/20">
+      {/* ── Deprecation Banner ────────────────────────── */}
+      <DeprecationBanner />
+
       {/* ── Header ────────────────────────────────────── */}
       <div className="px-4 py-3 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between">
         <div>
@@ -198,6 +201,43 @@ export function BridgeChatPanel() {
             {running ? "처리 중" : "전송"}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── deprecation banner ─────────────────────────────
+
+function DeprecationBanner() {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+  return (
+    <div className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 px-4 py-2.5">
+      <div className="flex items-start gap-2 max-w-5xl mx-auto">
+        <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+        <div className="flex-1 text-[12px] text-amber-800 dark:text-amber-200">
+          <div className="font-semibold mb-0.5">
+            v1 chat 은 더 이상 권장되지 않음 (2026-05-18 deprecated · Phase 1~6 완료)
+          </div>
+          <div className="text-[11px] opacity-90">
+            새로운 멀티턴 chat 으로 이동:{" "}
+            <a
+              href="/?view=multiturn"
+              className="inline-flex items-center gap-1 underline font-medium hover:text-amber-600 dark:hover:text-amber-300"
+            >
+              multiturn chat 으로 가기 <ArrowRight size={12} />
+            </a>
+            {" · "}
+            영향도 검토 + 시뮬레이션 + Provenance 모두 지원.
+          </div>
+        </div>
+        <button
+          onClick={() => setDismissed(true)}
+          className="text-[10px] text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 px-2 py-0.5 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30"
+          title="이 세션에서만 숨기기"
+        >
+          닫기
+        </button>
       </div>
     </div>
   );
