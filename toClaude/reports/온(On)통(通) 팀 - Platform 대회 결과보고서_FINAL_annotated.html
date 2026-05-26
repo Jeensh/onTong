@@ -3502,11 +3502,13 @@
     </style>
 
 <style>
+  /* annotated FINAL: 16:9 통일 + contain (raster 박스 안 잘림) */
   .screenshot-thumb {
-    aspect-ratio: auto !important;
+    aspect-ratio: 16 / 9 !important;
     object-fit: contain !important;
     width: 100%; height: auto;
     background: #f8fafc;
+    border-radius: 8px;
   }
 </style>
 
@@ -10037,12 +10039,7 @@
           <div style="flex:1;background:white;padding:1rem 1.2rem;border-radius:0 0 16px 0;">
             <!-- <iframe class="youtube-iframe" src="https://www.youtube.com/embed/VIDEO_ID" title="온통 Agent 소개 영상" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe> -->
             <div class="youtube-slot">
-              <div class="youtube-empty" style="min-height:320px;">
-                <div class="youtube-play-btn"></div>
-                <div class="youtube-empty-label">온통 Agent 소개 영상</div>
-                <div class="youtube-empty-hint">YouTube 링크를 추가하면 영상이 표시됩니다</div>
-                <div class="youtube-empty-code">youtube.com/embed/VIDEO_ID</div>
-              </div>
+              <iframe class="youtube-iframe" src="https://www.youtube.com/embed/huOLddRE0uk" title="온통 Agent 소개 영상" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
             </div>
           </div>
         </div>
