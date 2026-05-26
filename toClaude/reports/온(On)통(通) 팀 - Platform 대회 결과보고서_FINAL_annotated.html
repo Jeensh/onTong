@@ -3502,7 +3502,7 @@
     </style>
 
 <style>
-  /* annotated FINAL: 16:9 통일 + contain (raster 박스 안 잘림) */
+  /* annotated FINAL: 16:9 통일 + contain (라스터 박스 안 잘림) */
   .screenshot-thumb {
     aspect-ratio: 16 / 9 !important;
     object-fit: contain !important;
@@ -9095,7 +9095,7 @@
                         <li>
                           <span class="bullet-icon">🔄</span>
                           <div class="bullet-content">
-                            <strong>Java → Python 실시간 변환·실행 (sim_v2)</strong>
+                            <strong>Java → Python 실시간 변환·실행 (시뮬레이션)</strong>
                             영향 메서드만 tree-sitter + idiom rewriter 로 즉석 변환 — 개발 환경 불필요.
                           </div>
                         </li>
@@ -9111,7 +9111,7 @@
                             </figcaption>
                           </figure>
                           <figure class="screenshot-item">
-                            <img class="screenshot-thumb" src="https://raw.githubusercontent.com/Jeensh/onTong/report/final-annotated/toClaude/reports/resultReport_FINAL/captures_rendered/34.png" alt="Java ↔ Python 변환 + 영향 분석" loading="lazy" onclick="openScreenshotModal(this)" data-caption="Java ↔ Python sim_v2 (tree-sitter + idiom rewriter) — 5 클래스 즉석 변환 + 영향 분석">
+                            <img class="screenshot-thumb" src="https://raw.githubusercontent.com/Jeensh/onTong/report/final-annotated/toClaude/reports/resultReport_FINAL/captures_rendered/34.png" alt="Java ↔ Python 변환 + 영향 분석" loading="lazy" onclick="openScreenshotModal(this)" data-caption="Java ↔ Python 시뮬레이션 (tree-sitter + idiom rewriter) — 5 클래스 즉석 변환 + 영향 분석">
                             <figcaption class="screenshot-meta">
                               <div class="screenshot-title">Java→Python 즉석 변환 + 영향 분석</div>
                             </figcaption>
@@ -9182,7 +9182,7 @@
                           <div class="arch-list">
                             • <strong>의도 분류</strong> <span style="color:var(--amber-700);">⚖️</span> 5종 + 정규식<br>
                             • <strong>가상 주문 합성</strong> <span style="color:var(--sky-700);">🧪</span> 실 ORDER 0 read<br>
-                            • <strong>sim_v2 변환</strong> <span style="color:var(--sky-700);">🧪</span> Java→Python<br>
+                            • <strong>시뮬레이션 변환</strong> <span style="color:var(--sky-700);">🧪</span> Java→Python<br>
                             • <strong>sweep / impact_compare</strong> <span style="color:var(--amber-700);">⚖️</span> 전·후 diff<br>
                             • <strong>EvidenceBundle</strong> <span style="color:var(--amber-700);">⚖️</span> 신뢰도 + trace<br>
                             • <strong>SSE 11 이벤트</strong> 실시간 스트리밍
@@ -9200,7 +9200,7 @@
                           <div class="arch-list">
                             • <strong>온톨로지 API</strong> — Modeling Agent<br>
                             • <strong>기준 row</strong> — 가상 주문 seed<br>
-                            • <strong>Java source</strong> — sim_v2 변환 대상<br>
+                            • <strong>Java source</strong> — 시뮬레이션 변환 대상<br>
                             • <strong>실 ORDER 4</strong> — 시뮬 시점 <strong>0 read</strong>
                           </div>
                         </div>
@@ -9222,7 +9222,7 @@
                           </div>
                           <div style="background:#fff;border:1px solid var(--emerald-200);border-radius:8px;padding:0.7rem 0.55rem;font-size:11px;line-height:1.6;text-align:center;">
                             <div style="font-size:18px;margin-bottom:0.3rem;">🔄</div>
-                            <strong style="color:var(--emerald-800);display:block;margin-bottom:0.2rem;">sim_v2 실시간 변환</strong>
+                            <strong style="color:var(--emerald-800);display:block;margin-bottom:0.2rem;">시뮬레이션 실시간 변환</strong>
                             <span style="color:var(--gray-600);">개발 환경 불필요</span>
                           </div>
                           <div style="background:#fff;border:1px solid var(--emerald-200);border-radius:8px;padding:0.7rem 0.55rem;font-size:11px;line-height:1.6;text-align:center;">
@@ -9305,7 +9305,7 @@
                                   <div class="qa-card-header">
                                     <span class="qa-card-num">③</span>
                                     <span class="qa-card-title">시뮬 실행 — 가상 데이터 + Java→Python</span>
-                                    <span class="qa-coderef">sim_v2/ · api/simulation_router.py</span>
+                                    <span class="qa-coderef">simulation/ · api/simulation_router.py</span>
                                   </div>
                                   <div class="qa-card-flow">
                                     <strong>가상 주문 합성</strong> 실 ORDER 0 read · <strong>Java→Python</strong> tree-sitter + idiom rewriter · <strong>전·후 동시 실행</strong> row-level diff · <strong>sweep</strong> 125 조합 + BEST cell 🏆
@@ -9350,7 +9350,7 @@
                               ├ <strong>step_catalog.py</strong> &nbsp;21-step + split_count<br>
                               └ <strong>clients/ontology_client.py</strong> &nbsp;httpx async + 60s 캐시<br>
                               <br>
-                              <strong style="color:var(--gray-800);">backend/sim_v2/</strong><br>
+                              <strong style="color:var(--gray-800);">backend/simulation/</strong><br>
                               ├ <strong>core/translate/</strong> &nbsp;tree-sitter Java + idiom rewriter<br>
                               └ <strong>impact_compare.py</strong> &nbsp;PROPAGATION_RULES + row-level diff<br>
                               <br>
@@ -9362,7 +9362,7 @@
                             <div class="tech-section-head"><div class="section-label">🔌 핵심 라이브러리</div><span class="tech-hint">💡 카드 클릭 → 상세 보기</span></div>
                             <div class="tech-grid">
                               <div class="tech-item" onclick="openSimTechModal(&#39;sim-arch-pydantic-ai&#39;)"><div class="tech-item-label" style="color:var(--gray-700);">pydantic-ai</div><div class="tech-item-value">SimulationAgent<br>+ ReAct tool</div><span class="tech-item-more">ⓘ</span></div>
-                              <div class="tech-item" onclick="openSimTechModal(&#39;sim-arch-sim-v2&#39;)"><div class="tech-item-label" style="color:var(--gray-700);">sim_v2 (tree-sitter)</div><div class="tech-item-value">Java→Python<br>실시간 변환</div><span class="tech-item-more">ⓘ</span></div>
+                              <div class="tech-item" onclick="openSimTechModal(&#39;sim-arch-sim-v2&#39;)"><div class="tech-item-label" style="color:var(--gray-700);">시뮬레이션 (tree-sitter)</div><div class="tech-item-value">Java→Python<br>실시간 변환</div><span class="tech-item-more">ⓘ</span></div>
                               <div class="tech-item" onclick="openSimTechModal(&#39;sim-arch-fastapi-sse&#39;)"><div class="tech-item-label" style="color:var(--gray-700);">FastAPI + SSE</div><div class="tech-item-value">/sim/agent/stream<br>11 이벤트</div><span class="tech-item-more">ⓘ</span></div>
                               <div class="tech-item" onclick="openSimTechModal(&#39;sim-arch-httpx&#39;)"><div class="tech-item-label" style="color:var(--gray-700);">httpx + openpyxl</div><div class="tech-item-value">OntologyClient<br>+ Excel 한·영</div><span class="tech-item-more">ⓘ</span></div>
                             </div>
@@ -9465,17 +9465,17 @@
                   'sim-step-catalog': { icon: '📐', title: 'step_catalog.py', subtitle: '21-step walkthrough + split_count',
                     body: `<h4>역할</h4><ul><li>21단계 알고리즘을 코드 카탈로그로 매핑</li><li>각 단계의 입력·공식·출력 테이블 생성</li><li>Phase 1 사전검사 → Phase 2-A 범위 → Phase 2-B 분할수×매수 → Phase 2-C 폭/길이 → Save</li></ul><h4>코드 위치</h4><ul><li><code>backend/section3/agents/simulation/step_catalog.py</code></li></ul>` },
                   'sim-propagation-rules': { icon: '🌊', title: 'PROPAGATION_RULES', subtitle: '한 필드 변경 → 14 필드 자동',
-                    body: `<h4>역할</h4><ul><li>한 필드 변경이 21-step 어디까지 영향가는지 사전 정의</li><li>slabThickness 변경 시 14개 단중 계열 필드 자동 재계산</li><li>변경 chain trace 도 함께 출력</li></ul><h4>코드 위치</h4><ul><li><code>backend/sim_v2/impact_compare.py</code></li></ul>` },
+                    body: `<h4>역할</h4><ul><li>한 필드 변경이 21-step 어디까지 영향가는지 사전 정의</li><li>slabThickness 변경 시 14개 단중 계열 필드 자동 재계산</li><li>변경 chain trace 도 함께 출력</li></ul><h4>코드 위치</h4><ul><li><code>backend/simulation/impact_compare.py</code></li></ul>` },
                   'sim-impact-compare': { icon: '🔁', title: 'impact_compare.py', subtitle: '변경 전·후 동시 실행 + row-level diff',
-                    body: `<div class="why-box"><strong>왜 동시?</strong> 같은 가상 입력으로 동시에 돌려야 diff 가 변경의 결과만 반영.</div><h4>역할</h4><ul><li>AnchorBinding 식별 메서드 N개 한 번에 변환·실행</li><li>변경 전·후 양쪽 동일 입력으로 비교</li><li>변경된 필드만 강조된 row-level diff 생성</li></ul><h4>코드 위치</h4><ul><li><code>backend/sim_v2/impact_compare.py</code></li></ul>` },
+                    body: `<div class="why-box"><strong>왜 동시?</strong> 같은 가상 입력으로 동시에 돌려야 diff 가 변경의 결과만 반영.</div><h4>역할</h4><ul><li>AnchorBinding 식별 메서드 N개 한 번에 변환·실행</li><li>변경 전·후 양쪽 동일 입력으로 비교</li><li>변경된 필드만 강조된 row-level diff 생성</li></ul><h4>코드 위치</h4><ul><li><code>backend/simulation/impact_compare.py</code></li></ul>` },
                   'sim-split-count': { icon: '🧮', title: 'split_count 알고리즘', subtitle: 'ceil(dpq / wgt_cap) + wgt_floor 보정',
                     body: `<h4>역할</h4><ul><li>주문 단중을 슬랩 단중 상한으로 나눠 분할수 결정</li><li>분할 후 단중이 하한 미달이면 wgt_floor 로 보정</li><li>walkthrough.md step 8~12 의 핵심 알고리즘</li></ul><h4>코드 위치</h4><ul><li><code>backend/section3/agents/simulation/step_catalog.py</code></li></ul>` },
                   'sim-virtual-order-synthesize': { icon: '🎲', title: 'virtual_order_synthesize', subtitle: '교집합 폭·단중 + BR 통과',
                     body: `<div class="why-box"><strong>왜 가상 주문만?</strong> 실 ORDER 4 테이블은 시뮬 시점에서 0 read — 운영 사고 차단.</div><h4>합성 규칙</h4><ul><li>연주·열연·Edging 능력 폭 교집합</li><li>단중 하한 max(ORDER_WGT_LOW, HR_MIN_WGT) / 상한 min(ORDER_WGT_HIGH, HR_MAX_WGT)</li><li>모든 BR 통과 시에만 가상 row 채택</li></ul><h4>코드 위치</h4><ul><li><code>backend/section3/api/simulation_router.py</code></li></ul>` },
                   'sim-sim-v2-javatopythontranslator': { icon: '🔄', title: 'JavaToPythonTranslator', subtitle: 'tree-sitter Java + idiom rewriter',
-                    body: `<div class="why-box"><strong>왜 변환?</strong> 실 Java 시스템을 띄우면 비용·시간이 큽니다. 영향 메서드만 즉석 Python 으로 변환.</div><h4>변환 대상</h4><ul><li>BigDecimal → Decimal (정밀도 유지)</li><li>Stream API → list comprehension / itertools</li><li>Optional → Python None 패턴</li><li>Spring annotation → 무시</li></ul><h4>코드 위치</h4><ul><li><code>backend/sim_v2/core/translate/</code></li></ul>` },
+                    body: `<div class="why-box"><strong>왜 변환?</strong> 실 Java 시스템을 띄우면 비용·시간이 큽니다. 영향 메서드만 즉석 Python 으로 변환.</div><h4>변환 대상</h4><ul><li>BigDecimal → Decimal (정밀도 유지)</li><li>Stream API → list comprehension / itertools</li><li>Optional → Python None 패턴</li><li>Spring annotation → 무시</li></ul><h4>코드 위치</h4><ul><li><code>backend/simulation/core/translate/</code></li></ul>` },
                   'sim-transpile-methods': { icon: '🧪', title: 'transpile_methods()', subtitle: '메서드 본문 → Python',
-                    body: `<h4>역할</h4><ul><li>AnchorBinding 식별 메서드 N개 한 번에 변환</li><li>변경 전·후 양쪽 같은 가상 입력으로 실행</li><li>row-level diff 자동 생성</li></ul><h4>코드 위치</h4><ul><li><code>backend/sim_v2/impact_compare.py</code></li></ul>` },
+                    body: `<h4>역할</h4><ul><li>AnchorBinding 식별 메서드 N개 한 번에 변환</li><li>변경 전·후 양쪽 같은 가상 입력으로 실행</li><li>row-level diff 자동 생성</li></ul><h4>코드 위치</h4><ul><li><code>backend/simulation/impact_compare.py</code></li></ul>` },
                   'sim-weight-optimize-sweep': { icon: '🏆', title: '/weight_optimize/sweep', subtitle: '조합 grid + 제약 필터',
                     body: `<h4>역할</h4><ul><li>변수 3개 × 5 step = 125 조합을 한 번에 평가</li><li>각 조합마다 split_count + 제약 적용</li><li>위반 조합 자동 라벨 + best 단중 cell 🏆 강조</li></ul><h4>코드 위치</h4><ul><li><code>backend/section3/api/simulation_router.py</code></li></ul>` },
                   'sim-q3interactivecard': { icon: '🎚️', title: 'Q3InteractiveCard', subtitle: 'React 4단계 + 병렬 호출',
@@ -9484,8 +9484,8 @@
                     body: `<div class="why-box"><strong>왜 2가지로?</strong> 내부 7가지를 그대로 노출하면 현업이 못 읽습니다. 사용자 표시는 <strong>온톨로지 % vs AI %</strong> 2값으로 단순화.</div><h4>역할</h4><ul><li>field 별 evidence 가중 평균</li><li>"높음·중간·보통·낮음" 4단계 chip</li><li>hover 시 raw 데이터 펼침</li></ul><h4>코드 위치</h4><ul><li><code>backend/section3/agents/simulation/evidence.py</code></li></ul>` },
                   'sim-arch-pydantic-ai': { icon: '🤖', title: 'pydantic-ai', subtitle: 'SimulationAgent + ReAct tool',
                     body: `<div class="why-box"><strong>왜 pydantic-ai?</strong> 타입 안전한 LLM 출력 + 자동 retry + tool calling 표준화.</div><h4>코드 위치</h4><ul><li><code>backend/section3/agents/simulation/</code> — agent + tool catalog</li></ul>` },
-                  'sim-arch-sim-v2': { icon: '🌳', title: 'sim_v2 (tree-sitter Java)', subtitle: 'Java → Python 실시간 변환',
-                    body: `<h4>역할</h4><ul><li>tree-sitter 로 Java AST 완전 파싱</li><li>idiom rewriter 로 BigDecimal·Stream·Optional 표준 변환</li><li>AnchorBinding 식별 메서드만 변환 — 전체 변환 불필요</li></ul><h4>코드 위치</h4><ul><li><code>backend/sim_v2/core/translate/</code> · <code>impact_compare.py</code></li></ul>` },
+                  'sim-arch-sim-v2': { icon: '🌳', title: '시뮬레이션 (tree-sitter Java)', subtitle: 'Java → Python 실시간 변환',
+                    body: `<h4>역할</h4><ul><li>tree-sitter 로 Java AST 완전 파싱</li><li>idiom rewriter 로 BigDecimal·Stream·Optional 표준 변환</li><li>AnchorBinding 식별 메서드만 변환 — 전체 변환 불필요</li></ul><h4>코드 위치</h4><ul><li><code>backend/simulation/core/translate/</code> · <code>impact_compare.py</code></li></ul>` },
                   'sim-arch-fastapi-sse': { icon: '⚡', title: 'FastAPI + SSE', subtitle: '/sim/agent/stream · 11 이벤트',
                     body: `<h4>11 SSE 이벤트</h4><ul><li><code>intent · timeline · ontology · clarify_form</code></li><li><code>sim_result · approval_request · evidence</code></li><li><code>walkthrough · llm_analysis · export_ready · done</code></li></ul><p>EventSource API 가 자동 재연결, 첫 토큰까지 지연 짧음.</p><h4>코드 위치</h4><ul><li><code>backend/section3/api/simulation_router.py</code></li></ul>` },
                   'sim-arch-httpx': { icon: '🌐', title: 'httpx + openpyxl', subtitle: 'OntologyClient + Excel 한·영 라벨',
@@ -10039,7 +10039,7 @@
           <div style="flex:1;background:white;padding:1rem 1.2rem;border-radius:0 0 16px 0;">
             <!-- <iframe class="youtube-iframe" src="https://www.youtube.com/embed/VIDEO_ID" title="온통 Agent 소개 영상" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe> -->
             <div class="youtube-slot">
-              <iframe class="youtube-iframe" src="https://www.youtube.com/embed/huOLddRE0uk" title="온통 Agent 소개 영상" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+              <iframe class="youtube-iframe" src="https://www.youtube.com/embed/huOLddRE0uk?si=M8BYGnKgsULJow3J" title="온통 Agent 소개 영상" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
             </div>
           </div>
         </div>
